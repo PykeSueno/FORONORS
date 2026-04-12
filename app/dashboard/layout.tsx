@@ -12,10 +12,11 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const supabase = getSupabaseAdmin();
   const { data: currentUser } = await supabase.from('users').select('name, role').eq('id', session.userId).maybeSingle();
 
-  const [canAccessDashboard, canAccessMembers, canAccessMoney] = await Promise.all([
+  const [canAccessDashboard, canAccessMembers, canAccessMoney, canAccessItems] = await Promise.all([
     hasUserPermission(session.userId, 'dashboard.access'),
     hasUserPermission(session.userId, 'members.access'),
-    hasUserPermission(session.userId, 'money.access')
+    hasUserPermission(session.userId, 'money.access'),
+    hasUserPermission(session.userId, 'items.access')
   ]);
 
   return (
@@ -31,6 +32,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               {canAccessDashboard ? <Link href="/dashboard" className="topbar-link">Dashboard</Link> : null}
               {canAccessMembers ? <Link href="/dashboard/membres" className="topbar-link">Membres</Link> : null}
               {canAccessMoney ? <Link href="/dashboard/argent" className="topbar-link">Argent</Link> : null}
+              {canAccessItems ? <Link href="/dashboard/items" className="topbar-link">Items</Link> : null}
             </nav>
           </div>
 

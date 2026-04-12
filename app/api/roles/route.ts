@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
@@ -53,14 +54,24 @@ export async function POST(request: Request) {
   }
 
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from('roles').insert({
+  const payload = {
     name: body.name.trim(),
     display_order: body.display_order ?? 100
-  });
+  };
+  const { data, error } = await supabase.from('roles').insert(payload).select('id, name').maybeSingle();
 
   if (error) {
     return NextResponse.json({ message: 'Création du rôle impossible.' }, { status: 400 });
   }
+
+  await createAuditLog({
+    actorUserId: session.userId,
+    action: 'roles.create',
+    entityType: 'role',
+    entityId: data?.id,
+    summary: `Création du rôle ${data?.name ?? payload.name}`,
+    newValues: payload
+  });
 
   return NextResponse.json({ ok: true });
 }

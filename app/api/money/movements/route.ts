@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
@@ -34,6 +35,15 @@ export async function POST(request: Request) {
       user_id: session.userId
     })
   ]);
+
+  await createAuditLog({
+    actorUserId: session.userId,
+    action: 'money.movement.create',
+    entityType: 'cash_movement',
+    summary: `Mouvement ${normalizedType} de ${amount} (${body.label.trim()})`,
+    oldValues: { balance: Number(cash.balance) },
+    newValues: { balance: nextBalance, type: normalizedType, amount, label: body.label.trim() }
+  });
 
   return NextResponse.json({ ok: true });
 }

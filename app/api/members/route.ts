@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession, hashPassword } from '@/lib/auth';
+import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
@@ -68,16 +69,27 @@ export async function POST(request: Request) {
     roleName = role?.name ?? '';
   }
 
-  const { error } = await supabase.from('users').insert({
+  const payload = {
     username: body.username.trim(),
     name: body.name.trim(),
     password_hash: passwordHash,
     role_id: body.role_id ?? null,
     role: roleName,
     is_active: body.is_active ?? true
-  });
+  };
+
+  const { data: createdUser, error } = await supabase.from('users').insert(payload).select('id, username, name').maybeSingle();
 
   if (error) return NextResponse.json({ message: 'Création impossible.' }, { status: 400 });
+
+  await createAuditLog({
+    actorUserId: session.userId,
+    action: 'members.create',
+    entityType: 'member',
+    entityId: createdUser?.id,
+    summary: `Création du membre ${createdUser?.name ?? payload.name} (@${createdUser?.username ?? payload.username})`,
+    newValues: { ...payload, password_hash: '[hidden]' }
+  });
 
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession, hashPassword } from '@/lib/auth';
+import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
@@ -20,6 +21,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   };
 
   const supabase = getSupabaseAdmin();
+  const { data: before } = await supabase.from('users').select('id, name, username, role_id, role, is_active').eq('id', id).maybeSingle();
 
   let roleName = '';
   if (body.role_id) {
@@ -43,6 +45,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (error) return NextResponse.json({ message: 'Mise à jour impossible.' }, { status: 400 });
 
+  await createAuditLog({
+    actorUserId: session.userId,
+    action: 'members.edit',
+    entityType: 'member',
+    entityId: id,
+    summary: `Modification du membre ${before?.name ?? before?.username ?? id}`,
+    oldValues: before ?? null,
+    newValues: { ...payload, ...(body.password ? { password_hash: '[updated]' } : {}) }
+  });
+
   return NextResponse.json({ ok: true });
 }
 
@@ -55,9 +67,19 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params;
   const supabase = getSupabaseAdmin();
+  const { data: before } = await supabase.from('users').select('id, name, username, role').eq('id', id).maybeSingle();
   const { error } = await supabase.from('users').delete().eq('id', id);
 
   if (error) return NextResponse.json({ message: 'Suppression impossible.' }, { status: 400 });
+
+  await createAuditLog({
+    actorUserId: session.userId,
+    action: 'members.delete',
+    entityType: 'member',
+    entityId: id,
+    summary: `Suppression du membre ${before?.name ?? before?.username ?? id}`,
+    oldValues: before ?? null
+  });
 
   return NextResponse.json({ ok: true });
 }

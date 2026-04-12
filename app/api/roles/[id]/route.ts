@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
@@ -18,8 +19,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if ('error' in access) return access.error;
 
   const { id } = await params;
+  const roleId = Number(id);
   const body = (await request.json()) as { permission_ids?: number[]; name?: string; display_order?: number };
   const supabase = getSupabaseAdmin();
+
+  const { data: before } = await supabase
+    .from('roles')
+    .select('id, name, display_order, role_permissions(permission_id)')
+    .eq('id', roleId)
+    .maybeSingle();
 
   if (body.name !== undefined || body.display_order !== undefined) {
     const { error: updateRoleError } = await supabase
@@ -28,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         ...(body.name !== undefined ? { name: body.name.trim() } : {}),
         ...(body.display_order !== undefined ? { display_order: body.display_order } : {})
       })
-      .eq('id', Number(id));
+      .eq('id', roleId);
 
     if (updateRoleError) {
       return NextResponse.json({ message: 'Mise à jour du rôle impossible.' }, { status: 400 });
@@ -38,12 +46,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.permission_ids) {
     const permissionIds = Array.from(new Set(body.permission_ids));
 
-    const { error: deleteError } = await supabase.from('role_permissions').delete().eq('role_id', Number(id));
+    const { error: deleteError } = await supabase.from('role_permissions').delete().eq('role_id', roleId);
     if (deleteError) return NextResponse.json({ message: 'Mise à jour impossible.' }, { status: 400 });
 
     if (permissionIds.length > 0) {
       const { error: insertError } = await supabase.from('role_permissions').insert(
-        permissionIds.map((permissionId) => ({ role_id: Number(id), permission_id: permissionId }))
+        permissionIds.map((permissionId) => ({ role_id: roleId, permission_id: permissionId }))
       );
 
       if (insertError) {
@@ -51,6 +59,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
   }
+
+  await createAuditLog({
+    actorUserId: access.session.userId,
+    action: 'roles.edit',
+    entityType: 'role',
+    entityId: roleId,
+    summary: `Modification du rôle ${body.name ?? (before as { name?: string } | null)?.name ?? roleId}`,
+    oldValues: before as Record<string, unknown> | null,
+    newValues: body as Record<string, unknown>
+  });
 
   return NextResponse.json({ ok: true });
 }
@@ -63,12 +81,23 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const roleId = Number(id);
   const supabase = getSupabaseAdmin();
 
+  const { data: before } = await supabase.from('roles').select('id, name, display_order').eq('id', roleId).maybeSingle();
+
   await supabase.from('users').update({ role_id: null, role: '' }).eq('role_id', roleId);
   const { error } = await supabase.from('roles').delete().eq('id', roleId);
 
   if (error) {
     return NextResponse.json({ message: 'Suppression du rôle impossible.' }, { status: 400 });
   }
+
+  await createAuditLog({
+    actorUserId: access.session.userId,
+    action: 'roles.delete',
+    entityType: 'role',
+    entityId: roleId,
+    summary: `Suppression du rôle ${before?.name ?? roleId}`,
+    oldValues: before as Record<string, unknown> | null
+  });
 
   return NextResponse.json({ ok: true });
 }

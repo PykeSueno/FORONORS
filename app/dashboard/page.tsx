@@ -11,14 +11,16 @@ export default async function DashboardPage() {
   const session = await getSession();
   const permissions = session ? await getUserPermissions(session.userId) : [];
   const canAccessMoney = permissions.includes('money.access');
+  const canAccessItems = permissions.includes('items.access');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: cash }, { data: latestMovement }, { count: membersCount }] = await Promise.all([
+  const [{ data: cash }, { data: latestMovement }, { count: membersCount }, { count: itemsCount }] = await Promise.all([
     canAccessMoney ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canAccessMoney
       ? supabase.from('cash_movements').select('type, amount, label').order('created_at', { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
-    supabase.from('users').select('id', { count: 'exact', head: true })
+    supabase.from('users').select('id', { count: 'exact', head: true }),
+    canAccessItems ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null })
   ]);
 
   return (
@@ -37,7 +39,11 @@ export default async function DashboardPage() {
             />
           </Link>
         ) : null}
-        <MetricCard label="Stock total" value="2 984" trend="+189 unités" />
+        {canAccessItems ? (
+          <Link href="/dashboard/items" className="block">
+            <MetricCard label="Catalogue Items" value={String(itemsCount ?? 0)} trend="Items enregistrés" />
+          </Link>
+        ) : null}
         <MetricCard label="Nombre de membres" value={String(membersCount ?? 0)} trend="Membres enregistrés" />
       </section>
 

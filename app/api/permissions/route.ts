@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
@@ -35,11 +36,21 @@ export async function POST(request: Request) {
   }
 
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from('permissions').insert({ name: normalizedName.toLowerCase() });
+  const permissionName = normalizedName.toLowerCase();
+  const { data, error } = await supabase.from('permissions').insert({ name: permissionName }).select('id, name').maybeSingle();
 
   if (error) {
     return NextResponse.json({ message: 'Création de permission impossible.' }, { status: 400 });
   }
+
+  await createAuditLog({
+    actorUserId: session.userId,
+    action: 'permissions.create',
+    entityType: 'permission',
+    entityId: data?.id,
+    summary: `Création permission ${data?.name ?? permissionName}`,
+    newValues: { name: permissionName }
+  });
 
   return NextResponse.json({ ok: true });
 }
