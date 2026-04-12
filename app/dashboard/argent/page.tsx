@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { MoneyPageClient } from '@/components/dashboard/money-page-client';
 
 export default async function MoneyPage() {
@@ -18,10 +19,13 @@ export default async function MoneyPage() {
   ]);
 
   return (
-    <MoneyPageClient
+    <>
+      <InternalPageHeader title="Argent" subtitle="Suivi de la caisse du groupe" />
+      <MoneyPageClient
       canEdit={permissions.includes('money.edit')}
       initialBalance={Number(cash?.balance ?? 0)}
       initialMovements={movements ?? []}
     />
+    </>
   );
 }

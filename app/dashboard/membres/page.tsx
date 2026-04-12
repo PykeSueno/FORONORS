@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { MembersPageClient } from '@/components/members/members-page-client';
 
 type MemberRow = {
@@ -57,11 +58,14 @@ export default async function MembersPage() {
   }));
 
   return (
-    <MembersPageClient
+    <>
+      <InternalPageHeader title="Membres" subtitle="Gestion des membres, rôles et permissions" />
+      <MembersPageClient
       initialMembers={initialMembers}
       initialRoles={initialRoles}
       initialPermissions={permsResult.data ?? []}
       userPermissions={userPermissions}
     />
+    </>
   );
 }

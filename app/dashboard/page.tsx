@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { MetricCard } from '@/components/dashboard/metric-card';
 import { formatUsd } from '@/lib/currency';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
@@ -8,49 +7,47 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 export default async function DashboardPage() {
   const session = await getSession();
   const permissions = session ? await getUserPermissions(session.userId) : [];
-  const canAccessMoney = permissions.includes('money.access');
-  const canAccessItems = permissions.includes('items.access');
-  const canAccessTransactions = permissions.includes('transactions.access') && permissions.includes('transactions.view');
+
+  const canMoney = permissions.includes('money.access');
+  const canItems = permissions.includes('items.access');
+  const canTransactions = permissions.includes('transactions.access') && permissions.includes('transactions.view');
+  const canTransactionsRecent = canTransactions && permissions.includes('transactions.recent.access');
+  const canMembers = permissions.includes('members.access');
+  const canLogs = permissions.includes('logs.access') && permissions.includes('logs.view');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: cash }, { data: latestMovement }, { count: itemsCount }, { count: txCount }, { data: recentCash }, { data: recentStock }] = await Promise.all([
-    canAccessMoney ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
-    canAccessMoney
-      ? supabase.from('cash_movements').select('type, amount, label').order('created_at', { ascending: false }).limit(1).maybeSingle()
-      : Promise.resolve({ data: null }),
-    canAccessItems ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
-    canAccessTransactions ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
-    canAccessMoney ? supabase.from('cash_movements').select('type, amount, label, created_at').order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
-    canAccessItems ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at').order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: [] })
+  const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }] = await Promise.all([
+    session ? supabase.from('users').select('name, role').eq('id', session.userId).maybeSingle() : Promise.resolve({ data: null }),
+    canMoney ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
+    canItems ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canTransactions ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canMembers ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canLogs ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canMoney ? supabase.from('cash_movements').select('type, amount, label, created_at').order('created_at', { ascending: false }).limit(4) : Promise.resolve({ data: [] }),
+    canItems ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at').order('created_at', { ascending: false }).limit(4) : Promise.resolve({ data: [] })
   ]);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <section className="glass-card p-6">
-        <h1 className="text-3xl font-semibold text-[#f6e5cd]">Dashboard FORONORS</h1>
-        <p className="mt-2 text-sm text-[#f1d2ae]">Résumé utile des modules actifs.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-semibold text-[#f6e5cd]">Bienvenue {user?.name || session?.username}</h1>
+            <p className="mt-1 text-sm text-[#f1d2ae]">Grade: {user?.role || session?.role || 'Utilisateur'}</p>
+          </div>
+          <form action="/api/logout" method="post">
+            <button aria-label="Se déconnecter" className="icon-logout-btn">Déconnexion</button>
+          </form>
+        </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        {canAccessMoney ? (
-          <Link href="/dashboard/argent" className="block">
-            <MetricCard
-              label="💰 Argent total"
-              value={formatUsd(Number(cash?.balance ?? 0))}
-              trend={latestMovement ? `${latestMovement.type} · ${formatUsd(Number(latestMovement.amount))} · ${latestMovement.label}` : 'Aucune activité'}
-            />
-          </Link>
-        ) : null}
-        {canAccessItems ? (
-          <Link href="/dashboard/items" className="block">
-            <MetricCard label="📦 Catalogue Items" value={String(itemsCount ?? 0)} trend="Items enregistrés" />
-          </Link>
-        ) : null}
-        {canAccessTransactions ? (
-          <Link href="/dashboard/transactions" className="block">
-            <MetricCard label="🔄 Transactions" value={String(txCount ?? 0)} trend="Transactions enregistrées" />
-          </Link>
-        ) : null}
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {canMoney ? <HubCard href="/dashboard/argent" icon="💰" title="Argent" value={formatUsd(Number(cash?.balance ?? 0))} subtitle="Caisse actuelle" /> : null}
+        {canItems ? <HubCard href="/dashboard/items" icon="📦" title="Items" value={String(itemsCount ?? 0)} subtitle="Catalogue" /> : null}
+        {canTransactions ? <HubCard href="/dashboard/transactions" icon="🔄" title="Transactions" value={String(txCount ?? 0)} subtitle="Créer et gérer" /> : null}
+        {canTransactionsRecent ? <HubCard href="/dashboard/transactions-recentes" icon="🕒" title="Transactions récentes" value={String(txCount ?? 0)} subtitle="Historique" /> : null}
+        {canMembers ? <HubCard href="/dashboard/membres" icon="👥" title="Membres" value={String(membersCount ?? 0)} subtitle="Gestion équipe" /> : null}
+        {canLogs ? <HubCard href="/dashboard/logs" icon="🧾" title="Logs" value={String(logsCount ?? 0)} subtitle="Traçabilité" /> : null}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
@@ -91,5 +88,18 @@ export default async function DashboardPage() {
         </article>
       </section>
     </div>
+  );
+}
+
+function HubCard({ href, icon, title, value, subtitle }: { href: string; icon: string; title: string; value: string; subtitle: string }) {
+  return (
+    <Link href={href} className="glass-card smooth-hover block p-6">
+      <div className="flex items-center justify-between">
+        <p className="text-3xl">{icon}</p>
+        <p className="text-2xl font-semibold text-[#ffe9cd]">{value}</p>
+      </div>
+      <p className="mt-3 text-lg font-semibold text-[#fff2de]">{title}</p>
+      <p className="text-sm text-[#f1d1ac]">{subtitle}</p>
+    </Link>
   );
 }

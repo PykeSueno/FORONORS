@@ -295,5 +295,6 @@ values
   ('transactions.create'),
   ('transactions.edit'),
   ('transactions.view'),
-  ('transactions.manage')
+  ('transactions.manage'),
+  ('transactions.recent.access')
 on conflict (name) do nothing;

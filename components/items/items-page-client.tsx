@@ -140,33 +140,36 @@ export function ItemsPageClient({
 
       {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <section className="space-y-2">
         {filteredItems.map((item) => (
-          <article key={item.id} className="glass-card overflow-hidden border-l-4 border-l-[#f1c792] p-4">
-            <div className="mb-3 h-36 rounded-xl border border-white/10 bg-[#2a1a12]/45">
-              {item.image_url ? (
-                <Image src={item.image_url} alt={item.name} width={480} height={240} className="h-full w-full rounded-xl object-cover" unoptimized />
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-[#f0d0ab]">🖼️ Aucune image</div>
-              )}
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-lg font-semibold text-[#fff1db]">{item.name}</p>
-              <span className="rounded-full bg-[#3f281b]/70 px-2 py-1 text-xs text-[#f8d9b8]">{item.category_label}</span>
-            </div>
-            <p className="text-sm text-[#f8d9b8]">{item.type_label ? `Type: ${item.type_label}` : 'Type: -'}</p>
-            <p className="mt-2 text-sm text-[#fce7ce]">Achat: {formatUsd(Number(item.buy_price))}</p>
-            <p className="text-sm text-[#fce7ce]">Vente: {formatUsd(Number(item.sell_price))}</p>
-            <p className="text-sm text-[#fce7ce]">Quantité: {item.quantity}</p>
-            {item.weapon_identifier ? <p className="text-sm text-[#fce7ce]">ID arme: {item.weapon_identifier}</p> : null}
-            {item.is_money_item ? <p className="text-sm text-[#c4f3b6]">💵 Item Argent lié au solde groupe</p> : null}
-
-            {(canEdit || canDelete) ? (
-              <div className="mt-3 flex gap-2">
-                {canEdit ? <button className="saas-ghost-btn" onClick={() => setEditing(item)}>Modifier</button> : null}
-                {canDelete ? <button className="saas-ghost-btn" onClick={() => void removeItem(item.id)}>Supprimer</button> : null}
+          <article key={item.id} className="glass-card border-l-4 border-l-[#f1c792] p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="h-16 w-16 overflow-hidden rounded-lg border border-white/10 bg-[#2a1a12]/45">
+                {item.image_url ? (
+                  <Image src={item.image_url} alt={item.name} width={96} height={96} className="h-full w-full object-cover" unoptimized />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🖼️</div>
+                )}
               </div>
-            ) : null}
+
+              <div className="min-w-[180px] flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-base font-semibold text-[#fff1db]">{item.name}</p>
+                  <span className="rounded-full bg-[#3f281b]/70 px-2 py-0.5 text-xs text-[#f8d9b8]">{item.category_label}</span>
+                  {item.type_label ? <span className="rounded-full bg-[#3f281b]/50 px-2 py-0.5 text-xs text-[#f8d9b8]">{item.type_label}</span> : null}
+                </div>
+                <p className="mt-1 text-xs text-[#fce7ce]">Achat {formatUsd(Number(item.buy_price))} · Vente {formatUsd(Number(item.sell_price))} · Stock {item.quantity}</p>
+                {item.weapon_identifier ? <p className="text-xs text-[#fce7ce]">ID arme: {item.weapon_identifier}</p> : null}
+                {item.is_money_item ? <p className="text-xs text-[#c4f3b6]">💵 Item Argent lié au solde groupe</p> : null}
+              </div>
+
+              {(canEdit || canDelete) ? (
+                <div className="flex gap-2">
+                  {canEdit ? <button className="saas-ghost-btn" onClick={() => setEditing(item)}>Modifier</button> : null}
+                  {canDelete ? <button className="saas-ghost-btn" onClick={() => void removeItem(item.id)}>Supprimer</button> : null}
+                </div>
+              ) : null}
+            </div>
           </article>
         ))}
       </section>

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { TransactionsPageClient } from '@/components/transactions/transactions-page-client';
 
 export default async function TransactionsPage() {
@@ -29,7 +30,9 @@ export default async function TransactionsPage() {
   const currentMember = members?.find((member) => member.id === session.userId);
 
   return (
-    <TransactionsPageClient
+    <>
+      <InternalPageHeader title="Transactions" subtitle="Créer et exécuter des transactions multi-items" />
+      <TransactionsPageClient
       canCreate={canCreate}
       items={items ?? []}
       members={members ?? []}
@@ -37,5 +40,6 @@ export default async function TransactionsPage() {
       defaultMemberLabel={currentMember?.name || currentMember?.username || 'Groupe'}
       defaultMemberId={session.userId}
     />
+    </>
   );
 }

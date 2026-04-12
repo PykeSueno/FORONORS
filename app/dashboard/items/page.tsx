@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { ItemsPageClient } from '@/components/items/items-page-client';
 import { ITEM_CATEGORIES } from '@/lib/items';
 
@@ -19,12 +20,15 @@ export default async function ItemsPage() {
     .order('name', { ascending: true });
 
   return (
-    <ItemsPageClient
+    <>
+      <InternalPageHeader title="Items" subtitle="Catalogue interne et gestion des stocks" />
+      <ItemsPageClient
       initialItems={items ?? []}
       categories={ITEM_CATEGORIES}
       canCreate={userPermissions.includes('items.create')}
       canEdit={userPermissions.includes('items.edit')}
       canDelete={userPermissions.includes('items.delete')}
     />
+    </>
   );
 }

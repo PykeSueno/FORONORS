@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { LogsPageClient } from '@/components/logs/logs-page-client';
 
 export default async function LogsPage() {
@@ -26,10 +27,13 @@ export default async function LogsPage() {
   ]);
 
   return (
-    <LogsPageClient
+    <>
+      <InternalPageHeader title="Logs" subtitle="Historique détaillé des actions" />
+      <LogsPageClient
       initialLogs={logs ?? []}
       initialWebhookUrl={webhook?.value ?? ''}
       canManageWebhook={canManageWebhook}
     />
+    </>
   );
 }
