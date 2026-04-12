@@ -382,9 +382,9 @@ function NumberField({ label, value, onChange, onMinus, onPlus }: { label: strin
     <div>
       <label className="mb-1 block text-xs text-[#efccaa]">{label}</label>
       <div className="flex items-center gap-2">
-        <button type="button" className="saas-ghost-btn" onClick={onMinus}>-1</button>
+        <button type="button" className="saas-ghost-btn" onClick={onMinus}>-</button>
         <input className="saas-input w-full" value={value} onChange={(e) => onChange(e.target.value)} required />
-        <button type="button" className="saas-ghost-btn" onClick={onPlus}>+1</button>
+        <button type="button" className="saas-ghost-btn" onClick={onPlus}>+</button>
       </div>
     </div>
   );

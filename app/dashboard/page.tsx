@@ -55,22 +55,36 @@ export default async function DashboardPage() {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="glass-card p-6">
-          <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2>
-          <div className="mt-3 space-y-2 text-sm text-[#f2d2ae]">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2>
+            <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">💰 Cash</span>
+          </div>
+          <div className="space-y-2">
             {(recentCash ?? []).map((row, idx) => (
               <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
-                {row.type} · {formatUsd(Number(row.amount))} · {row.label} · {new Date(row.created_at).toLocaleString('fr-FR')}
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-[#ffe8c9]">{row.label}</p>
+                  <p className={`text-sm font-semibold ${Number(row.amount) >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{formatUsd(Number(row.amount))}</p>
+                </div>
+                <p className="mt-1 text-xs text-[#f2d2ae]">{row.type} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
               </div>
             ))}
           </div>
         </article>
 
         <article className="glass-card p-6">
-          <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2>
-          <div className="mt-3 space-y-2 text-sm text-[#f2d2ae]">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2>
+            <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">📦 Stock</span>
+          </div>
+          <div className="space-y-2">
             {(recentStock ?? []).map((row, idx) => (
               <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
-                {row.item_name} · {row.quantity_delta > 0 ? '+' : ''}{row.quantity_delta} · {row.transaction_type} · {new Date(row.created_at).toLocaleString('fr-FR')}
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-[#ffe8c9]">{row.item_name}</p>
+                  <p className={`text-sm font-semibold ${row.quantity_delta >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{row.quantity_delta > 0 ? '+' : ''}{row.quantity_delta}</p>
+                </div>
+                <p className="mt-1 text-xs text-[#f2d2ae]">{row.transaction_type} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
               </div>
             ))}
           </div>
