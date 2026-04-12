@@ -4,6 +4,22 @@ import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { MembersPageClient } from '@/components/members/members-page-client';
 
+type MemberRow = {
+  id: string;
+  name: string;
+  username: string;
+  role_id: number | null;
+  is_active: boolean;
+  roles: { name: string } | { name: string }[] | null;
+};
+
+type RoleRow = {
+  id: number;
+  name: string;
+  display_order: number;
+  role_permissions: Array<{ permission_id: number }>;
+};
+
 export default async function MembersPage() {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -24,7 +40,7 @@ export default async function MembersPage() {
       : Promise.resolve({ data: [] as { id: number; name: string }[] })
   ]);
 
-  const initialMembers = (members ?? []).map((member) => ({
+  const initialMembers = ((members ?? []) as MemberRow[]).map((member) => ({
     id: member.id,
     name: member.name,
     username: member.username,
@@ -33,7 +49,7 @@ export default async function MembersPage() {
     is_active: member.is_active
   }));
 
-  const initialRoles = (roles ?? []).map((role) => ({
+  const initialRoles = ((roles ?? []) as RoleRow[]).map((role) => ({
     id: role.id,
     name: role.name,
     display_order: role.display_order,
