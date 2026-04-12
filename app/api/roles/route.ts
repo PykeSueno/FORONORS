@@ -2,10 +2,17 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+type PermissionRow = { id: number; name: string };
+
+type RolePermissionRow = {
+  permission_id: number;
+  permissions: PermissionRow | PermissionRow[] | null;
+};
+
 type RoleRow = {
   id: number;
   name: string;
-  role_permissions: Array<{ permission_id: number; permissions: { id: number; name: string } | null }>;
+  role_permissions: RolePermissionRow[];
 };
 
 export async function GET() {
@@ -22,14 +29,18 @@ export async function GET() {
     return NextResponse.json({ message: 'Erreur de lecture des rôles.' }, { status: 500 });
   }
 
-  const roles = ((data ?? []) as RoleRow[]).map((role) => ({
-    id: role.id,
-    name: role.name,
-    permission_ids: role.role_permissions.map((rp) => rp.permission_id),
-    permissions: role.role_permissions
-      .map((rp) => rp.permissions)
-      .filter((permission): permission is { id: number; name: string } => Boolean(permission))
-  }));
+  const roles = ((data ?? []) as RoleRow[]).map((role) => {
+    const resolvedPermissions = role.role_permissions
+      .map((rp) => (Array.isArray(rp.permissions) ? rp.permissions[0] : rp.permissions))
+      .filter((permission): permission is PermissionRow => Boolean(permission));
+
+    return {
+      id: role.id,
+      name: role.name,
+      permission_ids: role.role_permissions.map((rp) => rp.permission_id),
+      permissions: resolvedPermissions
+    };
+  });
 
   return NextResponse.json({ roles });
 }
