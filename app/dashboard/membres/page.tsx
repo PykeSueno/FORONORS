@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { getUserPermissions, hasUserPermission } from '@/lib/permissions';
+import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { MembersPageClient } from '@/components/members/members-page-client';
 
@@ -19,7 +19,7 @@ export default async function MembersPage() {
       .from('roles')
       .select('id, name, display_order, role_permissions(permission_id)')
       .order('display_order', { ascending: true }),
-    hasUserPermission(session.userId, 'roles.manage')
+    userPermissions.includes('roles.manage')
       ? supabase.from('permissions').select('id, name').order('name', { ascending: true })
       : Promise.resolve({ data: [] as { id: number; name: string }[] })
   ]);
