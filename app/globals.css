@@ -8,11 +8,34 @@
 
 body {
   @apply antialiased;
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
   background:
-    radial-gradient(circle at top left, rgba(223, 191, 155, 0.45), transparent 38%),
-    radial-gradient(circle at bottom right, rgba(198, 154, 113, 0.28), transparent 40%),
-    linear-gradient(180deg, #9f744f 0%, #845b3d 38%, #6f4b33 100%);
+    radial-gradient(circle at top left, rgba(223, 191, 155, 0.42), transparent 38%),
+    radial-gradient(circle at bottom right, rgba(198, 154, 113, 0.25), transparent 40%),
+    linear-gradient(180deg, #8f6847 0%, #775136 38%, #5e3e2b 100%);
   color: #fff5e8;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: -6%;
+  background-image: url('/foronors-logo.svg');
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0.05;
+  filter: blur(20px);
+  transform: scale(1.08);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
 }
 
 input,
