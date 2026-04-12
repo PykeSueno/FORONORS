@@ -4,14 +4,17 @@ type PermissionRelation = { permissions: { name: string } | { name: string }[] |
 
 export async function getUserPermissions(userId: string) {
   const supabase = getSupabaseAdmin();
-  const { data: user } = await supabase.from('users').select('role_id').eq('id', userId).maybeSingle();
+  const { data: user } = await supabase.from('users').select('role_id, role').eq('id', userId).maybeSingle();
+
+  const isPatron = user?.role?.trim().toLowerCase() === 'patron';
+  if (isPatron) {
+    const { data: allPermissions } = await supabase.from('permissions').select('name');
+    return Array.from(new Set((allPermissions ?? []).map((item) => item.name)));
+  }
 
   if (!user?.role_id) return [] as string[];
 
-  const { data } = await supabase
-    .from('role_permissions')
-    .select('permissions(name)')
-    .eq('role_id', user.role_id);
+  const { data } = await supabase.from('role_permissions').select('permissions(name)').eq('role_id', user.role_id);
 
   const permissions = ((data ?? []) as PermissionRelation[])
     .map((item) => (Array.isArray(item.permissions) ? item.permissions[0]?.name : item.permissions?.name))

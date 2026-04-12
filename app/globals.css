@@ -11,7 +11,7 @@ body {
   background:
     radial-gradient(circle at top left, rgba(223, 191, 155, 0.45), transparent 38%),
     radial-gradient(circle at bottom right, rgba(198, 154, 113, 0.28), transparent 40%),
-    linear-gradient(180deg, #caa378 0%, #b48357 35%, #9c6f49 100%);
+    linear-gradient(180deg, #9f744f 0%, #845b3d 38%, #6f4b33 100%);
   color: #fff5e8;
 }
 
@@ -129,4 +129,40 @@ button {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+
+.brand-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  color: #452a1b;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 236, 208, 0.45);
+}
+
+.user-compact {
+  border-radius: 14px;
+  border: 1px solid rgba(123, 89, 61, 0.45);
+  background: rgba(255, 237, 212, 0.48);
+  padding: 0.45rem 0.7rem;
+  line-height: 1.15;
+}
+
+.icon-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(114, 79, 53, 0.45);
+  background: rgba(255, 236, 210, 0.55);
+  color: #5d3f29;
+  transition: all 0.2s ease;
+}
+
+.icon-logout-btn:hover {
+  background: rgba(255, 228, 191, 0.75);
+  box-shadow: 0 0 14px rgba(160, 103, 58, 0.35);
 }

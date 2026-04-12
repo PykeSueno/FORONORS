@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ReactNode } from 'react';
@@ -17,12 +16,11 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-[#7e5f44]/40 bg-[#c19b75]/72 backdrop-blur-lg">
+      <header className="sticky top-0 z-30 border-b border-[#6f513a]/45 bg-[#b0865f]/78 backdrop-blur-lg">
         <div className="mx-auto flex h-20 w-full max-w-[1200px] items-center justify-between px-4">
           <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="flex items-center gap-3">
-              <Image src="/logo.png" alt="Foronors" width={40} height={40} className="h-10 w-10 object-contain" priority />
-              <span className="text-sm font-semibold tracking-[0.18em] text-[#4b301f]">FORONORS</span>
+            <Link href="/dashboard" className="brand-title">
+              FORONORS
             </Link>
 
             <nav className="hidden items-center gap-2 sm:flex">
@@ -39,13 +37,19 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             </nav>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl border border-[#946f4f]/40 bg-[#f2e4d1]/55 px-3 py-2 text-right">
-              <p className="text-xs font-medium text-[#6b4a33]">{session.username}</p>
-              <p className="text-[11px] text-[#8a6548]">{session.role || 'Utilisateur'}</p>
+          <div className="flex items-center gap-2">
+            <div className="user-compact">
+              <p className="text-xs font-semibold text-[#5a3d2a]">{session.username}</p>
+              <p className="text-[11px] text-[#805a3f]">{session.role || 'Utilisateur'}</p>
             </div>
             <form action="/api/logout" method="post">
-              <button className="saas-ghost-btn">Logout</button>
+              <button aria-label="Se déconnecter" className="icon-logout-btn">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+                  <path d="M14 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                  <path d="M10 17l5-5-5-5" />
+                  <path d="M15 12H3" />
+                </svg>
+              </button>
             </form>
           </div>
         </div>
