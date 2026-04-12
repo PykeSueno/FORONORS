@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, hashPassword } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { hasUserPermission } from '@/lib/permissions';
 
 type MemberRow = {
   id: string;
@@ -15,6 +16,8 @@ type MemberRow = {
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+  const canAccess = await hasUserPermission(session.userId, 'members.access');
+  if (!canAccess) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -44,6 +47,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+  const canCreate = await hasUserPermission(session.userId, 'members.create');
+  if (!canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as {
     username?: string;

@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+
+  const canManageRoles = await hasUserPermission(session.userId, 'roles.manage');
+  if (!canManageRoles) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.from('permissions').select('id, name').order('name', { ascending: true });
@@ -20,10 +24,11 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const body = (await request.json()) as { name?: string; module?: string; action?: string };
+  const canManageRoles = await hasUserPermission(session.userId, 'roles.manage');
+  if (!canManageRoles) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
-  const normalizedName = body.name?.trim() ||
-    (body.module && body.action ? `${body.module.trim()}.${body.action.trim()}` : '');
+  const body = (await request.json()) as { name?: string; module?: string; action?: string };
+  const normalizedName = body.name?.trim() || (body.module && body.action ? `${body.module.trim()}.${body.action.trim()}` : '');
 
   if (!normalizedName) {
     return NextResponse.json({ message: 'Nom de permission requis.' }, { status: 400 });

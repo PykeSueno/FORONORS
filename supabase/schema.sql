@@ -62,3 +62,13 @@ on public.users
 for all
 using (true)
 with check (true);
+
+
+insert into public.permissions (name)
+values
+  ('members.access'),
+  ('members.create'),
+  ('members.edit'),
+  ('roles.manage'),
+  ('dashboard.access')
+on conflict (name) do nothing;

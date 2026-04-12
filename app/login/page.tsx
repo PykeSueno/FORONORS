@@ -2,7 +2,6 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Logo } from '@/components/logo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,7 +35,8 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="glass-card w-full max-w-md p-8 animate-fade-in">
-        <Logo />
+        <h1 className="mb-6 text-center text-2xl font-semibold tracking-wide text-[#fff1dc]">FORONORS</h1>
+
         <form onSubmit={onSubmit} className="space-y-4">
           <input
             className="saas-input w-full"
@@ -54,7 +54,7 @@ export default function LoginPage() {
             required
           />
 
-          {error ? <p className="text-sm text-red-300">{error}</p> : null}
+          {error ? <p className="text-sm text-red-100">{error}</p> : null}
 
           <button type="submit" disabled={loading} className="saas-primary-btn w-full disabled:opacity-70">
             {loading ? 'Connexion...' : 'Se connecter'}
