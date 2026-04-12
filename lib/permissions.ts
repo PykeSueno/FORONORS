@@ -6,8 +6,13 @@ export async function getUserPermissions(userId: string) {
   const supabase = getSupabaseAdmin();
   const { data: user } = await supabase.from('users').select('role_id, role').eq('id', userId).maybeSingle();
 
-  const isPatron = user?.role?.trim().toLowerCase() === 'patron';
-  if (isPatron) {
+  let roleName = user?.role?.trim().toLowerCase() ?? '';
+  if (!roleName && user?.role_id) {
+    const { data: role } = await supabase.from('roles').select('name').eq('id', user.role_id).maybeSingle();
+    roleName = role?.name?.trim().toLowerCase() ?? '';
+  }
+
+  if (roleName === 'patron') {
     const { data: allPermissions } = await supabase.from('permissions').select('name');
     return Array.from(new Set((allPermissions ?? []).map((item) => item.name)));
   }
