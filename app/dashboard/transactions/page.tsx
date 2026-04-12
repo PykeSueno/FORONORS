@@ -18,14 +18,9 @@ export default async function TransactionsPage() {
   if (!canAccess || !canView) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: items }, { data: members }, { data: transactions }] = await Promise.all([
+  const [{ data: items }, { data: members }] = await Promise.all([
     supabase.from('items').select('id, name, image_url, buy_price, sell_price, quantity, is_money_item, category_key, type_key').order('name', { ascending: true }),
-    supabase.from('users').select('id, name, username').order('username', { ascending: true }),
-    supabase
-      .from('transactions')
-      .select('id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type)')
-      .order('created_at', { ascending: false })
-      .limit(30)
+    supabase.from('users').select('id, name, username').order('username', { ascending: true })
   ]);
 
   const currentMember = members?.find((member) => member.id === session.userId);
@@ -38,7 +33,6 @@ export default async function TransactionsPage() {
       canCreate={canCreate}
       items={items ?? []}
       members={members ?? []}
-      transactions={transactions ?? []}
       defaultMemberLabel={currentMember?.name || currentMember?.username || 'Groupe'}
       defaultMemberId={session.userId}
     />

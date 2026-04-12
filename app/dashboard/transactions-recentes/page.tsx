@@ -8,6 +8,22 @@ import { getUserPermissions } from '@/lib/permissions';
 import { humanStockMovementLabel } from '@/lib/labels';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+type RecentTransaction = {
+  id: number;
+  reason: string;
+  member_label: string;
+  total_money_in: number;
+  total_money_out: number;
+  profit_loss: number;
+  created_at: string;
+  transaction_lines: Array<{
+    item_name_snapshot: string;
+    quantity: number;
+    movement_type: string;
+    items: { image_url: string | null } | Array<{ image_url: string | null }> | null;
+  }>;
+};
+
 export default async function RecentTransactionsPage() {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -20,11 +36,12 @@ export default async function RecentTransactionsPage() {
   if (!canAccess || !canView || !canRecent) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
-  const { data: transactions } = await supabase
+  const { data } = await supabase
     .from('transactions')
     .select('id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, item_id, items(image_url))')
     .order('created_at', { ascending: false })
     .limit(200);
+  const transactions = (data ?? []) as RecentTransaction[];
 
   return (
     <div className="space-y-5">

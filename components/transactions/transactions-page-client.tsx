@@ -32,14 +32,12 @@ export function TransactionsPageClient({
   canCreate,
   items,
   members,
-  transactions,
   defaultMemberLabel,
   defaultMemberId
 }: {
   canCreate: boolean;
   items: Item[];
   members: Member[];
-  transactions: Array<{ id: number; reason: string; member_label: string; total_money_in: number; total_money_out: number; profit_loss: number; created_at: string; transaction_lines: Array<{ item_name_snapshot: string; quantity: number; movement_type: string }> }>;
   defaultMemberLabel: string;
   defaultMemberId: string;
 }) {
