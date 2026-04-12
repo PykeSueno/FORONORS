@@ -29,6 +29,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     type_key?: string | null;
     type_label?: string | null;
     weapon_identifier?: string | null;
+    is_money_item?: boolean;
   };
 
   const payload = {
@@ -42,6 +43,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     type_key: body.type_key ?? null,
     type_label: body.type_label ?? null,
     weapon_identifier: body.weapon_identifier?.trim() || null,
+    is_money_item: Boolean((body.is_money_item ?? before.is_money_item) && (body.category_key ?? before.category_key) === 'other'),
     updated_at: new Date().toISOString()
   };
 

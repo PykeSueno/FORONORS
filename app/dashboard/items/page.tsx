@@ -15,7 +15,7 @@ export default async function ItemsPage() {
   const supabase = getSupabaseAdmin();
   const { data: items } = await supabase
     .from('items')
-    .select('id, name, image_url, buy_price, sell_price, quantity, weapon_identifier, category_key, category_label, type_key, type_label, created_at, updated_at')
+    .select('id, name, image_url, buy_price, sell_price, quantity, weapon_identifier, is_money_item, category_key, category_label, type_key, type_label, created_at, updated_at')
     .order('name', { ascending: true });
 
   return (

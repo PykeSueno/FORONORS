@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const supabase = getSupabaseAdmin();
   let dbQuery = supabase
     .from('items')
-    .select('id, name, image_url, buy_price, sell_price, quantity, weapon_identifier, category_key, category_label, type_key, type_label, created_at, updated_at')
+    .select('id, name, image_url, buy_price, sell_price, quantity, weapon_identifier, is_money_item, category_key, category_label, type_key, type_label, created_at, updated_at')
     .order('name', { ascending: true });
 
   if (category) dbQuery = dbQuery.eq('category_key', category);
@@ -51,6 +51,7 @@ export async function POST(request: Request) {
     type_key?: string | null;
     type_label?: string | null;
     weapon_identifier?: string | null;
+    is_money_item?: boolean;
   };
 
   if (!body.name?.trim() || !body.category_key || !body.category_label) {
@@ -71,7 +72,8 @@ export async function POST(request: Request) {
     category_label: body.category_label,
     type_key: body.type_key ?? null,
     type_label: body.type_label ?? null,
-    weapon_identifier: body.weapon_identifier?.trim() || null
+    weapon_identifier: body.weapon_identifier?.trim() || null,
+    is_money_item: Boolean(body.is_money_item && body.category_key === 'other')
   };
 
   const supabase = getSupabaseAdmin();

@@ -215,3 +215,85 @@ on public.app_settings
 for all
 using (true)
 with check (true);
+
+alter table public.items add column if not exists is_money_item boolean not null default false;
+
+create table if not exists public.transactions (
+  id bigint generated always as identity primary key,
+  actor_user_id uuid references public.users(id) on delete set null,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null default 'Groupe',
+  reason text not null,
+  total_money_in numeric(12,2) not null default 0,
+  total_money_out numeric(12,2) not null default 0,
+  stock_in_count integer not null default 0,
+  stock_out_count integer not null default 0,
+  profit_loss numeric(12,2) not null default 0,
+  summary text not null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.transaction_lines (
+  id bigint generated always as identity primary key,
+  transaction_id bigint not null references public.transactions(id) on delete cascade,
+  item_id bigint references public.items(id) on delete set null,
+  item_name_snapshot text not null,
+  movement_type text not null,
+  quantity integer not null,
+  unit_price numeric(12,2) not null default 0,
+  total_amount numeric(12,2) not null default 0,
+  money_effect numeric(12,2) not null default 0,
+  stock_effect integer not null default 0,
+  metadata jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.item_stock_movements (
+  id bigint generated always as identity primary key,
+  item_id bigint references public.items(id) on delete set null,
+  transaction_id bigint references public.transactions(id) on delete set null,
+  item_name text not null,
+  transaction_type text not null,
+  quantity_delta integer not null,
+  user_id uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_transactions_created_at on public.transactions(created_at desc);
+create index if not exists idx_transaction_lines_transaction on public.transaction_lines(transaction_id);
+create index if not exists idx_item_stock_movements_created_at on public.item_stock_movements(created_at desc);
+
+alter table public.transactions enable row level security;
+alter table public.transaction_lines enable row level security;
+alter table public.item_stock_movements enable row level security;
+
+drop policy if exists "allow_service_role_all_transactions" on public.transactions;
+create policy "allow_service_role_all_transactions"
+on public.transactions
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_transaction_lines" on public.transaction_lines;
+create policy "allow_service_role_all_transaction_lines"
+on public.transaction_lines
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_item_stock_movements" on public.item_stock_movements;
+create policy "allow_service_role_all_item_stock_movements"
+on public.item_stock_movements
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('transactions.access'),
+  ('transactions.create'),
+  ('transactions.edit'),
+  ('transactions.view'),
+  ('transactions.manage')
+on conflict (name) do nothing;

@@ -1,45 +1,43 @@
 import Link from 'next/link';
 import { MetricCard } from '@/components/dashboard/metric-card';
+import { formatUsd } from '@/lib/currency';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
-
-const mockActivity = [52, 61, 48, 73, 58, 80, 67, 74, 62, 85, 72, 88];
-const maxValue = Math.max(...mockActivity);
 
 export default async function DashboardPage() {
   const session = await getSession();
   const permissions = session ? await getUserPermissions(session.userId) : [];
   const canAccessMoney = permissions.includes('money.access');
   const canAccessItems = permissions.includes('items.access');
-  const canAccessLogs = permissions.includes('logs.access') && permissions.includes('logs.view');
-  const canAccessMembers = permissions.includes('members.access');
+  const canAccessTransactions = permissions.includes('transactions.access') && permissions.includes('transactions.view');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: cash }, { data: latestMovement }, { count: membersCount }, { count: itemsCount }, { count: logsCount }] = await Promise.all([
+  const [{ data: cash }, { data: latestMovement }, { count: itemsCount }, { count: txCount }, { data: recentCash }, { data: recentStock }] = await Promise.all([
     canAccessMoney ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canAccessMoney
       ? supabase.from('cash_movements').select('type, amount, label').order('created_at', { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
-    canAccessMembers ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canAccessItems ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
-    canAccessLogs ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null })
+    canAccessTransactions ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canAccessMoney ? supabase.from('cash_movements').select('type, amount, label, created_at').order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
+    canAccessItems ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at').order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: [] })
   ]);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <section className="glass-card p-6">
         <h1 className="text-3xl font-semibold text-[#f6e5cd]">Dashboard FORONORS</h1>
-        <p className="mt-2 text-sm text-[#f1d2ae]">Pilotage rapide des modules avec repères visuels.</p>
+        <p className="mt-2 text-sm text-[#f1d2ae]">Résumé utile des modules actifs.</p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-3">
         {canAccessMoney ? (
           <Link href="/dashboard/argent" className="block">
             <MetricCard
               label="💰 Argent total"
-              value={Number(cash?.balance ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-              trend={latestMovement ? `${latestMovement.type} · ${Number(latestMovement.amount).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · ${latestMovement.label}` : 'Aucune activité'}
+              value={formatUsd(Number(cash?.balance ?? 0))}
+              trend={latestMovement ? `${latestMovement.type} · ${formatUsd(Number(latestMovement.amount))} · ${latestMovement.label}` : 'Aucune activité'}
             />
           </Link>
         ) : null}
@@ -48,31 +46,34 @@ export default async function DashboardPage() {
             <MetricCard label="📦 Catalogue Items" value={String(itemsCount ?? 0)} trend="Items enregistrés" />
           </Link>
         ) : null}
-        {canAccessLogs ? (
-          <Link href="/dashboard/logs" className="block">
-            <MetricCard label="🧾 Logs" value={String(logsCount ?? 0)} trend="Actions historisées" />
+        {canAccessTransactions ? (
+          <Link href="/dashboard/transactions" className="block">
+            <MetricCard label="🔄 Transactions" value={String(txCount ?? 0)} trend="Transactions enregistrées" />
           </Link>
         ) : null}
-        {canAccessMembers ? <MetricCard label="👥 Membres" value={String(membersCount ?? 0)} trend="Membres enregistrés" /> : null}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <article className="glass-card lg:col-span-2 p-6">
-          <h2 className="text-lg font-semibold text-[#f6e5cd]">Activité visuelle</h2>
-          <div className="mt-6 flex h-52 items-end gap-2">
-            {mockActivity.map((value, index) => (
-              <div key={index} className="flex-1 rounded-t-md bg-gradient-to-t from-[#8d6038] to-[#d4aa78]/90" style={{ height: `${(value / maxValue) * 100}%` }} />
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="glass-card p-6">
+          <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2>
+          <div className="mt-3 space-y-2 text-sm text-[#f2d2ae]">
+            {(recentCash ?? []).map((row, idx) => (
+              <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
+                {row.type} · {formatUsd(Number(row.amount))} · {row.label} · {new Date(row.created_at).toLocaleString('fr-FR')}
+              </div>
             ))}
           </div>
         </article>
 
         <article className="glass-card p-6">
-          <h2 className="text-lg font-semibold text-[#f6e5cd]">Repères rapides</h2>
-          <ul className="mt-4 space-y-3 text-sm text-[#dec5a8]">
-            <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">🔐 Permissions par module</li>
-            <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">🧾 Traçabilité via logs</li>
-            <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">📦 Gestion centralisée des items</li>
-          </ul>
+          <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2>
+          <div className="mt-3 space-y-2 text-sm text-[#f2d2ae]">
+            {(recentStock ?? []).map((row, idx) => (
+              <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
+                {row.item_name} · {row.quantity_delta > 0 ? '+' : ''}{row.quantity_delta} · {row.transaction_type} · {new Date(row.created_at).toLocaleString('fr-FR')}
+              </div>
+            ))}
+          </div>
         </article>
       </section>
     </div>

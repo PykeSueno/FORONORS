@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
+import { formatUsd } from '@/lib/currency';
 
 type Movement = { id: number; type: string; amount: number; label: string; created_at: string };
 
@@ -21,7 +22,7 @@ export function MoneyPageClient({
   const [error, setError] = useState('');
 
   const latest = movements[0];
-  const formattedBalance = useMemo(() => Number(balance || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }), [balance]);
+  const formattedBalance = useMemo(() => formatUsd(Number(balance || 0)), [balance]);
 
   async function saveBalance(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,7 +61,7 @@ export function MoneyPageClient({
       <section className="glass-card p-6">
         <h1 className="text-2xl font-semibold text-[#fff2de]">Argent</h1>
         <p className="mt-2 text-3xl font-bold text-[#ffe5c0]">{formattedBalance}</p>
-        {latest ? <p className="mt-2 text-sm text-[#ffe3c3]">Dernière activité: {latest.type} · {Number(latest.amount).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · {latest.label}</p> : null}
+        {latest ? <p className="mt-2 text-sm text-[#ffe3c3]">Dernière activité: {latest.type} · {formatUsd(Number(latest.amount))} · {latest.label}</p> : null}
       </section>
 
       {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
@@ -94,7 +95,7 @@ export function MoneyPageClient({
         <div className="mt-3 space-y-2">
           {movements.map((movement) => (
             <div key={movement.id} className="rounded-xl border border-white/10 bg-[#5a3924]/55 px-3 py-2 text-sm text-[#ffe4c6]">
-              {movement.type} · {Number(movement.amount).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · {movement.label} ·{' '}
+              {movement.type} · {formatUsd(Number(movement.amount))} · {movement.label} ·{' '}
               {new Date(movement.created_at).toLocaleString('fr-FR')}
             </div>
           ))}

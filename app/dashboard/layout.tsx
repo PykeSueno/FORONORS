@@ -12,13 +12,14 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const supabase = getSupabaseAdmin();
   const { data: currentUser } = await supabase.from('users').select('name, role').eq('id', session.userId).maybeSingle();
 
-  const [canAccessDashboard, canAccessMembers, canAccessMoney, canAccessItems, canAccessLogs, canViewLogs] = await Promise.all([
+  const [canAccessDashboard, canAccessMembers, canAccessMoney, canAccessItems, canAccessLogs, canViewLogs, canAccessTransactions] = await Promise.all([
     hasUserPermission(session.userId, 'dashboard.access'),
     hasUserPermission(session.userId, 'members.access'),
     hasUserPermission(session.userId, 'money.access'),
     hasUserPermission(session.userId, 'items.access'),
     hasUserPermission(session.userId, 'logs.access'),
-    hasUserPermission(session.userId, 'logs.view')
+    hasUserPermission(session.userId, 'logs.view'),
+    hasUserPermission(session.userId, 'transactions.access')
   ]);
 
   const showLogsModule = canAccessLogs && canViewLogs;
@@ -37,6 +38,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               {canAccessMembers ? <Link href="/dashboard/membres" className="topbar-link">👥 Membres</Link> : null}
               {canAccessMoney ? <Link href="/dashboard/argent" className="topbar-link">💰 Argent</Link> : null}
               {canAccessItems ? <Link href="/dashboard/items" className="topbar-link">📦 Items</Link> : null}
+              {canAccessTransactions ? <Link href="/dashboard/transactions" className="topbar-link">🔄 Transactions</Link> : null}
               {showLogsModule ? <Link href="/dashboard/logs" className="topbar-link">🧾 Logs</Link> : null}
             </nav>
           </div>

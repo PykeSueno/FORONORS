@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { FormEvent, useMemo, useState } from 'react';
+import { formatUsd } from '@/lib/currency';
 import { needsWeaponId } from '@/lib/items';
 
 type Category = {
@@ -18,6 +19,7 @@ type Item = {
   sell_price: number;
   quantity: number;
   weapon_identifier: string | null;
+  is_money_item: boolean;
   category_key: string;
   category_label: string;
   type_key: string | null;
@@ -32,7 +34,8 @@ const EMPTY_FORM = {
   quantity: '0',
   category_key: 'objects',
   type_key: '',
-  weapon_identifier: ''
+  weapon_identifier: '',
+  is_money_item: false
 };
 
 export function ItemsPageClient({
@@ -152,10 +155,11 @@ export function ItemsPageClient({
               <span className="rounded-full bg-[#3f281b]/70 px-2 py-1 text-xs text-[#f8d9b8]">{item.category_label}</span>
             </div>
             <p className="text-sm text-[#f8d9b8]">{item.type_label ? `Type: ${item.type_label}` : 'Type: -'}</p>
-            <p className="mt-2 text-sm text-[#fce7ce]">Achat: {Number(item.buy_price).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
-            <p className="text-sm text-[#fce7ce]">Vente: {Number(item.sell_price).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
+            <p className="mt-2 text-sm text-[#fce7ce]">Achat: {formatUsd(Number(item.buy_price))}</p>
+            <p className="text-sm text-[#fce7ce]">Vente: {formatUsd(Number(item.sell_price))}</p>
             <p className="text-sm text-[#fce7ce]">Quantité: {item.quantity}</p>
             {item.weapon_identifier ? <p className="text-sm text-[#fce7ce]">ID arme: {item.weapon_identifier}</p> : null}
+            {item.is_money_item ? <p className="text-sm text-[#c4f3b6]">💵 Item Argent lié au solde groupe</p> : null}
 
             {(canEdit || canDelete) ? (
               <div className="mt-3 flex gap-2">
@@ -241,7 +245,8 @@ function ItemModal({
           quantity: String(initial.quantity),
           category_key: initial.category_key,
           type_key: initial.type_key ?? '',
-          weapon_identifier: initial.weapon_identifier ?? ''
+          weapon_identifier: initial.weapon_identifier ?? '',
+          is_money_item: initial.is_money_item
         }
       : {})
   });
@@ -288,7 +293,8 @@ function ItemModal({
       category_label: category.label,
       type_key: type?.key ?? null,
       type_label: type?.label ?? null,
-      weapon_identifier: form.weapon_identifier || null
+      weapon_identifier: form.weapon_identifier || null,
+      is_money_item: form.is_money_item
     });
   }
 
@@ -355,6 +361,10 @@ function ItemModal({
               <label className="block text-xs text-[#efccaa]">ID arme</label>
               <input className="saas-input w-full" placeholder="ID arme" value={form.weapon_identifier} onChange={(e) => setForm({ ...form, weapon_identifier: e.target.value })} required />
             </>
+          ) : null}
+
+          {form.category_key === 'other' ? (
+            <label className="flex items-center gap-2 text-xs text-[#d8f0c9]"><input type="checkbox" checked={form.is_money_item} onChange={(e) => setForm({ ...form, is_money_item: e.target.checked })} /> Lier cet item au solde réel du groupe (item Argent)</label>
           ) : null}
 
           <div className="flex justify-end gap-2">
