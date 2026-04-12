@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
+import { ITEM_CATEGORIES } from '@/lib/items';
 
 type Item = {
   id: number;
@@ -12,6 +13,8 @@ type Item = {
   sell_price: number;
   quantity: number;
   is_money_item: boolean;
+  category_key: string;
+  type_key: string | null;
 };
 
 type Member = { id: string; name: string; username: string };
@@ -45,6 +48,20 @@ export function TransactionsPageClient({
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+
+  const availableTypes = ITEM_CATEGORIES.find((entry) => entry.key === categoryFilter)?.types ?? [];
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const qOk = !query || item.name.toLowerCase().includes(query.toLowerCase());
+      const categoryOk = !categoryFilter || item.category_key === categoryFilter;
+      const typeOk = !typeFilter || item.type_key === typeFilter;
+      return qOk && categoryOk && typeOk;
+    });
+  }, [items, query, categoryFilter, typeFilter]);
 
   const totals = useMemo(() => {
     let moneyIn = 0;
@@ -109,18 +126,29 @@ export function TransactionsPageClient({
 
   return (
     <div className="space-y-5">
-      <section className="glass-card p-6">
-        <h1 className="text-2xl font-semibold text-[#fff1dc]">Transactions</h1>
-        <p className="mt-1 text-sm text-[#f3d2ad]">Ajoutez vos items à gauche, pilotez toute la transaction à droite.</p>
-      </section>
-
       <section className="grid gap-4 lg:grid-cols-[1.05fr_1fr]">
         <section className="glass-card p-5">
           <h2 className="text-lg font-semibold text-[#fff1dd]">Ajouter des items</h2>
-          <p className="mt-1 text-xs text-[#f0d0ac]">Cliquez un item pour l’ajouter immédiatement à la transaction.</p>
+          <input className="saas-input mt-3 w-full" placeholder="Rechercher un item" value={query} onChange={(e) => setQuery(e.target.value)} />
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className={`filter-pill ${!categoryFilter ? 'filter-pill-active' : ''}`} onClick={() => { setCategoryFilter(''); setTypeFilter(''); }}>Tous</button>
+            {ITEM_CATEGORIES.map((category) => (
+              <button key={category.key} className={`filter-pill ${categoryFilter === category.key ? 'filter-pill-active' : ''}`} onClick={() => { setCategoryFilter(category.key); setTypeFilter(''); }}>{category.label}</button>
+            ))}
+          </div>
+
+          {availableTypes.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button className={`filter-pill ${!typeFilter ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter('')}>Tous types</button>
+              {availableTypes.map((type) => (
+                <button key={type.key} className={`filter-pill ${typeFilter === type.key ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter(type.key)}>{type.label}</button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <button key={item.id} className="rounded-xl border border-white/15 bg-[#3f281b]/60 p-3 text-left smooth-hover" onClick={() => addItem(item)}>
                 <div className="mb-2 h-20 rounded-lg bg-[#22140e]">
                   {item.image_url ? <Image src={item.image_url} alt={item.name} width={280} height={120} className="h-full w-full rounded-lg object-cover" unoptimized /> : null}
@@ -195,36 +223,33 @@ export function TransactionsPageClient({
             </div>
           </section>
 
-          <section className="glass-card p-5">
-            <h3 className="text-base font-semibold text-[#fff1dd]">C. Résultat</h3>
-            <p className="mt-2 text-sm text-[#c5f2b9]">Entrée argent: +{formatUsd(totals.moneyIn)}</p>
-            <p className="text-sm text-[#f2b9b9]">Sortie argent: -{formatUsd(totals.moneyOut)}</p>
-            <p className="text-sm text-[#c5f2b9]">Entrée stock: +{totals.stockIn}</p>
-            <p className="text-sm text-[#f2b9b9]">Sortie stock: -{totals.stockOut}</p>
-            <p className={`mt-2 text-sm font-semibold ${totals.profit >= 0 ? 'text-[#c5f2b9]' : 'text-[#f2b9b9]'}`}>Résultat final: {formatUsd(totals.profit)}</p>
-            {canCreate ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void submit()}>Valider transaction</button> : null}
+          <section className="glass-card p-6">
+            <h3 className="text-lg font-semibold text-[#fff1dd]">C. Résultat</h3>
+            <div className="mt-3 grid gap-2">
+              <ResultRow icon="💵" label="Entrée argent" value={`+${formatUsd(totals.moneyIn)}`} positive />
+              <ResultRow icon="💸" label="Sortie argent" value={`-${formatUsd(totals.moneyOut)}`} />
+              <ResultRow icon="📦" label="Entrée stock" value={`+${totals.stockIn}`} positive />
+              <ResultRow icon="📤" label="Sortie stock" value={`-${totals.stockOut}`} />
+            </div>
+            <div className={`mt-4 rounded-xl border px-4 py-3 ${totals.profit >= 0 ? 'border-[#83d89f]/40 bg-[#83d89f]/10 text-[#cbf5d6]' : 'border-[#e08f8f]/40 bg-[#e08f8f]/10 text-[#f8caca]'}`}>
+              <p className="text-xs uppercase tracking-wider">Résultat final</p>
+              <p className="text-2xl font-bold">{formatUsd(totals.profit)}</p>
+            </div>
+            {canCreate ? <button className="saas-primary-btn mt-4 w-full" onClick={() => void submit()}>Valider transaction</button> : null}
           </section>
         </section>
       </section>
 
       {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
+    </div>
+  );
+}
 
-      <section className="glass-card p-5">
-        <h2 className="text-lg font-semibold text-[#fff1dd]">Transactions récentes</h2>
-        <div className="mt-3 space-y-2">
-          {transactions.map((transaction) => (
-            <article key={transaction.id} className="rounded-xl border border-white/10 bg-[#4f3220]/55 p-3 text-sm text-[#f4d4b0]">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium">#{transaction.id} · {transaction.reason}</p>
-                <p>{new Date(transaction.created_at).toLocaleString('fr-FR')}</p>
-              </div>
-              <p className="mt-1">Membre: {transaction.member_label}</p>
-              <p className="mt-1">Items: {transaction.transaction_lines.map((line) => `${line.item_name_snapshot} x${line.quantity}`).join(', ')}</p>
-              <p className="mt-1">Entrée {formatUsd(Number(transaction.total_money_in))} · Sortie {formatUsd(Number(transaction.total_money_out))} · Résultat {formatUsd(Number(transaction.profit_loss))}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+function ResultRow({ icon, label, value, positive }: { icon: string; label: string; value: string; positive?: boolean }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
+      <p className="text-sm text-[#f3d4b0]">{icon} {label}</p>
+      <p className={`text-sm font-semibold ${positive ? 'text-[#c5f2b9]' : 'text-[#f2b9b9]'}`}>{value}</p>
     </div>
   );
 }

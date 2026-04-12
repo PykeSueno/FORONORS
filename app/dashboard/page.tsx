@@ -36,7 +36,13 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-[#f1d2ae]">Grade: {user?.role || session?.role || 'Utilisateur'}</p>
           </div>
           <form action="/api/logout" method="post">
-            <button aria-label="Se déconnecter" className="icon-logout-btn">Déconnexion</button>
+            <button aria-label="Se déconnecter" className="icon-logout-btn">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M14 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <path d="M10 17l5-5-5-5" />
+                <path d="M15 12H3" />
+              </svg>
+            </button>
           </form>
         </div>
       </section>

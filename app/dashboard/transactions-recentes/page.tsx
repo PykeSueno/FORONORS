@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
+import { TransactionsTabs } from '@/components/dashboard/transactions-tabs';
 import { formatUsd } from '@/lib/currency';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
@@ -26,6 +27,7 @@ export default async function RecentTransactionsPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Transactions récentes" subtitle="Historique complet des dernières transactions" />
+      <TransactionsTabs active="recent" />
       <section className="glass-card p-5">
         <div className="space-y-2">
           {(transactions ?? []).map((transaction) => (

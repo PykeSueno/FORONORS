@@ -16,7 +16,8 @@ export const ITEM_CATEGORIES = [
     types: [
       { key: 'seeds', label: 'Graines' },
       { key: 'equipment', label: 'Equipement' },
-      { key: 'bag', label: 'Pochon' }
+      { key: 'bag', label: 'Pochon' },
+      { key: 'production', label: 'Production' }
     ]
   },
   { key: 'other', label: 'Autres', types: [] }

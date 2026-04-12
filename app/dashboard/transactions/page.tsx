@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
+import { TransactionsTabs } from '@/components/dashboard/transactions-tabs';
 import { TransactionsPageClient } from '@/components/transactions/transactions-page-client';
 
 export default async function TransactionsPage() {
@@ -18,7 +19,7 @@ export default async function TransactionsPage() {
 
   const supabase = getSupabaseAdmin();
   const [{ data: items }, { data: members }, { data: transactions }] = await Promise.all([
-    supabase.from('items').select('id, name, image_url, buy_price, sell_price, quantity, is_money_item').order('name', { ascending: true }),
+    supabase.from('items').select('id, name, image_url, buy_price, sell_price, quantity, is_money_item, category_key, type_key').order('name', { ascending: true }),
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
     supabase
       .from('transactions')
@@ -32,6 +33,7 @@ export default async function TransactionsPage() {
   return (
     <>
       <InternalPageHeader title="Transactions" subtitle="Créer et exécuter des transactions multi-items" />
+      <TransactionsTabs active="transactions" />
       <TransactionsPageClient
       canCreate={canCreate}
       items={items ?? []}
