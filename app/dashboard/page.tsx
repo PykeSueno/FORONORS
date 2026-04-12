@@ -5,6 +5,27 @@ import { getUserPermissions } from '@/lib/permissions';
 import { humanMoneyMovementLabel, humanStockMovementLabel } from '@/lib/labels';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+type DashboardCashRow = {
+  type: string;
+  amount: number;
+  label: string;
+  created_at: string;
+  users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null;
+};
+
+type DashboardStockRow = {
+  item_name: string;
+  quantity_delta: number;
+  transaction_type: string;
+  created_at: string;
+  users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null;
+};
+
+type DashboardTabletPassageRow = {
+  member_label: string;
+  created_at: string;
+};
+
 export default async function DashboardPage() {
   const session = await getSession();
   const permissions = session ? await getUserPermissions(session.userId) : [];
@@ -30,15 +51,19 @@ export default async function DashboardPage() {
     canTablet ? supabase.from('tablet_passages').select('member_label, created_at').order('created_at', { ascending: false }).limit(4) : Promise.resolve({ data: [] })
   ]);
 
+  const cashRows = (recentCash ?? []) as DashboardCashRow[];
+  const stockBaseRows = (recentStock ?? []) as DashboardStockRow[];
+  const tabletPassageRows = (recentTabletPassages ?? []) as DashboardTabletPassageRow[];
+
   const stockRows = [
-    ...((recentStock ?? []).map((row) => ({
+    ...(stockBaseRows.map((row) => ({
       type: 'stock' as const,
       created_at: row.created_at,
       member: Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username) || 'Groupe',
       description: `${humanStockMovementLabel(row.transaction_type)} — ${row.item_name}`,
       value: `${row.quantity_delta > 0 ? '+' : ''}${row.quantity_delta}`
     }))),
-    ...((recentTabletPassages ?? []).map((row) => ({
+    ...(tabletPassageRows.map((row) => ({
       type: 'tablet' as const,
       created_at: row.created_at,
       member: row.member_label || 'Groupe',
@@ -86,7 +111,7 @@ export default async function DashboardPage() {
             <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">💰 Cash</span>
           </div>
           <div className="space-y-2">
-            {(recentCash ?? []).slice(0, 4).map((row, idx) => (
+            {cashRows.slice(0, 4).map((row, idx) => (
               <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-[#ffe8c9]">{(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'} — {humanMoneyMovementLabel(row.type)} — {row.label}</p>
