@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server';
 import { getSession, hashPassword } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+type MemberRow = {
+  id: string;
+  username: string;
+  role: string | null;
+  role_id: number | null;
+  is_active: boolean;
+  created_at: string;
+  roles: { name: string } | null;
+};
+
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
@@ -9,14 +19,23 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, role, is_active, created_at')
+    .select('id, username, role, role_id, is_active, created_at, roles(name)')
     .order('created_at', { ascending: false });
 
   if (error) {
     return NextResponse.json({ message: 'Erreur de lecture.' }, { status: 500 });
   }
 
-  return NextResponse.json({ members: data });
+  const members = ((data ?? []) as MemberRow[]).map((member) => ({
+    id: member.id,
+    username: member.username,
+    role_id: member.role_id,
+    role_name: member.roles?.name ?? member.role ?? '',
+    is_active: member.is_active,
+    created_at: member.created_at
+  }));
+
+  return NextResponse.json({ members });
 }
 
 export async function POST(request: Request) {
@@ -26,7 +45,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     username?: string;
     password?: string;
-    role?: string;
+    role_id?: number | null;
     is_active?: boolean;
   };
 
@@ -35,12 +54,19 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await hashPassword(body.password);
-
   const supabase = getSupabaseAdmin();
+
+  let roleName = '';
+  if (body.role_id) {
+    const { data: role } = await supabase.from('roles').select('name').eq('id', body.role_id).maybeSingle();
+    roleName = role?.name ?? '';
+  }
+
   const { error } = await supabase.from('users').insert({
     username: body.username,
     password_hash: passwordHash,
-    role: body.role ?? '',
+    role_id: body.role_id ?? null,
+    role: roleName,
     is_active: body.is_active ?? true
   });
 
