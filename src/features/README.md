@@ -1,15 +1,15 @@
 # Feature architecture (base)
 
-Objectif: garder Supabase en **couche technique** et piloter la gestion des comptes depuis FORONORS.
+Objectif: authentification **username + mot de passe** gérée dans FORONORS (pas depuis le dashboard Supabase).
 
 ## Principes
 
-- L'UI consomme des **contrats métiers** (`AuthRepository`, `MemberRepository`).
-- Les implémentations techniques (Supabase/Auth API) seront ajoutées ensuite derrière ces contrats.
-- La gestion des membres (création, modification, activation, désactivation, suppression, rôles) reste dans le site.
+- Supabase reste une couche DB technique cachée.
+- Les routes API du site gèrent login/session et la création des membres.
+- Le hash de mot de passe se fait avec `bcryptjs` côté serveur.
 
-## Prochaine étape
+## Étapes couvertes
 
-1. Implémenter un bootstrap serveur pour créer le premier admin si absent.
-2. Brancher une implémentation `AuthRepository` (Supabase en arrière-plan).
-3. Créer le module UI "Gestion des membres" sur `MemberRepository`.
+1. Login via `/api/login` (username/password).
+2. Session HTTP-only signée (JWT) pour protéger `/dashboard`.
+3. Module membres initial pour lister et créer des comptes.

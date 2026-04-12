@@ -1,19 +1,20 @@
 /**
- * Configuration du premier compte admin.
+ * Configuration du premier compte admin à injecter au bootstrap.
  *
- * Les valeurs sont prévues pour être lues côté serveur uniquement,
- * et utilisées lors d'une phase de bootstrap contrôlée.
+ * Utilisée uniquement côté serveur.
  */
 export type BootstrapAdminConfig = {
-  email: string;
-  temporaryPassword: string;
-  fullName: string;
+  username: string;
+  password: string;
+  role: 'super_admin';
+  isActive: true;
 };
 
 export function getBootstrapAdminConfig(): BootstrapAdminConfig {
   return {
-    email: process.env.BOOTSTRAP_ADMIN_EMAIL ?? '',
-    temporaryPassword: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? '',
-    fullName: process.env.BOOTSTRAP_ADMIN_FULL_NAME ?? 'Admin FORONORS',
+    username: process.env.BOOTSTRAP_ADMIN_USERNAME ?? 'pyke',
+    password: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? 'santa',
+    role: 'super_admin',
+    isActive: true,
   };
 }
