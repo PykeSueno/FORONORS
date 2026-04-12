@@ -73,7 +73,10 @@ values
   ('members.edit'),
   ('members.delete'),
   ('roles.manage'),
-  ('dashboard.access')
+  ('dashboard.access'),
+  ('money.access'),
+  ('money.edit'),
+  ('money.history.view')
 on conflict (name) do nothing;
 
 
@@ -83,3 +86,40 @@ from public.roles r
 join public.permissions p on p.name = 'members.access'
 where lower(r.name) = 'patron'
 on conflict (role_id, permission_id) do nothing;
+
+
+create table if not exists public.group_cash (
+  id bigint generated always as identity primary key,
+  balance numeric(12,2) not null default 0,
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.cash_movements (
+  id bigint generated always as identity primary key,
+  type text not null,
+  amount numeric(12,2) not null,
+  label text not null,
+  user_id uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.group_cash enable row level security;
+alter table public.cash_movements enable row level security;
+
+drop policy if exists "allow_service_role_all_group_cash" on public.group_cash;
+create policy "allow_service_role_all_group_cash"
+on public.group_cash
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_cash_movements" on public.cash_movements;
+create policy "allow_service_role_all_cash_movements"
+on public.cash_movements
+for all
+using (true)
+with check (true);
+
+insert into public.group_cash (balance)
+select 0
+where not exists (select 1 from public.group_cash);
