@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-coffee-950 text-coffee-100 antialiased;
+}
+
+input,
+select,
+button {
+  @apply outline-none;
+}
