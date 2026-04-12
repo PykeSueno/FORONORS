@@ -14,7 +14,7 @@ export function MoneyPageClient({
   initialMovements: Movement[];
 }) {
   const [balance, setBalance] = useState(String(initialBalance));
-  const [movements, setMovements] = useState<Movement[]>(initialMovements);
+  const [movements] = useState<Movement[]>(initialMovements);
   const [type, setType] = useState('entry');
   const [amount, setAmount] = useState('');
   const [label, setLabel] = useState('');

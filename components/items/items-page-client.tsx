@@ -1,12 +1,13 @@
 'use client';
 
+import Image from 'next/image';
 import { FormEvent, useMemo, useState } from 'react';
 import { needsWeaponId } from '@/lib/items';
 
 type Category = {
   key: string;
   label: string;
-  types: Array<{ key: string; label: string }>;
+  types: readonly { key: string; label: string }[];
 };
 
 type Item = {
@@ -126,7 +127,11 @@ export function ItemsPageClient({
         {filteredItems.map((item) => (
           <article key={item.id} className="glass-card overflow-hidden p-4">
             <div className="mb-3 h-36 rounded-xl border border-white/10 bg-[#2a1a12]/45">
-              {item.image_url ? <img src={item.image_url} alt={item.name} className="h-full w-full rounded-xl object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-[#f0d0ab]">Aucune image</div>}
+              {item.image_url ? (
+                <Image src={item.image_url} alt={item.name} width={480} height={240} className="h-full w-full rounded-xl object-cover" unoptimized />
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-[#f0d0ab]">Aucune image</div>
+              )}
             </div>
             <p className="text-lg font-semibold text-[#fff1db]">{item.name}</p>
             <p className="text-sm text-[#f8d9b8]">{item.category_label}{item.type_label ? ` · ${item.type_label}` : ''}</p>
@@ -280,7 +285,7 @@ function ItemModal({
             {uploading ? <p className="mt-1 text-xs">Upload en cours...</p> : null}
             {form.image_url ? (
               <div className="mt-2 space-y-2">
-                <img src={form.image_url} alt="Preview" className="h-32 w-full rounded-xl object-cover" />
+                <Image src={form.image_url} alt="Preview" width={640} height={256} className="h-32 w-full rounded-xl object-cover" unoptimized />
                 <div className="flex gap-2">
                   <label className="saas-ghost-btn cursor-pointer">
                     Remplacer
