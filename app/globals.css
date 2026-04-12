@@ -189,3 +189,24 @@ button {
   background: rgba(255, 228, 191, 0.75);
   box-shadow: 0 0 14px rgba(160, 103, 58, 0.35);
 }
+
+
+.topbar-shell {
+  border-bottom: 1px solid rgba(96, 67, 46, 0.55);
+  background: linear-gradient(180deg, rgba(201, 157, 116, 0.9) 0%, rgba(173, 128, 90, 0.85) 100%);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 30px rgba(50, 27, 14, 0.22);
+}
+
+.filter-pill {
+  @apply rounded-full px-3 py-1.5 text-xs font-medium transition;
+  border: 1px solid rgba(255, 228, 187, 0.45);
+  background: rgba(86, 54, 33, 0.45);
+  color: #ffe7ca;
+}
+
+.filter-pill-active {
+  background: linear-gradient(135deg, #ffe1b8 0%, #f4c795 100%);
+  color: #4a2c1b;
+  border-color: rgba(255, 234, 208, 0.9);
+}

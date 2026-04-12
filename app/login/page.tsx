@@ -28,6 +28,11 @@ export default function LoginPage() {
       return;
     }
 
+    const data = (await response.json()) as { sessionToken?: string };
+    if (data.sessionToken) {
+      localStorage.setItem('foronors_session_token', data.sessionToken);
+    }
+
     router.push('/dashboard');
     router.refresh();
   }
@@ -64,6 +69,9 @@ export default function LoginPage() {
           <button type="submit" disabled={loading} className="saas-primary-btn w-full disabled:opacity-70">
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
+
+          <p className="text-xs text-[#f4d4ae]/80">Mode FiveM: le token de session est aussi renvoyé côté API pour les requêtes Bearer / x-fivem-session.</p>
+
         </form>
       </div>
     </main>

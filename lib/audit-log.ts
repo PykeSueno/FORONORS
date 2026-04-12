@@ -11,8 +11,13 @@ type CreateAuditLogInput = {
   metadata?: Record<string, unknown> | null;
 };
 
-function getDiscordWebhookUrl() {
-  return process.env.DISCORD_LOG_WEBHOOK_URL;
+async function getDiscordWebhookUrl() {
+  const envWebhook = process.env.DISCORD_LOG_WEBHOOK_URL;
+  if (envWebhook) return envWebhook;
+
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase.from('app_settings').select('value').eq('key', 'discord.log_webhook_url').maybeSingle();
+  return data?.value as string | undefined;
 }
 
 async function sendDiscordWebhook(payload: {
@@ -25,7 +30,7 @@ async function sendDiscordWebhook(payload: {
   summary: string;
   createdAt: string;
 }) {
-  const webhookUrl = getDiscordWebhookUrl();
+  const webhookUrl = await getDiscordWebhookUrl();
   if (!webhookUrl) return;
 
   await fetch(webhookUrl, {

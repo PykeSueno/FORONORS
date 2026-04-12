@@ -12,27 +12,32 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const supabase = getSupabaseAdmin();
   const { data: currentUser } = await supabase.from('users').select('name, role').eq('id', session.userId).maybeSingle();
 
-  const [canAccessDashboard, canAccessMembers, canAccessMoney, canAccessItems] = await Promise.all([
+  const [canAccessDashboard, canAccessMembers, canAccessMoney, canAccessItems, canAccessLogs, canViewLogs] = await Promise.all([
     hasUserPermission(session.userId, 'dashboard.access'),
     hasUserPermission(session.userId, 'members.access'),
     hasUserPermission(session.userId, 'money.access'),
-    hasUserPermission(session.userId, 'items.access')
+    hasUserPermission(session.userId, 'items.access'),
+    hasUserPermission(session.userId, 'logs.access'),
+    hasUserPermission(session.userId, 'logs.view')
   ]);
+
+  const showLogsModule = canAccessLogs && canViewLogs;
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-[#6f513a]/45 bg-[#b0865f]/78 backdrop-blur-lg">
-        <div className="mx-auto flex h-20 w-full max-w-[1200px] items-center justify-between px-4">
+      <header className="topbar-shell sticky top-0 z-30">
+        <div className="mx-auto flex h-24 w-full max-w-[1250px] items-center justify-between px-4">
           <div className="flex items-center gap-8">
             <Link href="/dashboard" className="brand-title">
               FORONORS
             </Link>
 
             <nav className="hidden items-center gap-2 sm:flex">
-              {canAccessDashboard ? <Link href="/dashboard" className="topbar-link">Dashboard</Link> : null}
-              {canAccessMembers ? <Link href="/dashboard/membres" className="topbar-link">Membres</Link> : null}
-              {canAccessMoney ? <Link href="/dashboard/argent" className="topbar-link">Argent</Link> : null}
-              {canAccessItems ? <Link href="/dashboard/items" className="topbar-link">Items</Link> : null}
+              {canAccessDashboard ? <Link href="/dashboard" className="topbar-link">🏠 Dashboard</Link> : null}
+              {canAccessMembers ? <Link href="/dashboard/membres" className="topbar-link">👥 Membres</Link> : null}
+              {canAccessMoney ? <Link href="/dashboard/argent" className="topbar-link">💰 Argent</Link> : null}
+              {canAccessItems ? <Link href="/dashboard/items" className="topbar-link">📦 Items</Link> : null}
+              {showLogsModule ? <Link href="/dashboard/logs" className="topbar-link">🧾 Logs</Link> : null}
             </nav>
           </div>
 
@@ -54,7 +59,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1200px] px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-[1250px] px-4 py-8">{children}</main>
     </div>
   );
 }

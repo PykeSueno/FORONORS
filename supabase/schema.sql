@@ -184,7 +184,9 @@ values
   ('items.create'),
   ('items.edit'),
   ('items.delete'),
-  ('logs.access')
+  ('logs.access'),
+  ('logs.view'),
+  ('logs.webhook.manage')
 on conflict (name) do nothing;
 
 insert into storage.buckets (id, name, public)
@@ -197,3 +199,19 @@ on storage.objects
 for all
 using (bucket_id = 'item-images')
 with check (bucket_id = 'item-images');
+
+
+create table if not exists public.app_settings (
+  key text primary key,
+  value text not null default '',
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.app_settings enable row level security;
+
+drop policy if exists "allow_service_role_all_app_settings" on public.app_settings;
+create policy "allow_service_role_all_app_settings"
+on public.app_settings
+for all
+using (true)
+with check (true);

@@ -56,6 +56,8 @@ export function ItemsPageClient({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
+  const availableTypes = categories.find((category) => category.key === categoryFilter)?.types ?? [];
+
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       const qOk = !query || item.name.toLowerCase().includes(query.toLowerCase());
@@ -98,43 +100,58 @@ export function ItemsPageClient({
           {canCreate ? <button className="saas-primary-btn" onClick={() => setCreating(true)}>Créer un item</button> : null}
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
           <input className="saas-input w-full" placeholder="Rechercher un item" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <select className="saas-input w-full" value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setTypeFilter(''); }}>
-            <option value="">Toutes les catégories</option>
-            {categories.map((category) => (
-              <option key={category.key} value={category.key}>{category.label}</option>
-            ))}
-          </select>
-          <select className="saas-input w-full" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-            <option value="">Tous les types</option>
-            {categories
-              .find((category) => category.key === categoryFilter)
-              ?.types.map((type) => (
-                <option key={type.key} value={type.key}>{type.label}</option>
-              ))}
-          </select>
+          <button className="saas-ghost-btn" onClick={() => void refresh()}>Appliquer</button>
         </div>
 
-        <div className="mt-3">
-          <button className="saas-ghost-btn" onClick={() => void refresh()}>Appliquer les filtres</button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button className={`filter-pill ${!categoryFilter ? 'filter-pill-active' : ''}`} onClick={() => { setCategoryFilter(''); setTypeFilter(''); }}>
+            Tous
+          </button>
+          {categories.map((category) => (
+            <button
+              key={category.key}
+              className={`filter-pill ${categoryFilter === category.key ? 'filter-pill-active' : ''}`}
+              onClick={() => {
+                setCategoryFilter(category.key);
+                setTypeFilter('');
+              }}
+            >
+              {category.label}
+            </button>
+          ))}
         </div>
+
+        {availableTypes.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className={`filter-pill ${!typeFilter ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter('')}>Tous les types</button>
+            {availableTypes.map((type) => (
+              <button key={type.key} className={`filter-pill ${typeFilter === type.key ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter(type.key)}>
+                {type.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {filteredItems.map((item) => (
-          <article key={item.id} className="glass-card overflow-hidden p-4">
+          <article key={item.id} className="glass-card overflow-hidden border-l-4 border-l-[#f1c792] p-4">
             <div className="mb-3 h-36 rounded-xl border border-white/10 bg-[#2a1a12]/45">
               {item.image_url ? (
                 <Image src={item.image_url} alt={item.name} width={480} height={240} className="h-full w-full rounded-xl object-cover" unoptimized />
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-[#f0d0ab]">Aucune image</div>
+                <div className="flex h-full items-center justify-center text-sm text-[#f0d0ab]">🖼️ Aucune image</div>
               )}
             </div>
-            <p className="text-lg font-semibold text-[#fff1db]">{item.name}</p>
-            <p className="text-sm text-[#f8d9b8]">{item.category_label}{item.type_label ? ` · ${item.type_label}` : ''}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-lg font-semibold text-[#fff1db]">{item.name}</p>
+              <span className="rounded-full bg-[#3f281b]/70 px-2 py-1 text-xs text-[#f8d9b8]">{item.category_label}</span>
+            </div>
+            <p className="text-sm text-[#f8d9b8]">{item.type_label ? `Type: ${item.type_label}` : 'Type: -'}</p>
             <p className="mt-2 text-sm text-[#fce7ce]">Achat: {Number(item.buy_price).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
             <p className="text-sm text-[#fce7ce]">Vente: {Number(item.sell_price).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
             <p className="text-sm text-[#fce7ce]">Quantité: {item.quantity}</p>
@@ -231,6 +248,12 @@ function ItemModal({
   const [uploading, setUploading] = useState(false);
   const category = categories.find((item) => item.key === form.category_key) ?? categories[0];
 
+  function step(field: 'buy_price' | 'sell_price' | 'quantity', delta: number) {
+    const current = Number(form[field] || '0');
+    const next = Math.max(0, current + delta);
+    setForm((state) => ({ ...state, [field]: String(next) }));
+  }
+
   async function uploadImage(file: File) {
     setUploading(true);
     const body = new FormData();
@@ -278,74 +301,60 @@ function ItemModal({
         </div>
 
         <form className="space-y-3" onSubmit={save}>
+          <label className="block text-xs text-[#efccaa]">Nom</label>
           <input className="saas-input w-full" placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
 
           <div onPaste={(e) => void onPaste(e)} className="rounded-xl border border-dashed border-[#f1cfaa]/60 bg-[#2e1d14]/40 p-3 text-sm text-[#f4d8b6]">
-            <p>Collez une image avec Ctrl+V dans cette zone.</p>
+            <p>Image (Ctrl+V pour coller)</p>
             {uploading ? <p className="mt-1 text-xs">Upload en cours...</p> : null}
             {form.image_url ? (
               <div className="mt-2 space-y-2">
                 <Image src={form.image_url} alt="Preview" width={640} height={256} className="h-32 w-full rounded-xl object-cover" unoptimized />
                 <div className="flex gap-2">
-                  <label className="saas-ghost-btn cursor-pointer">
-                    Remplacer
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) void uploadImage(file);
-                      }}
-                    />
+                  <label className="saas-ghost-btn cursor-pointer">Remplacer
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadImage(file); }} />
                   </label>
                   <button type="button" className="saas-ghost-btn" onClick={() => setForm({ ...form, image_url: '' })}>Supprimer image</button>
                 </div>
               </div>
             ) : (
-              <label className="mt-2 inline-block cursor-pointer rounded-xl border border-white/25 px-3 py-2">
-                Choisir un fichier
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void uploadImage(file);
-                  }}
-                />
+              <label className="mt-2 inline-block cursor-pointer rounded-xl border border-white/25 px-3 py-2">Choisir un fichier
+                <input type="file" className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadImage(file); }} />
               </label>
             )}
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <input className="saas-input w-full" placeholder="Prix achat" value={form.buy_price} onChange={(e) => setForm({ ...form, buy_price: e.target.value })} required />
-            <input className="saas-input w-full" placeholder="Prix vente" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: e.target.value })} required />
+          <NumberField label="Prix achat" value={form.buy_price} onChange={(value) => setForm({ ...form, buy_price: value })} onMinus={() => step('buy_price', -1)} onPlus={() => step('buy_price', 1)} />
+          <NumberField label="Prix vente" value={form.sell_price} onChange={(value) => setForm({ ...form, sell_price: value })} onMinus={() => step('sell_price', -1)} onPlus={() => step('sell_price', 1)} />
+          <NumberField label="Quantité" value={form.quantity} onChange={(value) => setForm({ ...form, quantity: value })} onMinus={() => step('quantity', -1)} onPlus={() => step('quantity', 1)} />
+
+          <label className="block text-xs text-[#efccaa]">Catégorie</label>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((entry) => (
+              <button key={entry.key} type="button" className={`filter-pill ${form.category_key === entry.key ? 'filter-pill-active' : ''}`} onClick={() => setForm({ ...form, category_key: entry.key, type_key: '', weapon_identifier: '' })}>
+                {entry.label}
+              </button>
+            ))}
           </div>
 
-          <input className="saas-input w-full" placeholder="Quantité" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <select
-              className="saas-input w-full"
-              value={form.category_key}
-              onChange={(e) => setForm({ ...form, category_key: e.target.value, type_key: '', weapon_identifier: '' })}
-            >
-              {categories.map((entry) => (
-                <option key={entry.key} value={entry.key}>{entry.label}</option>
-              ))}
-            </select>
-
-            <select className="saas-input w-full" value={form.type_key} onChange={(e) => setForm({ ...form, type_key: e.target.value })}>
-              <option value="">Aucun type</option>
-              {category.types.map((entry) => (
-                <option key={entry.key} value={entry.key}>{entry.label}</option>
-              ))}
-            </select>
-          </div>
+          {category.types.length > 0 ? (
+            <>
+              <label className="block text-xs text-[#efccaa]">Type</label>
+              <div className="flex flex-wrap gap-2">
+                {category.types.map((entry) => (
+                  <button key={entry.key} type="button" className={`filter-pill ${form.type_key === entry.key ? 'filter-pill-active' : ''}`} onClick={() => setForm({ ...form, type_key: entry.key })}>
+                    {entry.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
 
           {needsWeaponId(form.category_key, form.type_key || null) ? (
-            <input className="saas-input w-full" placeholder="ID arme" value={form.weapon_identifier} onChange={(e) => setForm({ ...form, weapon_identifier: e.target.value })} required />
+            <>
+              <label className="block text-xs text-[#efccaa]">ID arme</label>
+              <input className="saas-input w-full" placeholder="ID arme" value={form.weapon_identifier} onChange={(e) => setForm({ ...form, weapon_identifier: e.target.value })} required />
+            </>
           ) : null}
 
           <div className="flex justify-end gap-2">
@@ -353,6 +362,19 @@ function ItemModal({
             <button type="submit" className="saas-primary-btn">Enregistrer</button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function NumberField({ label, value, onChange, onMinus, onPlus }: { label: string; value: string; onChange: (value: string) => void; onMinus: () => void; onPlus: () => void }) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs text-[#efccaa]">{label}</label>
+      <div className="flex items-center gap-2">
+        <button type="button" className="saas-ghost-btn" onClick={onMinus}>-1</button>
+        <input className="saas-input w-full" value={value} onChange={(e) => onChange(e.target.value)} required />
+        <button type="button" className="saas-ghost-btn" onClick={onPlus}>+1</button>
       </div>
     </div>
   );
