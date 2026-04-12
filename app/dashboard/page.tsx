@@ -18,16 +18,36 @@ export default async function DashboardPage() {
   const canTablet = permissions.includes('tablet.access');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }] = await Promise.all([
+  const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: recentTabletPassages }] = await Promise.all([
     session ? supabase.from('users').select('name, role').eq('id', session.userId).maybeSingle() : Promise.resolve({ data: null }),
     canMoney ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItems ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canTransactions ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canMembers ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canLogs ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
-    canMoney ? supabase.from('cash_movements').select('type, amount, label, created_at').order('created_at', { ascending: false }).limit(4) : Promise.resolve({ data: [] }),
-    canItems ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at').order('created_at', { ascending: false }).limit(4) : Promise.resolve({ data: [] })
+    canMoney ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
+    canItems ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
+    canTablet ? supabase.from('tablet_passages').select('member_label, created_at').order('created_at', { ascending: false }).limit(4) : Promise.resolve({ data: [] })
   ]);
+
+  const stockRows = [
+    ...((recentStock ?? []).map((row) => ({
+      type: 'stock' as const,
+      created_at: row.created_at,
+      member: Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username) || 'Groupe',
+      description: `${humanStockMovementLabel(row.transaction_type)} — ${row.item_name}`,
+      value: `${row.quantity_delta > 0 ? '+' : ''}${row.quantity_delta}`
+    }))),
+    ...((recentTabletPassages ?? []).map((row) => ({
+      type: 'tablet' as const,
+      created_at: row.created_at,
+      member: row.member_label || 'Groupe',
+      description: 'Passage Tablette — Kit +2 / Disqueuse +2',
+      value: '+4'
+    })))
+  ]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 4);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -66,13 +86,13 @@ export default async function DashboardPage() {
             <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">💰 Cash</span>
           </div>
           <div className="space-y-2">
-            {(recentCash ?? []).map((row, idx) => (
+            {(recentCash ?? []).slice(0, 4).map((row, idx) => (
               <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-[#ffe8c9]">{row.label}</p>
+                  <p className="text-sm font-medium text-[#ffe8c9]">{(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'} — {humanMoneyMovementLabel(row.type)} — {row.label}</p>
                   <p className={`text-sm font-semibold ${Number(row.amount) >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{formatUsd(Number(row.amount))}</p>
                 </div>
-                <p className="mt-1 text-xs text-[#f2d2ae]">{humanMoneyMovementLabel(row.type)} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
+                <p className="mt-1 text-xs text-[#f2d2ae]">{new Date(row.created_at).toLocaleString('fr-FR')}</p>
               </div>
             ))}
           </div>
@@ -84,13 +104,13 @@ export default async function DashboardPage() {
             <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">📦 Stock</span>
           </div>
           <div className="space-y-2">
-            {(recentStock ?? []).map((row, idx) => (
+            {stockRows.map((row, idx) => (
               <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-[#ffe8c9]">{row.item_name}</p>
-                  <p className={`text-sm font-semibold ${row.quantity_delta >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{row.quantity_delta > 0 ? '+' : ''}{row.quantity_delta}</p>
+                  <p className="text-sm font-medium text-[#ffe8c9]">{row.member} — {row.description}</p>
+                  <p className={`text-sm font-semibold ${row.value.startsWith('+') ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{row.value}</p>
                 </div>
-                <p className="mt-1 text-xs text-[#f2d2ae]">{humanStockMovementLabel(row.transaction_type)} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
+                <p className="mt-1 text-xs text-[#f2d2ae]">{new Date(row.created_at).toLocaleString('fr-FR')}</p>
               </div>
             ))}
           </div>

@@ -16,10 +16,13 @@ export default async function TabletPage() {
 
   const businessDay = getTabletBusinessDate();
   const supabase = getSupabaseAdmin();
-  const [{ data: day }, { data: members }, { data: passages }] = await Promise.all([
+  const [{ data: day }, { data: members }, { data: cash }, { data: passages }, { data: kitItem }, { data: cutterItem }] = await Promise.all([
     supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle(),
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
-    supabase.from('tablet_passages').select('id, member_label, before_cash, after_cash, before_kits, after_kits, before_cutters, after_cutters, created_at').eq('tablet_day_id', -1).limit(0)
+    supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
+    supabase.from('tablet_passages').select('id, member_label, before_cash, after_cash, before_kits, after_kits, before_cutters, after_cutters, created_at').eq('tablet_day_id', -1).limit(0),
+    supabase.from('items').select('name, quantity').ilike('name', '%kit%').limit(1).maybeSingle(),
+    supabase.from('items').select('name, quantity').ilike('name', '%disqueuse%').limit(1).maybeSingle()
   ]);
 
   const dayId = day?.id;
@@ -42,6 +45,9 @@ export default async function TabletPage() {
         businessDay={businessDay}
         members={members ?? []}
         passages={dayPassages}
+        groupCash={Number(cash?.balance ?? 0)}
+        kitsInStock={Number(kitItem?.quantity ?? 0)}
+        cuttersInStock={Number(cutterItem?.quantity ?? 0)}
         canManageDaily={permissions.includes('tablet.daily.manage')}
         canCreatePassage={permissions.includes('tablet.passage.create')}
         defaultMemberId={session.userId}

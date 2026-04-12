@@ -5,6 +5,8 @@ export function humanMoneyMovementLabel(type: string) {
   if (type === 'exit') return 'Sortie argent';
   if (type === 'sale') return 'Vente';
   if (type === 'purchase') return 'Achat';
+  if (type === 'tablet_passage') return 'Passage Tablette';
+  if (type === 'tablet_morning_deposit') return 'Dépôt matin Tablette';
   return type;
 }
 
@@ -13,5 +15,6 @@ export function humanStockMovementLabel(type: string) {
   if (type === 'stock_out') return 'Sortie stock';
   if (type === 'purchase') return 'Achat';
   if (type === 'sale') return 'Vente';
+  if (type === 'tablet_passage') return 'Passage Tablette';
   return type;
 }

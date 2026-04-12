@@ -45,7 +45,12 @@ export async function POST(request: Request) {
   if (existingPassage) return NextResponse.json({ message: 'Ce membre a déjà fait son passage pour cette journée tablette.' }, { status: 400 });
 
   const beforeCash = Number(day.chest_amount);
-  if (beforeCash < 400) return NextResponse.json({ message: 'Coffre tablette insuffisant (minimum 400$).' }, { status: 400 });
+  if (beforeCash < 400) return NextResponse.json({ message: 'Dépôt tablette insuffisant (minimum 400$).' }, { status: 400 });
+
+  const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
+  if (!cash) return NextResponse.json({ message: 'Caisse groupe introuvable.' }, { status: 404 });
+  const beforeGroupBalance = Number(cash.balance);
+  if (beforeGroupBalance < 400) return NextResponse.json({ message: 'Argent réel du groupe insuffisant (minimum 400$).' }, { status: 400 });
 
   const { data: kit } = await supabase.from('items').select('id, name, quantity').ilike('name', '%kit%').limit(1).maybeSingle();
   const { data: cutter } = await supabase.from('items').select('id, name, quantity').ilike('name', '%disqueuse%').limit(1).maybeSingle();
@@ -53,6 +58,7 @@ export async function POST(request: Request) {
   const beforeKits = Number(kit?.quantity ?? 0);
   const beforeCutters = Number(cutter?.quantity ?? 0);
   const afterCash = beforeCash - 400;
+  const afterGroupBalance = beforeGroupBalance - 400;
   const afterKits = beforeKits + 2;
   const afterCutters = beforeCutters + 2;
 
@@ -80,16 +86,45 @@ export async function POST(request: Request) {
     })
     .eq('id', day.id);
 
+  await supabase
+    .from('group_cash')
+    .update({ balance: afterGroupBalance, updated_at: new Date().toISOString() })
+    .eq('id', cash.id);
+
+  await supabase.from('cash_movements').insert({
+    type: 'tablet_passage',
+    amount: -400,
+    label: 'Passage Tablette',
+    user_id: memberId
+  });
+
   if (kit) await supabase.from('items').update({ quantity: afterKits, updated_at: new Date().toISOString() }).eq('id', kit.id);
   if (cutter) await supabase.from('items').update({ quantity: afterCutters, updated_at: new Date().toISOString() }).eq('id', cutter.id);
+  await supabase.from('item_stock_movements').insert([
+    {
+      item_id: kit?.id ?? null,
+      item_name: kit?.name || 'Kit',
+      transaction_type: 'tablet_passage',
+      quantity_delta: 2,
+      user_id: memberId
+    },
+    {
+      item_id: cutter?.id ?? null,
+      item_name: cutter?.name || 'Disqueuse',
+      transaction_type: 'tablet_passage',
+      quantity_delta: 2,
+      user_id: memberId
+    }
+  ]);
 
   await createAuditLog({
     actorUserId: session.userId,
     action: 'tablet.passage.create',
     entityType: 'tablet_passage',
     entityId: day.id,
-    summary: `Passage tablette ${memberLabel} | coffre ${beforeCash}$ -> ${afterCash}$ | kits ${beforeKits}->${afterKits} | disqueuses ${beforeCutters}->${afterCutters}`,
-    newValues: { memberLabel, beforeCash, afterCash, beforeKits, afterKits, beforeCutters, afterCutters, businessDay }
+    summary: `Passage tablette ${memberLabel} | dépôt ${beforeCash}$ -> ${afterCash}$ | groupe ${beforeGroupBalance}$ -> ${afterGroupBalance}$ | kits ${beforeKits}->${afterKits} | disqueuses ${beforeCutters}->${afterCutters}`,
+    oldValues: { beforeCash, beforeGroupBalance, beforeKits, beforeCutters },
+    newValues: { memberLabel, afterCash, afterGroupBalance, afterKits, afterCutters, businessDay }
   });
 
   return NextResponse.json({ ok: true });

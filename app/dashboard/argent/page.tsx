@@ -15,7 +15,7 @@ export default async function MoneyPage() {
   const supabase = getSupabaseAdmin();
   const [{ data: cash }, { data: movements }] = await Promise.all([
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
-    supabase.from('cash_movements').select('id, type, amount, label, created_at').order('created_at', { ascending: false }).limit(25)
+    supabase.from('cash_movements').select('id, type, amount, label, created_at, user_id, users(name, username)').order('created_at', { ascending: false }).limit(30)
   ]);
 
   return (

@@ -24,7 +24,7 @@ type Passage = {
   created_at: string;
 };
 
-export function TabletPageClient({ day, businessDay, members, passages, canManageDaily, canCreatePassage, defaultMemberId, defaultMemberLabel }: { day: Day; businessDay: string; members: Array<{ id: string; name: string; username: string }>; passages: Passage[]; canManageDaily: boolean; canCreatePassage: boolean; defaultMemberId: string; defaultMemberLabel: string }) {
+export function TabletPageClient({ day, businessDay, members, passages, groupCash, kitsInStock, cuttersInStock, canManageDaily, canCreatePassage, defaultMemberId, defaultMemberLabel }: { day: Day; businessDay: string; members: Array<{ id: string; name: string; username: string }>; passages: Passage[]; groupCash: number; kitsInStock: number; cuttersInStock: number; canManageDaily: boolean; canCreatePassage: boolean; defaultMemberId: string; defaultMemberLabel: string }) {
   const [deposit, setDeposit] = useState(String(day?.deposited_amount ?? 0));
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
@@ -53,9 +53,12 @@ export function TabletPageClient({ day, businessDay, members, passages, canManag
     <div className="space-y-4">
       <section className="glass-card p-5">
         <h2 className="text-lg font-semibold text-[#fff1dd]">Journée tablette ({businessDay})</h2>
-        <div className="mt-3 grid gap-3 md:grid-cols-5">
-          <Stat label="Coffre restant" value={`${day?.chest_amount ?? 0}$`} />
+        <div className="mt-3 grid gap-3 md:grid-cols-7">
+          <Stat label="Dépôt restant" value={`${day?.chest_amount ?? 0}$`} />
           <Stat label="Dépôt matin" value={`${day?.deposited_amount ?? 0}$`} />
+          <Stat label="Argent groupe réel" value={`${groupCash}$`} />
+          <Stat label="Kits stock réel" value={String(kitsInStock)} />
+          <Stat label="Disqueuses stock réel" value={String(cuttersInStock)} />
           <Stat label="Passages" value={String(day?.passages_count ?? 0)} />
           <Stat label="Kits ajoutés" value={String(day?.kits_added ?? 0)} />
           <Stat label="Disqueuses ajoutées" value={String(day?.cutters_added ?? 0)} />

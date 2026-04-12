@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useMemo, useState } from 'react';
 
 type Permission = { id: number; name: string };
@@ -33,6 +34,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const canEditMembers = userPermissions.includes('members.edit');
   const canDeleteMembers = userPermissions.includes('members.delete');
   const canManageRoles = userPermissions.includes('roles.manage');
+  const canViewActivities = userPermissions.includes('members.activities.view');
 
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
 
@@ -118,11 +120,18 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
                   <p className="font-medium text-[#fff3df]">{member.role_name || 'Sans rôle'}</p>
                 </div>
               </div>
-              {(canEditMembers || canDeleteMembers) ? (
-                <button className="saas-ghost-btn" onClick={() => setSelectedMember(member)}>
-                  Gérer
-                </button>
-              ) : null}
+              <div className="flex items-center gap-2">
+                {canViewActivities ? (
+                  <Link href={`/dashboard/membres/${member.id}/activites`} className="saas-ghost-btn">
+                    Activités
+                  </Link>
+                ) : null}
+                {(canEditMembers || canDeleteMembers) ? (
+                  <button className="saas-ghost-btn" onClick={() => setSelectedMember(member)}>
+                    Gérer
+                  </button>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>

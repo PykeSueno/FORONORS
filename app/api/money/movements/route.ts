@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id),
     supabase.from('cash_movements').insert({
       type: normalizedType,
-      amount,
+      amount: sign * amount,
       label: body.label.trim(),
       user_id: session.userId
     })

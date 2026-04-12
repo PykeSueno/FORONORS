@@ -72,6 +72,7 @@ values
   ('members.create'),
   ('members.edit'),
   ('members.delete'),
+  ('members.activities.view'),
   ('roles.manage'),
   ('dashboard.access'),
   ('money.access'),

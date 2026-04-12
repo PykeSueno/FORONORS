@@ -14,7 +14,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const [{ data: cash }, { data: movements }] = await Promise.all([
     supabase.from('group_cash').select('id, balance, updated_at').order('id').limit(1).maybeSingle(),
-    supabase.from('cash_movements').select('id, type, amount, label, created_at').order('created_at', { ascending: false }).limit(20)
+    supabase.from('cash_movements').select('id, type, amount, label, created_at, user_id, users(name, username)').order('created_at', { ascending: false }).limit(30)
   ]);
 
   return NextResponse.json({ cash, movements: movements ?? [] });
@@ -44,7 +44,7 @@ export async function PATCH(request: Request) {
   if (delta !== 0) {
     await supabase.from('cash_movements').insert({
       type: 'adjust',
-      amount: Math.abs(delta),
+      amount: delta,
       label: body.label?.trim() || 'Ajustement manuel',
       user_id: session.userId
     });
