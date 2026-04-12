@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ReactNode } from 'react';
@@ -15,7 +16,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <header className="border-b border-[#6d4e31]/70 bg-[#1e140f]/85 backdrop-blur">
         <div className="mx-auto flex h-20 w-full max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-8">
-            <img src="/foronors-logo.svg" alt="Foronors" className="h-10 w-10 object-contain" />
+            <Image src="/foronors-logo.svg" alt="Foronors" width={40} height={40} className="h-10 w-10 object-contain" priority />
 
             <nav className="flex items-center gap-2 text-sm">
               <Link href="/dashboard" className="premium-tab">

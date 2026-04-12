@@ -9,7 +9,7 @@ type MemberRow = {
   role_id: number | null;
   is_active: boolean;
   created_at: string;
-  roles: { name: string } | null;
+  roles: Array<{ name: string }> | { name: string } | null;
 };
 
 export async function GET() {
@@ -30,7 +30,10 @@ export async function GET() {
     id: member.id,
     username: member.username,
     role_id: member.role_id,
-    role_name: member.roles?.name ?? member.role ?? '',
+    role_name:
+      (Array.isArray(member.roles) ? member.roles[0]?.name : member.roles?.name) ??
+      member.role ??
+      '',
     is_active: member.is_active,
     created_at: member.created_at
   }));
