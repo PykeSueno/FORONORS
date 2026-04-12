@@ -33,18 +33,23 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="glass-card w-full max-w-md p-8 animate-fade-in">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+      <div
+        className="pointer-events-none absolute inset-0 bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/foronors-logo.svg')",
+          backgroundSize: 'cover',
+          opacity: 0.06,
+          filter: 'blur(20px)',
+          transform: 'scale(1.1)'
+        }}
+      />
+
+      <div className="glass-card relative z-10 w-full max-w-md p-8">
         <h1 className="mb-6 text-center text-2xl font-semibold tracking-wide text-[#fff1dc]">FORONORS</h1>
 
         <form onSubmit={onSubmit} className="space-y-4">
-          <input
-            className="saas-input w-full"
-            placeholder="Username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            required
-          />
+          <input className="saas-input w-full" placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} required />
           <input
             type="password"
             className="saas-input w-full"

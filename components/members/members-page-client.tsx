@@ -1,7 +1,6 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
-import { CreateMemberModal } from '@/components/members/create-member-modal';
 
 type Permission = { id: number; name: string };
 type Role = { id: number; name: string; display_order: number; permission_ids: number[] };
@@ -21,48 +20,30 @@ type MembersPageClientProps = {
   userPermissions: string[];
 };
 
-export function MembersPageClient({
-  initialMembers,
-  initialRoles,
-  initialPermissions,
-  userPermissions
-}: MembersPageClientProps) {
+export function MembersPageClient({ initialMembers, initialRoles, initialPermissions, userPermissions }: MembersPageClientProps) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [roles, setRoles] = useState<Role[]>(initialRoles);
   const [permissions, setPermissions] = useState<Permission[]>(initialPermissions);
-  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(initialRoles[0]?.id ?? null);
-  const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>(initialRoles[0]?.permission_ids ?? []);
-  const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [error, setError] = useState('');
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [newRoleName, setNewRoleName] = useState('');
-  const [newPermissionName, setNewPermissionName] = useState('');
-  const [dragRoleId, setDragRoleId] = useState<number | null>(null);
+  const [error, setError] = useState('');
 
   const canCreateMember = userPermissions.includes('members.create');
   const canEditMembers = userPermissions.includes('members.edit');
   const canDeleteMembers = userPermissions.includes('members.delete');
   const canManageRoles = userPermissions.includes('roles.manage');
 
-  const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? null;
-
-  const permissionsByCategory = useMemo(() => {
-    return permissions.reduce<Record<string, Permission[]>>((acc, permission) => {
-      const category = permission.name.includes('.') ? permission.name.split('.')[0] : 'global';
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(permission);
-      return acc;
-    }, {});
-  }, [permissions]);
+  const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
 
   async function refreshAll() {
-    const [membersRes, rolesRes, permsRes] = await Promise.all([
+    const [membersRes, rolesRes, permissionsRes] = await Promise.all([
       fetch('/api/members'),
       fetch('/api/roles'),
       canManageRoles ? fetch('/api/permissions') : Promise.resolve(null)
     ]);
 
-    if (!membersRes.ok || !rolesRes.ok || (permsRes && !permsRes.ok)) {
+    if (!membersRes.ok || !rolesRes.ok || (permissionsRes && !permissionsRes.ok)) {
       setError('Chargement impossible.');
       return;
     }
@@ -73,60 +54,22 @@ export function MembersPageClient({
     setMembers(membersData.members);
     setRoles(rolesData.roles);
 
-    if (permsRes) {
-      const permsData = (await permsRes.json()) as { permissions: Permission[] };
-      setPermissions(permsData.permissions);
+    if (permissionsRes) {
+      const permissionsData = (await permissionsRes.json()) as { permissions: Permission[] };
+      setPermissions(permissionsData.permissions);
     }
-
-    if (rolesData.roles.length) {
-      const role = rolesData.roles.find((item) => item.id === selectedRoleId) ?? rolesData.roles[0];
-      setSelectedRoleId(role.id);
-      setSelectedPermissionIds(role.permission_ids);
-    }
-  }
-
-  async function saveMember(member: Member, payload: { password?: string }) {
-    const response = await fetch(`/api/members/${member.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: member.name,
-        username: member.username,
-        role_id: member.role_id,
-        is_active: member.is_active,
-        password: payload.password || undefined
-      })
-    });
-
-    if (!response.ok) {
-      setError('Mise à jour membre impossible.');
-      return;
-    }
-
-    setEditingMember(null);
-    await refreshAll();
-  }
-
-  async function removeMember(memberId: string) {
-    const response = await fetch(`/api/members/${memberId}`, { method: 'DELETE' });
-    if (!response.ok) {
-      setError('Suppression membre impossible.');
-      return;
-    }
-    await refreshAll();
   }
 
   async function createRole(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const displayOrder = (roles.at(-1)?.display_order ?? 0) + 10;
     const response = await fetch('/api/roles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newRoleName, display_order: displayOrder })
+      body: JSON.stringify({ name: newRoleName, display_order: (sortedRoles.at(-1)?.display_order ?? 0) + 10 })
     });
 
     if (!response.ok) {
-      setError('Création rôle impossible.');
+      setError('Création du rôle impossible.');
       return;
     }
 
@@ -134,273 +77,309 @@ export function MembersPageClient({
     await refreshAll();
   }
 
-  async function renameRole(roleId: number, name: string) {
-    const response = await fetch(`/api/roles/${roleId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
+  async function openCreateMember() {
+    setSelectedMember({
+      id: '',
+      name: '',
+      username: '',
+      role_id: null,
+      role_name: '',
+      is_active: true
     });
-    if (!response.ok) setError('Renommage rôle impossible.');
-    await refreshAll();
   }
-
-  async function deleteRole(roleId: number) {
-    const response = await fetch(`/api/roles/${roleId}`, { method: 'DELETE' });
-    if (!response.ok) setError('Suppression rôle impossible.');
-    await refreshAll();
-  }
-
-  async function saveRoleOrder(nextRoles: Role[]) {
-    await Promise.all(
-      nextRoles.map((role, index) =>
-        fetch(`/api/roles/${role.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ display_order: (index + 1) * 10 })
-        })
-      )
-    );
-    await refreshAll();
-  }
-
-  async function createPermission(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const response = await fetch('/api/permissions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newPermissionName })
-    });
-    if (!response.ok) setError('Création permission impossible.');
-    setNewPermissionName('');
-    await refreshAll();
-  }
-
-  async function saveRolePermissions() {
-    if (!selectedRole) return;
-    const response = await fetch(`/api/roles/${selectedRole.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ permission_ids: selectedPermissionIds })
-    });
-
-    if (!response.ok) setError('Enregistrement permissions impossible.');
-    await refreshAll();
-  }
-
-  const sortedRoles = [...roles].sort((a, b) => a.display_order - b.display_order);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-[#fff1df]">Membres / Rôles / Permissions</h1>
-        {canCreateMember ? <button className="saas-primary-btn" onClick={() => setShowCreateModal(true)}>Nouveau membre</button> : null}
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold text-[#fff2de]">Membres & Rôles</h1>
+          {canCreateMember ? <button className="saas-primary-btn" onClick={() => void openCreateMember()}>Nouveau membre</button> : null}
+        </div>
       </div>
 
-      {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
+      {error ? <p className="rounded-xl border border-red-300/45 bg-red-500/10 px-4 py-2 text-sm text-red-100">{error}</p> : null}
 
-      <section className="glass-card p-4">
-        <div className="grid gap-3">
+      <section className="glass-card p-5">
+        <h2 className="text-lg font-semibold text-[#fff0d9]">Membres</h2>
+        <div className="mt-3 space-y-2">
           {members.map((member) => (
-            <div key={member.id} className="rounded-xl border border-white/10 bg-[#5f3d26]/55 px-4 py-3">
-              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_220px_auto] sm:items-center">
+            <div key={member.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
+              <div className="grid min-w-[280px] flex-1 grid-cols-3 gap-3 text-sm">
                 <div>
-                  <p className="text-sm text-[#ffe6cb]">Nom</p>
+                  <p className="text-[#ffe2c1]/80">Nom</p>
                   <p className="font-medium text-[#fff3df]">{member.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-[#ffe6cb]">User</p>
+                  <p className="text-[#ffe2c1]/80">User</p>
                   <p className="font-medium text-[#fff3df]">{member.username}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-[#ffe6cb]">Rôle</p>
+                  <p className="text-[#ffe2c1]/80">Rôle</p>
                   <p className="font-medium text-[#fff3df]">{member.role_name || 'Sans rôle'}</p>
                 </div>
-                <div className="flex gap-2 sm:justify-end">
-                  {canEditMembers ? <button className="saas-ghost-btn" onClick={() => setEditingMember(member)}>Modifier</button> : null}
-                  {canDeleteMembers ? <button className="saas-ghost-btn" onClick={() => void removeMember(member.id)}>Supprimer</button> : null}
-                </div>
               </div>
+              {(canEditMembers || canDeleteMembers) ? (
+                <button className="saas-ghost-btn" onClick={() => setSelectedMember(member)}>
+                  Gérer
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
       </section>
 
       {canManageRoles ? (
-        <section className="grid gap-4 xl:grid-cols-[1fr_1.05fr]">
-          <article className="glass-card p-5">
-            <h2 className="text-lg font-semibold text-[#fff2df]">Rôles</h2>
-            <form onSubmit={createRole} className="mt-3 flex gap-2">
-              <input className="saas-input flex-1" placeholder="Nom du rôle" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} required />
-              <button className="saas-primary-btn" type="submit">Créer</button>
+        <section className="glass-card p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-[#fff0d9]">Rôles</h2>
+            <form onSubmit={createRole} className="flex gap-2">
+              <input className="saas-input" placeholder="Nouveau rôle" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} required />
+              <button type="submit" className="saas-primary-btn">Créer</button>
             </form>
+          </div>
 
-            <div className="mt-4 space-y-2">
-              {sortedRoles.map((role) => (
-                <RoleCard
-                  key={role.id}
-                  role={role}
-                  active={selectedRoleId === role.id}
-                  onSelect={() => {
-                    setSelectedRoleId(role.id);
-                    setSelectedPermissionIds(role.permission_ids);
-                  }}
-                  onRename={renameRole}
-                  onDelete={deleteRole}
-                  onDragStart={() => setDragRoleId(role.id)}
-                  onDrop={() => {
-                    if (!dragRoleId || dragRoleId === role.id) return;
-                    const items = [...sortedRoles];
-                    const from = items.findIndex((r) => r.id === dragRoleId);
-                    const to = items.findIndex((r) => r.id === role.id);
-                    const [moved] = items.splice(from, 1);
-                    items.splice(to, 0, moved);
-                    void saveRoleOrder(items);
-                  }}
-                />
-              ))}
-            </div>
-          </article>
-
-          <article className="glass-card p-5">
-            <h2 className="text-lg font-semibold text-[#fff2df]">Permissions par rôle</h2>
-            <p className="mt-1 text-sm text-[#ffe5c6]">{selectedRole?.name ?? 'Sélectionnez un rôle'}</p>
-
-            <form onSubmit={createPermission} className="mt-3 flex gap-2">
-              <input className="saas-input flex-1" placeholder="Nouvelle permission" value={newPermissionName} onChange={(e) => setNewPermissionName(e.target.value)} required />
-              <button className="saas-primary-btn" type="submit">Ajouter</button>
-            </form>
-
-            <div className="mt-4 space-y-4">
-              {Object.entries(permissionsByCategory).map(([category, items]) => (
-                <div key={category}>
-                  <p className="mb-2 text-xs uppercase tracking-[0.18em] text-[#ffe1bd]">{category}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {items.map((permission) => {
-                      const active = selectedPermissionIds.includes(permission.id);
-                      return (
-                        <button
-                          key={permission.id}
-                          className={active ? 'permission-pill permission-pill-active' : 'permission-pill'}
-                          onClick={() =>
-                            setSelectedPermissionIds((current) =>
-                              current.includes(permission.id)
-                                ? current.filter((id) => id !== permission.id)
-                                : [...current, permission.id]
-                            )
-                          }
-                        >
-                          {permission.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button className="saas-primary-btn mt-4" onClick={() => void saveRolePermissions()}>
-              Enregistrer permissions
-            </button>
-          </article>
+          <div className="mt-3 space-y-2">
+            {sortedRoles.map((role) => (
+              <div key={role.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
+                <p className="font-medium text-[#fff2df]">{role.name}</p>
+                <button className="saas-ghost-btn" onClick={() => setSelectedRole(role)}>Gérer</button>
+              </div>
+            ))}
+          </div>
         </section>
       ) : null}
 
-      {showCreateModal ? <CreateMemberModal roles={sortedRoles.map((r) => ({ id: r.id, name: r.name }))} onClose={() => setShowCreateModal(false)} onCreated={refreshAll} /> : null}
-      {editingMember ? (
-        <EditMemberDrawer member={editingMember} roles={sortedRoles} onClose={() => setEditingMember(null)} onSave={saveMember} />
+      {selectedMember ? (
+        <MemberManageModal
+          member={selectedMember}
+          roles={sortedRoles}
+          canDelete={canDeleteMembers}
+          isCreateMode={!selectedMember.id}
+          onClose={() => setSelectedMember(null)}
+          onSaved={async () => {
+            setSelectedMember(null);
+            await refreshAll();
+          }}
+          onError={setError}
+        />
+      ) : null}
+
+      {selectedRole ? (
+        <RoleManageModal
+          role={selectedRole}
+          permissions={permissions}
+          onClose={() => setSelectedRole(null)}
+          onSaved={async () => {
+            setSelectedRole(null);
+            await refreshAll();
+          }}
+          onError={setError}
+        />
       ) : null}
     </div>
   );
 }
 
-function RoleCard({
-  role,
-  active,
-  onSelect,
-  onRename,
-  onDelete,
-  onDragStart,
-  onDrop
-}: {
-  role: Role;
-  active: boolean;
-  onSelect: () => void;
-  onRename: (roleId: number, name: string) => Promise<void>;
-  onDelete: (roleId: number) => Promise<void>;
-  onDragStart: () => void;
-  onDrop: () => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(role.name);
-
-  return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={onDrop}
-      className={active ? 'rounded-xl border border-[#ffddb4]/40 bg-[#6e462c]/45 p-3' : 'rounded-xl border border-white/10 bg-[#5b3a25]/45 p-3'}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        {editing ? <input className="saas-input flex-1" value={name} onChange={(e) => setName(e.target.value)} /> : <p className="flex-1 text-[#fff2df]">{role.name}</p>}
-        <button className="saas-ghost-btn" onClick={onSelect}>Gérer</button>
-        {editing ? (
-          <button className="saas-primary-btn" onClick={() => void onRename(role.id, name).then(() => setEditing(false))}>OK</button>
-        ) : (
-          <button className="saas-ghost-btn" onClick={() => setEditing(true)}>Renommer</button>
-        )}
-        <button className="saas-ghost-btn" onClick={() => void onDelete(role.id)}>Supprimer</button>
-      </div>
-    </div>
-  );
-}
-
-function EditMemberDrawer({
+function MemberManageModal({
   member,
   roles,
+  canDelete,
+  isCreateMode,
   onClose,
-  onSave
+  onSaved,
+  onError
 }: {
   member: Member;
   roles: Role[];
+  canDelete: boolean;
+  isCreateMode: boolean;
   onClose: () => void;
-  onSave: (member: Member, payload: { password?: string }) => Promise<void>;
+  onSaved: () => Promise<void>;
+  onError: (message: string) => void;
 }) {
-  const [draft, setDraft] = useState<Member>(member);
+  const [draft, setDraft] = useState(member);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  function generatePassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    const value = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    setNewPassword(value);
+  }
+
+  async function save() {
+    const response = await fetch(isCreateMode ? '/api/members' : `/api/members/${draft.id}`, {
+      method: isCreateMode ? 'POST' : 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: draft.name,
+        username: draft.username,
+        role_id: draft.role_id,
+        is_active: draft.is_active,
+        password: newPassword || undefined
+      })
+    });
+
+    if (!response.ok) {
+      const data = (await response.json()) as { message?: string };
+      onError(data.message ?? 'Enregistrement impossible.');
+      return;
+    }
+
+    await onSaved();
+  }
+
+  async function remove() {
+    const response = await fetch(`/api/members/${draft.id}`, { method: 'DELETE' });
+    if (!response.ok) {
+      onError('Suppression impossible.');
+      return;
+    }
+    await onSaved();
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/55 backdrop-blur-sm">
-      <div className="h-full w-full max-w-md bg-[#4b2f1e] p-5 text-[#ffe8cb] shadow-2xl animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-lg p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Modifier membre</h3>
+          <h3 className="text-xl font-semibold text-[#fff0db]">Gérer membre</h3>
           <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
         </div>
 
         <div className="space-y-3">
-          <input className="saas-input w-full" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Nom" />
-          <input className="saas-input w-full" value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value })} placeholder="User" />
+          <input className="saas-input w-full" placeholder="Nom" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <input className="saas-input w-full" placeholder="User" value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value })} />
           <select className="saas-input w-full" value={draft.role_id ?? ''} onChange={(e) => setDraft({ ...draft, role_id: e.target.value ? Number(e.target.value) : null })}>
             <option value="">Sans rôle</option>
-            {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+            {roles.map((role) => (
+              <option key={role.id} value={role.id}>{role.name}</option>
+            ))}
           </select>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Actif</label>
+          <label className="flex items-center gap-2 text-sm text-[#ffe3c1]"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Actif</label>
+
+          <div>
+            <p className="mb-1 text-xs text-[#ffe3c1]/80">Mot de passe actuel</p>
+            <input className="saas-input w-full" value="••••••" readOnly />
+          </div>
 
           <div className="relative">
             <input
-              className="saas-input w-full pr-11"
+              className="saas-input w-full pr-20"
               type={showPassword ? 'text' : 'password'}
               placeholder="Nouveau mot de passe"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
             />
-            <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 saas-ghost-btn !px-2 !py-1" onClick={() => setShowPassword((v) => !v)}>
-              {showPassword ? '🙈' : '👁️'}
-            </button>
+            <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
+              <button type="button" className="saas-ghost-btn !px-2 !py-1" onClick={() => setShowPassword((v) => !v)}>{showPassword ? '🙈' : '👁️'}</button>
+              <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={generatePassword}>Gen</button>
+            </div>
           </div>
 
-          <button className="saas-primary-btn w-full" onClick={() => void onSave(draft, { password: newPassword })}>Enregistrer</button>
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            {!isCreateMode && canDelete ? <button className="saas-ghost-btn" onClick={() => void remove()}>Supprimer</button> : null}
+            <button className="saas-primary-btn" onClick={() => void save()}>Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoleManageModal({
+  role,
+  permissions,
+  onClose,
+  onSaved,
+  onError
+}: {
+  role: Role;
+  permissions: Permission[];
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  onError: (message: string) => void;
+}) {
+  const [name, setName] = useState(role.name);
+  const [checked, setChecked] = useState<number[]>(role.permission_ids);
+  const [newPermission, setNewPermission] = useState('');
+
+  async function saveRole() {
+    const response = await fetch(`/api/roles/${role.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, permission_ids: checked })
+    });
+
+    if (!response.ok) {
+      onError('Enregistrement rôle impossible.');
+      return;
+    }
+
+    await onSaved();
+  }
+
+  async function removeRole() {
+    const response = await fetch(`/api/roles/${role.id}`, { method: 'DELETE' });
+    if (!response.ok) {
+      onError('Suppression rôle impossible.');
+      return;
+    }
+    await onSaved();
+  }
+
+  async function addPermission() {
+    const response = await fetch('/api/permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newPermission })
+    });
+
+    if (!response.ok) {
+      onError('Création permission impossible.');
+      return;
+    }
+
+    setNewPermission('');
+    await onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-2xl p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-[#fff0db]">Gérer rôle</h3>
+          <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
+        </div>
+
+        <div className="space-y-4">
+          <input className="saas-input w-full" value={name} onChange={(e) => setName(e.target.value)} />
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {permissions.map((permission) => (
+              <label key={permission.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
+                <input
+                  type="checkbox"
+                  checked={checked.includes(permission.id)}
+                  onChange={(e) =>
+                    setChecked((current) =>
+                      e.target.checked ? [...current, permission.id] : current.filter((id) => id !== permission.id)
+                    )
+                  }
+                />
+                {permission.name}
+              </label>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <input className="saas-input flex-1" placeholder="Nouvelle permission" value={newPermission} onChange={(e) => setNewPermission(e.target.value)} />
+            <button className="saas-ghost-btn" onClick={() => void addPermission()}>Ajouter</button>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button className="saas-ghost-btn" onClick={() => void removeRole()}>Supprimer rôle</button>
+            <button className="saas-primary-btn" onClick={() => void saveRole()}>Enregistrer</button>
+          </div>
         </div>
       </div>
     </div>
