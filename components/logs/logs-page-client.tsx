@@ -2,6 +2,13 @@
 
 import { useMemo, useState } from 'react';
 
+function humanAction(action: string) {
+  if (action === 'money.edit') return "Ajustement d’argent";
+  if (action.includes('stock_in')) return 'Entrée stock';
+  if (action.includes('stock_out')) return 'Sortie stock';
+  return action;
+}
+
 type LogEntry = {
   id: number;
   actor_name: string;
@@ -113,7 +120,7 @@ export function LogsPageClient({
         {filteredLogs.map((log) => (
           <article key={log.id} className="glass-card border-l-4 border-l-[#f1c792] p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-[#ffe9cb]">{log.action}</p>
+              <p className="text-sm font-semibold text-[#ffe9cb]">{humanAction(log.action)}</p>
               <span className="rounded-full border border-white/20 px-2 py-0.5 text-xs text-[#f8d9b8]">{new Date(log.created_at).toLocaleString('fr-FR')}</span>
             </div>
             <p className="mt-1 text-sm text-[#f2d2ae]">{log.summary}</p>

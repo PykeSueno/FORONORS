@@ -298,3 +298,60 @@ values
   ('transactions.manage'),
   ('transactions.recent.access')
 on conflict (name) do nothing;
+
+create table if not exists public.tablet_days (
+  id bigint generated always as identity primary key,
+  business_day date not null unique,
+  deposited_amount numeric(12,2) not null default 0,
+  chest_amount numeric(12,2) not null default 0,
+  passages_count integer not null default 0,
+  kits_added integer not null default 0,
+  cutters_added integer not null default 0,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.tablet_passages (
+  id bigint generated always as identity primary key,
+  tablet_day_id bigint not null references public.tablet_days(id) on delete cascade,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null,
+  before_cash numeric(12,2) not null,
+  after_cash numeric(12,2) not null,
+  before_kits integer not null,
+  after_kits integer not null,
+  before_cutters integer not null,
+  after_cutters integer not null,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  unique(tablet_day_id, member_user_id)
+);
+
+create index if not exists idx_tablet_passages_created_at on public.tablet_passages(created_at desc);
+
+alter table public.tablet_days enable row level security;
+alter table public.tablet_passages enable row level security;
+
+drop policy if exists "allow_service_role_all_tablet_days" on public.tablet_days;
+create policy "allow_service_role_all_tablet_days"
+on public.tablet_days
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_tablet_passages" on public.tablet_passages;
+create policy "allow_service_role_all_tablet_passages"
+on public.tablet_passages
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('tablet.access'),
+  ('tablet.passage.create'),
+  ('tablet.daily.manage'),
+  ('tablet.stats.view'),
+  ('tablet.logs.view')
+on conflict (name) do nothing;

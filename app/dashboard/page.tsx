@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { formatUsd } from '@/lib/currency';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
+import { humanMoneyMovementLabel, humanStockMovementLabel } from '@/lib/labels';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export default async function DashboardPage() {
@@ -14,6 +15,7 @@ export default async function DashboardPage() {
   const canTransactionsRecent = canTransactions && permissions.includes('transactions.recent.access');
   const canMembers = permissions.includes('members.access');
   const canLogs = permissions.includes('logs.access') && permissions.includes('logs.view');
+  const canTablet = permissions.includes('tablet.access');
 
   const supabase = getSupabaseAdmin();
   const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }] = await Promise.all([
@@ -54,6 +56,7 @@ export default async function DashboardPage() {
         {canTransactionsRecent ? <HubCard href="/dashboard/transactions-recentes" icon="🕒" title="Transactions récentes" value={String(txCount ?? 0)} subtitle="Historique" /> : null}
         {canMembers ? <HubCard href="/dashboard/membres" icon="👥" title="Membres" value={String(membersCount ?? 0)} subtitle="Gestion équipe" /> : null}
         {canLogs ? <HubCard href="/dashboard/logs" icon="🧾" title="Logs" value={String(logsCount ?? 0)} subtitle="Traçabilité" /> : null}
+        {canTablet ? <HubCard href="/dashboard/tablette" icon="📱" title="Tablette" value="Module" subtitle="Passages 8h → 8h" /> : null}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
@@ -69,7 +72,7 @@ export default async function DashboardPage() {
                   <p className="text-sm font-medium text-[#ffe8c9]">{row.label}</p>
                   <p className={`text-sm font-semibold ${Number(row.amount) >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{formatUsd(Number(row.amount))}</p>
                 </div>
-                <p className="mt-1 text-xs text-[#f2d2ae]">{row.type} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
+                <p className="mt-1 text-xs text-[#f2d2ae]">{humanMoneyMovementLabel(row.type)} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
               </div>
             ))}
           </div>
@@ -87,7 +90,7 @@ export default async function DashboardPage() {
                   <p className="text-sm font-medium text-[#ffe8c9]">{row.item_name}</p>
                   <p className={`text-sm font-semibold ${row.quantity_delta >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{row.quantity_delta > 0 ? '+' : ''}{row.quantity_delta}</p>
                 </div>
-                <p className="mt-1 text-xs text-[#f2d2ae]">{row.transaction_type} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
+                <p className="mt-1 text-xs text-[#f2d2ae]">{humanStockMovementLabel(row.transaction_type)} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
               </div>
             ))}
           </div>
