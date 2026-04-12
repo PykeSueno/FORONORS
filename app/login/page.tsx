@@ -35,39 +35,29 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="premium-panel w-full max-w-md rounded-3xl p-8">
+      <div className="glass-card w-full max-w-md p-8 animate-fade-in">
         <Logo />
-
         <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <label className="mb-2 block text-sm text-[#e5ccab]">Nom d&apos;utilisateur</label>
-            <input
-              className="premium-input w-full"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm text-[#e5ccab]">Mot de passe</label>
-            <input
-              type="password"
-              className="premium-input w-full"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </div>
+          <input
+            className="saas-input w-full"
+            placeholder="Username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            required
+          />
+          <input
+            type="password"
+            className="saas-input w-full"
+            placeholder="Mot de passe"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
 
           {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-          <button type="submit" disabled={loading} className="premium-button w-full disabled:opacity-70">
+          <button type="submit" disabled={loading} className="saas-primary-btn w-full disabled:opacity-70">
             {loading ? 'Connexion...' : 'Se connecter'}
-          </button>
-
-          <button type="button" className="w-full text-sm text-[#d3b28d] underline underline-offset-4">
-            Mot de passe oublié ?
           </button>
         </form>
       </div>

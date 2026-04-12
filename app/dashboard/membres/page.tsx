@@ -1,8 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-
-type Tab = 'members' | 'roles' | 'permissions';
+import { CreateMemberModal } from '@/components/members/create-member-modal';
 
 type Permission = { id: number; name: string };
 type Role = { id: number; name: string; permission_ids: number[]; permissions: Permission[] };
@@ -17,8 +16,9 @@ type Member = {
 
 type EditableMember = Member & { editingRoleId: number | null; editingActive: boolean };
 
+const MODULE_SUGGESTIONS = ['dashboard.view', 'members.view', 'members.create', 'members.edit', 'roles.manage'];
+
 export default function MembersPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('members');
   const [members, setMembers] = useState<EditableMember[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -138,302 +138,179 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="premium-panel rounded-3xl p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <div className="space-y-6 animate-fade-in">
+      <section className="glass-card p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[#d7c2a0]/75">Private gaming app</p>
-            <h1 className="mt-2 text-3xl font-semibold text-[#f5e6cf]">Module Membres</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#dcc5a0]/80">
-              Espace premium de gestion des comptes, rôles et permissions avec une interface propre et lumineuse.
-            </p>
+            <h1 className="text-3xl font-semibold text-[#f6e5cd]">Membres</h1>
+            <p className="mt-1 text-sm text-[#d7ba99]">Gestion des utilisateurs, rôles et permissions de modules.</p>
           </div>
-
-          <button className="premium-button" onClick={() => setMemberModalOpen(true)}>
-            + Nouveau membre
+          <button className="saas-primary-btn" onClick={() => setMemberModalOpen(true)}>
+            Créer
           </button>
-        </div>
-
-        <div className="mt-6 flex flex-wrap gap-2">
-          <TabButton tab="members" activeTab={activeTab} onClick={setActiveTab} label="Membres" />
-          <TabButton tab="roles" activeTab={activeTab} onClick={setActiveTab} label="Rôles" />
-          <TabButton tab="permissions" activeTab={activeTab} onClick={setActiveTab} label="Permissions" />
         </div>
       </section>
 
-      {error ? <p className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+      <section className="grid gap-4 md:grid-cols-3">
+        <SummaryCard label="Total membres" value={String(totalMembers)} />
+        <SummaryCard label="Membres actifs" value={String(activeMembers)} />
+        <SummaryCard label="Rôles" value={String(roles.length)} />
+      </section>
 
-      {activeTab === 'members' ? (
-        <>
-          <section className="grid gap-4 md:grid-cols-2">
-            <StatCard label="Membres" value={String(totalMembers)} />
-            <StatCard label="Actifs" value={String(activeMembers)} />
-          </section>
+      {error ? <p className="rounded-xl border border-red-400/35 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
 
-          <section className="premium-panel overflow-hidden rounded-3xl">
-            <div className="border-b border-[#6e5132]/60 px-6 py-4">
-              <h2 className="text-lg font-medium text-[#f5e6cf]">Gestion des membres</h2>
-            </div>
+      <section className="glass-card overflow-hidden p-0">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <h2 className="text-lg font-semibold text-[#f5e2c7]">Table des membres</h2>
+          {loading ? <span className="text-xs text-[#cfae8a]">Chargement...</span> : null}
+        </div>
 
-            {loading ? (
-              <p className="px-6 py-5 text-sm text-[#d8c2a2]/80">Chargement...</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-[#2b1d15]/90 text-[#ddc4a3]">
-                    <tr>
-                      <th className="px-6 py-3 font-medium">Username</th>
-                      <th className="px-6 py-3 font-medium">Rôle</th>
-                      <th className="px-6 py-3 font-medium">Statut</th>
-                      <th className="px-6 py-3 font-medium">Créé le</th>
-                      <th className="px-6 py-3 font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {members.map((member) => (
-                      <tr key={member.id} className="border-t border-[#6e5132]/40 transition hover:bg-[#2d2018]/70">
-                        <td className="px-6 py-4 text-[#f1ddbe]">{member.username}</td>
-                        <td className="px-6 py-4">
-                          <select
-                            className="premium-input w-52"
-                            value={member.editingRoleId ?? ''}
-                            onChange={(event) =>
-                              setMembers((current) =>
-                                current.map((item) =>
-                                  item.id === member.id
-                                    ? { ...item, editingRoleId: event.target.value ? Number(event.target.value) : null }
-                                    : item
-                                )
-                              )
-                            }
-                          >
-                            <option value="">Sans rôle</option>
-                            {roles.map((role) => (
-                              <option key={role.id} value={role.id}>
-                                {role.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-6 py-4">
-                          <label className="inline-flex items-center gap-2 rounded-xl border border-[#7f603f] bg-[#1f1510] px-3 py-2 text-xs text-[#e8d3b2]">
-                            <input
-                              type="checkbox"
-                              checked={member.editingActive}
-                              onChange={(event) =>
-                                setMembers((current) =>
-                                  current.map((item) =>
-                                    item.id === member.id ? { ...item, editingActive: event.target.checked } : item
-                                  )
-                                )
-                              }
-                            />
-                            {member.editingActive ? 'Actif' : 'Inactif'}
-                          </label>
-                        </td>
-                        <td className="px-6 py-4 text-[#c4a788]">{new Date(member.created_at).toLocaleDateString('fr-FR')}</td>
-                        <td className="px-6 py-4">
-                          <button className="premium-ghost" onClick={() => void saveMember(member)}>
-                            Enregistrer
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        </>
-      ) : null}
+        <div className="overflow-x-auto px-3 pb-3 pt-2">
+          <table className="min-w-full border-separate border-spacing-y-2 text-sm">
+            <thead>
+              <tr className="text-left text-[#d6b896]">
+                <th className="px-4 py-2">Username</th>
+                <th className="px-4 py-2">Rôle</th>
+                <th className="px-4 py-2">Statut</th>
+                <th className="px-4 py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((member) => (
+                <tr key={member.id} className="rounded-xl border border-white/10 bg-[#22170f]/70 transition duration-200 hover:bg-[#2c1d13]/90 hover:shadow-[0_0_20px_rgba(140,90,50,0.2)]">
+                  <td className="px-4 py-3 text-[#f4e0c3]">{member.username}</td>
+                  <td className="px-4 py-3">
+                    <select
+                      className="saas-input w-44"
+                      value={member.editingRoleId ?? ''}
+                      onChange={(event) =>
+                        setMembers((current) =>
+                          current.map((item) =>
+                            item.id === member.id
+                              ? { ...item, editingRoleId: event.target.value ? Number(event.target.value) : null }
+                              : item
+                          )
+                        )
+                      }
+                    >
+                      <option value="">Sans rôle</option>
+                      {roles.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      className={member.editingActive ? 'status-badge status-active' : 'status-badge status-inactive'}
+                      onClick={() =>
+                        setMembers((current) =>
+                          current.map((item) =>
+                            item.id === member.id ? { ...item, editingActive: !item.editingActive } : item
+                          )
+                        )
+                      }
+                    >
+                      {member.editingActive ? 'Actif' : 'Inactif'}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button className="saas-ghost-btn" onClick={() => void saveMember(member)}>
+                      Sauvegarder
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      {activeTab === 'roles' ? (
-        <section className="premium-panel space-y-6 rounded-3xl p-6">
-          <form onSubmit={createRole} className="flex flex-col gap-3 md:flex-row">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="glass-card p-5">
+          <h3 className="text-lg font-semibold text-[#f5e2c7]">Rôles</h3>
+          <form onSubmit={createRole} className="mt-4 flex gap-2">
             <input
-              className="premium-input flex-1"
-              placeholder="Créer un rôle (ex: Administrateur)"
+              className="saas-input flex-1"
+              placeholder="Ex: Admin"
               value={newRoleName}
               onChange={(event) => setNewRoleName(event.target.value)}
               required
             />
-            <button type="submit" className="premium-button">
-              Ajouter le rôle
+            <button type="submit" className="saas-primary-btn">
+              Ajouter
             </button>
           </form>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="mt-4 space-y-3">
             {roles.map((role) => (
-              <article key={role.id} className="premium-card rounded-2xl p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-[#f5e6cf]">{role.name}</h3>
-                  <span className="text-xs text-[#cfb08f]">{role.permissions.length} permissions</span>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div key={role.id} className="rounded-xl border border-white/10 bg-[#241910]/65 p-3">
+                <p className="text-sm font-medium text-[#f2ddbf]">{role.name}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
                   {permissions.map((permission) => {
                     const assigned = role.permission_ids.includes(permission.id);
                     return (
                       <button
                         key={`${role.id}-${permission.id}`}
                         onClick={() => void toggleRolePermission(role, permission.id)}
-                        className={assigned ? 'permission-chip permission-chip-active' : 'permission-chip'}
+                        className={assigned ? 'permission-pill permission-pill-active' : 'permission-pill'}
                       >
                         {permission.name}
                       </button>
                     );
                   })}
                 </div>
-              </article>
+              </div>
             ))}
           </div>
-        </section>
-      ) : null}
+        </article>
 
-      {activeTab === 'permissions' ? (
-        <section className="premium-panel space-y-6 rounded-3xl p-6">
-          <form onSubmit={createPermission} className="flex flex-col gap-3 md:flex-row">
+        <article className="glass-card p-5">
+          <h3 className="text-lg font-semibold text-[#f5e2c7]">Permissions (modules)</h3>
+          <form onSubmit={createPermission} className="mt-4 flex gap-2">
             <input
-              className="premium-input flex-1"
-              placeholder="Créer une permission (ex: members.write)"
+              className="saas-input flex-1"
+              placeholder="Ex: members.edit"
               value={newPermissionName}
               onChange={(event) => setNewPermissionName(event.target.value)}
               required
             />
-            <button type="submit" className="premium-button">
-              Ajouter la permission
+            <button type="submit" className="saas-primary-btn">
+              Ajouter
             </button>
           </form>
 
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-3 flex flex-wrap gap-2">
+            {MODULE_SUGGESTIONS.map((item) => (
+              <button key={item} className="saas-ghost-btn text-xs" onClick={() => setNewPermissionName(item)}>
+                {item}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {permissions.map((permission) => (
-              <div key={permission.id} className="premium-card rounded-2xl px-4 py-3 text-sm text-[#ead4b3]">
+              <div key={permission.id} className="rounded-xl border border-white/10 bg-[#241910]/65 px-3 py-2 text-xs text-[#e2c6a6]">
                 {permission.name}
               </div>
             ))}
           </div>
-        </section>
-      ) : null}
+        </article>
+      </section>
 
       {memberModalOpen ? (
-        <CreateMemberModal roles={roles} onClose={() => setMemberModalOpen(false)} onCreated={loadAll} />
+        <CreateMemberModal roles={roles.map((role) => ({ id: role.id, name: role.name }))} onClose={() => setMemberModalOpen(false)} onCreated={loadAll} />
       ) : null}
     </div>
   );
 }
 
-function TabButton({
-  tab,
-  activeTab,
-  onClick,
-  label
-}: {
-  tab: Tab;
-  activeTab: Tab;
-  onClick: (tab: Tab) => void;
-  label: string;
-}) {
-  const isActive = tab === activeTab;
+function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <button onClick={() => onClick(tab)} className={isActive ? 'premium-tab premium-tab-active' : 'premium-tab'}>
-      {label}
-    </button>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="premium-card rounded-2xl p-5">
-      <p className="text-xs uppercase tracking-[0.14em] text-[#cfb08f]/75">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-[#f9e9d1]">{value}</p>
-    </div>
-  );
-}
-
-function CreateMemberModal({
-  onClose,
-  onCreated,
-  roles
-}: {
-  onClose: () => void;
-  onCreated: () => Promise<void>;
-  roles: Role[];
-}) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [roleId, setRoleId] = useState<number | null>(null);
-  const [isActive, setIsActive] = useState(true);
-  const [error, setError] = useState('');
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const response = await fetch('/api/members', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, role_id: roleId, is_active: isActive })
-    });
-
-    if (!response.ok) {
-      const data = (await response.json()) as { message?: string };
-      setError(data.message ?? 'Création impossible.');
-      return;
-    }
-
-    await onCreated();
-    onClose();
-  }
-
-  return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
-      <div className="premium-panel w-full max-w-md rounded-3xl p-6 shadow-2xl">
-        <h2 className="text-lg font-semibold text-[#f4e3cc]">Créer un membre</h2>
-        <p className="mt-1 text-sm text-[#cfb08f]">Ajoutez un utilisateur et assignez son rôle.</p>
-
-        <form onSubmit={onSubmit} className="mt-5 space-y-3">
-          <input
-            className="premium-input w-full"
-            placeholder="Username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            required
-          />
-          <input
-            type="password"
-            className="premium-input w-full"
-            placeholder="Mot de passe"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-          <select
-            className="premium-input w-full"
-            value={roleId ?? ''}
-            onChange={(event) => setRoleId(event.target.value ? Number(event.target.value) : null)}
-          >
-            <option value="">Sans rôle</option>
-            {roles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-
-          <label className="flex items-center gap-2 text-sm text-[#dcc5a4]">
-            <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Actif
-          </label>
-
-          {error ? <p className="text-sm text-red-300">{error}</p> : null}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" className="premium-ghost" onClick={onClose}>
-              Annuler
-            </button>
-            <button type="submit" className="premium-button">
-              Créer
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <article className="glass-card p-5 smooth-hover">
+      <p className="text-xs uppercase tracking-[0.15em] text-[#d7ba98]/75">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-[#f6e4cc]">{value}</p>
+    </article>
   );
 }

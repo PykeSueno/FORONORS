@@ -9,9 +9,10 @@
 body {
   @apply antialiased;
   background:
-    radial-gradient(circle at top, rgba(167, 121, 70, 0.2), transparent 42%),
-    linear-gradient(180deg, #130d0a 0%, #19110d 55%, #130d0a 100%);
-  color: #f3e3cc;
+    radial-gradient(circle at 15% 0%, rgba(120, 78, 42, 0.26), transparent 35%),
+    radial-gradient(circle at 85% 100%, rgba(87, 56, 32, 0.18), transparent 40%),
+    linear-gradient(180deg, #0f0b08 0%, #15100c 50%, #100b08 100%);
+  color: #f6e4cc;
 }
 
 input,
@@ -20,79 +21,98 @@ button {
   @apply outline-none;
 }
 
-.premium-panel {
-  background: linear-gradient(160deg, rgba(36, 24, 18, 0.92) 0%, rgba(27, 18, 13, 0.95) 100%);
-  border: 1px solid rgba(126, 93, 57, 0.7);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 25px rgba(191, 143, 84, 0.08);
+.glass-card {
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  background: rgba(30, 20, 10, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.28);
 }
 
-.premium-card {
-  background: rgba(29, 20, 15, 0.88);
-  border: 1px solid rgba(121, 89, 56, 0.65);
-  box-shadow: inset 0 1px 0 rgba(255, 229, 192, 0.05);
+.smooth-hover {
+  transition: all 0.2s ease;
 }
 
-.premium-button {
-  @apply rounded-xl px-4 py-2.5 text-sm font-semibold transition;
-  color: #2a1c13;
-  background: linear-gradient(140deg, #f1d5ad 0%, #d5ab76 100%);
-  box-shadow: 0 8px 20px rgba(192, 141, 83, 0.3);
+.smooth-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.34), 0 0 20px rgba(123, 77, 39, 0.25);
 }
 
-.premium-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 25px rgba(192, 141, 83, 0.45), 0 0 20px rgba(214, 171, 113, 0.45);
-}
-
-.premium-ghost {
-  @apply rounded-xl px-4 py-2 text-xs font-medium transition;
-  border: 1px solid rgba(122, 92, 60, 0.8);
-  color: #e3c8a6;
-  background: rgba(38, 26, 20, 0.7);
-}
-
-.premium-ghost:hover {
-  background: rgba(76, 52, 37, 0.8);
-  box-shadow: 0 0 18px rgba(187, 137, 82, 0.3);
-}
-
-.premium-input {
+.saas-input {
   @apply rounded-xl px-3 py-2.5 text-sm transition;
-  border: 1px solid rgba(123, 90, 56, 0.9);
-  background: rgba(25, 17, 13, 0.9);
-  color: #f6e4ca;
+  background: rgba(25, 17, 10, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f4dec2;
 }
 
-.premium-input:focus {
-  border-color: rgba(220, 172, 113, 0.9);
-  box-shadow: 0 0 0 3px rgba(221, 171, 107, 0.18);
+.saas-input:focus {
+  border-color: rgba(217, 166, 112, 0.85);
+  box-shadow: 0 0 0 3px rgba(214, 162, 105, 0.2);
 }
 
-.premium-tab {
-  @apply rounded-xl px-4 py-2 text-sm transition;
-  border: 1px solid rgba(122, 90, 56, 0.8);
-  color: #d8bd9a;
-  background: rgba(32, 21, 16, 0.8);
+.saas-primary-btn {
+  @apply rounded-xl px-4 py-2.5 text-sm font-semibold transition;
+  color: #2b1b10;
+  background: linear-gradient(135deg, #f0d3ab 0%, #c9955f 100%);
+  box-shadow: 0 10px 24px rgba(176, 120, 66, 0.32);
 }
 
-.premium-tab-active {
-  color: #261911;
-  background: linear-gradient(140deg, #ebcfaa 0%, #c89662 100%);
-  box-shadow: 0 8px 24px rgba(194, 143, 85, 0.35);
+.saas-primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(192, 130, 71, 0.45);
 }
 
-.permission-chip {
-  @apply rounded-lg px-3 py-2 text-left text-xs transition;
-  border: 1px solid rgba(110, 81, 50, 0.7);
-  color: #cfb293;
-  background: rgba(31, 21, 16, 0.7);
+.saas-ghost-btn {
+  @apply rounded-xl px-3 py-2 text-sm transition;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(28, 19, 11, 0.7);
+  color: #e2c4a2;
 }
 
-.permission-chip:hover {
-  box-shadow: 0 0 12px rgba(195, 141, 79, 0.35);
+.saas-ghost-btn:hover {
+  border-color: rgba(213, 160, 102, 0.6);
+  box-shadow: 0 0 16px rgba(157, 99, 50, 0.3);
 }
 
-.permission-chip-active {
-  color: #2a1c13;
-  background: linear-gradient(145deg, #f0d6b2 0%, #d2a876 100%);
+.status-badge {
+  @apply rounded-full px-3 py-1 text-xs font-medium transition;
+}
+
+.status-active {
+  background: rgba(40, 130, 80, 0.2);
+  border: 1px solid rgba(87, 188, 126, 0.55);
+  color: #a5f0bf;
+}
+
+.status-inactive {
+  background: rgba(143, 47, 47, 0.2);
+  border: 1px solid rgba(214, 101, 101, 0.5);
+  color: #ffb4b4;
+}
+
+.permission-pill {
+  @apply rounded-lg px-2.5 py-1.5 text-xs transition;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #d8b792;
+  background: rgba(27, 18, 11, 0.72);
+}
+
+.permission-pill-active {
+  color: #2a1b10;
+  background: linear-gradient(135deg, #ebcca5 0%, #cb985f 100%);
+}
+
+.animate-fade-in {
+  animation: fade-in 0.22s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

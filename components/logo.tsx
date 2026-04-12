@@ -3,7 +3,7 @@ import Image from 'next/image';
 export function Logo() {
   return (
     <div className="mb-8 flex justify-center">
-      <Image src="/foronors-logo.svg" alt="Foronors" width={110} height={110} className="h-24 w-24 object-contain" priority />
+      <Image src="/logo.png" alt="Foronors" width={120} height={120} className="h-24 w-24 object-contain" priority />
     </div>
   );
 }

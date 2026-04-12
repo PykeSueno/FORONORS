@@ -20,14 +20,17 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const body = (await request.json()) as { name?: string };
+  const body = (await request.json()) as { name?: string; module?: string; action?: string };
 
-  if (!body.name) {
+  const normalizedName = body.name?.trim() ||
+    (body.module && body.action ? `${body.module.trim()}.${body.action.trim()}` : '');
+
+  if (!normalizedName) {
     return NextResponse.json({ message: 'Nom de permission requis.' }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from('permissions').insert({ name: body.name });
+  const { error } = await supabase.from('permissions').insert({ name: normalizedName.toLowerCase() });
 
   if (error) {
     return NextResponse.json({ message: 'Création de permission impossible.' }, { status: 400 });
