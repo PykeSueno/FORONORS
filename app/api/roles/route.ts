@@ -12,6 +12,7 @@ type RolePermissionRow = {
 type RoleRow = {
   id: number;
   name: string;
+  display_order: number;
   role_permissions: RolePermissionRow[];
 };
 
@@ -22,7 +23,8 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from('roles')
-    .select('id, name, role_permissions(permission_id, permissions(id, name))')
+    .select('id, name, display_order, role_permissions(permission_id, permissions(id, name))')
+    .order('display_order', { ascending: true })
     .order('name', { ascending: true });
 
   if (error) {
@@ -37,6 +39,7 @@ export async function GET() {
     return {
       id: role.id,
       name: role.name,
+      display_order: role.display_order,
       permission_ids: role.role_permissions.map((rp) => rp.permission_id),
       permissions: resolvedPermissions
     };
@@ -49,14 +52,17 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const body = (await request.json()) as { name?: string };
+  const body = (await request.json()) as { name?: string; display_order?: number };
 
   if (!body.name) {
     return NextResponse.json({ message: 'Nom du rôle requis.' }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from('roles').insert({ name: body.name });
+  const { error } = await supabase.from('roles').insert({
+    name: body.name.trim(),
+    display_order: body.display_order ?? 100
+  });
 
   if (error) {
     return NextResponse.json({ message: 'Création du rôle impossible.' }, { status: 400 });

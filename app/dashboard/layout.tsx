@@ -11,21 +11,28 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-white/10 bg-[#17110c]/70 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-[#8a6a4d]/35 bg-[#e7d5bf]/75 backdrop-blur-lg">
         <div className="mx-auto flex h-20 w-full max-w-[1200px] items-center justify-between px-4">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <Image src="/logo.png" alt="Foronors" width={40} height={40} className="h-10 w-10 object-contain" priority />
-          </Link>
+          <div className="flex items-center gap-8">
+            <Link href="/dashboard" className="flex items-center gap-3">
+              <Image src="/logo.png" alt="Foronors" width={40} height={40} className="h-10 w-10 object-contain" priority />
+              <span className="text-sm font-semibold tracking-[0.18em] text-[#4b301f]">FORONORS</span>
+            </Link>
 
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard" className="saas-ghost-btn hidden sm:inline-flex">
-              Dashboard
-            </Link>
-            <Link href="/dashboard/membres" className="saas-ghost-btn hidden sm:inline-flex">
-              Membres
-            </Link>
-            <div className="rounded-xl border border-white/10 bg-[#23180f]/75 px-3 py-2 text-right">
-              <p className="text-[11px] text-[#cdac89]">{session.username}</p>
+            <nav className="hidden items-center gap-2 sm:flex">
+              <Link href="/dashboard" className="topbar-link">
+                Dashboard
+              </Link>
+              <Link href="/dashboard/membres" className="topbar-link">
+                Membres
+              </Link>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl border border-[#9f7a58]/40 bg-[#f2e4d1]/60 px-3 py-2 text-right">
+              <p className="text-xs font-medium text-[#6b4a33]">{session.username}</p>
+              <p className="text-[11px] text-[#8a6548]">{session.role || 'Utilisateur'}</p>
             </div>
             <form action="/api/logout" method="post">
               <button className="saas-ghost-btn">Logout</button>

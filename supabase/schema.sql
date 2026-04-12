@@ -2,7 +2,8 @@ create extension if not exists "pgcrypto";
 
 create table if not exists public.roles (
   id bigint generated always as identity primary key,
-  name text not null unique
+  name text not null unique,
+  display_order integer not null default 100
 );
 
 create table if not exists public.permissions (
@@ -26,6 +27,7 @@ create table if not exists public.users (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+alter table public.roles add column if not exists display_order integer not null default 100;
 alter table public.users add column if not exists role_id bigint references public.roles(id) on delete set null;
 
 alter table public.roles enable row level security;

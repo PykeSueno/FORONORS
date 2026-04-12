@@ -9,10 +9,10 @@
 body {
   @apply antialiased;
   background:
-    radial-gradient(circle at 15% 0%, rgba(120, 78, 42, 0.26), transparent 35%),
-    radial-gradient(circle at 85% 100%, rgba(87, 56, 32, 0.18), transparent 40%),
-    linear-gradient(180deg, #0f0b08 0%, #15100c 50%, #100b08 100%);
-  color: #f6e4cc;
+    radial-gradient(circle at top left, rgba(223, 191, 155, 0.45), transparent 38%),
+    radial-gradient(circle at bottom right, rgba(198, 154, 113, 0.28), transparent 40%),
+    linear-gradient(180deg, #caa378 0%, #b48357 35%, #9c6f49 100%);
+  color: #fff5e8;
 }
 
 input,
@@ -24,9 +24,9 @@ button {
 .glass-card {
   border-radius: 20px;
   backdrop-filter: blur(10px);
-  background: rgba(30, 20, 10, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.28);
+  background: rgba(82, 53, 33, 0.58);
+  border: 1px solid rgba(255, 245, 231, 0.16);
+  box-shadow: 0 12px 35px rgba(48, 26, 13, 0.2);
 }
 
 .smooth-hover {
@@ -35,43 +35,57 @@ button {
 
 .smooth-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.34), 0 0 20px rgba(123, 77, 39, 0.25);
+  box-shadow: 0 16px 36px rgba(50, 27, 14, 0.28), 0 0 18px rgba(195, 143, 95, 0.22);
 }
 
 .saas-input {
   @apply rounded-xl px-3 py-2.5 text-sm transition;
-  background: rgba(25, 17, 10, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #f4dec2;
+  background: rgba(89, 57, 35, 0.65);
+  border: 1px solid rgba(255, 245, 228, 0.25);
+  color: #ffeedb;
+}
+
+.saas-input::placeholder {
+  color: rgba(255, 232, 201, 0.72);
 }
 
 .saas-input:focus {
-  border-color: rgba(217, 166, 112, 0.85);
-  box-shadow: 0 0 0 3px rgba(214, 162, 105, 0.2);
+  border-color: rgba(255, 228, 187, 0.9);
+  box-shadow: 0 0 0 3px rgba(255, 223, 176, 0.24);
 }
 
 .saas-primary-btn {
   @apply rounded-xl px-4 py-2.5 text-sm font-semibold transition;
-  color: #2b1b10;
-  background: linear-gradient(135deg, #f0d3ab 0%, #c9955f 100%);
-  box-shadow: 0 10px 24px rgba(176, 120, 66, 0.32);
+  color: #4a2f1e;
+  background: linear-gradient(135deg, #ffe0b8 0%, #f4c998 100%);
+  box-shadow: 0 10px 22px rgba(149, 89, 42, 0.28);
 }
 
 .saas-primary-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 0 20px rgba(192, 130, 71, 0.45);
+  box-shadow: 0 0 18px rgba(246, 198, 141, 0.45);
 }
 
 .saas-ghost-btn {
   @apply rounded-xl px-3 py-2 text-sm transition;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(28, 19, 11, 0.7);
-  color: #e2c4a2;
+  border: 1px solid rgba(255, 241, 219, 0.3);
+  background: rgba(92, 58, 35, 0.5);
+  color: #ffe9cc;
 }
 
 .saas-ghost-btn:hover {
-  border-color: rgba(213, 160, 102, 0.6);
-  box-shadow: 0 0 16px rgba(157, 99, 50, 0.3);
+  border-color: rgba(255, 222, 179, 0.7);
+  box-shadow: 0 0 14px rgba(202, 140, 86, 0.28);
+}
+
+.topbar-link {
+  @apply rounded-xl px-3 py-2 text-sm font-medium transition;
+  color: #6e4a31;
+}
+
+.topbar-link:hover {
+  background: rgba(253, 236, 213, 0.6);
+  color: #4c2f1e;
 }
 
 .status-badge {
@@ -79,27 +93,27 @@ button {
 }
 
 .status-active {
-  background: rgba(40, 130, 80, 0.2);
-  border: 1px solid rgba(87, 188, 126, 0.55);
-  color: #a5f0bf;
+  background: rgba(126, 205, 159, 0.28);
+  border: 1px solid rgba(159, 230, 188, 0.7);
+  color: #f0fff8;
 }
 
 .status-inactive {
-  background: rgba(143, 47, 47, 0.2);
-  border: 1px solid rgba(214, 101, 101, 0.5);
-  color: #ffb4b4;
+  background: rgba(199, 110, 110, 0.3);
+  border: 1px solid rgba(248, 153, 153, 0.64);
+  color: #fff0f0;
 }
 
 .permission-pill {
   @apply rounded-lg px-2.5 py-1.5 text-xs transition;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #d8b792;
-  background: rgba(27, 18, 11, 0.72);
+  border: 1px solid rgba(255, 236, 210, 0.32);
+  color: #fde1c0;
+  background: rgba(79, 49, 30, 0.56);
 }
 
 .permission-pill-active {
-  color: #2a1b10;
-  background: linear-gradient(135deg, #ebcca5 0%, #cb985f 100%);
+  color: #4e2f1b;
+  background: linear-gradient(135deg, #ffe1b8 0%, #f8ca9a 100%);
 }
 
 .animate-fade-in {
