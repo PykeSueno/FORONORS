@@ -9,7 +9,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Renseignez les variables d'environnement, puis lancez:
+Renseignez les variables d'environnement (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SESSION_SECRET`), puis lancez:
 
 ```bash
 npm run dev

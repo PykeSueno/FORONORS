@@ -11,7 +11,7 @@ export type AppUser = {
 };
 
 export function getSupabaseAdmin() {
-  return createClient(getEnv('SUPABASE_URL'), getEnv('SUPABASE_SERVICE_ROLE_KEY'), {
+  return createClient(getEnv('NEXT_PUBLIC_SUPABASE_URL'), getEnv('SUPABASE_SECRET_KEY'), {
     auth: {
       persistSession: false,
       autoRefreshToken: false
