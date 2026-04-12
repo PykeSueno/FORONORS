@@ -45,6 +45,7 @@ export function TransactionsPageClient({
   const [reason, setReason] = useState('');
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
+  const [defaultMovementType, setDefaultMovementType] = useState<MovementType>('sale');
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -95,7 +96,8 @@ export function TransactionsPageClient({
   }, [lines, items]);
 
   function addItem(item: Item) {
-    setLines((current) => [...current, { item_id: item.id, movement_type: 'sale', quantity: 1, unit_price: Number(item.sell_price || 0) }]);
+    const defaultPrice = defaultMovementType === 'purchase' ? Number(item.buy_price || 0) : Number(item.sell_price || 0);
+    setLines((current) => [...current, { item_id: item.id, movement_type: defaultMovementType, quantity: 1, unit_price: defaultPrice }]);
   }
 
   function updateLine(index: number, patch: Partial<Line>) {
@@ -171,6 +173,14 @@ export function TransactionsPageClient({
 
             <label className="mt-3 block text-xs text-[#efccaa]">Motif</label>
             <input className="saas-input mt-1 w-full" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Vente event, achat stock..." />
+
+            <label className="mt-3 block text-xs text-[#efccaa]">Type de mouvement par défaut</label>
+            <select className="saas-input mt-1 w-full" value={defaultMovementType} onChange={(e) => setDefaultMovementType(e.target.value as MovementType)}>
+              <option value="sale">Vente</option>
+              <option value="purchase">Achat</option>
+              <option value="stock_out">Sortie</option>
+              <option value="stock_in">Entrée</option>
+            </select>
           </section>
 
           <section className="glass-card p-5">
@@ -193,6 +203,7 @@ export function TransactionsPageClient({
                       <div>
                         <p className="font-medium text-[#ffe8c9]">{item.name}</p>
                         <p className={`text-xs ${meta.tone}`}>{meta.icon} {meta.label}</p>
+                        <p className="text-xs text-[#f4d4b0]">📦 Stock actuel: <span className="font-semibold text-[#ffe9cd]">{item.quantity}</span></p>
                       </div>
 
                       <select className="saas-input" value={line.movement_type} onChange={(e) => updateLine(idx, { movement_type: e.target.value as MovementType })}>

@@ -142,7 +142,7 @@ export function ItemsPageClient({
 
       <section className="space-y-2">
         {filteredItems.map((item) => (
-          <article key={item.id} className="glass-card border-l-4 border-l-[#f1c792] p-3">
+          <article key={item.id} className="glass-card border-l-4 border-l-[#f1c792] p-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="h-16 w-16 overflow-hidden rounded-lg border border-white/10 bg-[#2a1a12]/45">
                 {item.image_url ? (
@@ -158,7 +158,20 @@ export function ItemsPageClient({
                   <span className="rounded-full bg-[#3f281b]/70 px-2 py-0.5 text-xs text-[#f8d9b8]">{item.category_label}</span>
                   {item.type_label ? <span className="rounded-full bg-[#3f281b]/50 px-2 py-0.5 text-xs text-[#f8d9b8]">{item.type_label}</span> : null}
                 </div>
-                <p className="mt-1 text-xs text-[#fce7ce]">Achat {formatUsd(Number(item.buy_price))} · Vente {formatUsd(Number(item.sell_price))} · Stock {item.quantity}</p>
+                <div className="mt-2 grid gap-2 md:grid-cols-3">
+                  <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2">
+                    <p className="text-[11px] text-[#efccaa]">📥 Achat</p>
+                    <p className="text-base font-semibold text-[#ffe8c9]">{formatUsd(Number(item.buy_price))}</p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2">
+                    <p className="text-[11px] text-[#efccaa]">💸 Vente</p>
+                    <p className="text-base font-semibold text-[#ffe8c9]">{formatUsd(Number(item.sell_price))}</p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2">
+                    <p className="text-[11px] text-[#efccaa]">📦 Stock</p>
+                    <p className="text-xl font-bold text-[#fff3df]">{item.quantity}</p>
+                  </div>
+                </div>
                 {item.weapon_identifier ? <p className="text-xs text-[#fce7ce]">ID arme: {item.weapon_identifier}</p> : null}
                 {item.is_money_item ? <p className="text-xs text-[#c4f3b6]">💵 Item Argent lié au solde groupe</p> : null}
               </div>
