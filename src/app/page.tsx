@@ -3,37 +3,52 @@ import { BrandLogo } from '@/components/brand-logo';
 
 export default function HomePage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 py-16">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_#4b3523_0%,_#1a130d_46%,_#0f0b08_100%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_bottom_right,rgba(255,255,255,0.04),transparent_30%,rgba(255,255,255,0.02)_60%,transparent)]" />
-
-      <section className="relative w-full max-w-2xl rounded-3xl border border-[#a88967]/25 bg-[#1b140f]/75 p-8 text-center shadow-[0_24px_90px_rgba(0,0,0,0.5)] backdrop-blur-md sm:p-12">
-        <div className="mb-10 flex justify-center">
+    <main className="flex min-h-screen items-center justify-center bg-[#140f0b] px-4 py-10">
+      <section className="w-full max-w-md rounded-2xl border border-[#8f765d]/30 bg-[#1f1712] p-6 shadow-[0_18px_45px_rgba(0,0,0,0.35)] sm:p-8">
+        <div className="mb-8 flex justify-center">
           <BrandLogo />
         </div>
 
-        <div className="space-y-4">
-          <p className="text-xs font-medium uppercase tracking-[0.28em] text-[#c8b39c]">Interface privée</p>
-          <h1 className="text-4xl font-semibold tracking-tight text-[#fff8f1] sm:text-5xl">FORONORS Stock</h1>
-          <p className="mx-auto max-w-xl text-sm text-[#d9c8b7] sm:text-base">
-            Plateforme interne dédiée à la gestion opérationnelle et au suivi des stocks FORONORS.
-          </p>
-        </div>
+        <form className="space-y-5" action="#" method="post">
+          <div className="space-y-2">
+            <label htmlFor="username" className="block text-sm font-medium text-[#efe2d3]">
+              Nom d&apos;utilisateur
+            </label>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              autoComplete="username"
+              className="w-full rounded-xl border border-[#846a53] bg-[#2a2019] px-4 py-3 text-sm text-[#fff7ee] outline-none transition focus:border-[#d8c1a9] focus:ring-2 focus:ring-[#d8c1a9]/25"
+            />
+          </div>
 
-        <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
-          <Link
-            href="#"
-            className="inline-flex items-center justify-center rounded-xl bg-[#f2e7db] px-6 py-3 text-sm font-semibold text-[#2d2016] transition hover:bg-[#fff6eb]"
+          <div className="space-y-2">
+            <label htmlFor="password" className="block text-sm font-medium text-[#efe2d3]">
+              Mot de passe
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              className="w-full rounded-xl border border-[#846a53] bg-[#2a2019] px-4 py-3 text-sm text-[#fff7ee] outline-none transition focus:border-[#d8c1a9] focus:ring-2 focus:ring-[#d8c1a9]/25"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full rounded-xl bg-[#f0e3d6] px-4 py-3 text-sm font-semibold text-[#2e2218] transition hover:bg-[#fff3e7]"
           >
             Se connecter
-          </Link>
-          <Link
-            href="#"
-            className="inline-flex items-center justify-center rounded-xl border border-[#baa084]/55 bg-transparent px-6 py-3 text-sm font-semibold text-[#efe2d5] transition hover:bg-[#2f2218]/55"
-          >
-            Voir l&apos;interface
-          </Link>
-        </div>
+          </button>
+
+          <div className="text-center">
+            <Link href="#" className="text-sm text-[#d3bba1] underline-offset-4 transition hover:text-[#f4e6d8] hover:underline">
+              Mot de passe oublié ?
+            </Link>
+          </div>
+        </form>
       </section>
     </main>
   );
