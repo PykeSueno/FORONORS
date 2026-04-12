@@ -1,15 +1,51 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions, hasUserPermission } from '@/lib/permissions';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { MembersPageClient } from '@/components/members/members-page-client';
 
 export default async function MembersPage() {
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const canAccessMembers = await hasUserPermission(session.userId, 'members.access');
-  if (!canAccessMembers) redirect('/dashboard');
+  const userPermissions = await getUserPermissions(session.userId);
+  if (!userPermissions.includes('members.access')) redirect('/dashboard');
 
-  const permissions = await getUserPermissions(session.userId);
-  return <MembersPageClient userPermissions={permissions} />;
+  const supabase = getSupabaseAdmin();
+
+  const [{ data: members }, { data: roles }, permsResult] = await Promise.all([
+    supabase.from('users').select('id, name, username, role_id, is_active, roles(name)').order('username', { ascending: true }),
+    supabase
+      .from('roles')
+      .select('id, name, display_order, role_permissions(permission_id)')
+      .order('display_order', { ascending: true }),
+    hasUserPermission(session.userId, 'roles.manage')
+      ? supabase.from('permissions').select('id, name').order('name', { ascending: true })
+      : Promise.resolve({ data: [] as { id: number; name: string }[] })
+  ]);
+
+  const initialMembers = (members ?? []).map((member) => ({
+    id: member.id,
+    name: member.name,
+    username: member.username,
+    role_id: member.role_id,
+    role_name: Array.isArray(member.roles) ? member.roles[0]?.name ?? '' : member.roles?.name ?? '',
+    is_active: member.is_active
+  }));
+
+  const initialRoles = (roles ?? []).map((role) => ({
+    id: role.id,
+    name: role.name,
+    display_order: role.display_order,
+    permission_ids: role.role_permissions.map((item) => item.permission_id)
+  }));
+
+  return (
+    <MembersPageClient
+      initialMembers={initialMembers}
+      initialRoles={initialRoles}
+      initialPermissions={permsResult.data ?? []}
+      userPermissions={userPermissions}
+    />
+  );
 }

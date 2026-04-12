@@ -1,44 +1,40 @@
 import { NextResponse } from 'next/server';
 import { getSession, hashPassword } from '@/lib/auth';
-import { getSupabaseAdmin } from '@/lib/supabase';
 import { hasUserPermission } from '@/lib/permissions';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 type MemberRow = {
   id: string;
   username: string;
+  name: string;
   role: string | null;
   role_id: number | null;
   is_active: boolean;
-  created_at: string;
   roles: Array<{ name: string }> | { name: string } | null;
 };
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+
   const canAccess = await hasUserPermission(session.userId, 'members.access');
   if (!canAccess) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, role, role_id, is_active, created_at, roles(name)')
-    .order('created_at', { ascending: false });
+    .select('id, username, name, role, role_id, is_active, roles(name)')
+    .order('username', { ascending: true });
 
-  if (error) {
-    return NextResponse.json({ message: 'Erreur de lecture.' }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ message: 'Erreur de lecture.' }, { status: 500 });
 
   const members = ((data ?? []) as MemberRow[]).map((member) => ({
     id: member.id,
+    name: member.name,
     username: member.username,
     role_id: member.role_id,
-    role_name:
-      (Array.isArray(member.roles) ? member.roles[0]?.name : member.roles?.name) ??
-      member.role ??
-      '',
-    is_active: member.is_active,
-    created_at: member.created_at
+    role_name: (Array.isArray(member.roles) ? member.roles[0]?.name : member.roles?.name) ?? member.role ?? '',
+    is_active: member.is_active
   }));
 
   return NextResponse.json({ members });
@@ -47,18 +43,20 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+
   const canCreate = await hasUserPermission(session.userId, 'members.create');
   if (!canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as {
     username?: string;
+    name?: string;
     password?: string;
     role_id?: number | null;
     is_active?: boolean;
   };
 
-  if (!body.username || !body.password) {
-    return NextResponse.json({ message: 'Username et mot de passe requis.' }, { status: 400 });
+  if (!body.username || !body.password || !body.name) {
+    return NextResponse.json({ message: 'Nom, user et mot de passe requis.' }, { status: 400 });
   }
 
   const passwordHash = await hashPassword(body.password);
@@ -71,16 +69,15 @@ export async function POST(request: Request) {
   }
 
   const { error } = await supabase.from('users').insert({
-    username: body.username,
+    username: body.username.trim(),
+    name: body.name.trim(),
     password_hash: passwordHash,
     role_id: body.role_id ?? null,
     role: roleName,
     is_active: body.is_active ?? true
   });
 
-  if (error) {
-    return NextResponse.json({ message: 'Création impossible.' }, { status: 400 });
-  }
+  if (error) return NextResponse.json({ message: 'Création impossible.' }, { status: 400 });
 
   return NextResponse.json({ ok: true });
 }

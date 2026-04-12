@@ -1,98 +1,128 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { CreateMemberModal } from '@/components/members/create-member-modal';
 
 type Permission = { id: number; name: string };
 type Role = { id: number; name: string; display_order: number; permission_ids: number[] };
-type Member = { id: string; username: string; role_id: number | null; is_active: boolean };
-type EditableMember = Member & { editingRoleId: number | null };
+type Member = {
+  id: string;
+  name: string;
+  username: string;
+  role_id: number | null;
+  role_name: string;
+  is_active: boolean;
+};
 
-const MODULE_SUGGESTIONS = ['members.access', 'members.create', 'members.edit', 'roles.manage', 'dashboard.access'];
+type MembersPageClientProps = {
+  initialMembers: Member[];
+  initialRoles: Role[];
+  initialPermissions: Permission[];
+  userPermissions: string[];
+};
 
-type MembersPageClientProps = { userPermissions: string[] };
-
-export function MembersPageClient({ userPermissions }: MembersPageClientProps) {
-  const [members, setMembers] = useState<EditableMember[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
-  const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>([]);
-  const [loading, setLoading] = useState(true);
+export function MembersPageClient({
+  initialMembers,
+  initialRoles,
+  initialPermissions,
+  userPermissions
+}: MembersPageClientProps) {
+  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [roles, setRoles] = useState<Role[]>(initialRoles);
+  const [permissions, setPermissions] = useState<Permission[]>(initialPermissions);
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(initialRoles[0]?.id ?? null);
+  const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>(initialRoles[0]?.permission_ids ?? []);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState('');
-
-  const [memberModalOpen, setMemberModalOpen] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [newPermissionName, setNewPermissionName] = useState('');
+  const [dragRoleId, setDragRoleId] = useState<number | null>(null);
 
   const canCreateMember = userPermissions.includes('members.create');
-  const canEditMembers = userPermissions.includes('members.edit') || canCreateMember;
+  const canEditMembers = userPermissions.includes('members.edit');
+  const canDeleteMembers = userPermissions.includes('members.delete');
   const canManageRoles = userPermissions.includes('roles.manage');
 
-  async function loadAll() {
-    setLoading(true);
+  const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? null;
 
-    const membersResponse = await fetch('/api/members');
-    const membersData = (await membersResponse.json()) as { members?: Member[]; message?: string };
+  const permissionsByCategory = useMemo(() => {
+    return permissions.reduce<Record<string, Permission[]>>((acc, permission) => {
+      const category = permission.name.includes('.') ? permission.name.split('.')[0] : 'global';
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(permission);
+      return acc;
+    }, {});
+  }, [permissions]);
 
-    const rolesResponse = await fetch('/api/roles');
-    const rolesData = (await rolesResponse.json()) as { roles?: Role[]; message?: string };
+  async function refreshAll() {
+    const [membersRes, rolesRes, permsRes] = await Promise.all([
+      fetch('/api/members'),
+      fetch('/api/roles'),
+      canManageRoles ? fetch('/api/permissions') : Promise.resolve(null)
+    ]);
 
-    const permissionsResponse = canManageRoles ? await fetch('/api/permissions') : null;
-    const permissionsData = permissionsResponse
-      ? ((await permissionsResponse.json()) as { permissions?: Permission[]; message?: string })
-      : { permissions: [] };
-
-    if (!membersResponse.ok || !rolesResponse.ok || (permissionsResponse && !permissionsResponse.ok)) {
-      setError(membersData.message ?? rolesData.message ?? permissionsData.message ?? 'Chargement impossible.');
-      setLoading(false);
+    if (!membersRes.ok || !rolesRes.ok || (permsRes && !permsRes.ok)) {
+      setError('Chargement impossible.');
       return;
     }
 
-    const loadedRoles = rolesData.roles ?? [];
+    const membersData = (await membersRes.json()) as { members: Member[] };
+    const rolesData = (await rolesRes.json()) as { roles: Role[] };
 
-    setMembers((membersData.members ?? []).map((member) => ({ ...member, editingRoleId: member.role_id })));
-    setRoles(loadedRoles);
-    setPermissions(permissionsData.permissions ?? []);
+    setMembers(membersData.members);
+    setRoles(rolesData.roles);
 
-    if (loadedRoles.length > 0) {
-      const roleId = selectedRoleId && loadedRoles.some((role) => role.id === selectedRoleId) ? selectedRoleId : loadedRoles[0].id;
-      setSelectedRoleId(roleId);
-      setSelectedPermissionIds(loadedRoles.find((role) => role.id === roleId)?.permission_ids ?? []);
+    if (permsRes) {
+      const permsData = (await permsRes.json()) as { permissions: Permission[] };
+      setPermissions(permsData.permissions);
     }
 
-    setError('');
-    setLoading(false);
+    if (rolesData.roles.length) {
+      const role = rolesData.roles.find((item) => item.id === selectedRoleId) ?? rolesData.roles[0];
+      setSelectedRoleId(role.id);
+      setSelectedPermissionIds(role.permission_ids);
+    }
   }
 
-  useEffect(() => {
-    void loadAll();
-  }, []);
-
-  const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? null;
-  const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
-
-  async function saveMember(member: EditableMember) {
+  async function saveMember(member: Member, payload: { password?: string }) {
     const response = await fetch(`/api/members/${member.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role_id: member.editingRoleId, is_active: member.is_active })
+      body: JSON.stringify({
+        name: member.name,
+        username: member.username,
+        role_id: member.role_id,
+        is_active: member.is_active,
+        password: payload.password || undefined
+      })
     });
 
     if (!response.ok) {
       setError('Mise à jour membre impossible.');
       return;
     }
-    await loadAll();
+
+    setEditingMember(null);
+    await refreshAll();
+  }
+
+  async function removeMember(memberId: string) {
+    const response = await fetch(`/api/members/${memberId}`, { method: 'DELETE' });
+    if (!response.ok) {
+      setError('Suppression membre impossible.');
+      return;
+    }
+    await refreshAll();
   }
 
   async function createRole(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const lastOrder = sortedRoles.at(-1)?.display_order ?? 0;
+    const displayOrder = (roles.at(-1)?.display_order ?? 0) + 10;
     const response = await fetch('/api/roles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newRoleName, display_order: lastOrder + 10 })
+      body: JSON.stringify({ name: newRoleName, display_order: displayOrder })
     });
 
     if (!response.ok) {
@@ -101,7 +131,7 @@ export function MembersPageClient({ userPermissions }: MembersPageClientProps) {
     }
 
     setNewRoleName('');
-    await loadAll();
+    await refreshAll();
   }
 
   async function renameRole(roleId: number, name: string) {
@@ -110,45 +140,27 @@ export function MembersPageClient({ userPermissions }: MembersPageClientProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
     });
-
-    if (!response.ok) {
-      setError('Renommage rôle impossible.');
-      return;
-    }
-    await loadAll();
+    if (!response.ok) setError('Renommage rôle impossible.');
+    await refreshAll();
   }
 
   async function deleteRole(roleId: number) {
     const response = await fetch(`/api/roles/${roleId}`, { method: 'DELETE' });
-    if (!response.ok) {
-      setError('Suppression rôle impossible.');
-      return;
-    }
-    await loadAll();
+    if (!response.ok) setError('Suppression rôle impossible.');
+    await refreshAll();
   }
 
-  async function moveRole(roleId: number, direction: 'up' | 'down') {
-    const index = sortedRoles.findIndex((role) => role.id === roleId);
-    const swapIndex = direction === 'up' ? index - 1 : index + 1;
-    if (index < 0 || swapIndex < 0 || swapIndex >= sortedRoles.length) return;
-
-    const current = sortedRoles[index];
-    const target = sortedRoles[swapIndex];
-
-    await Promise.all([
-      fetch(`/api/roles/${current.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ display_order: target.display_order })
-      }),
-      fetch(`/api/roles/${target.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ display_order: current.display_order })
-      })
-    ]);
-
-    await loadAll();
+  async function saveRoleOrder(nextRoles: Role[]) {
+    await Promise.all(
+      nextRoles.map((role, index) =>
+        fetch(`/api/roles/${role.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ display_order: (index + 1) * 10 })
+        })
+      )
+    );
+    await refreshAll();
   }
 
   async function createPermission(event: FormEvent<HTMLFormElement>) {
@@ -158,17 +170,12 @@ export function MembersPageClient({ userPermissions }: MembersPageClientProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newPermissionName })
     });
-
-    if (!response.ok) {
-      setError('Création permission impossible.');
-      return;
-    }
-
+    if (!response.ok) setError('Création permission impossible.');
     setNewPermissionName('');
-    await loadAll();
+    await refreshAll();
   }
 
-  async function savePermissionsForRole() {
+  async function saveRolePermissions() {
     if (!selectedRole) return;
     const response = await fetch(`/api/roles/${selectedRole.id}`, {
       method: 'PATCH',
@@ -176,214 +183,225 @@ export function MembersPageClient({ userPermissions }: MembersPageClientProps) {
       body: JSON.stringify({ permission_ids: selectedPermissionIds })
     });
 
-    if (!response.ok) {
-      setError('Enregistrement permissions impossible.');
-      return;
-    }
-
-    await loadAll();
+    if (!response.ok) setError('Enregistrement permissions impossible.');
+    await refreshAll();
   }
 
+  const sortedRoles = [...roles].sort((a, b) => a.display_order - b.display_order);
+
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-[#fff1df]">Membres</h1>
-        {canCreateMember ? (
-          <button className="saas-primary-btn" onClick={() => setMemberModalOpen(true)}>
-            Créer
-          </button>
-        ) : null}
+        <h1 className="text-2xl font-semibold text-[#fff1df]">Membres / Rôles / Permissions</h1>
+        {canCreateMember ? <button className="saas-primary-btn" onClick={() => setShowCreateModal(true)}>Nouveau membre</button> : null}
       </div>
 
-      {error ? <p className="rounded-xl border border-red-300/50 bg-red-500/15 px-3 py-2 text-sm text-red-100">{error}</p> : null}
+      {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
 
-      <section className="glass-card overflow-hidden p-0">
-        <div className="overflow-x-auto px-3 py-3">
-          <table className="min-w-full border-separate border-spacing-y-2 text-sm">
-            <thead>
-              <tr className="text-left text-[#ffe3c5]">
-                <th className="px-4 py-2">Nom</th>
-                <th className="px-4 py-2">User</th>
-                <th className="px-4 py-2">Rôle</th>
-                <th className="px-4 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((member) => (
-                <tr key={member.id} className="rounded-xl border border-white/10 bg-[#5a3925]/55">
-                  <td className="px-4 py-3 font-medium text-[#fff2de]">{member.username}</td>
-                  <td className="px-4 py-3 text-[#ffe2c3]">{member.username.toLowerCase()}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      className="saas-input w-52"
-                      disabled={!canEditMembers}
-                      value={member.editingRoleId ?? ''}
-                      onChange={(event) =>
-                        setMembers((current) =>
-                          current.map((item) =>
-                            item.id === member.id
-                              ? { ...item, editingRoleId: event.target.value ? Number(event.target.value) : null }
-                              : item
-                          )
-                        )
-                      }
-                    >
-                      <option value="">Sans rôle</option>
-                      {sortedRoles.map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    {canEditMembers ? (
-                      <button className="saas-ghost-btn" onClick={() => void saveMember(member)}>
-                        Enregistrer
-                      </button>
-                    ) : (
-                      <span className="text-xs text-[#ffe2c5]/70">Lecture seule</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {loading ? <p className="px-2 pt-2 text-xs text-[#ffe3c1]">Chargement...</p> : null}
+      <section className="glass-card p-4">
+        <div className="grid gap-3">
+          {members.map((member) => (
+            <div key={member.id} className="rounded-xl border border-white/10 bg-[#5f3d26]/55 px-4 py-3">
+              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_220px_auto] sm:items-center">
+                <div>
+                  <p className="text-sm text-[#ffe6cb]">Nom</p>
+                  <p className="font-medium text-[#fff3df]">{member.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[#ffe6cb]">User</p>
+                  <p className="font-medium text-[#fff3df]">{member.username}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[#ffe6cb]">Rôle</p>
+                  <p className="font-medium text-[#fff3df]">{member.role_name || 'Sans rôle'}</p>
+                </div>
+                <div className="flex gap-2 sm:justify-end">
+                  {canEditMembers ? <button className="saas-ghost-btn" onClick={() => setEditingMember(member)}>Modifier</button> : null}
+                  {canDeleteMembers ? <button className="saas-ghost-btn" onClick={() => void removeMember(member.id)}>Supprimer</button> : null}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
       {canManageRoles ? (
-        <section className="grid gap-4 xl:grid-cols-[1.1fr_1fr]">
+        <section className="grid gap-4 xl:grid-cols-[1fr_1.05fr]">
           <article className="glass-card p-5">
-            <h2 className="text-lg font-semibold text-[#fff1dd]">Rôles</h2>
+            <h2 className="text-lg font-semibold text-[#fff2df]">Rôles</h2>
             <form onSubmit={createRole} className="mt-3 flex gap-2">
-              <input className="saas-input flex-1" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="Nouveau rôle" required />
-              <button type="submit" className="saas-primary-btn">
-                Ajouter
-              </button>
+              <input className="saas-input flex-1" placeholder="Nom du rôle" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} required />
+              <button className="saas-primary-btn" type="submit">Créer</button>
             </form>
 
             <div className="mt-4 space-y-2">
-              {sortedRoles.map((role, index) => (
-                <RoleRow
+              {sortedRoles.map((role) => (
+                <RoleCard
                   key={role.id}
                   role={role}
-                  isFirst={index === 0}
-                  isLast={index === sortedRoles.length - 1}
-                  selected={selectedRoleId === role.id}
+                  active={selectedRoleId === role.id}
                   onSelect={() => {
                     setSelectedRoleId(role.id);
                     setSelectedPermissionIds(role.permission_ids);
                   }}
                   onRename={renameRole}
                   onDelete={deleteRole}
-                  onMove={moveRole}
+                  onDragStart={() => setDragRoleId(role.id)}
+                  onDrop={() => {
+                    if (!dragRoleId || dragRoleId === role.id) return;
+                    const items = [...sortedRoles];
+                    const from = items.findIndex((r) => r.id === dragRoleId);
+                    const to = items.findIndex((r) => r.id === role.id);
+                    const [moved] = items.splice(from, 1);
+                    items.splice(to, 0, moved);
+                    void saveRoleOrder(items);
+                  }}
                 />
               ))}
             </div>
           </article>
 
           <article className="glass-card p-5">
-            <h2 className="text-lg font-semibold text-[#fff1dd]">Permissions du rôle</h2>
-            <p className="mt-1 text-sm text-[#ffe3c5]">{selectedRole ? selectedRole.name : 'Sélectionnez un rôle'}</p>
+            <h2 className="text-lg font-semibold text-[#fff2df]">Permissions par rôle</h2>
+            <p className="mt-1 text-sm text-[#ffe5c6]">{selectedRole?.name ?? 'Sélectionnez un rôle'}</p>
 
             <form onSubmit={createPermission} className="mt-3 flex gap-2">
-              <input className="saas-input flex-1" placeholder="Ex: members.access" value={newPermissionName} onChange={(e) => setNewPermissionName(e.target.value)} required />
-              <button type="submit" className="saas-primary-btn">Ajouter</button>
+              <input className="saas-input flex-1" placeholder="Nouvelle permission" value={newPermissionName} onChange={(e) => setNewPermissionName(e.target.value)} required />
+              <button className="saas-primary-btn" type="submit">Ajouter</button>
             </form>
 
-            <div className="mt-2 flex flex-wrap gap-2">
-              {MODULE_SUGGESTIONS.map((item) => (
-                <button key={item} className="saas-ghost-btn text-xs" onClick={() => setNewPermissionName(item)}>
-                  {item}
-                </button>
+            <div className="mt-4 space-y-4">
+              {Object.entries(permissionsByCategory).map(([category, items]) => (
+                <div key={category}>
+                  <p className="mb-2 text-xs uppercase tracking-[0.18em] text-[#ffe1bd]">{category}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {items.map((permission) => {
+                      const active = selectedPermissionIds.includes(permission.id);
+                      return (
+                        <button
+                          key={permission.id}
+                          className={active ? 'permission-pill permission-pill-active' : 'permission-pill'}
+                          onClick={() =>
+                            setSelectedPermissionIds((current) =>
+                              current.includes(permission.id)
+                                ? current.filter((id) => id !== permission.id)
+                                : [...current, permission.id]
+                            )
+                          }
+                        >
+                          {permission.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {permissions.map((permission) => {
-                const active = selectedPermissionIds.includes(permission.id);
-                return (
-                  <button
-                    key={permission.id}
-                    className={active ? 'permission-pill permission-pill-active' : 'permission-pill'}
-                    onClick={() =>
-                      setSelectedPermissionIds((current) =>
-                        current.includes(permission.id)
-                          ? current.filter((id) => id !== permission.id)
-                          : [...current, permission.id]
-                      )
-                    }
-                  >
-                    {permission.name}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button className="saas-primary-btn mt-4" onClick={() => void savePermissionsForRole()}>
+            <button className="saas-primary-btn mt-4" onClick={() => void saveRolePermissions()}>
               Enregistrer permissions
             </button>
           </article>
         </section>
       ) : null}
 
-      {memberModalOpen ? (
-        <CreateMemberModal
-          roles={sortedRoles.map((role) => ({ id: role.id, name: role.name }))}
-          onClose={() => setMemberModalOpen(false)}
-          onCreated={loadAll}
-        />
+      {showCreateModal ? <CreateMemberModal roles={sortedRoles.map((r) => ({ id: r.id, name: r.name }))} onClose={() => setShowCreateModal(false)} onCreated={refreshAll} /> : null}
+      {editingMember ? (
+        <EditMemberDrawer member={editingMember} roles={sortedRoles} onClose={() => setEditingMember(null)} onSave={saveMember} />
       ) : null}
     </div>
   );
 }
 
-function RoleRow({
+function RoleCard({
   role,
-  isFirst,
-  isLast,
-  selected,
+  active,
   onSelect,
   onRename,
   onDelete,
-  onMove
+  onDragStart,
+  onDrop
 }: {
   role: Role;
-  isFirst: boolean;
-  isLast: boolean;
-  selected: boolean;
+  active: boolean;
   onSelect: () => void;
   onRename: (roleId: number, name: string) => Promise<void>;
   onDelete: (roleId: number) => Promise<void>;
-  onMove: (roleId: number, direction: 'up' | 'down') => Promise<void>;
+  onDragStart: () => void;
+  onDrop: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(role.name);
 
-  useEffect(() => setName(role.name), [role.name]);
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={onDrop}
+      className={active ? 'rounded-xl border border-[#ffddb4]/40 bg-[#6e462c]/45 p-3' : 'rounded-xl border border-white/10 bg-[#5b3a25]/45 p-3'}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        {editing ? <input className="saas-input flex-1" value={name} onChange={(e) => setName(e.target.value)} /> : <p className="flex-1 text-[#fff2df]">{role.name}</p>}
+        <button className="saas-ghost-btn" onClick={onSelect}>Gérer</button>
+        {editing ? (
+          <button className="saas-primary-btn" onClick={() => void onRename(role.id, name).then(() => setEditing(false))}>OK</button>
+        ) : (
+          <button className="saas-ghost-btn" onClick={() => setEditing(true)}>Renommer</button>
+        )}
+        <button className="saas-ghost-btn" onClick={() => void onDelete(role.id)}>Supprimer</button>
+      </div>
+    </div>
+  );
+}
+
+function EditMemberDrawer({
+  member,
+  roles,
+  onClose,
+  onSave
+}: {
+  member: Member;
+  roles: Role[];
+  onClose: () => void;
+  onSave: (member: Member, payload: { password?: string }) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<Member>(member);
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className={selected ? 'rounded-xl border border-[#ffe3c2]/45 bg-[#724b30]/45 p-3' : 'rounded-xl border border-white/10 bg-[#5e3c26]/45 p-3'}>
-      <div className="flex flex-wrap items-center gap-2">
-        {editing ? (
-          <input className="saas-input flex-1" value={name} onChange={(e) => setName(e.target.value)} />
-        ) : (
-          <p className="flex-1 font-medium text-[#fff2df]">{role.name}</p>
-        )}
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/55 backdrop-blur-sm">
+      <div className="h-full w-full max-w-md bg-[#4b2f1e] p-5 text-[#ffe8cb] shadow-2xl animate-fade-in">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Modifier membre</h3>
+          <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
+        </div>
 
-        <button className="saas-ghost-btn" onClick={onSelect}>Gérer permissions</button>
+        <div className="space-y-3">
+          <input className="saas-input w-full" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Nom" />
+          <input className="saas-input w-full" value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value })} placeholder="User" />
+          <select className="saas-input w-full" value={draft.role_id ?? ''} onChange={(e) => setDraft({ ...draft, role_id: e.target.value ? Number(e.target.value) : null })}>
+            <option value="">Sans rôle</option>
+            {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+          </select>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Actif</label>
 
-        {editing ? (
-          <button className="saas-primary-btn" onClick={() => void onRename(role.id, name).then(() => setEditing(false))}>Valider</button>
-        ) : (
-          <button className="saas-ghost-btn" onClick={() => setEditing(true)}>Modifier</button>
-        )}
+          <div className="relative">
+            <input
+              className="saas-input w-full pr-11"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Nouveau mot de passe"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 saas-ghost-btn !px-2 !py-1" onClick={() => setShowPassword((v) => !v)}>
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
 
-        <button className="saas-ghost-btn" disabled={isFirst} onClick={() => void onMove(role.id, 'up')}>Monter</button>
-        <button className="saas-ghost-btn" disabled={isLast} onClick={() => void onMove(role.id, 'down')}>Descendre</button>
-        <button className="saas-ghost-btn" onClick={() => void onDelete(role.id)}>Supprimer</button>
+          <button className="saas-primary-btn w-full" onClick={() => void onSave(draft, { password: newPassword })}>Enregistrer</button>
+        </div>
       </div>
     </div>
   );

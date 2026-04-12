@@ -20,6 +20,7 @@ create table if not exists public.role_permissions (
 create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   username text not null unique,
+  name text not null default '',
   password_hash text not null,
   role text,
   role_id bigint references public.roles(id) on delete set null,
@@ -29,6 +30,7 @@ create table if not exists public.users (
 
 alter table public.roles add column if not exists display_order integer not null default 100;
 alter table public.users add column if not exists role_id bigint references public.roles(id) on delete set null;
+alter table public.users add column if not exists name text not null default '';
 
 alter table public.roles enable row level security;
 alter table public.permissions enable row level security;
@@ -69,6 +71,7 @@ values
   ('members.access'),
   ('members.create'),
   ('members.edit'),
+  ('members.delete'),
   ('roles.manage'),
   ('dashboard.access')
 on conflict (name) do nothing;
