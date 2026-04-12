@@ -34,9 +34,9 @@ export default function DashboardPage() {
         <article className="glass-card p-6">
           <h2 className="text-lg font-semibold text-[#f6e5cd]">Dernières actions</h2>
           <ul className="mt-4 space-y-3 text-sm text-[#dec5a8]">
-            <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">Membre "pyke" connecté</li>
-            <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">Rôle "Manager" mis à jour</li>
-            <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">Permission "dashboard.view" créée</li>
+            <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">Membre &quot;pyke&quot; connecté</li>
+            <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">Rôle &quot;Manager&quot; mis à jour</li>
+            <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">Permission &quot;dashboard.view&quot; créée</li>
             <li className="rounded-xl border border-white/10 bg-[#281a12]/70 px-3 py-2">Nouveau membre ajouté</li>
           </ul>
         </article>
