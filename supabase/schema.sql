@@ -298,7 +298,9 @@ values
   ('transactions.edit'),
   ('transactions.view'),
   ('transactions.manage'),
-  ('transactions.recent.access')
+  ('transactions.recent.access'),
+  ('transactions.recent.edit'),
+  ('transactions.recent.cancel')
 on conflict (name) do nothing;
 
 create table if not exists public.tablet_days (
@@ -410,5 +412,7 @@ values
   ('activity.create'),
   ('activity.view'),
   ('activity.stats.view'),
-  ('activity.logs.view')
+  ('activity.logs.view'),
+  ('activity.edit'),
+  ('activity.cancel')
 on conflict (name) do nothing;

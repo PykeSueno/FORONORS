@@ -91,6 +91,8 @@ export default async function ActivityPage() {
         defaultMemberId={session.userId}
         defaultMemberLabel={currentMember?.name || currentMember?.username || 'Groupe'}
         canCreate={permissions.includes('activity.create')}
+        canEdit={permissions.includes('activity.edit')}
+        canCancel={permissions.includes('activity.cancel')}
       />
     </div>
   );

@@ -14,14 +14,16 @@ type RecentTransaction = {
   profit_loss: number;
   created_at: string;
   transaction_lines: Array<{
+    item_id?: number;
     item_name_snapshot: string;
     quantity: number;
-    movement_type: string;
+    movement_type: 'purchase' | 'sale' | 'stock_in' | 'stock_out';
+    unit_price?: number;
     items: { image_url: string | null } | Array<{ image_url: string | null }> | null;
   }>;
 };
 
-export function RecentTransactionsClient({ transactions }: { transactions: RecentTransaction[] }) {
+export function RecentTransactionsClient({ transactions, canEditRecent, canCancelRecent }: { transactions: RecentTransaction[]; canEditRecent: boolean; canCancelRecent: boolean }) {
   const [query, setQuery] = useState('');
   const [member, setMember] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -29,6 +31,8 @@ export function RecentTransactionsClient({ transactions }: { transactions: Recen
   const [movementType, setMovementType] = useState('');
   const [itemQuery, setItemQuery] = useState('');
   const [flow, setFlow] = useState('');
+  const [error, setError] = useState('');
+  const [editing, setEditing] = useState<RecentTransaction | null>(null);
 
   const members = useMemo(() => Array.from(new Set(transactions.map((entry) => entry.member_label))).sort(), [transactions]);
 
@@ -50,6 +54,16 @@ export function RecentTransactionsClient({ transactions }: { transactions: Recen
       return textMatch && memberMatch && fromMatch && toMatch && movementMatch && itemMatch && flowMatch;
     });
   }, [transactions, query, member, fromDate, toDate, movementType, itemQuery, flow]);
+
+  async function cancelTransaction(id: number) {
+    const response = await fetch(`/api/transactions/recent/${id}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const data = (await response.json()) as { message?: string };
+      setError(data.message ?? 'Annulation impossible.');
+      return;
+    }
+    window.location.reload();
+  }
 
   return (
     <div className="space-y-4">
@@ -77,22 +91,13 @@ export function RecentTransactionsClient({ transactions }: { transactions: Recen
             <option value="exit">Sortie</option>
             <option value="balanced">Sans mouvement argent</option>
           </select>
-          <button
-            className="saas-ghost-btn"
-            onClick={() => {
-              setQuery('');
-              setMember('');
-              setFromDate('');
-              setToDate('');
-              setMovementType('');
-              setItemQuery('');
-              setFlow('');
-            }}
-          >
+          <button className="saas-ghost-btn" onClick={() => { setQuery(''); setMember(''); setFromDate(''); setToDate(''); setMovementType(''); setItemQuery(''); setFlow(''); }}>
             Réinitialiser
           </button>
         </div>
       </section>
+
+      {error ? <p className="rounded-xl border border-red-300/45 bg-red-500/10 px-4 py-2 text-sm text-red-100">{error}</p> : null}
 
       <section className="space-y-3">
         {filtered.map((transaction) => (
@@ -125,11 +130,86 @@ export function RecentTransactionsClient({ transactions }: { transactions: Recen
               <p className="rounded-xl bg-[#e08f8f]/10 px-3 py-2 text-[#f8caca]">Sortie: {formatUsd(Number(transaction.total_money_out))}</p>
               <p className={`rounded-xl px-3 py-2 ${Number(transaction.profit_loss) >= 0 ? 'bg-[#83d89f]/10 text-[#cbf5d6]' : 'bg-[#e08f8f]/10 text-[#f8caca]'}`}>Résultat: {formatUsd(Number(transaction.profit_loss))}</p>
             </div>
+
+            {(canEditRecent || canCancelRecent) ? (
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                {canEditRecent ? <button className="saas-ghost-btn" onClick={() => setEditing(transaction)}>Modifier</button> : null}
+                {canCancelRecent ? <button className="saas-ghost-btn" onClick={() => void cancelTransaction(transaction.id)}>Annuler</button> : null}
+              </div>
+            ) : null}
           </article>
         ))}
 
         {filtered.length === 0 ? <p className="glass-card p-4 text-sm text-[#f3d4b0]">Aucune transaction ne correspond aux filtres.</p> : null}
       </section>
+
+      {editing ? <EditTransactionModal transaction={editing} onClose={() => setEditing(null)} onError={setError} /> : null}
+    </div>
+  );
+}
+
+function EditTransactionModal({ transaction, onClose, onError }: { transaction: RecentTransaction; onClose: () => void; onError: (message: string) => void }) {
+  const [reason, setReason] = useState(transaction.reason);
+  const [memberLabel, setMemberLabel] = useState(transaction.member_label);
+  const [lines, setLines] = useState(transaction.transaction_lines.map((line) => ({
+    item_id: Number(line.item_id ?? 0),
+    movement_type: line.movement_type,
+    quantity: Number(line.quantity),
+    unit_price: Number(line.unit_price ?? 0)
+  })));
+
+  function updateLine(index: number, patch: Partial<typeof lines[number]>) {
+    setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  }
+
+  async function save() {
+    const response = await fetch(`/api/transactions/recent/${transaction.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason, member_label: memberLabel, lines })
+    });
+
+    if (!response.ok) {
+      const data = (await response.json()) as { message?: string };
+      onError(data.message ?? 'Modification impossible.');
+      return;
+    }
+
+    window.location.reload();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-3xl p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-[#fff0db]">Modifier transaction #{transaction.id}</h3>
+          <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
+        </div>
+
+        <div className="space-y-3">
+          <input className="saas-input w-full" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motif" />
+          <input className="saas-input w-full" value={memberLabel} onChange={(e) => setMemberLabel(e.target.value)} placeholder="Membre" />
+
+          {lines.map((line, index) => (
+            <div key={index} className="grid gap-2 rounded-lg border border-white/10 bg-[#4f3220]/45 p-2 md:grid-cols-4">
+              <select className="saas-input" value={line.movement_type} onChange={(e) => updateLine(index, { movement_type: e.target.value as 'purchase' | 'sale' | 'stock_in' | 'stock_out' })}>
+                <option value="stock_in">Entrée</option>
+                <option value="stock_out">Sortie</option>
+                <option value="purchase">Achat</option>
+                <option value="sale">Vente</option>
+              </select>
+              <input className="saas-input" value={line.quantity} onChange={(e) => updateLine(index, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
+              <input className="saas-input" value={line.unit_price} onChange={(e) => updateLine(index, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
+              <p className="flex items-center text-sm text-[#f5d7b6]">Item #{line.item_id}</p>
+            </div>
+          ))}
+
+          <div className="flex justify-end gap-2">
+            <button className="saas-ghost-btn" onClick={onClose}>Annuler</button>
+            <button className="saas-primary-btn" onClick={() => void save()}>Enregistrer</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

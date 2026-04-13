@@ -17,7 +17,9 @@ type RecentTransaction = {
   transaction_lines: Array<{
     item_name_snapshot: string;
     quantity: number;
-    movement_type: string;
+    movement_type: 'purchase' | 'sale' | 'stock_in' | 'stock_out';
+    item_id?: number;
+    unit_price?: number;
     items: { image_url: string | null } | Array<{ image_url: string | null }> | null;
   }>;
 };
@@ -36,7 +38,7 @@ export default async function RecentTransactionsPage() {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from('transactions')
-    .select('id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, item_id, items(image_url))')
+    .select('id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, item_id, unit_price, items(image_url))')
     .order('created_at', { ascending: false })
     .limit(200);
   const transactions = (data ?? []) as RecentTransaction[];
@@ -45,7 +47,11 @@ export default async function RecentTransactionsPage() {
     <div className="space-y-5">
       <InternalPageHeader title="Transactions récentes" subtitle="Historique complet des dernières transactions" />
       <TransactionsTabs active="recent" />
-      <RecentTransactionsClient transactions={transactions} />
+      <RecentTransactionsClient
+        transactions={transactions}
+        canEditRecent={permissions.includes('transactions.recent.edit')}
+        canCancelRecent={permissions.includes('transactions.recent.cancel')}
+      />
     </div>
   );
 }

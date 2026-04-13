@@ -16,6 +16,7 @@ type RecentActivity = {
   equipment_after: number;
   created_at: string;
   activity_items: Array<{
+    item_id?: number | null;
     item_name: string;
     quantity_added: number;
     before_quantity: number;
@@ -32,7 +33,7 @@ const ACTIVITY_META: Record<ActivityType, { label: string; icon: string; subtitl
   container: { label: 'Conteneur', icon: '📦', subtitle: 'Consomme des Disqueuses' }
 };
 
-export function ActivityPageClient({ items, members, activities, defaultMemberId, defaultMemberLabel, canCreate }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; defaultMemberLabel: string; canCreate: boolean }) {
+export function ActivityPageClient({ items, members, activities, defaultMemberId, defaultMemberLabel, canCreate, canEdit, canCancel }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; defaultMemberLabel: string; canCreate: boolean; canEdit: boolean; canCancel: boolean }) {
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
@@ -42,9 +43,18 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [editingActivity, setEditingActivity] = useState<RecentActivity | null>(null);
 
   const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
-  const availableItems = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(query.toLowerCase())), [items, query]);
+  const availableTypes = useMemo(() => Array.from(new Set(items.filter((item) => !categoryFilter || item.category_key === categoryFilter).map((item) => item.type_key).filter(Boolean))) as string[], [items, categoryFilter]);
+  const availableItems = useMemo(() => items.filter((item) => {
+    const qOk = item.name.toLowerCase().includes(query.toLowerCase());
+    const categoryOk = !categoryFilter || item.category_key === categoryFilter;
+    const typeOk = !typeFilter || item.type_key === typeFilter;
+    return qOk && categoryOk && typeOk;
+  }), [items, query, categoryFilter, typeFilter]);
   const kitItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('kit')), [items]);
   const cutterItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('disqueuse')), [items]);
 
@@ -179,6 +189,18 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
           <section className="glass-card p-5">
             <h3 className="text-base font-semibold text-[#fff1dd]">B. Items récupérés</h3>
             <input className="saas-input mt-2 w-full" placeholder="Rechercher item" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button className={`filter-pill ${!categoryFilter ? 'filter-pill-active' : ''}`} onClick={() => { setCategoryFilter(''); setTypeFilter(''); }}>Tous</button>
+              {[['objects', 'Objets'], ['weapons', 'Armes'], ['equipment', 'Équipement'], ['drugs', 'Drogues'], ['other', 'Autres']].map(([key, label]) => (
+                <button key={key} className={`filter-pill ${categoryFilter === key ? 'filter-pill-active' : ''}`} onClick={() => { setCategoryFilter(key); setTypeFilter(''); }}>{label}</button>
+              ))}
+            </div>
+            {availableTypes.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button className={`filter-pill ${!typeFilter ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter('')}>Tous types</button>
+                {availableTypes.map((type) => <button key={type} className={`filter-pill ${typeFilter === type ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter(type)}>{type}</button>)}
+              </div>
+            ) : null}
             <div className="mt-2 grid max-h-60 gap-2 overflow-auto sm:grid-cols-2">
               {availableItems.map((item) => (
                 <button key={item.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#3f281b]/60 px-3 py-2 text-left" onClick={() => addItem(item.id)}>
@@ -246,10 +268,62 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                 ))}
               </div>
               {activity.proof_image_url ? <Image src={activity.proof_image_url} alt="Preuve activité" width={420} height={180} className="mt-2 h-24 w-full rounded-lg object-cover" unoptimized /> : null}
+              {(canEdit || canCancel) ? (
+                <div className="mt-2 flex justify-end gap-2">
+                  {canEdit ? <button className="saas-ghost-btn" onClick={() => setEditingActivity(activity)}>Modifier</button> : null}
+                  {canCancel ? <button className="saas-ghost-btn" onClick={() => { void fetch(`/api/activity/${activity.id}`, { method: 'DELETE' }).then(() => window.location.reload()); }}>Annuler</button> : null}
+                </div>
+              ) : null}
             </article>
           ))}
         </div>
       </section>
+
+      {editingActivity ? <EditActivityModal activity={editingActivity} onClose={() => setEditingActivity(null)} /> : null}
+    </div>
+  );
+}
+
+function EditActivityModal({ activity, onClose }: { activity: RecentActivity; onClose: () => void }) {
+  const [memberLabel, setMemberLabel] = useState(activity.member_label);
+  const [equipmentUsed, setEquipmentUsed] = useState(activity.equipment_used);
+  const [lines, setLines] = useState(activity.activity_items.map((line) => ({ item_id: Number(line.item_id ?? 0), quantity: line.quantity_added, item_name: line.item_name })));
+
+
+  async function save() {
+    const response = await fetch(`/api/activity/${activity.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        member_label: memberLabel,
+        equipment_used: equipmentUsed,
+        lines: lines.filter((line) => line.item_id > 0).map((line) => ({ item_id: line.item_id, quantity: line.quantity }))
+      })
+    });
+    if (response.ok) window.location.reload();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-xl p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-[#fff0db]">Modifier activité #{activity.id}</h3>
+          <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
+        </div>
+        <div className="space-y-2">
+          <input className="saas-input w-full" value={memberLabel} onChange={(e) => setMemberLabel(e.target.value)} />
+          <input className="saas-input w-full" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} />
+          <div className="rounded-lg border border-white/10 bg-[#4f3220]/45 p-2 text-xs text-[#efcdab]">
+            {lines.map((line, index) => (
+              <div key={index} className="flex items-center justify-between gap-2">
+                <span>{line.item_name}</span>
+                <input className="saas-input w-20" value={line.quantity} onChange={(e) => setLines((current) => current.map((entry, i) => i === index ? { ...entry, quantity: Math.max(1, Number(e.target.value || 1)) } : entry))} />
+              </div>
+            ))}
+          </div>
+          <button className="saas-primary-btn w-full" onClick={() => void save()}>Enregistrer</button>
+        </div>
+      </div>
     </div>
   );
 }

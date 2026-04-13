@@ -54,14 +54,14 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
       <section className="glass-card p-5">
         <h2 className="text-lg font-semibold text-[#fff1dd]">Journée tablette ({businessDay})</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-7">
-          <Stat label="Dépôt restant" value={`${day?.chest_amount ?? 0}$`} />
-          <Stat label="Dépôt matin" value={`${day?.deposited_amount ?? 0}$`} />
-          <Stat label="Argent groupe réel" value={`${groupCash}$`} />
-          <Stat label="Kits stock réel" value={String(kitsInStock)} />
-          <Stat label="Disqueuses stock réel" value={String(cuttersInStock)} />
-          <Stat label="Passages" value={String(day?.passages_count ?? 0)} />
-          <Stat label="Kits ajoutés" value={String(day?.kits_added ?? 0)} />
-          <Stat label="Disqueuses ajoutées" value={String(day?.cutters_added ?? 0)} />
+          <Stat icon="💰" tone="from-emerald-700/40 to-emerald-500/10" label="Dépôt restant" value={`${day?.chest_amount ?? 0}$`} />
+          <Stat icon="🏦" tone="from-amber-700/40 to-amber-500/10" label="Dépôt matin" value={`${day?.deposited_amount ?? 0}$`} />
+          <Stat icon="💵" tone="from-green-700/40 to-green-500/10" label="Argent groupe réel" value={`${groupCash}$`} />
+          <Stat icon="🧰" tone="from-cyan-700/40 to-cyan-500/10" label="Kits stock réel" value={String(kitsInStock)} />
+          <Stat icon="🪚" tone="from-sky-700/40 to-sky-500/10" label="Disqueuses stock réel" value={String(cuttersInStock)} />
+          <Stat icon="🧾" tone="from-violet-700/40 to-violet-500/10" label="Passages" value={String(day?.passages_count ?? 0)} />
+          <Stat icon="➕🧰" tone="from-teal-700/40 to-teal-500/10" label="Kits ajoutés" value={String(day?.kits_added ?? 0)} />
+          <Stat icon="➕🪚" tone="from-blue-700/40 to-blue-500/10" label="Disqueuses ajoutées" value={String(day?.cutters_added ?? 0)} />
         </div>
       </section>
 
@@ -107,10 +107,10 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ icon, label, value, tone }: { icon: string; label: string; value: string; tone: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-[#3f281b]/60 p-3">
-      <p className="text-xs text-[#efcbab]">{label}</p>
+    <div className={`rounded-xl border border-white/15 bg-gradient-to-br ${tone} p-3`}>
+      <p className="text-xs text-[#efcbab]">{icon} {label}</p>
       <p className="mt-1 text-lg font-semibold text-[#fff1dd]">{value}</p>
     </div>
   );

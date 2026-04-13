@@ -14,6 +14,49 @@ type Member = {
   is_active: boolean;
 };
 
+
+const PERMISSION_LABELS: Record<string, { module: string; label: string }> = {
+  'dashboard.access': { module: 'Dashboard', label: 'Accès au dashboard' },
+  'dashboard.view': { module: 'Dashboard', label: 'Voir les bulles du dashboard' },
+  'members.access': { module: 'Membres', label: 'Accéder à la page Membres' },
+  'members.create': { module: 'Membres', label: 'Créer un membre' },
+  'members.edit': { module: 'Membres', label: 'Modifier un membre' },
+  'members.delete': { module: 'Membres', label: 'Supprimer un membre' },
+  'members.activities.view': { module: 'Membres', label: 'Voir les activités d’un membre' },
+  'money.access': { module: 'Argent', label: 'Accéder au module Argent' },
+  'money.view': { module: 'Argent', label: 'Voir les mouvements d’argent' },
+  'money.edit': { module: 'Argent', label: 'Créer un mouvement d’argent' },
+  'items.access': { module: 'Items', label: 'Accéder à la page Items' },
+  'items.view': { module: 'Items', label: 'Voir les items' },
+  'items.create': { module: 'Items', label: 'Créer un item' },
+  'items.edit': { module: 'Items', label: 'Modifier un item' },
+  'items.delete': { module: 'Items', label: 'Supprimer un item' },
+  'transactions.access': { module: 'Transactions', label: 'Accéder au module Transactions' },
+  'transactions.view': { module: 'Transactions', label: 'Voir les transactions' },
+  'transactions.create': { module: 'Transactions', label: 'Créer une transaction' },
+  'transactions.recent.access': { module: 'Transactions récentes', label: 'Accéder aux transactions récentes' },
+  'transactions.recent.edit': { module: 'Transactions récentes', label: 'Modifier une transaction récente' },
+  'transactions.recent.cancel': { module: 'Transactions récentes', label: 'Annuler une transaction récente' },
+  'logs.access': { module: 'Logs', label: 'Accéder au module Logs' },
+  'logs.view': { module: 'Logs', label: 'Voir les logs' },
+  'tablet.access': { module: 'Tablette', label: 'Accéder à la page Tablette' },
+  'tablet.passage.create': { module: 'Tablette', label: 'Créer un passage tablette' },
+  'tablet.daily.manage': { module: 'Tablette', label: 'Gérer le dépôt du matin' },
+  'tablet.stats.view': { module: 'Tablette', label: 'Voir les stats tablette' },
+  'activity.access': { module: 'Activité', label: 'Accéder à la page Activité' },
+  'activity.create': { module: 'Activité', label: 'Créer une activité' },
+  'activity.edit': { module: 'Activité', label: 'Modifier une activité récente' },
+  'activity.cancel': { module: 'Activité', label: 'Annuler une activité récente' },
+  'activity.view': { module: 'Activité', label: 'Voir les activités récentes' },
+  'activity.stats.view': { module: 'Activité', label: 'Voir les stats activité' },
+  'account.password.edit': { module: 'Compte', label: 'Modifier un mot de passe' },
+  'roles.manage': { module: 'Rôles', label: 'Gérer les rôles et permissions' }
+};
+
+function humanPermission(permission: Permission) {
+  return PERMISSION_LABELS[permission.name] ?? { module: 'Autres', label: permission.name.replace(/\./g, ' · ') };
+}
+
 type MembersPageClientProps = {
   initialMembers: Member[];
   initialRoles: Role[];
@@ -363,20 +406,40 @@ function RoleManageModal({
         <div className="space-y-4">
           <input className="saas-input w-full" value={name} onChange={(e) => setName(e.target.value)} />
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            {permissions.map((permission) => (
-              <label key={permission.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
-                <input
-                  type="checkbox"
-                  checked={checked.includes(permission.id)}
-                  onChange={(e) =>
-                    setChecked((current) =>
-                      e.target.checked ? [...current, permission.id] : current.filter((id) => id !== permission.id)
-                    )
-                  }
-                />
-                {permission.name}
-              </label>
+          <div className="space-y-3">
+            {Object.entries(permissions.reduce((acc, permission) => {
+              const info = humanPermission(permission);
+              if (!acc[info.module]) acc[info.module] = [];
+              acc[info.module].push(permission);
+              return acc;
+            }, {} as Record<string, Permission[]>)).map(([moduleName, modulePermissions]) => (
+              <section key={moduleName} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
+                <h4 className="text-sm font-semibold text-[#ffe9ce]">{moduleName}</h4>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {modulePermissions.map((permission) => {
+                    const info = humanPermission(permission);
+                    return (
+                      <label key={permission.id} className="rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={checked.includes(permission.id)}
+                            onChange={(e) =>
+                              setChecked((current) =>
+                                e.target.checked ? [...current, permission.id] : current.filter((id) => id !== permission.id)
+                              )
+                            }
+                          />
+                          <div>
+                            <p className="font-medium">{info.label}</p>
+                            <p className="text-[11px] text-[#efcba8]">{permission.name}</p>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
             ))}
           </div>
 
