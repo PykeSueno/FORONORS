@@ -1,4 +1,6 @@
-export async function syncMoneyItemToGroupCash(supabase: any) {
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+export async function syncMoneyItemToGroupCash(supabase: SupabaseClient) {
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
   if (!cash) return;
 
