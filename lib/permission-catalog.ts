@@ -88,6 +88,9 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'four.close': { module: 'FOUR', label: 'Fermer une session FOUR', hint: 'Clôturer une session FOUR et consolider les stocks/cash.' },
   'four.logs.view': { module: 'FOUR', label: 'Voir les logs FOUR', hint: 'Afficher les logs détaillés du module FOUR.' },
   'four.history.view': { module: 'FOUR', label: 'Voir l’historique FOUR', hint: 'Consulter l’historique des sessions FOUR fermées.' },
+  'four.stats.view': { module: 'FOUR', label: 'Voir les stats FOUR', hint: 'Afficher les statistiques du module FOUR.' },
+  'four.messages.view': { module: 'FOUR', label: 'Voir les messages FOUR', hint: 'Afficher la zone de messages prédéfinis FOUR.' },
+  'four.messages.manage': { module: 'FOUR', label: 'Gérer les messages FOUR', hint: 'Créer / modifier / supprimer les messages prédéfinis FOUR.' },
 
   'account.password.update': { module: 'Compte', label: 'Modifier son mot de passe', hint: 'Changer son propre mot de passe utilisateur.' },
 

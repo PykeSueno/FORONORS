@@ -21,7 +21,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data: active } = await supabase
     .from('four_sessions')
-    .select('id, status, managed_by, opened_at, closed_at, summary, users:managed_by(name, username), four_movements(id, movement_kind, item_id, item_name, quantity, unit_price, total_amount, note, created_at)')
+    .select('id, status, managed_by, opened_at, closed_at, summary, users:managed_by(name, username), four_movements(id, movement_kind, item_id, item_name, quantity, unit_price, total_amount, note, counterparty, created_at)')
     .eq('status', 'open')
     .order('opened_at', { ascending: false })
     .limit(1)
@@ -81,7 +81,7 @@ export async function PATCH(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: session } = await supabase
     .from('four_sessions')
-    .select('id, status, four_movements(id, movement_kind, item_id, item_name, quantity, total_amount)')
+    .select('id, status, four_movements(id, movement_kind, item_id, item_name, quantity, total_amount, counterparty)')
     .eq('id', sessionId)
     .maybeSingle();
 

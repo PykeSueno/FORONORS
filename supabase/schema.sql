@@ -493,3 +493,31 @@ values
   ('four.logs.view'),
   ('four.history.view')
 on conflict (name) do nothing;
+
+alter table public.four_movements add column if not exists counterparty text;
+
+create table if not exists public.four_messages (
+  id bigint generated always as identity primary key,
+  title text not null,
+  content text not null,
+  display_order integer not null default 100,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_four_messages_order on public.four_messages(display_order, id);
+alter table public.four_messages enable row level security;
+
+drop policy if exists "allow_service_role_all_four_messages" on public.four_messages;
+create policy "allow_service_role_all_four_messages"
+on public.four_messages
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('four.stats.view'),
+  ('four.messages.view'),
+  ('four.messages.manage')
+on conflict (name) do nothing;
