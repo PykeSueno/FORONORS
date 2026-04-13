@@ -6,6 +6,28 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getTabletBusinessDate } from '@/lib/tablet';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 
+type EquipmentRow = { id: number; name: string; quantity: number };
+
+function pickBestEquipment(items: EquipmentRow[], keyword: 'kit' | 'disqueuse') {
+  if (items.length === 0) return null;
+  const normalizedKeyword = keyword.toLowerCase();
+
+  return [...items].sort((a, b) => {
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+
+    const aExact = aName === normalizedKeyword || aName === `${normalizedKeyword}s`;
+    const bExact = bName === normalizedKeyword || bName === `${normalizedKeyword}s`;
+    if (aExact !== bExact) return aExact ? -1 : 1;
+
+    const aStarts = aName.startsWith(normalizedKeyword);
+    const bStarts = bName.startsWith(normalizedKeyword);
+    if (aStarts !== bStarts) return aStarts ? -1 : 1;
+
+    return aName.localeCompare(bName);
+  })[0];
+}
+
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
@@ -45,7 +67,8 @@ export async function POST(request: Request) {
 
   if (existingPassage) return NextResponse.json({ message: 'Ce membre a déjà fait son passage pour cette journée tablette.' }, { status: 400 });
 
-  const beforeCash = Number(day.chest_amount);
+  const { data: freshDay } = await supabase.from('tablet_days').select('id, chest_amount, passages_count, kits_added, cutters_added').eq('id', day.id).maybeSingle();
+  const beforeCash = Number(freshDay?.chest_amount ?? day.chest_amount ?? 0);
   if (beforeCash < 400) return NextResponse.json({ message: 'Dépôt tablette insuffisant (minimum 400$).' }, { status: 400 });
 
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
@@ -53,8 +76,10 @@ export async function POST(request: Request) {
   const beforeGroupBalance = Number(cash.balance);
   if (beforeGroupBalance < 400) return NextResponse.json({ message: 'Argent réel du groupe insuffisant (minimum 400$).' }, { status: 400 });
 
-  const { data: kit } = await supabase.from('items').select('id, name, quantity').ilike('name', '%kit%').limit(1).maybeSingle();
-  const { data: cutter } = await supabase.from('items').select('id, name, quantity').ilike('name', '%disqueuse%').limit(1).maybeSingle();
+  const { data: possibleKits } = await supabase.from('items').select('id, name, quantity').ilike('name', '%kit%').order('name', { ascending: true }).limit(20);
+  const { data: possibleCutters } = await supabase.from('items').select('id, name, quantity').ilike('name', '%disqueuse%').order('name', { ascending: true }).limit(20);
+  const kit = pickBestEquipment((possibleKits ?? []) as EquipmentRow[], 'kit');
+  const cutter = pickBestEquipment((possibleCutters ?? []) as EquipmentRow[], 'disqueuse');
 
   const beforeKits = Number(kit?.quantity ?? 0);
   const beforeCutters = Number(cutter?.quantity ?? 0);
@@ -82,9 +107,9 @@ export async function POST(request: Request) {
     .from('tablet_days')
     .update({
       chest_amount: afterCash,
-      passages_count: Number(day.passages_count) + 1,
-      kits_added: Number(day.kits_added) + 2,
-      cutters_added: Number(day.cutters_added) + 2,
+      passages_count: Number(freshDay?.passages_count ?? day.passages_count ?? 0) + 1,
+      kits_added: Number(freshDay?.kits_added ?? day.kits_added ?? 0) + 2,
+      cutters_added: Number(freshDay?.cutters_added ?? day.cutters_added ?? 0) + 2,
       updated_at: new Date().toISOString()
     })
     .eq('id', day.id);
@@ -104,22 +129,11 @@ export async function POST(request: Request) {
 
   if (kit) await supabase.from('items').update({ quantity: afterKits, updated_at: new Date().toISOString() }).eq('id', kit.id);
   if (cutter) await supabase.from('items').update({ quantity: afterCutters, updated_at: new Date().toISOString() }).eq('id', cutter.id);
-  await supabase.from('item_stock_movements').insert([
-    {
-      item_id: kit?.id ?? null,
-      item_name: kitName,
-      transaction_type: 'tablet_passage',
-      quantity_delta: 2,
-      user_id: memberId
-    },
-    {
-      item_id: cutter?.id ?? null,
-      item_name: cutterName,
-      transaction_type: 'tablet_passage',
-      quantity_delta: 2,
-      user_id: memberId
-    }
-  ]);
+
+  const movementRows = [];
+  if (kit) movementRows.push({ item_id: kit.id, item_name: kitName, transaction_type: 'tablet_passage', quantity_delta: 2, user_id: memberId });
+  if (cutter) movementRows.push({ item_id: cutter.id, item_name: cutterName, transaction_type: 'tablet_passage', quantity_delta: 2, user_id: memberId });
+  if (movementRows.length > 0) await supabase.from('item_stock_movements').insert(movementRows);
 
   await createAuditLog({
     actorUserId: session.userId,

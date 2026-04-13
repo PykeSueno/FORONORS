@@ -17,6 +17,7 @@ type ActivityRow = {
   equipment_after: number;
   created_at: string;
   activity_items: Array<{
+    item_id: number | null;
     item_name: string;
     quantity_added: number;
     before_quantity: number;
@@ -27,11 +28,11 @@ type ActivityRow = {
 
 type ActivityDbRow = Omit<ActivityRow, 'activity_items'> & {
   activity_items: Array<{
+    item_id: number | null;
     item_name: string;
     quantity_added: number;
     before_quantity: number;
     after_quantity: number;
-    items: Array<{ image_url: string | null }> | null;
   }>;
 };
 
@@ -50,10 +51,12 @@ export default async function ActivityPage() {
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
     supabase
       .from('activities')
-      .select('id, activity_type, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_name, quantity_added, before_quantity, after_quantity, items(image_url))')
+      .select('id, activity_type, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_id, item_name, quantity_added, before_quantity, after_quantity)')
       .order('created_at', { ascending: false })
       .limit(50)
   ]);
+
+  const imageByItemId = new Map((items ?? []).map((item) => [item.id, item.image_url]));
 
   const enrichedActivities: ActivityRow[] = ((activities ?? []) as ActivityDbRow[]).map((activity) => ({
     id: activity.id,
@@ -66,11 +69,12 @@ export default async function ActivityPage() {
     equipment_after: activity.equipment_after,
     created_at: activity.created_at,
     activity_items: activity.activity_items.map((line) => ({
+      item_id: line.item_id,
       item_name: line.item_name,
       quantity_added: line.quantity_added,
       before_quantity: line.before_quantity,
       after_quantity: line.after_quantity,
-      item_image_url: line.items?.[0]?.image_url ?? null
+      item_image_url: line.item_id ? (imageByItemId.get(line.item_id) ?? null) : null
     }))
   }));
 

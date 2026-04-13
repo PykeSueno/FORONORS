@@ -79,22 +79,29 @@ export async function POST(request: Request) {
   let stockOut = 0;
 
   const resolvedLines: Array<Record<string, unknown>> = [];
-  const stockUpdates: Array<{ id: number; nextQuantity: number }> = [];
+  const stockByItem = new Map<number, { name: string; before: number; current: number; }>();
   const stockMovementRows: Array<Record<string, unknown>> = [];
 
   for (const line of body.lines) {
     const { data: item } = await supabase.from('items').select('id, name, quantity, is_money_item').eq('id', line.item_id).maybeSingle();
     if (!item) return NextResponse.json({ message: `Item ${line.item_id} introuvable.` }, { status: 404 });
 
-    const effects = computeEffects(line, Boolean(item.is_money_item));
+    if (!stockByItem.has(item.id)) {
+      const before = Number(item.quantity);
+      stockByItem.set(item.id, { name: item.name, before, current: before });
+    }
 
-    if (effects.stockEffect < 0 && Number(item.quantity) + effects.stockEffect < 0) {
+    const effects = computeEffects(line, Boolean(item.is_money_item));
+    const tracked = stockByItem.get(item.id)!;
+    const nextTrackedQuantity = tracked.current + effects.stockEffect;
+
+    if (effects.stockEffect < 0 && nextTrackedQuantity < 0) {
       return NextResponse.json({ message: `Stock insuffisant pour ${item.name}.` }, { status: 400 });
     }
 
+    tracked.current = nextTrackedQuantity;
+
     if (effects.stockEffect !== 0) {
-      const nextQuantity = Number(item.quantity) + effects.stockEffect;
-      stockUpdates.push({ id: item.id, nextQuantity });
       stockMovementRows.push({
         item_id: item.id,
         item_name: item.name,
@@ -122,6 +129,8 @@ export async function POST(request: Request) {
   }
 
   const profitLoss = moneyIn - moneyOut;
+  const nextBalance = Number(cash.balance) + moneyIn - moneyOut;
+  if (nextBalance < 0) return NextResponse.json({ message: 'Solde groupe insuffisant.' }, { status: 400 });
 
   const { data: transaction, error: txError } = await supabase
     .from('transactions')
@@ -144,16 +153,16 @@ export async function POST(request: Request) {
 
   await supabase.from('transaction_lines').insert(resolvedLines.map((line) => ({ ...line, transaction_id: transaction.id })));
 
-  for (const update of stockUpdates) {
-    await supabase.from('items').update({ quantity: update.nextQuantity, updated_at: new Date().toISOString() }).eq('id', update.id);
+  for (const [itemId, state] of stockByItem.entries()) {
+    if (state.current !== state.before) {
+      await supabase.from('items').update({ quantity: state.current, updated_at: new Date().toISOString() }).eq('id', itemId);
+    }
   }
 
   if (stockMovementRows.length > 0) {
     await supabase.from('item_stock_movements').insert(stockMovementRows.map((row) => ({ ...row, transaction_id: transaction.id })));
   }
 
-  const nextBalance = Number(cash.balance) + moneyIn - moneyOut;
-  if (nextBalance < 0) return NextResponse.json({ message: 'Solde groupe insuffisant.' }, { status: 400 });
   await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
   await syncMoneyItemToGroupCash(supabase);
 

@@ -195,17 +195,19 @@ export function TransactionsPageClient({
 
                 return (
                   <article key={`${line.item_id}-${idx}`} className="rounded-xl border border-white/10 bg-[#4e311f]/60 p-3">
-                    <div className="grid gap-3 xl:grid-cols-[auto_1fr_auto_auto_auto_auto] xl:items-center">
+                    <div className="flex items-start gap-3">
                       <div className="h-14 w-14 overflow-hidden rounded-lg bg-[#23140e]">
                         {item.image_url ? <Image src={item.image_url} alt={item.name} width={80} height={80} className="h-full w-full object-cover" unoptimized /> : null}
                       </div>
 
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium text-[#ffe8c9]">{item.name}</p>
-                        <p className={`text-xs ${meta.tone}`}>{meta.icon} {meta.label}</p>
-                        <p className="text-xs text-[#f4d4b0]">📦 Stock actuel: <span className="font-semibold text-[#ffe9cd]">{item.quantity}</span></p>
+                        <p className={`mt-0.5 text-xs ${meta.tone}`}>{meta.icon} {meta.label}</p>
+                        <p className="mt-0.5 text-xs text-[#f4d4b0]">📦 Stock actuel: <span className="font-semibold text-[#ffe9cd]">{item.quantity}</span></p>
                       </div>
+                    </div>
 
+                    <div className="mt-3 grid gap-2 xl:grid-cols-[1fr_auto_auto_auto_auto_auto] xl:items-center">
                       <select className="saas-input" value={line.movement_type} onChange={(e) => updateLine(idx, { movement_type: e.target.value as MovementType })}>
                         <option value="stock_in">Entrée</option>
                         <option value="stock_out">Sortie</option>
@@ -221,10 +223,9 @@ export function TransactionsPageClient({
 
                       <input className="saas-input w-24" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
 
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-[#ffe8c9]">{formatUsd(lineTotal)}</p>
-                        <button type="button" className="saas-ghost-btn !px-2" onClick={() => removeLine(idx)}>🗑️</button>
-                      </div>
+                      <p className="text-sm font-semibold text-[#ffe8c9]">{formatUsd(lineTotal)}</p>
+
+                      <button type="button" className="saas-ghost-btn !px-2" onClick={() => removeLine(idx)}>🗑️</button>
                     </div>
                   </article>
                 );

@@ -12,6 +12,28 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   container: 'Conteneur'
 };
 
+type EquipmentRow = { id: number; name: string; quantity: number };
+
+function pickBestEquipment(items: EquipmentRow[], keyword: 'kit' | 'disqueuse') {
+  if (items.length === 0) return null;
+  const normalizedKeyword = keyword.toLowerCase();
+
+  return [...items].sort((a, b) => {
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+
+    const aExact = aName === normalizedKeyword || aName === `${normalizedKeyword}s`;
+    const bExact = bName === normalizedKeyword || bName === `${normalizedKeyword}s`;
+    if (aExact !== bExact) return aExact ? -1 : 1;
+
+    const aStarts = aName.startsWith(normalizedKeyword);
+    const bStarts = bName.startsWith(normalizedKeyword);
+    if (aStarts !== bStarts) return aStarts ? -1 : 1;
+
+    return aName.localeCompare(bName);
+  })[0];
+}
+
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
@@ -64,26 +86,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Boîte aux lettres ne consomme aucun équipement.' }, { status: 400 });
   }
 
-  const equipmentKeyword = body.activity_type === 'burglary' ? '%kit%' : body.activity_type === 'container' ? '%disqueuse%' : '';
   const memberId = body.member_user_id || session.userId;
   const memberLabel = body.member_label?.trim() || session.username;
 
   const supabase = getSupabaseAdmin();
 
-  let equipmentRow: { id: number; name: string; quantity: number } | null = null;
-  if (equipmentKeyword) {
-    const { data: equipment } = await supabase.from('items').select('id, name, quantity').ilike('name', equipmentKeyword).limit(1).maybeSingle();
-    equipmentRow = equipment ?? null;
+  let equipmentRow: EquipmentRow | null = null;
+  if (body.activity_type !== 'mailbox') {
+    const keyword = body.activity_type === 'burglary' ? 'kit' : 'disqueuse';
+    const { data: matches } = await supabase.from('items').select('id, name, quantity').ilike('name', `%${keyword}%`).order('name', { ascending: true }).limit(20);
+    equipmentRow = pickBestEquipment((matches ?? []) as EquipmentRow[], keyword);
     if (!equipmentRow) return NextResponse.json({ message: 'Équipement introuvable pour cette activité.' }, { status: 400 });
     if (equipmentUsed <= 0) return NextResponse.json({ message: 'Quantité d’équipement requise.' }, { status: 400 });
     if (Number(equipmentRow.quantity) < equipmentUsed) return NextResponse.json({ message: `Stock insuffisant pour ${equipmentRow.name}.` }, { status: 400 });
   }
 
-  const resolvedItems: Array<{ item_id: number; item_name: string; quantity: number; before: number; after: number; isMoneyItem: boolean }> = [];
+  const mergedLines = new Map<number, number>();
   for (const line of lines) {
     const quantity = Math.max(1, Number(line.quantity));
-    const { data: item } = await supabase.from('items').select('id, name, quantity, is_money_item').eq('id', line.item_id).maybeSingle();
-    if (!item) return NextResponse.json({ message: `Item ${line.item_id} introuvable.` }, { status: 404 });
+    mergedLines.set(line.item_id, (mergedLines.get(line.item_id) ?? 0) + quantity);
+  }
+
+  const resolvedItems: Array<{ item_id: number; item_name: string; quantity: number; before: number; after: number; isMoneyItem: boolean }> = [];
+  for (const [itemId, quantity] of mergedLines.entries()) {
+    const { data: item } = await supabase.from('items').select('id, name, quantity, is_money_item').eq('id', itemId).maybeSingle();
+    if (!item) return NextResponse.json({ message: `Item ${itemId} introuvable.` }, { status: 404 });
 
     const before = Number(item.quantity);
     const after = before + quantity;

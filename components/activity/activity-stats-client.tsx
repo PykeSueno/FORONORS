@@ -1,12 +1,16 @@
 'use client';
 
+import Image from 'next/image';
+
+type VisualCount = { quantity: number; imageUrl: string | null };
+
 type MemberStats = {
   total: number;
   mailbox: number;
   burglary: number;
   container: number;
-  items: Record<string, number>;
-  equipments: Record<string, number>;
+  items: Record<string, VisualCount>;
+  equipments: Record<string, VisualCount>;
 };
 
 export function ActivityStatsClient({ byMember, total }: { byMember: Record<string, MemberStats>; total: number }) {
@@ -32,9 +36,14 @@ export function ActivityStatsClient({ byMember, total }: { byMember: Record<stri
                   {Object.entries(stats.items).length > 0 ? (
                     <ul className="mt-1 space-y-1 text-xs text-[#f1cfaa]">
                       {Object.entries(stats.items)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([name, quantity]) => (
-                          <li key={`${member}-item-${name}`}>{name} x{quantity}</li>
+                        .sort((a, b) => b[1].quantity - a[1].quantity)
+                        .map(([name, data]) => (
+                          <li key={`${member}-item-${name}`} className="flex items-center gap-2">
+                            <div className="h-7 w-7 overflow-hidden rounded-md bg-[#22140e]">
+                              {data.imageUrl ? <Image src={data.imageUrl} alt={name} width={28} height={28} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-[10px]">🖼️</div>}
+                            </div>
+                            <span>{name} x{data.quantity}</span>
+                          </li>
                         ))}
                     </ul>
                   ) : (
@@ -47,9 +56,14 @@ export function ActivityStatsClient({ byMember, total }: { byMember: Record<stri
                   {Object.entries(stats.equipments).length > 0 ? (
                     <ul className="mt-1 space-y-1 text-xs text-[#f1cfaa]">
                       {Object.entries(stats.equipments)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([name, quantity]) => (
-                          <li key={`${member}-equipment-${name}`}>{name} x{quantity}</li>
+                        .sort((a, b) => b[1].quantity - a[1].quantity)
+                        .map(([name, data]) => (
+                          <li key={`${member}-equipment-${name}`} className="flex items-center gap-2">
+                            <div className="h-7 w-7 overflow-hidden rounded-md bg-[#22140e]">
+                              {data.imageUrl ? <Image src={data.imageUrl} alt={name} width={28} height={28} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-[10px]">🧰</div>}
+                            </div>
+                            <span>{name} x{data.quantity}</span>
+                          </li>
                         ))}
                     </ul>
                   ) : (
