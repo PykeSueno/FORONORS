@@ -158,12 +158,7 @@ export function ItemsPageClient({
                   {item.type_label ? <span className="rounded-full bg-[#3f281b]/50 px-2 py-0.5 text-xs text-[#f8d9b8]">{item.type_label}</span> : null}
                 </div>
                 <div className="mt-2 grid gap-2 md:grid-cols-3">
-                  {item.is_money_item ? (
-                    <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2 md:col-span-2">
-                      <p className="text-[11px] text-[#efccaa]">💰 Item spécial Argent</p>
-                      <p className="text-base font-semibold text-[#ffe8c9]">1 entrée/sortie = 1$ (lié au solde groupe)</p>
-                    </div>
-                  ) : (
+                  {item.is_money_item ? null : (
                     <>
                       <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2">
                         <p className="text-[11px] text-[#efccaa]">📥 Achat</p>
@@ -181,7 +176,6 @@ export function ItemsPageClient({
                   </div>
                 </div>
                 {item.weapon_identifier ? <p className="text-xs text-[#fce7ce]">ID arme: {item.weapon_identifier}</p> : null}
-                {item.is_money_item ? <p className="text-xs text-[#c4f3b6]">💵 Item Argent lié au solde groupe</p> : null}
               </div>
 
               {(canEdit || canDelete) ? (

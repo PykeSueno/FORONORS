@@ -68,6 +68,7 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
       {canManageDaily ? (
         <section className="glass-card p-5">
           <h3 className="text-base font-semibold text-[#fff1dd]">Dépôt du matin (8h)</h3>
+          <p className="mt-1 text-xs text-[#efcdab]">Allocation interne uniquement (ne modifie pas le solde réel du groupe).</p>
           <div className="mt-2 flex gap-2">
             <input className="saas-input w-full" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
             <button className="saas-primary-btn" onClick={() => void saveDeposit()}>Enregistrer</button>

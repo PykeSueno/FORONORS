@@ -15,7 +15,13 @@ type RecentActivity = {
   equipment_before: number;
   equipment_after: number;
   created_at: string;
-  activity_items: Array<{ item_name: string; quantity_added: number; before_quantity: number; after_quantity: number }>;
+  activity_items: Array<{
+    item_name: string;
+    quantity_added: number;
+    before_quantity: number;
+    after_quantity: number;
+    item_image_url?: string | null;
+  }>;
 };
 
 type Line = { item_id: number; quantity: number };
@@ -30,16 +36,22 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
-  const [equipmentUsed, setEquipmentUsed] = useState('0');
+  const [equipmentUsed, setEquipmentUsed] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
   const [proofImageUrl, setProofImageUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
 
+  const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const availableItems = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(query.toLowerCase())), [items, query]);
   const kitItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('kit')), [items]);
   const cutterItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('disqueuse')), [items]);
+
+  function setType(type: ActivityType) {
+    setActivityType(type);
+    if (type === 'mailbox') setEquipmentUsed(0);
+  }
 
   function addItem(itemId: number) {
     setLines((current) => {
@@ -57,6 +69,10 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
 
   function removeLine(index: number) {
     setLines((current) => current.filter((_, idx) => idx !== index));
+  }
+
+  function stepEquipment(delta: number) {
+    setEquipmentUsed((current) => Math.max(0, current + delta));
   }
 
   async function uploadImage(file: File) {
@@ -90,7 +106,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
         activity_type: activityType,
         member_user_id: memberId,
         member_label: memberLabel,
-        equipment_used: activityType === 'mailbox' ? 0 : Number(equipmentUsed || 0),
+        equipment_used: activityType === 'mailbox' ? 0 : equipmentUsed,
         proof_image_url: proofImageUrl || null,
         lines
       })
@@ -109,7 +125,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
     <div className="space-y-4">
       <section className="grid gap-3 md:grid-cols-3">
         {(Object.keys(ACTIVITY_META) as ActivityType[]).map((key) => (
-          <button key={key} className={`glass-card p-4 text-left ${activityType === key ? 'activity-card-active' : ''}`} onClick={() => setActivityType(key)}>
+          <button key={key} className={`glass-card p-4 text-left ${activityType === key ? 'activity-card-active' : ''}`} onClick={() => setType(key)}>
             <p className="text-2xl">{ACTIVITY_META[key].icon}</p>
             <p className="mt-1 text-base font-semibold text-[#fff1dd]">{ACTIVITY_META[key].label}</p>
             <p className="text-xs text-[#efcdab]">{ACTIVITY_META[key].subtitle}</p>
@@ -137,7 +153,9 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                     <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🧰</div>
                   )}
                 </div>
-                <input className="saas-input w-full" value={equipmentUsed} onChange={(e) => setEquipmentUsed(e.target.value)} />
+                <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(-1)}>-</button>
+                <input className="saas-input w-20 text-center" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} inputMode="numeric" />
+                <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(1)}>+</button>
               </div>
             </>
           ) : null}
@@ -180,13 +198,18 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
             <h3 className="text-base font-semibold text-[#fff1dd]">C. Récapitulatif</h3>
             <div className="mt-2 space-y-2">
               {lines.map((line, idx) => {
-                const item = items.find((entry) => entry.id === line.item_id);
+                const item = itemMap.get(line.item_id);
                 if (!item) return null;
                 return (
                   <div key={`${line.item_id}-${idx}`} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2">
-                    <div>
-                      <p className="text-sm text-[#ffe9cd]">{item.name}</p>
-                      <p className="text-xs text-[#efcdab]">Stock: {item.quantity} → {item.quantity + line.quantity}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
+                        {item.image_url ? <Image src={item.image_url} alt={item.name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🖼️</div>}
+                      </div>
+                      <div>
+                        <p className="text-sm text-[#ffe9cd]">{item.name}</p>
+                        <p className="text-xs text-[#efcdab]">Qté: +{line.quantity} · Avant/Après: {item.quantity} → {item.quantity + line.quantity}</p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-1">
                       <button className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, line.quantity - 1)}>-</button>
@@ -212,7 +235,16 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
             <article key={activity.id} className="rounded-xl border border-white/10 bg-[#4f3220]/55 p-3 text-sm text-[#f3d4b0]">
               <p className="font-medium">👤 {activity.member_label} — {ACTIVITY_META[activity.activity_type].label} — {new Date(activity.created_at).toLocaleString('fr-FR')}</p>
               {activity.equipment_item_name ? <p>🧰 {activity.equipment_item_name}: {activity.equipment_before} → {activity.equipment_after} (utilisé {activity.equipment_used})</p> : <p>🧰 Aucun équipement requis</p>}
-              <div className="mt-1 text-xs text-[#f1cfaa]">{activity.activity_items.map((line) => `${line.item_name} ${line.before_quantity}→${line.after_quantity} (+${line.quantity_added})`).join(' · ')}</div>
+              <div className="mt-2 space-y-1 text-xs text-[#f1cfaa]">
+                {activity.activity_items.map((line, index) => (
+                  <div key={`${activity.id}-${index}`} className="flex items-center gap-2">
+                    <div className="h-8 w-8 overflow-hidden rounded-md bg-[#22140e]">
+                      {line.item_image_url ? <Image src={line.item_image_url} alt={line.item_name} width={32} height={32} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-[10px] text-[#f0d0ab]">🖼️</div>}
+                    </div>
+                    <p>{line.item_name} {line.before_quantity}→{line.after_quantity} (+{line.quantity_added})</p>
+                  </div>
+                ))}
+              </div>
               {activity.proof_image_url ? <Image src={activity.proof_image_url} alt="Preuve activité" width={420} height={180} className="mt-2 h-24 w-full rounded-lg object-cover" unoptimized /> : null}
             </article>
           ))}

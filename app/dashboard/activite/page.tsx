@@ -16,7 +16,13 @@ type ActivityRow = {
   equipment_before: number;
   equipment_after: number;
   created_at: string;
-  activity_items: Array<{ item_name: string; quantity_added: number; before_quantity: number; after_quantity: number }>;
+  activity_items: Array<{
+    item_name: string;
+    quantity_added: number;
+    before_quantity: number;
+    after_quantity: number;
+    items?: { image_url: string | null } | null;
+  }>;
 };
 
 export default async function ActivityPage() {
@@ -34,10 +40,21 @@ export default async function ActivityPage() {
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
     supabase
       .from('activities')
-      .select('id, activity_type, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_name, quantity_added, before_quantity, after_quantity)')
+      .select('id, activity_type, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_name, quantity_added, before_quantity, after_quantity, items(image_url))')
       .order('created_at', { ascending: false })
       .limit(50)
   ]);
+
+  const enrichedActivities = ((activities ?? []) as ActivityRow[]).map((activity) => ({
+    ...activity,
+    activity_items: activity.activity_items.map((line) => ({
+      item_name: line.item_name,
+      quantity_added: line.quantity_added,
+      before_quantity: line.before_quantity,
+      after_quantity: line.after_quantity,
+      item_image_url: line.items?.image_url ?? null
+    }))
+  }));
 
   const currentMember = members?.find((entry) => entry.id === session.userId);
 
@@ -48,7 +65,7 @@ export default async function ActivityPage() {
       <ActivityPageClient
         items={items ?? []}
         members={members ?? []}
-        activities={(activities ?? []) as ActivityRow[]}
+        activities={enrichedActivities}
         defaultMemberId={session.userId}
         defaultMemberLabel={currentMember?.name || currentMember?.username || 'Groupe'}
         canCreate={permissions.includes('activity.create')}

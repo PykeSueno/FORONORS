@@ -1,6 +1,15 @@
 'use client';
 
-export function ActivityStatsClient({ byMember, total }: { byMember: Record<string, { total: number; mailbox: number; burglary: number; container: number }>; total: number }) {
+type MemberStats = {
+  total: number;
+  mailbox: number;
+  burglary: number;
+  container: number;
+  items: Record<string, number>;
+  equipments: Record<string, number>;
+};
+
+export function ActivityStatsClient({ byMember, total }: { byMember: Record<string, MemberStats>; total: number }) {
   const rows = Object.entries(byMember).sort((a, b) => b[1].total - a[1].total);
 
   return (
@@ -16,6 +25,38 @@ export function ActivityStatsClient({ byMember, total }: { byMember: Record<stri
             <article key={member} className="rounded-xl border border-white/10 bg-[#4f3220]/55 p-3 text-sm text-[#f3d4b0]">
               <p className="font-medium">👤 {member}</p>
               <p className="mt-1">Total: {stats.total} · 📬 {stats.mailbox} · 🏠 {stats.burglary} · 📦 {stats.container}</p>
+
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <div className="rounded-lg border border-white/10 bg-[#3d2619]/60 p-2">
+                  <p className="text-xs font-semibold text-[#ffe9cd]">Items récupérés</p>
+                  {Object.entries(stats.items).length > 0 ? (
+                    <ul className="mt-1 space-y-1 text-xs text-[#f1cfaa]">
+                      {Object.entries(stats.items)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([name, quantity]) => (
+                          <li key={`${member}-item-${name}`}>{name} x{quantity}</li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-xs text-[#efcdab]">Aucun item.</p>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-white/10 bg-[#3d2619]/60 p-2">
+                  <p className="text-xs font-semibold text-[#ffe9cd]">Équipements utilisés</p>
+                  {Object.entries(stats.equipments).length > 0 ? (
+                    <ul className="mt-1 space-y-1 text-xs text-[#f1cfaa]">
+                      {Object.entries(stats.equipments)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([name, quantity]) => (
+                          <li key={`${member}-equipment-${name}`}>{name} x{quantity}</li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-xs text-[#efcdab]">Aucun équipement.</p>
+                  )}
+                </div>
+              </div>
             </article>
           ))}
           {rows.length === 0 ? <p className="text-sm text-[#f1d0ab]">Aucune donnée activité.</p> : null}
