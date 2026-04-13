@@ -35,7 +35,6 @@ const EMPTY_FORM = {
   category_key: 'objects',
   type_key: '',
   weapon_identifier: '',
-  is_money_item: false
 };
 
 export function ItemsPageClient({
@@ -262,7 +261,6 @@ function ItemModal({
           category_key: initial.category_key,
           type_key: initial.type_key ?? '',
           weapon_identifier: initial.weapon_identifier ?? '',
-          is_money_item: initial.is_money_item
         }
       : {})
   });
@@ -310,7 +308,6 @@ function ItemModal({
       type_key: type?.key ?? null,
       type_label: type?.label ?? null,
       weapon_identifier: form.weapon_identifier || null,
-      is_money_item: form.is_money_item
     });
   }
 
@@ -377,10 +374,6 @@ function ItemModal({
               <label className="block text-xs text-[#efccaa]">ID arme</label>
               <input className="saas-input w-full" placeholder="ID arme" value={form.weapon_identifier} onChange={(e) => setForm({ ...form, weapon_identifier: e.target.value })} required />
             </>
-          ) : null}
-
-          {form.category_key === 'other' ? (
-            <label className="flex items-center gap-2 text-xs text-[#d8f0c9]"><input type="checkbox" checked={form.is_money_item} onChange={(e) => setForm({ ...form, is_money_item: e.target.checked })} /> Lier cet item au solde réel du groupe (item Argent)</label>
           ) : null}
 
           <div className="flex justify-end gap-2">

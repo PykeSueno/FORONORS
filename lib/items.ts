@@ -26,3 +26,7 @@ export const ITEM_CATEGORIES = [
 export function needsWeaponId(categoryKey: string, typeKey: string | null) {
   return categoryKey === 'weapons' && typeKey === 'weapons';
 }
+
+export function isMoneyLinkedItemName(name: string) {
+  return name.trim().toLowerCase() === 'argent';
+}

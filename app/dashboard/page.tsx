@@ -33,6 +33,7 @@ export default async function DashboardPage() {
   const canMembers = permissions.includes('members.access');
   const canLogs = permissions.includes('logs.access') && permissions.includes('logs.view');
   const canTablet = permissions.includes('tablet.access');
+  const canActivity = permissions.includes('activity.access');
   const canUpdatePassword = permissions.includes('account.password.update');
 
   const supabase = getSupabaseAdmin();
@@ -79,6 +80,7 @@ export default async function DashboardPage() {
         {canMembers ? <HubCard href="/dashboard/membres" icon="👥" title="Membres" value={String(membersCount ?? 0)} subtitle="Gestion équipe" /> : null}
         {canLogs ? <HubCard href="/dashboard/logs" icon="🧾" title="Logs" value={String(logsCount ?? 0)} subtitle="Traçabilité" /> : null}
         {canTablet ? <HubCard href="/dashboard/tablette" icon="📱" title="Tablette" value="Module" subtitle="Passages 8h → 8h" /> : null}
+        {canActivity ? <HubCard href="/dashboard/activite" icon="🎯" title="Activité" value="Module" subtitle="Boîte / Cambriolage / Conteneur" /> : null}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">

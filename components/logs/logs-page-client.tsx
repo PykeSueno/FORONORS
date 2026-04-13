@@ -18,6 +18,7 @@ type LogEntry = {
   entity_type: string;
   entity_id: string | null;
   summary: string;
+  new_values?: { proofImageUrl?: string | null } | null;
   created_at: string;
 };
 
@@ -124,6 +125,10 @@ export function LogsPageClient({
               <span className="rounded-full border border-white/20 px-2 py-0.5 text-xs text-[#f8d9b8]">{new Date(log.created_at).toLocaleString('fr-FR')}</span>
             </div>
             <p className="mt-1 text-sm text-[#f2d2ae]">{log.summary}</p>
+            {log.new_values?.proofImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={log.new_values.proofImageUrl} alt="Preuve activité" className="mt-2 h-24 w-full rounded-lg object-cover" />
+            ) : null}
             <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#efc89f]">
               <span className="rounded-full bg-[#3f281b]/70 px-2 py-1">👤 {log.actor_name} (@{log.actor_username})</span>
               <span className="rounded-full bg-[#3f281b]/70 px-2 py-1">🛡️ {log.actor_role || 'N/A'}</span>

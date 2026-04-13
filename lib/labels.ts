@@ -7,6 +7,7 @@ export function humanMoneyMovementLabel(type: string) {
   if (type === 'purchase') return 'Achat';
   if (type === 'tablet_passage') return 'Passage Tablette';
   if (type === 'tablet_morning_deposit') return 'Dépôt matin Tablette';
+  if (type === 'item_money_sync') return 'Sync Item Argent';
   return type;
 }
 
@@ -16,5 +17,7 @@ export function humanStockMovementLabel(type: string) {
   if (type === 'purchase') return 'Achat';
   if (type === 'sale') return 'Vente';
   if (type === 'tablet_passage') return 'Passage Tablette';
+  if (type === 'activity_loot_in') return 'Activité (loot entré)';
+  if (type === 'activity_equipment_out') return 'Activité (équipement sorti)';
   return type;
 }

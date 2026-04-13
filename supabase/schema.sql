@@ -357,3 +357,58 @@ values
   ('tablet.stats.view'),
   ('tablet.logs.view')
 on conflict (name) do nothing;
+
+create table if not exists public.activities (
+  id bigint generated always as identity primary key,
+  activity_type text not null,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null,
+  proof_image_url text,
+  equipment_item_id bigint references public.items(id) on delete set null,
+  equipment_item_name text,
+  equipment_used integer not null default 0,
+  equipment_before integer not null default 0,
+  equipment_after integer not null default 0,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.activity_items (
+  id bigint generated always as identity primary key,
+  activity_id bigint not null references public.activities(id) on delete cascade,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text not null,
+  quantity_added integer not null,
+  before_quantity integer not null,
+  after_quantity integer not null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_activities_created_at on public.activities(created_at desc);
+create index if not exists idx_activity_items_activity on public.activity_items(activity_id);
+
+alter table public.activities enable row level security;
+alter table public.activity_items enable row level security;
+
+drop policy if exists "allow_service_role_all_activities" on public.activities;
+create policy "allow_service_role_all_activities"
+on public.activities
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_activity_items" on public.activity_items;
+create policy "allow_service_role_all_activity_items"
+on public.activity_items
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('activity.access'),
+  ('activity.create'),
+  ('activity.view'),
+  ('activity.stats.view'),
+  ('activity.logs.view')
+on conflict (name) do nothing;

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
-import { needsWeaponId } from '@/lib/items';
+import { isMoneyLinkedItemName, needsWeaponId } from '@/lib/items';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
@@ -29,11 +29,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     type_key?: string | null;
     type_label?: string | null;
     weapon_identifier?: string | null;
-    is_money_item?: boolean;
   };
 
+  const nextName = body.name?.trim() ?? before.name;
+  const isMoneyLinked = isMoneyLinkedItemName(nextName);
   const payload = {
-    name: body.name?.trim() ?? before.name,
+    name: nextName,
     image_url: body.image_url?.trim() || null,
     buy_price: Number(body.buy_price ?? before.buy_price),
     sell_price: Number(body.sell_price ?? before.sell_price),
@@ -43,7 +44,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     type_key: body.type_key ?? null,
     type_label: body.type_label ?? null,
     weapon_identifier: body.weapon_identifier?.trim() || null,
-    is_money_item: Boolean((body.is_money_item ?? before.is_money_item) && (body.category_key ?? before.category_key) === 'other'),
+    is_money_item: isMoneyLinked,
     updated_at: new Date().toISOString()
   };
 
@@ -54,6 +55,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { data, error } = await supabase.from('items').update(payload).eq('id', Number(id)).select('id, name').maybeSingle();
 
   if (error) return NextResponse.json({ message: 'Modification item impossible.' }, { status: 400 });
+
+  const beforeMoneyLinked = Boolean(before.is_money_item);
+  const afterMoneyLinked = Boolean(payload.is_money_item);
+  const quantityDelta = Number(payload.quantity) - Number(before.quantity);
+
+  if ((beforeMoneyLinked || afterMoneyLinked) && quantityDelta !== 0) {
+    const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
+    if (cash) {
+      const nextBalance = Number(cash.balance) + quantityDelta;
+      if (nextBalance < 0) return NextResponse.json({ message: 'Solde groupe insuffisant pour ce stock Argent.' }, { status: 400 });
+      await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
+      await supabase.from('cash_movements').insert({
+        type: 'item_money_sync',
+        amount: quantityDelta,
+        label: `Sync item Argent (${quantityDelta > 0 ? '+' : ''}${quantityDelta})`,
+        user_id: session.userId
+      });
+    }
+  }
 
   await createAuditLog({
     actorUserId: session.userId,

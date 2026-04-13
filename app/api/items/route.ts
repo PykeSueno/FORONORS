@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { needsWeaponId } from '@/lib/items';
+import { isMoneyLinkedItemName, needsWeaponId } from '@/lib/items';
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -51,7 +51,6 @@ export async function POST(request: Request) {
     type_key?: string | null;
     type_label?: string | null;
     weapon_identifier?: string | null;
-    is_money_item?: boolean;
   };
 
   if (!body.name?.trim() || !body.category_key || !body.category_label) {
@@ -62,8 +61,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'ID arme requis pour une arme.' }, { status: 400 });
   }
 
+  const normalizedName = body.name.trim();
+  const isMoneyLinked = isMoneyLinkedItemName(normalizedName);
   const payload = {
-    name: body.name.trim(),
+    name: normalizedName,
     image_url: body.image_url?.trim() || null,
     buy_price: Number(body.buy_price ?? 0),
     sell_price: Number(body.sell_price ?? 0),
@@ -73,13 +74,28 @@ export async function POST(request: Request) {
     type_key: body.type_key ?? null,
     type_label: body.type_label ?? null,
     weapon_identifier: body.weapon_identifier?.trim() || null,
-    is_money_item: Boolean(body.is_money_item && body.category_key === 'other')
+    is_money_item: isMoneyLinked
   };
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.from('items').insert(payload).select('id, name').maybeSingle();
 
   if (error) return NextResponse.json({ message: 'Création item impossible.' }, { status: 400 });
+
+  if (isMoneyLinked && Number(payload.quantity) !== 0) {
+    const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
+    if (cash) {
+      const nextBalance = Number(cash.balance) + Number(payload.quantity);
+      if (nextBalance < 0) return NextResponse.json({ message: 'Solde groupe insuffisant pour ce stock Argent.' }, { status: 400 });
+      await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
+      await supabase.from('cash_movements').insert({
+        type: 'item_money_sync',
+        amount: Number(payload.quantity),
+        label: `Sync item Argent (${payload.quantity > 0 ? '+' : ''}${payload.quantity})`,
+        user_id: session.userId
+      });
+    }
+  }
 
   await createAuditLog({
     actorUserId: session.userId,
