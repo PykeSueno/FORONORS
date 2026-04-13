@@ -32,7 +32,7 @@ export async function comparePassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export async function createSessionToken(user: Pick<AppUser, 'id' | 'username' | 'role'>) {
+export async function createSessionToken(user: Pick<AppUser, 'id' | 'username' | 'role'>, remember = false) {
   const payload: SessionPayload = {
     sub: user.id,
     username: user.username,
@@ -42,20 +42,29 @@ export async function createSessionToken(user: Pick<AppUser, 'id' | 'username' |
   return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(remember ? '30d' : '7d')
     .sign(getSecret());
 }
 
-export async function createSessionCookie(user: Pick<AppUser, 'id' | 'username' | 'role'>) {
-  const token = await createSessionToken(user);
+export async function createSessionCookie(user: Pick<AppUser, 'id' | 'username' | 'role'>, remember = false) {
+  const token = await new SignJWT({
+    sub: user.id,
+    username: user.username,
+    role: user.role ?? ''
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(remember ? '30d' : '7d')
+    .sign(getSecret());
 
   const cookieStore = await cookies();
+  const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7;
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7
+    maxAge
   });
 
   return token;

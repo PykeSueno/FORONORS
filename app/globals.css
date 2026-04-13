@@ -24,10 +24,10 @@ body::before {
   inset: -6%;
   background-image: url('/foronors-logo.svg');
   background-position: center;
-  background-size: cover;
+  background-size: min(78vw, 900px);
   background-repeat: no-repeat;
-  opacity: 0.05;
-  filter: blur(20px);
+  opacity: 0.045;
+  filter: blur(18px);
   transform: scale(1.08);
   pointer-events: none;
   z-index: 0;
@@ -183,6 +183,24 @@ button {
   background: rgba(255, 220, 220, 0.68);
   color: #8a2f2f;
   transition: all 0.2s ease;
+}
+
+.icon-key-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(198, 163, 84, 0.62);
+  background: rgba(255, 238, 189, 0.72);
+  color: #7f5a12;
+  transition: all 0.2s ease;
+}
+
+.icon-key-btn:hover {
+  background: rgba(255, 233, 169, 0.86);
+  box-shadow: 0 0 14px rgba(199, 156, 64, 0.35);
 }
 
 .icon-logout-btn:hover {

@@ -35,7 +35,7 @@ async function ensureInitialPykeUser() {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { username?: string; password?: string };
+    const body = (await request.json()) as { username?: string; password?: string; remember?: boolean };
 
     if (!body.username || !body.password) {
       return NextResponse.json({ message: "Nom d'utilisateur et mot de passe requis." }, { status: 400 });
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     const isValidPassword = await comparePassword(body.password, user.password_hash);
     if (!isValidPassword) return NextResponse.json({ message: 'Mot de passe invalide.' }, { status: 401 });
 
-    const sessionToken = await createSessionCookie(user);
+    const sessionToken = await createSessionCookie(user, Boolean(body.remember));
 
     return NextResponse.json({ ok: true, redirectTo: '/dashboard', sessionToken, tokenType: 'Bearer' });
   } catch (error) {

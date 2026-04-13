@@ -57,6 +57,8 @@ export async function POST(request: Request) {
 
   const beforeKits = Number(kit?.quantity ?? 0);
   const beforeCutters = Number(cutter?.quantity ?? 0);
+  const kitName = kit?.name || 'Kit';
+  const cutterName = cutter?.name || 'Disqueuse';
   const afterCash = beforeCash - 400;
   const afterGroupBalance = beforeGroupBalance - 400;
   const afterKits = beforeKits + 2;
@@ -103,14 +105,14 @@ export async function POST(request: Request) {
   await supabase.from('item_stock_movements').insert([
     {
       item_id: kit?.id ?? null,
-      item_name: kit?.name || 'Kit',
+      item_name: kitName,
       transaction_type: 'tablet_passage',
       quantity_delta: 2,
       user_id: memberId
     },
     {
       item_id: cutter?.id ?? null,
-      item_name: cutter?.name || 'Disqueuse',
+      item_name: cutterName,
       transaction_type: 'tablet_passage',
       quantity_delta: 2,
       user_id: memberId
@@ -122,7 +124,7 @@ export async function POST(request: Request) {
     action: 'tablet.passage.create',
     entityType: 'tablet_passage',
     entityId: day.id,
-    summary: `Passage tablette ${memberLabel} | dépôt ${beforeCash}$ -> ${afterCash}$ | groupe ${beforeGroupBalance}$ -> ${afterGroupBalance}$ | kits ${beforeKits}->${afterKits} | disqueuses ${beforeCutters}->${afterCutters}`,
+    summary: `Passage tablette ${memberLabel} | dépôt ${beforeCash}$ -> ${afterCash}$ | groupe ${beforeGroupBalance}$ -> ${afterGroupBalance}$ | ${kitName} ${beforeKits}->${afterKits} | ${cutterName} ${beforeCutters}->${afterCutters}`,
     oldValues: { beforeCash, beforeGroupBalance, beforeKits, beforeCutters },
     newValues: { memberLabel, afterCash, afterGroupBalance, afterKits, afterCutters, businessDay }
   });

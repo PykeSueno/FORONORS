@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { formatUsd } from '@/lib/currency';
 import { getSession } from '@/lib/auth';
+import { WelcomeCardActions } from '@/components/dashboard/welcome-card-actions';
 import { getUserPermissions } from '@/lib/permissions';
 import { humanMoneyMovementLabel, humanStockMovementLabel } from '@/lib/labels';
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -21,11 +22,6 @@ type DashboardStockRow = {
   users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null;
 };
 
-type DashboardTabletPassageRow = {
-  member_label: string;
-  created_at: string;
-};
-
 export default async function DashboardPage() {
   const session = await getSession();
   const permissions = session ? await getUserPermissions(session.userId) : [];
@@ -37,9 +33,10 @@ export default async function DashboardPage() {
   const canMembers = permissions.includes('members.access');
   const canLogs = permissions.includes('logs.access') && permissions.includes('logs.view');
   const canTablet = permissions.includes('tablet.access');
+  const canUpdatePassword = permissions.includes('account.password.update');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: recentTabletPassages }] = await Promise.all([
+  const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }] = await Promise.all([
     session ? supabase.from('users').select('name, role').eq('id', session.userId).maybeSingle() : Promise.resolve({ data: null }),
     canMoney ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItems ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
@@ -47,31 +44,19 @@ export default async function DashboardPage() {
     canMembers ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canLogs ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canMoney ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
-    canItems ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
-    canTablet ? supabase.from('tablet_passages').select('member_label, created_at').order('created_at', { ascending: false }).limit(4) : Promise.resolve({ data: [] })
+    canItems ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] })
   ]);
 
   const cashRows = (recentCash ?? []) as DashboardCashRow[];
   const stockBaseRows = (recentStock ?? []) as DashboardStockRow[];
-  const tabletPassageRows = (recentTabletPassages ?? []) as DashboardTabletPassageRow[];
 
-  const stockRows = [
-    ...(stockBaseRows.map((row) => ({
-      type: 'stock' as const,
+  const stockRows = stockBaseRows
+    .map((row) => ({
       created_at: row.created_at,
       member: Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username) || 'Groupe',
       description: `${humanStockMovementLabel(row.transaction_type)} — ${row.item_name}`,
       value: `${row.quantity_delta > 0 ? '+' : ''}${row.quantity_delta}`
-    }))),
-    ...(tabletPassageRows.map((row) => ({
-      type: 'tablet' as const,
-      created_at: row.created_at,
-      member: row.member_label || 'Groupe',
-      description: 'Passage Tablette — Kit +2 / Disqueuse +2',
-      value: '+4'
-    })))
-  ]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }))
     .slice(0, 4);
 
   return (
@@ -82,15 +67,7 @@ export default async function DashboardPage() {
             <h1 className="text-3xl font-semibold text-[#f6e5cd]">Bienvenue {user?.name || session?.username}</h1>
             <p className="mt-1 text-sm text-[#f1d2ae]">Grade: {user?.role || session?.role || 'Utilisateur'}</p>
           </div>
-          <form action="/api/logout" method="post">
-            <button aria-label="Se déconnecter" className="icon-logout-btn">
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
-                <path d="M14 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                <path d="M10 17l5-5-5-5" />
-                <path d="M15 12H3" />
-              </svg>
-            </button>
-          </form>
+          <WelcomeCardActions canUpdatePassword={canUpdatePassword} />
         </div>
       </section>
 

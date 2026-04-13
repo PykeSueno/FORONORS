@@ -7,6 +7,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -18,7 +19,7 @@ export default function LoginPage() {
     const response = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password, remember })
     });
 
     if (!response.ok) {
@@ -43,9 +44,9 @@ export default function LoginPage() {
         className="pointer-events-none absolute inset-0 bg-center bg-no-repeat"
         style={{
           backgroundImage: "url('/foronors-logo.svg')",
-          backgroundSize: 'cover',
-          opacity: 0.06,
-          filter: 'blur(20px)',
+          backgroundSize: '70%',
+          opacity: 0.05,
+          filter: 'blur(16px)',
           transform: 'scale(1.1)'
         }}
       />
@@ -66,11 +67,14 @@ export default function LoginPage() {
 
           {error ? <p className="text-sm text-red-100">{error}</p> : null}
 
+          <label className="flex items-center gap-2 text-sm text-[#f4d4ae]">
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            Rester connecté
+          </label>
+
           <button type="submit" disabled={loading} className="saas-primary-btn w-full disabled:opacity-70">
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
-
-          <p className="text-xs text-[#f4d4ae]/80">Mode FiveM: le token de session est aussi renvoyé côté API pour les requêtes Bearer / x-fivem-session.</p>
 
         </form>
       </div>
