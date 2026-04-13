@@ -21,7 +21,17 @@ type ActivityRow = {
     quantity_added: number;
     before_quantity: number;
     after_quantity: number;
-    items?: { image_url: string | null } | null;
+    item_image_url: string | null;
+  }>;
+};
+
+type ActivityDbRow = Omit<ActivityRow, 'activity_items'> & {
+  activity_items: Array<{
+    item_name: string;
+    quantity_added: number;
+    before_quantity: number;
+    after_quantity: number;
+    items: Array<{ image_url: string | null }> | null;
   }>;
 };
 
@@ -45,14 +55,22 @@ export default async function ActivityPage() {
       .limit(50)
   ]);
 
-  const enrichedActivities = ((activities ?? []) as ActivityRow[]).map((activity) => ({
-    ...activity,
+  const enrichedActivities: ActivityRow[] = ((activities ?? []) as ActivityDbRow[]).map((activity) => ({
+    id: activity.id,
+    activity_type: activity.activity_type,
+    member_label: activity.member_label,
+    proof_image_url: activity.proof_image_url,
+    equipment_item_name: activity.equipment_item_name,
+    equipment_used: activity.equipment_used,
+    equipment_before: activity.equipment_before,
+    equipment_after: activity.equipment_after,
+    created_at: activity.created_at,
     activity_items: activity.activity_items.map((line) => ({
       item_name: line.item_name,
       quantity_added: line.quantity_added,
       before_quantity: line.before_quantity,
       after_quantity: line.after_quantity,
-      item_image_url: line.items?.image_url ?? null
+      item_image_url: line.items?.[0]?.image_url ?? null
     }))
   }));
 
