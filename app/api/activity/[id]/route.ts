@@ -15,11 +15,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canEdit] = await Promise.all([
+  const [canAccess, canEditOwn, canEditAny] = await Promise.all([
     hasUserPermission(session.userId, 'activity.access'),
-    hasUserPermission(session.userId, 'activity.edit')
+    hasUserPermission(session.userId, 'activity.edit.own'),
+    hasUserPermission(session.userId, 'activity.edit.any')
   ]);
-  if (!canAccess || !canEdit) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canAccess || (!canEditOwn && !canEditAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const activityId = Number(id);
@@ -40,6 +41,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .maybeSingle();
 
   if (!activity) return NextResponse.json({ message: 'Activité introuvable.' }, { status: 404 });
+  if (!canEditAny && activity.member_user_id !== session.userId) {
+    return NextResponse.json({ message: 'Vous pouvez modifier uniquement vos propres activités.' }, { status: 403 });
+  }
 
   const oldLines = (activity.activity_items ?? []) as ActivityLine[];
 
@@ -132,11 +136,12 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canCancel] = await Promise.all([
+  const [canAccess, canCancelOwn, canCancelAny] = await Promise.all([
     hasUserPermission(session.userId, 'activity.access'),
-    hasUserPermission(session.userId, 'activity.cancel')
+    hasUserPermission(session.userId, 'activity.cancel.own'),
+    hasUserPermission(session.userId, 'activity.cancel.any')
   ]);
-  if (!canAccess || !canCancel) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canAccess || (!canCancelOwn && !canCancelAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const activityId = Number(id);
@@ -144,11 +149,14 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const supabase = getSupabaseAdmin();
   const { data: activity } = await supabase
     .from('activities')
-    .select('id, equipment_item_id, equipment_used, activity_items(item_id, item_name, quantity_added)')
+    .select('id, member_user_id, equipment_item_id, equipment_used, activity_items(item_id, item_name, quantity_added)')
     .eq('id', activityId)
     .maybeSingle();
 
   if (!activity) return NextResponse.json({ message: 'Activité introuvable.' }, { status: 404 });
+  if (!canCancelAny && activity.member_user_id !== session.userId) {
+    return NextResponse.json({ message: 'Vous pouvez annuler uniquement vos propres activités.' }, { status: 403 });
+  }
 
   for (const line of (activity.activity_items ?? []) as ActivityLine[]) {
     if (!line.item_id) continue;

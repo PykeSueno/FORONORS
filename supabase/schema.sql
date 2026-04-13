@@ -73,10 +73,12 @@ values
   ('members.edit'),
   ('members.delete'),
   ('members.activities.view'),
+  ('members.preview'),
   ('account.password.update'),
   ('roles.manage'),
   ('dashboard.access'),
   ('money.access'),
+  ('money.preview'),
   ('money.edit'),
   ('money.history.view')
 on conflict (name) do nothing;
@@ -186,8 +188,10 @@ values
   ('items.create'),
   ('items.edit'),
   ('items.delete'),
+  ('items.preview'),
   ('logs.access'),
   ('logs.view'),
+  ('logs.preview'),
   ('logs.webhook.manage')
 on conflict (name) do nothing;
 
@@ -300,7 +304,9 @@ values
   ('transactions.manage'),
   ('transactions.recent.access'),
   ('transactions.recent.edit'),
-  ('transactions.recent.cancel')
+  ('transactions.recent.cancel'),
+  ('transactions.preview'),
+  ('transactions.recent.preview')
 on conflict (name) do nothing;
 
 create table if not exists public.tablet_days (
@@ -357,7 +363,8 @@ values
   ('tablet.passage.create'),
   ('tablet.daily.manage'),
   ('tablet.stats.view'),
-  ('tablet.logs.view')
+  ('tablet.logs.view'),
+  ('tablet.preview')
 on conflict (name) do nothing;
 
 create table if not exists public.activities (
@@ -414,5 +421,10 @@ values
   ('activity.stats.view'),
   ('activity.logs.view'),
   ('activity.edit'),
-  ('activity.cancel')
+  ('activity.cancel'),
+  ('activity.edit.own'),
+  ('activity.edit.any'),
+  ('activity.cancel.own'),
+  ('activity.cancel.any'),
+  ('activity.preview')
 on conflict (name) do nothing;

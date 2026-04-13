@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export function WelcomeCardActions({ canUpdatePassword }: { canUpdatePassword: boolean }) {
-  const router = useRouter();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -13,8 +11,8 @@ export function WelcomeCardActions({ canUpdatePassword }: { canUpdatePassword: b
 
   async function logout() {
     await fetch('/api/logout', { method: 'POST' });
-    router.push('/login');
-    router.refresh();
+    localStorage.removeItem('foronors_session_token');
+    window.location.href = '/login';
   }
 
   async function savePassword() {
@@ -65,14 +63,15 @@ export function WelcomeCardActions({ canUpdatePassword }: { canUpdatePassword: b
       </div>
 
       {showPasswordModal && canUpdatePassword ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="glass-card w-full max-w-md p-6">
+            <p className="mt-1 text-xs text-[#efcdab]">Renseigne les trois champs pour valider la modification.</p>
             <h3 className="text-lg font-semibold text-[#fff1dd]">Modifier le mot de passe</h3>
 
             <div className="mt-3 space-y-3">
-              <input type="password" className="saas-input w-full" placeholder="Ancien mot de passe" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-              <input type="password" className="saas-input w-full" placeholder="Nouveau mot de passe" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-              <input type="password" className="saas-input w-full" placeholder="Confirmation" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <label className="block text-xs text-[#efcdab]">Ancien mot de passe<input type="password" className="saas-input mt-1 w-full" placeholder="Ancien mot de passe" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} /></label>
+              <label className="block text-xs text-[#efcdab]">Nouveau mot de passe<input type="password" className="saas-input mt-1 w-full" placeholder="Nouveau mot de passe" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
+              <label className="block text-xs text-[#efcdab]">Confirmation<input type="password" className="saas-input mt-1 w-full" placeholder="Confirmation" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
               {error ? <p className="text-sm text-red-100">{error}</p> : null}
             </div>
 

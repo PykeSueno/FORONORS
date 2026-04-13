@@ -26,26 +26,42 @@ export default async function DashboardPage() {
   const session = await getSession();
   const permissions = session ? await getUserPermissions(session.userId) : [];
 
-  const canMoney = permissions.includes('money.access');
-  const canItems = permissions.includes('items.access');
-  const canTransactions = permissions.includes('transactions.access') && permissions.includes('transactions.view');
-  const canTransactionsRecent = canTransactions && permissions.includes('transactions.recent.access');
-  const canMembers = permissions.includes('members.access');
-  const canLogs = permissions.includes('logs.access') && permissions.includes('logs.view');
-  const canTablet = permissions.includes('tablet.access');
-  const canActivity = permissions.includes('activity.access');
+  const canMoneyAccess = permissions.includes('money.access');
+  const canMoneyPreview = canMoneyAccess || permissions.includes('money.preview');
+
+  const canItemsAccess = permissions.includes('items.access');
+  const canItemsPreview = canItemsAccess || permissions.includes('items.preview');
+
+  const canTransactionsAccess = permissions.includes('transactions.access') && permissions.includes('transactions.view');
+  const canTransactionsPreview = canTransactionsAccess || permissions.includes('transactions.preview');
+
+  const canTransactionsRecentAccess = canTransactionsAccess && permissions.includes('transactions.recent.access');
+  const canTransactionsRecentPreview = canTransactionsRecentAccess || permissions.includes('transactions.recent.preview');
+
+  const canMembersAccess = permissions.includes('members.access');
+  const canMembersPreview = canMembersAccess || permissions.includes('members.preview');
+
+  const canLogsAccess = permissions.includes('logs.access') && permissions.includes('logs.view');
+  const canLogsPreview = canLogsAccess || permissions.includes('logs.preview');
+
+  const canTabletAccess = permissions.includes('tablet.access');
+  const canTabletPreview = canTabletAccess || permissions.includes('tablet.preview');
+
+  const canActivityAccess = permissions.includes('activity.access');
+  const canActivityPreview = canActivityAccess || permissions.includes('activity.preview');
+
   const canUpdatePassword = permissions.includes('account.password.update');
 
   const supabase = getSupabaseAdmin();
   const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }] = await Promise.all([
     session ? supabase.from('users').select('name, role').eq('id', session.userId).maybeSingle() : Promise.resolve({ data: null }),
-    canMoney ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
-    canItems ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
-    canTransactions ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
-    canMembers ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
-    canLogs ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
-    canMoney ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
-    canItems ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] })
+    canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
+    canItemsPreview ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canMembersPreview ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canLogsPreview ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canMoneyPreview ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
+    canItemsPreview ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] })
   ]);
 
   const cashRows = (recentCash ?? []) as DashboardCashRow[];
@@ -73,18 +89,18 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {canMoney ? <HubCard href="/dashboard/argent" icon="💰" title="Argent" value={formatUsd(Number(cash?.balance ?? 0))} subtitle="Caisse actuelle" /> : null}
-        {canItems ? <HubCard href="/dashboard/items" icon="📦" title="Items" value={String(itemsCount ?? 0)} subtitle="Catalogue" /> : null}
-        {canTransactions ? <HubCard href="/dashboard/transactions" icon="🔄" title="Transactions" value={String(txCount ?? 0)} subtitle="Créer et gérer" /> : null}
-        {canTransactionsRecent ? <HubCard href="/dashboard/transactions-recentes" icon="🕒" title="Transactions récentes" value={String(txCount ?? 0)} subtitle="Historique" /> : null}
-        {canMembers ? <HubCard href="/dashboard/membres" icon="👥" title="Membres" value={String(membersCount ?? 0)} subtitle="Gestion équipe" /> : null}
-        {canLogs ? <HubCard href="/dashboard/logs" icon="🧾" title="Logs" value={String(logsCount ?? 0)} subtitle="Traçabilité" /> : null}
-        {canTablet ? <HubCard href="/dashboard/tablette" icon="📱" title="Tablette" value="Module" subtitle="Passages 8h → 8h" /> : null}
-        {canActivity ? <HubCard href="/dashboard/activite" icon="🎯" title="Activité" value="Module" subtitle="Boîte / Cambriolage / Conteneur" /> : null}
+        {canMoneyPreview ? <HubCard href="/dashboard/argent" enabled={canMoneyAccess} icon="💰" title="Argent" value={formatUsd(Number(cash?.balance ?? 0))} subtitle="Caisse actuelle" /> : null}
+        {canItemsPreview ? <HubCard href="/dashboard/items" enabled={canItemsAccess} icon="📦" title="Items" value={String(itemsCount ?? 0)} subtitle="Catalogue" /> : null}
+        {canTransactionsPreview ? <HubCard href="/dashboard/transactions" enabled={canTransactionsAccess} icon="🔄" title="Transactions" value={String(txCount ?? 0)} subtitle="Créer et gérer" /> : null}
+        {canTransactionsRecentPreview ? <HubCard href="/dashboard/transactions-recentes" enabled={canTransactionsRecentAccess} icon="🕒" title="Transactions récentes" value={String(txCount ?? 0)} subtitle="Historique" /> : null}
+        {canMembersPreview ? <HubCard href="/dashboard/membres" enabled={canMembersAccess} icon="👥" title="Membres" value={String(membersCount ?? 0)} subtitle="Gestion équipe" /> : null}
+        {canLogsPreview ? <HubCard href="/dashboard/logs" enabled={canLogsAccess} icon="🧾" title="Logs" value={String(logsCount ?? 0)} subtitle="Traçabilité" /> : null}
+        {canTabletPreview ? <HubCard href="/dashboard/tablette" enabled={canTabletAccess} icon="📱" title="Tablette" value="Module" subtitle="Passages 8h → 8h" /> : null}
+        {canActivityPreview ? <HubCard href="/dashboard/activite" enabled={canActivityAccess} icon="🎯" title="Activité" value="Module" subtitle="Boîte / Cambriolage / Conteneur" /> : null}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <article className="glass-card p-6">
+        {canMoneyPreview ? <article className="glass-card p-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2>
             <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">💰 Cash</span>
@@ -100,9 +116,9 @@ export default async function DashboardPage() {
               </div>
             ))}
           </div>
-        </article>
+        </article> : null}
 
-        <article className="glass-card p-6">
+        {canItemsPreview ? <article className="glass-card p-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2>
             <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">📦 Stock</span>
@@ -118,21 +134,28 @@ export default async function DashboardPage() {
               </div>
             ))}
           </div>
-        </article>
+        </article> : null}
       </section>
     </div>
   );
 }
 
-function HubCard({ href, icon, title, value, subtitle }: { href: string; icon: string; title: string; value: string; subtitle: string }) {
-  return (
-    <Link href={href} className="glass-card smooth-hover block p-6">
+function HubCard({ href, enabled, icon, title, value, subtitle }: { href: string; enabled: boolean; icon: string; title: string; value: string; subtitle: string }) {
+  const content = (
+    <>
       <div className="flex items-center justify-between">
         <p className="text-3xl">{icon}</p>
         <p className="text-2xl font-semibold text-[#ffe9cd]">{value}</p>
       </div>
       <p className="mt-3 text-lg font-semibold text-[#fff2de]">{title}</p>
       <p className="text-sm text-[#f1d1ac]">{subtitle}</p>
-    </Link>
+      {!enabled ? <p className="mt-2 text-xs text-[#efcaa7]">Aperçu uniquement</p> : null}
+    </>
   );
+
+  if (!enabled) {
+    return <div className="glass-card block cursor-not-allowed opacity-90 p-6">{content}</div>;
+  }
+
+  return <Link href={href} className="glass-card smooth-hover block p-6">{content}</Link>;
 }

@@ -9,6 +9,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 type ActivityRow = {
   id: number;
   activity_type: 'mailbox' | 'burglary' | 'container';
+  member_user_id: string | null;
   member_label: string;
   proof_image_url: string | null;
   equipment_item_name: string | null;
@@ -51,7 +52,7 @@ export default async function ActivityPage() {
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
     supabase
       .from('activities')
-      .select('id, activity_type, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_id, item_name, quantity_added, before_quantity, after_quantity)')
+      .select('id, activity_type, member_user_id, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_id, item_name, quantity_added, before_quantity, after_quantity)')
       .order('created_at', { ascending: false })
       .limit(50)
   ]);
@@ -61,6 +62,7 @@ export default async function ActivityPage() {
   const enrichedActivities: ActivityRow[] = ((activities ?? []) as ActivityDbRow[]).map((activity) => ({
     id: activity.id,
     activity_type: activity.activity_type,
+    member_user_id: activity.member_user_id,
     member_label: activity.member_label,
     proof_image_url: activity.proof_image_url,
     equipment_item_name: activity.equipment_item_name,
@@ -91,8 +93,11 @@ export default async function ActivityPage() {
         defaultMemberId={session.userId}
         defaultMemberLabel={currentMember?.name || currentMember?.username || 'Groupe'}
         canCreate={permissions.includes('activity.create')}
-        canEdit={permissions.includes('activity.edit')}
-        canCancel={permissions.includes('activity.cancel')}
+        canEditOwn={permissions.includes('activity.edit.own')}
+        canEditAny={permissions.includes('activity.edit.any')}
+        canCancelOwn={permissions.includes('activity.cancel.own')}
+        canCancelAny={permissions.includes('activity.cancel.any')}
+        currentUserId={session.userId}
       />
     </div>
   );

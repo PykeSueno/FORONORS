@@ -8,6 +8,7 @@ type Item = { id: number; name: string; image_url: string | null; quantity: numb
 type RecentActivity = {
   id: number;
   activity_type: ActivityType;
+  member_user_id: string | null;
   member_label: string;
   proof_image_url: string | null;
   equipment_item_name: string | null;
@@ -44,7 +45,7 @@ const ACTIVITY_META: Record<ActivityType, { label: string; icon: string; subtitl
   container: { label: 'Conteneur', icon: '📦', subtitle: 'Consomme des Disqueuses' }
 };
 
-export function ActivityPageClient({ items, members, activities, defaultMemberId, defaultMemberLabel, canCreate, canEdit, canCancel }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; defaultMemberLabel: string; canCreate: boolean; canEdit: boolean; canCancel: boolean }) {
+export function ActivityPageClient({ items, members, activities, defaultMemberId, defaultMemberLabel, canCreate, canEditOwn, canEditAny, canCancelOwn, canCancelAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; defaultMemberLabel: string; canCreate: boolean; canEditOwn: boolean; canEditAny: boolean; canCancelOwn: boolean; canCancelAny: boolean; currentUserId: string }) {
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
@@ -286,12 +287,18 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                 ))}
               </div>
               {activity.proof_image_url ? <Image src={activity.proof_image_url} alt="Preuve activité" width={420} height={180} className="mt-2 h-24 w-full rounded-lg object-cover" unoptimized /> : null}
-              {(canEdit || canCancel) ? (
-                <div className="mt-2 flex justify-end gap-2">
-                  {canEdit ? <button className="saas-ghost-btn" onClick={() => setEditingActivity(activity)}>Modifier</button> : null}
-                  {canCancel ? <button className="saas-ghost-btn" onClick={() => { void fetch(`/api/activity/${activity.id}`, { method: 'DELETE' }).then(() => window.location.reload()); }}>Annuler</button> : null}
-                </div>
-              ) : null}
+              {(() => {
+                const canEditThis = canEditAny || (canEditOwn && activity.member_user_id === currentUserId);
+                const canCancelThis = canCancelAny || (canCancelOwn && activity.member_user_id === currentUserId);
+                if (!canEditThis && !canCancelThis) return null;
+
+                return (
+                  <div className="mt-2 flex justify-end gap-2">
+                    {canEditThis ? <button className="saas-ghost-btn" onClick={() => setEditingActivity(activity)}>Modifier</button> : null}
+                    {canCancelThis ? <button className="saas-ghost-btn" onClick={() => { void fetch(`/api/activity/${activity.id}`, { method: 'DELETE' }).then(() => window.location.reload()); }}>Annuler</button> : null}
+                  </div>
+                );
+              })()}
             </article>
           ))}
         </div>
