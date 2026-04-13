@@ -38,6 +38,8 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const [query, setQuery] = useState('');
 
   const availableItems = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(query.toLowerCase())), [items, query]);
+  const kitItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('kit')), [items]);
+  const cutterItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('disqueuse')), [items]);
 
   function addItem(itemId: number) {
     setLines((current) => {
@@ -107,7 +109,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
     <div className="space-y-4">
       <section className="grid gap-3 md:grid-cols-3">
         {(Object.keys(ACTIVITY_META) as ActivityType[]).map((key) => (
-          <button key={key} className={`glass-card p-4 text-left ${activityType === key ? 'border-[#f5d4ab]' : ''}`} onClick={() => setActivityType(key)}>
+          <button key={key} className={`glass-card p-4 text-left ${activityType === key ? 'activity-card-active' : ''}`} onClick={() => setActivityType(key)}>
             <p className="text-2xl">{ACTIVITY_META[key].icon}</p>
             <p className="mt-1 text-base font-semibold text-[#fff1dd]">{ACTIVITY_META[key].label}</p>
             <p className="text-xs text-[#efcdab]">{ACTIVITY_META[key].subtitle}</p>
@@ -127,7 +129,16 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
           {activityType !== 'mailbox' ? (
             <>
               <label className="mt-3 block text-xs text-[#efccaa]">{activityType === 'burglary' ? 'Kits pris' : 'Disqueuses prises'}</label>
-              <input className="saas-input mt-1 w-full" value={equipmentUsed} onChange={(e) => setEquipmentUsed(e.target.value)} />
+              <div className="mt-1 flex items-center gap-2">
+                <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
+                  {(activityType === 'burglary' ? kitItem?.image_url : cutterItem?.image_url) ? (
+                    <Image src={(activityType === 'burglary' ? kitItem?.image_url : cutterItem?.image_url) as string} alt="Équipement" width={40} height={40} className="h-full w-full object-cover" unoptimized />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🧰</div>
+                  )}
+                </div>
+                <input className="saas-input w-full" value={equipmentUsed} onChange={(e) => setEquipmentUsed(e.target.value)} />
+              </div>
             </>
           ) : null}
 
@@ -152,9 +163,14 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
             <input className="saas-input mt-2 w-full" placeholder="Rechercher item" value={query} onChange={(e) => setQuery(e.target.value)} />
             <div className="mt-2 grid max-h-60 gap-2 overflow-auto sm:grid-cols-2">
               {availableItems.map((item) => (
-                <button key={item.id} className="rounded-lg border border-white/10 bg-[#3f281b]/60 px-3 py-2 text-left" onClick={() => addItem(item.id)}>
-                  <p className="text-sm font-medium text-[#ffe9cd]">{item.name}</p>
-                  <p className="text-xs text-[#efcdab]">Stock actuel: {item.quantity}</p>
+                <button key={item.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#3f281b]/60 px-3 py-2 text-left" onClick={() => addItem(item.id)}>
+                  <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
+                    {item.image_url ? <Image src={item.image_url} alt={item.name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🖼️</div>}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[#ffe9cd]">{item.name}</p>
+                    <p className="text-xs text-[#efcdab]">Stock actuel: {item.quantity}</p>
+                  </div>
                 </button>
               ))}
             </div>

@@ -4,6 +4,7 @@ import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getTabletBusinessDate } from '@/lib/tablet';
+import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
     .from('group_cash')
     .update({ balance: afterGroupBalance, updated_at: new Date().toISOString() })
     .eq('id', cash.id);
+  await syncMoneyItemToGroupCash(supabase);
 
   await supabase.from('cash_movements').insert({
     type: 'tablet_passage',

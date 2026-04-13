@@ -4,6 +4,7 @@ import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { isMoneyLinkedItemName, needsWeaponId } from '@/lib/items';
+import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -66,8 +67,8 @@ export async function POST(request: Request) {
   const payload = {
     name: normalizedName,
     image_url: body.image_url?.trim() || null,
-    buy_price: Number(body.buy_price ?? 0),
-    sell_price: Number(body.sell_price ?? 0),
+    buy_price: isMoneyLinked ? 0 : Number(body.buy_price ?? 0),
+    sell_price: isMoneyLinked ? 0 : Number(body.sell_price ?? 0),
     quantity: Number(body.quantity ?? 0),
     category_key: body.category_key,
     category_label: body.category_label,
@@ -82,18 +83,20 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ message: 'Création item impossible.' }, { status: 400 });
 
-  if (isMoneyLinked && Number(payload.quantity) !== 0) {
+  if (isMoneyLinked) {
     const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
     if (cash) {
-      const nextBalance = Number(cash.balance) + Number(payload.quantity);
+      const nextBalance = Number(payload.quantity);
       if (nextBalance < 0) return NextResponse.json({ message: 'Solde groupe insuffisant pour ce stock Argent.' }, { status: 400 });
       await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
+      const delta = nextBalance - Number(cash.balance);
       await supabase.from('cash_movements').insert({
-        type: 'item_money_sync',
-        amount: Number(payload.quantity),
-        label: `Sync item Argent (${payload.quantity > 0 ? '+' : ''}${payload.quantity})`,
+        type: delta >= 0 ? 'entry' : 'exit',
+        amount: delta,
+        label: `Entrée/Sortie argent via item Argent (${delta > 0 ? '+' : ''}${delta})`,
         user_id: session.userId
       });
+      await syncMoneyItemToGroupCash(supabase);
     }
   }
 

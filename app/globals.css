@@ -228,3 +228,9 @@ button {
   color: #4a2c1b;
   border-color: rgba(255, 234, 208, 0.9);
 }
+
+.activity-card-active {
+  background: linear-gradient(135deg, #ffe0b8 0%, #f4c998 100%);
+  border-color: rgba(255, 232, 201, 0.92);
+  color: #4a2f1e;
+}

@@ -3,8 +3,14 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 
 type ActivityType = 'mailbox' | 'burglary' | 'container';
+const ACTIVITY_LABELS: Record<ActivityType, string> = {
+  mailbox: 'Boîte aux lettres',
+  burglary: 'Cambriolage',
+  container: 'Conteneur'
+};
 
 export async function GET() {
   const session = await getSession();
@@ -73,15 +79,15 @@ export async function POST(request: Request) {
     if (Number(equipmentRow.quantity) < equipmentUsed) return NextResponse.json({ message: `Stock insuffisant pour ${equipmentRow.name}.` }, { status: 400 });
   }
 
-  const resolvedItems: Array<{ item_id: number; item_name: string; quantity: number; before: number; after: number }> = [];
+  const resolvedItems: Array<{ item_id: number; item_name: string; quantity: number; before: number; after: number; isMoneyItem: boolean }> = [];
   for (const line of lines) {
     const quantity = Math.max(1, Number(line.quantity));
-    const { data: item } = await supabase.from('items').select('id, name, quantity').eq('id', line.item_id).maybeSingle();
+    const { data: item } = await supabase.from('items').select('id, name, quantity, is_money_item').eq('id', line.item_id).maybeSingle();
     if (!item) return NextResponse.json({ message: `Item ${line.item_id} introuvable.` }, { status: 404 });
 
     const before = Number(item.quantity);
     const after = before + quantity;
-    resolvedItems.push({ item_id: item.id, item_name: item.name, quantity, before, after });
+    resolvedItems.push({ item_id: item.id, item_name: item.name, quantity, before, after, isMoneyItem: Boolean(item.is_money_item) });
   }
 
   const equipmentBefore = Number(equipmentRow?.quantity ?? 0);
@@ -117,7 +123,12 @@ export async function POST(request: Request) {
     });
   }
 
+  let moneyDeltaFromArgentItem = 0;
   for (const row of resolvedItems) {
+    if (row.isMoneyItem) {
+      moneyDeltaFromArgentItem += row.quantity;
+      continue;
+    }
     await supabase.from('items').update({ quantity: row.after, updated_at: new Date().toISOString() }).eq('id', row.item_id);
   }
 
@@ -132,22 +143,37 @@ export async function POST(request: Request) {
     }))
   );
 
-  await supabase.from('item_stock_movements').insert(
-    resolvedItems.map((row) => ({
-      item_id: row.item_id,
-      item_name: row.item_name,
-      transaction_type: 'activity_loot_in',
-      quantity_delta: row.quantity,
+  const lootStockRows = resolvedItems.filter((row) => !row.isMoneyItem).map((row) => ({
+    item_id: row.item_id,
+    item_name: row.item_name,
+    transaction_type: 'activity_loot_in',
+    quantity_delta: row.quantity,
+    user_id: memberId
+  }));
+  if (lootStockRows.length > 0) {
+    await supabase.from('item_stock_movements').insert(lootStockRows);
+  }
+
+  if (moneyDeltaFromArgentItem !== 0) {
+    const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
+    if (!cash) return NextResponse.json({ message: 'Caisse groupe introuvable.' }, { status: 404 });
+    const nextBalance = Number(cash.balance) + moneyDeltaFromArgentItem;
+    await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
+    await supabase.from('cash_movements').insert({
+      type: 'entry',
+      amount: moneyDeltaFromArgentItem,
+      label: `Entrée argent activité (${ACTIVITY_LABELS[body.activity_type]})`,
       user_id: memberId
-    }))
-  );
+    });
+    await syncMoneyItemToGroupCash(supabase);
+  }
 
   await createAuditLog({
     actorUserId: session.userId,
     action: 'activity.create',
     entityType: 'activity',
     entityId: activity.id,
-    summary: `${memberLabel} — ${body.activity_type} | équipement ${equipmentRow?.name ?? 'Aucun'}: ${equipmentUsed} | items: ${resolvedItems.map((row) => `${row.item_name} +${row.quantity}`).join(', ')}`,
+    summary: `${memberLabel} — ${ACTIVITY_LABELS[body.activity_type]} | équipement ${equipmentRow?.name ?? 'Aucun'}: ${equipmentUsed} | items: ${resolvedItems.map((row) => `${row.item_name} +${row.quantity}`).join(', ')}`,
     newValues: {
       activityType: body.activity_type,
       memberLabel,

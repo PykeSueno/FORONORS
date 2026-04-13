@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 
 export async function GET() {
   const session = await getSession();
@@ -40,6 +41,7 @@ export async function PATCH(request: Request) {
   const delta = nextBalance - previousBalance;
 
   await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
+  await syncMoneyItemToGroupCash(supabase);
 
   if (delta !== 0) {
     await supabase.from('cash_movements').insert({

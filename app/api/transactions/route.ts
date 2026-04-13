@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 
 type TxLineInput = {
   item_id: number;
@@ -12,11 +13,13 @@ type TxLineInput = {
 };
 
 function computeEffects(line: TxLineInput, isMoneyItem: boolean) {
-  const total = Number(line.quantity) * Number(line.unit_price);
   if (isMoneyItem) {
+    const total = Number(line.quantity);
     const money = line.movement_type === 'purchase' || line.movement_type === 'stock_out' ? -total : total;
     return { stockEffect: 0, moneyEffect: money, total };
   }
+
+  const total = Number(line.quantity) * Number(line.unit_price);
 
   if (line.movement_type === 'purchase') return { stockEffect: Number(line.quantity), moneyEffect: -total, total };
   if (line.movement_type === 'sale') return { stockEffect: -Number(line.quantity), moneyEffect: total, total };
@@ -111,7 +114,7 @@ export async function POST(request: Request) {
       item_name_snapshot: item.name,
       movement_type: line.movement_type,
       quantity: line.quantity,
-      unit_price: line.unit_price,
+      unit_price: item.is_money_item ? 1 : line.unit_price,
       total_amount: effects.total,
       money_effect: effects.moneyEffect,
       stock_effect: effects.stockEffect
@@ -150,7 +153,9 @@ export async function POST(request: Request) {
   }
 
   const nextBalance = Number(cash.balance) + moneyIn - moneyOut;
+  if (nextBalance < 0) return NextResponse.json({ message: 'Solde groupe insuffisant.' }, { status: 400 });
   await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
+  await syncMoneyItemToGroupCash(supabase);
 
   if (moneyIn > 0 || moneyOut > 0) {
     await supabase.from('cash_movements').insert({

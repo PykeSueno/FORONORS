@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { FormEvent, useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
-import { needsWeaponId } from '@/lib/items';
+import { isMoneyLinkedItemName, needsWeaponId } from '@/lib/items';
 
 type Category = {
   key: string;
@@ -158,14 +158,23 @@ export function ItemsPageClient({
                   {item.type_label ? <span className="rounded-full bg-[#3f281b]/50 px-2 py-0.5 text-xs text-[#f8d9b8]">{item.type_label}</span> : null}
                 </div>
                 <div className="mt-2 grid gap-2 md:grid-cols-3">
-                  <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2">
-                    <p className="text-[11px] text-[#efccaa]">📥 Achat</p>
-                    <p className="text-base font-semibold text-[#ffe8c9]">{formatUsd(Number(item.buy_price))}</p>
-                  </div>
-                  <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2">
-                    <p className="text-[11px] text-[#efccaa]">💸 Vente</p>
-                    <p className="text-base font-semibold text-[#ffe8c9]">{formatUsd(Number(item.sell_price))}</p>
-                  </div>
+                  {item.is_money_item ? (
+                    <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2 md:col-span-2">
+                      <p className="text-[11px] text-[#efccaa]">💰 Item spécial Argent</p>
+                      <p className="text-base font-semibold text-[#ffe8c9]">1 entrée/sortie = 1$ (lié au solde groupe)</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2">
+                        <p className="text-[11px] text-[#efccaa]">📥 Achat</p>
+                        <p className="text-base font-semibold text-[#ffe8c9]">{formatUsd(Number(item.buy_price))}</p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2">
+                        <p className="text-[11px] text-[#efccaa]">💸 Vente</p>
+                        <p className="text-base font-semibold text-[#ffe8c9]">{formatUsd(Number(item.sell_price))}</p>
+                      </div>
+                    </>
+                  )}
                   <div className="rounded-lg border border-white/10 bg-[#2f1f15]/60 px-3 py-2">
                     <p className="text-[11px] text-[#efccaa]">📦 Stock</p>
                     <p className="text-xl font-bold text-[#fff3df]">{item.quantity}</p>
@@ -266,6 +275,7 @@ function ItemModal({
   });
   const [uploading, setUploading] = useState(false);
   const category = categories.find((item) => item.key === form.category_key) ?? categories[0];
+  const isMoneyItemDraft = isMoneyLinkedItemName(form.name || '');
 
   function step(field: 'buy_price' | 'sell_price' | 'quantity', delta: number) {
     const current = Number(form[field] || '0');
@@ -343,8 +353,14 @@ function ItemModal({
             )}
           </div>
 
-          <NumberField label="Prix achat" value={form.buy_price} onChange={(value) => setForm({ ...form, buy_price: value })} onMinus={() => step('buy_price', -1)} onPlus={() => step('buy_price', 1)} />
-          <NumberField label="Prix vente" value={form.sell_price} onChange={(value) => setForm({ ...form, sell_price: value })} onMinus={() => step('sell_price', -1)} onPlus={() => step('sell_price', 1)} />
+          {!isMoneyItemDraft ? (
+            <>
+              <NumberField label="Prix achat" value={form.buy_price} onChange={(value) => setForm({ ...form, buy_price: value })} onMinus={() => step('buy_price', -1)} onPlus={() => step('buy_price', 1)} />
+              <NumberField label="Prix vente" value={form.sell_price} onChange={(value) => setForm({ ...form, sell_price: value })} onMinus={() => step('sell_price', -1)} onPlus={() => step('sell_price', 1)} />
+            </>
+          ) : (
+            <p className="rounded-xl border border-white/10 bg-[#2f1f15]/60 px-3 py-2 text-xs text-[#efcdab]">Item Argent détecté : prix achat/vente désactivés, la quantité représente directement le montant.</p>
+          )}
           <NumberField label="Quantité" value={form.quantity} onChange={(value) => setForm({ ...form, quantity: value })} onMinus={() => step('quantity', -1)} onPlus={() => step('quantity', 1)} />
 
           <label className="block text-xs text-[#efccaa]">Catégorie</label>
