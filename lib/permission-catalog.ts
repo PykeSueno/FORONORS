@@ -8,6 +8,7 @@ export const MODULE_ORDER = [
   'Membres',
   'Activité',
   'Tablette',
+  'FOUR',
   'Compte',
   'Rôles',
   'Autres'
@@ -78,6 +79,15 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'tablet.passage.create': { module: 'Tablette', label: 'Créer un passage tablette', hint: 'Ajouter un passage tablette.' },
   'tablet.logs.view': { module: 'Tablette', label: 'Voir les logs tablette', hint: 'Consulter les journaux tablette.' },
   'tablet.stats.view': { module: 'Tablette', label: 'Voir les stats tablette', hint: 'Afficher l’onglet stats tablette.' },
+
+
+  'four.preview': { module: 'FOUR', label: 'Voir la bulle FOUR', hint: 'Afficher la bulle FOUR sur le dashboard.' },
+  'four.access': { module: 'FOUR', label: 'Accéder à la page FOUR', hint: 'Entrer dans la page FOUR.' },
+  'four.open': { module: 'FOUR', label: 'Ouvrir une session FOUR', hint: 'Démarrer une nouvelle session FOUR.' },
+  'four.manage': { module: 'FOUR', label: 'Gérer une session FOUR active', hint: 'Ajouter et modifier les mouvements de session FOUR.' },
+  'four.close': { module: 'FOUR', label: 'Fermer une session FOUR', hint: 'Clôturer une session FOUR et consolider les stocks/cash.' },
+  'four.logs.view': { module: 'FOUR', label: 'Voir les logs FOUR', hint: 'Afficher les logs détaillés du module FOUR.' },
+  'four.history.view': { module: 'FOUR', label: 'Voir l’historique FOUR', hint: 'Consulter l’historique des sessions FOUR fermées.' },
 
   'account.password.update': { module: 'Compte', label: 'Modifier son mot de passe', hint: 'Changer son propre mot de passe utilisateur.' },
 

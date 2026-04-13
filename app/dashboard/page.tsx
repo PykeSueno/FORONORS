@@ -52,13 +52,16 @@ export default async function DashboardPage() {
   const canActivityAccess = has('activity.access');
   const canActivityPreview = canActivityAccess || has('activity.preview');
 
+  const canFourAccess = has('four.access');
+  const canFourPreview = canFourAccess || has('four.preview');
+
   const canShowMoneyMovements = has('dashboard.money.movements.access') || has('dashboard.money.movements.preview') || canMoneyPreview;
   const canShowStockMovements = has('dashboard.stock.movements.access') || has('dashboard.stock.movements.preview') || canItemsPreview;
 
   const canUpdatePassword = has('account.password.update');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }] = await Promise.all([
+  const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: fourActive }] = await Promise.all([
     session ? supabase.from('users').select('name, role').eq('id', session.userId).maybeSingle() : Promise.resolve({ data: null }),
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItemsPreview ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
@@ -66,7 +69,8 @@ export default async function DashboardPage() {
     canMembersPreview ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canLogsPreview ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canShowMoneyMovements ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
-    canShowStockMovements ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] })
+    canShowStockMovements ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
+    canFourPreview ? supabase.from('four_sessions').select('id, status').eq('status', 'open').order('opened_at', { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null })
   ]);
 
   const cashRows = (recentCash ?? []) as DashboardCashRow[];
@@ -100,11 +104,12 @@ export default async function DashboardPage() {
         {canLogsPreview ? <HubCard href="/dashboard/logs" enabled={canLogsAccess} icon="🧾" title="Logs" value={String(logsCount ?? 0)} subtitle="Traçabilité" /> : null}
         {canTabletPreview ? <HubCard href="/dashboard/tablette" enabled={canTabletAccess} icon="📱" title="Tablette" value="Module" subtitle="Passages 8h → 8h" /> : null}
         {canActivityPreview ? <HubCard href="/dashboard/activite" enabled={canActivityAccess} icon="🎯" title="Activité" value="Module" subtitle="Boîte / Cambriolage / Conteneur" /> : null}
+        {canFourPreview ? <HubCard href="/dashboard/four" enabled={canFourAccess} icon="🔥" title="FOUR" value={fourActive ? 'Ouvert' : 'Fermé'} subtitle="Session vente / achat" /> : null}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         {canShowMoneyMovements ? <article className="glass-card p-6">
-          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2></div>
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2><span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">💰 Cash</span></div>
           <div className="space-y-2">
             {cashRows.slice(0, 4).map((row, idx) => (
               <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
@@ -119,7 +124,7 @@ export default async function DashboardPage() {
         </article> : null}
 
         {canShowStockMovements ? <article className="glass-card p-6">
-          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2></div>
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2><span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">📦 Stock</span></div>
           <div className="space-y-2">
             {stockRows.map((row, idx) => (
               <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">

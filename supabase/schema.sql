@@ -437,3 +437,59 @@ values
   ('activity.cancel.any'),
   ('activity.preview')
 on conflict (name) do nothing;
+
+create table if not exists public.four_sessions (
+  id bigint generated always as identity primary key,
+  status text not null default 'open',
+  opened_by uuid references public.users(id) on delete set null,
+  managed_by uuid references public.users(id) on delete set null,
+  opened_at timestamptz not null default timezone('utc', now()),
+  closed_at timestamptz,
+  summary jsonb
+);
+
+create table if not exists public.four_movements (
+  id bigint generated always as identity primary key,
+  session_id bigint not null references public.four_sessions(id) on delete cascade,
+  movement_kind text not null,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text,
+  quantity numeric(12,2) not null default 0,
+  unit_price numeric(12,2) not null default 0,
+  total_amount numeric(12,2) not null default 0,
+  note text,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_four_sessions_status_opened_at on public.four_sessions(status, opened_at desc);
+create index if not exists idx_four_movements_session_id on public.four_movements(session_id, created_at desc);
+
+alter table public.four_sessions enable row level security;
+alter table public.four_movements enable row level security;
+
+drop policy if exists "allow_service_role_all_four_sessions" on public.four_sessions;
+create policy "allow_service_role_all_four_sessions"
+on public.four_sessions
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_four_movements" on public.four_movements;
+create policy "allow_service_role_all_four_movements"
+on public.four_movements
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('four.preview'),
+  ('four.access'),
+  ('four.open'),
+  ('four.manage'),
+  ('four.close'),
+  ('four.logs.view'),
+  ('four.history.view')
+on conflict (name) do nothing;

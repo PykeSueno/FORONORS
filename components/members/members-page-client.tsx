@@ -128,7 +128,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
             {sortedRoles.map((role) => (
               <div key={role.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
                 <p className="font-medium text-[#fff2df]">{role.name}</p>
-                <button className="saas-ghost-btn" onClick={() => setSelectedRoleId(role.id)}>Gérer</button>
+                <button className="saas-ghost-btn" onClick={() => { if (selectedRoleId === null) setSelectedRoleId(role.id); }}>Gérer</button>
               </div>
             ))}
           </div>
@@ -326,7 +326,10 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
     });
 
     setIsSaving(false);
-    if (!response.ok) return onError('Enregistrement rôle impossible.');
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
+      return onError(data.message ?? 'Enregistrement rôle impossible.');
+    }
     await onSaved(role.id);
   }
 
