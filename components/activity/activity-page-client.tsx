@@ -182,7 +182,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                   )}
                 </div>
                 <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(-1)}>-</button>
-                <input className="saas-input w-20 text-center" value={equipmentUsed} onChange={(e) => { setError(''); setEquipmentUsed(Math.max(0, Number(e.target.value || 0))); }} inputMode="numeric" />
+                <input className="saas-input w-20 text-center" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} inputMode="numeric" />
                 <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(1)}>+</button>
               </div>
             </>
@@ -330,7 +330,7 @@ function EditActivityModal({ activity, onClose }: { activity: RecentActivity; on
         </div>
         <div className="space-y-2">
           <input className="saas-input w-full" value={memberLabel} onChange={(e) => setMemberLabel(e.target.value)} />
-          <input className="saas-input w-full" value={equipmentUsed} onChange={(e) => { setError(''); setEquipmentUsed(Math.max(0, Number(e.target.value || 0))); }} />
+          <input className="saas-input w-full" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} />
           <div className="rounded-lg border border-white/10 bg-[#4f3220]/45 p-2 text-xs text-[#efcdab]">
             {lines.map((line, index) => (
               <div key={index} className="flex items-center justify-between gap-2">
