@@ -12,10 +12,9 @@ export default async function TransactionsPage() {
 
   const permissions = await getUserPermissions(session.userId);
   const canAccess = permissions.includes('transactions.access');
-  const canView = permissions.includes('transactions.view');
   const canCreate = permissions.includes('transactions.create');
 
-  if (!canAccess || !canView) redirect('/dashboard');
+  if (!canAccess) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const [{ data: items }, { data: members }] = await Promise.all([

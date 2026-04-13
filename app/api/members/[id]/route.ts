@@ -8,7 +8,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const canEdit = await hasUserPermission(session.userId, 'members.edit');
+  const [canEdit, canEditPassword] = await Promise.all([
+    hasUserPermission(session.userId, 'members.edit'),
+    hasUserPermission(session.userId, 'members.password.edit')
+  ]);
   if (!canEdit) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
@@ -38,7 +41,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   };
 
   if (body.password) {
+    if (!canEditPassword) return NextResponse.json({ message: 'Permission mot de passe manquante.' }, { status: 403 });
     payload.password_hash = await hashPassword(body.password);
+    payload.password_plain = body.password;
   }
 
   const { error } = await supabase.from('users').update(payload).eq('id', id);

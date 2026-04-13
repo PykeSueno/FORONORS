@@ -31,11 +31,8 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canView] = await Promise.all([
-    hasUserPermission(session.userId, 'transactions.access'),
-    hasUserPermission(session.userId, 'transactions.view')
-  ]);
-  if (!canAccess || !canView) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const canAccess = await hasUserPermission(session.userId, 'transactions.access');
+  if (!canAccess) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase

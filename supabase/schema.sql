@@ -22,6 +22,7 @@ create table if not exists public.users (
   username text not null unique,
   name text not null default '',
   password_hash text not null,
+  password_plain text,
   role text,
   role_id bigint references public.roles(id) on delete set null,
   is_active boolean not null default true,
@@ -31,6 +32,7 @@ create table if not exists public.users (
 alter table public.roles add column if not exists display_order integer not null default 100;
 alter table public.users add column if not exists role_id bigint references public.roles(id) on delete set null;
 alter table public.users add column if not exists name text not null default '';
+alter table public.users add column if not exists password_plain text;
 
 alter table public.roles enable row level security;
 alter table public.permissions enable row level security;
@@ -75,6 +77,9 @@ values
   ('members.activities.view'),
   ('members.preview'),
   ('members.view'),
+  ('members.password.view'),
+  ('members.password.copy'),
+  ('members.password.edit'),
   ('account.password.update'),
   ('roles.manage'),
   ('dashboard.preview'),
@@ -307,7 +312,6 @@ values
   ('transactions.access'),
   ('transactions.create'),
   ('transactions.edit'),
-  ('transactions.view'),
   ('transactions.manage'),
   ('transactions.recent.access'),
   ('transactions.recent.edit'),

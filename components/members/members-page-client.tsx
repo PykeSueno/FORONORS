@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useMemo, useState } from 'react';
-import { describePermission, MODULE_ORDER } from '@/lib/permission-catalog';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { describePermission, MODULE_ORDER, permissionOrder } from '@/lib/permission-catalog';
 
 type Permission = { id: number; name: string };
 type Role = { id: number; name: string; display_order: number; permission_ids: number[] };
@@ -36,6 +36,9 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const canDeleteMembers = userPermissions.includes('members.delete');
   const canManageRoles = userPermissions.includes('roles.manage');
   const canViewActivities = userPermissions.includes('members.activities.view');
+  const canViewMemberPassword = userPermissions.includes('members.password.view');
+  const canCopyMemberPassword = userPermissions.includes('members.password.copy');
+  const canEditMemberPassword = userPermissions.includes('members.password.edit');
 
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
   const selectedRole = useMemo(() => sortedRoles.find((role) => role.id === selectedRoleId) ?? null, [selectedRoleId, sortedRoles]);
@@ -137,6 +140,9 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
           member={selectedMember}
           roles={sortedRoles}
           canDelete={canDeleteMembers}
+          canViewPassword={canViewMemberPassword}
+          canCopyPassword={canCopyMemberPassword}
+          canEditPassword={canEditMemberPassword}
           isCreateMode={!selectedMember.id}
           onClose={() => setSelectedMember(null)}
           onSaved={async () => {
@@ -163,11 +169,29 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   );
 }
 
-function MemberManageModal({ member, roles, canDelete, isCreateMode, onClose, onSaved, onError }: { member: Member; roles: Role[]; canDelete: boolean; isCreateMode: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
+function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyPassword, canEditPassword, isCreateMode, onClose, onSaved, onError }: { member: Member; roles: Role[]; canDelete: boolean; canViewPassword: boolean; canCopyPassword: boolean; canEditPassword: boolean; isCreateMode: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
   const [draft, setDraft] = useState(member);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+
+  useEffect(() => {
+    async function loadCurrentPassword() {
+      if (isCreateMode || !member.id || (!canViewPassword && !canCopyPassword)) {
+        setCurrentPassword('');
+        return;
+      }
+
+      const response = await fetch(`/api/members/${member.id}/password`, { cache: 'no-store' });
+      if (!response.ok) return;
+      const data = (await response.json()) as { password?: string };
+      setCurrentPassword(data.password ?? '');
+    }
+
+    void loadCurrentPassword();
+  }, [isCreateMode, member.id, canViewPassword, canCopyPassword]);
 
   function generatePassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -176,8 +200,9 @@ function MemberManageModal({ member, roles, canDelete, isCreateMode, onClose, on
   }
 
   async function copyCurrentPassword() {
+    if (!currentPassword) return;
     try {
-      await navigator.clipboard.writeText('••••••');
+      await navigator.clipboard.writeText(currentPassword);
       setCopyFeedback('Copié');
       setTimeout(() => setCopyFeedback(''), 1200);
     } catch {
@@ -190,7 +215,13 @@ function MemberManageModal({ member, roles, canDelete, isCreateMode, onClose, on
     const response = await fetch(isCreateMode ? '/api/members' : `/api/members/${draft.id}`, {
       method: isCreateMode ? 'POST' : 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: draft.name, username: draft.username, role_id: draft.role_id, is_active: draft.is_active, password: newPassword || undefined })
+      body: JSON.stringify({
+        name: draft.name,
+        username: draft.username,
+        role_id: draft.role_id,
+        is_active: draft.is_active,
+        password: canEditPassword ? (newPassword || undefined) : undefined
+      })
     });
 
     if (!response.ok) {
@@ -221,22 +252,29 @@ function MemberManageModal({ member, roles, canDelete, isCreateMode, onClose, on
           </select>
           <label className="flex items-center gap-2 text-sm text-[#ffe3c1]"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Actif</label>
 
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <p className="text-xs text-[#ffe3c1]/80">Mot de passe actuel</p>
-              <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => void copyCurrentPassword()}>Copier</button>
+          {(canViewPassword || canCopyPassword) ? (
+            <div>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-xs text-[#ffe3c1]/80">Mot de passe actuel</p>
+                <div className="flex items-center gap-1">
+                  {canViewPassword ? <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => setShowCurrentPassword((v) => !v)}>{showCurrentPassword ? 'Masquer' : 'Afficher'}</button> : null}
+                  {canCopyPassword ? <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => void copyCurrentPassword()}>Copier</button> : null}
+                </div>
+              </div>
+              <input className="saas-input w-full" type={showCurrentPassword ? 'text' : 'password'} value={currentPassword || ''} readOnly />
+              {copyFeedback ? <p className="mt-1 text-xs text-[#efcdab]">{copyFeedback}</p> : null}
             </div>
-            <input className="saas-input w-full" value="••••••" readOnly />
-            {copyFeedback ? <p className="mt-1 text-xs text-[#efcdab]">{copyFeedback}</p> : null}
-          </div>
+          ) : null}
 
-          <div className="relative">
-            <input className="saas-input w-full pr-20" type={showPassword ? 'text' : 'password'} placeholder="Nouveau mot de passe" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-            <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
-              <button type="button" className="saas-ghost-btn !px-2 !py-1" onClick={() => setShowPassword((v) => !v)}>{showPassword ? '🙈' : '👁️'}</button>
-              <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={generatePassword}>Gen</button>
+          {canEditPassword ? (
+            <div className="relative">
+              <input className="saas-input w-full pr-20" type={showPassword ? 'text' : 'password'} placeholder="Nouveau mot de passe" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
+                <button type="button" className="saas-ghost-btn !px-2 !py-1" onClick={() => setShowPassword((v) => !v)}>{showPassword ? '🙈' : '👁️'}</button>
+                <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={generatePassword}>Gen</button>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="flex flex-wrap justify-end gap-2 pt-2">
             {!isCreateMode && canDelete ? <button className="saas-ghost-btn" onClick={() => void remove()}>Supprimer</button> : null}
@@ -272,7 +310,7 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
       })
       .map(([moduleName, modulePermissions]) => ({
         moduleName,
-        permissions: [...modulePermissions].sort((a, b) => describePermission(a.name).label.localeCompare(describePermission(b.name).label, 'fr'))
+        permissions: [...modulePermissions].sort((a, b) => permissionOrder(a.name) - permissionOrder(b.name) || describePermission(a.name).label.localeCompare(describePermission(b.name).label, 'fr'))
       }));
   }, [permissions]);
 
@@ -333,7 +371,7 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
                   {module.permissions.map((permission) => {
                     const info = describePermission(permission.name);
                     return (
-                      <label key={permission.id} className="rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
+                      <label key={permission.id} title={info.hint} className="rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
                         <div className="flex items-start gap-2">
                           <input
                             type="checkbox"

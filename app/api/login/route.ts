@@ -25,6 +25,7 @@ async function ensureInitialPykeUser() {
   const { error: insertError } = await supabase.from('users').insert({
     username: 'pyke',
     password_hash: passwordHash,
+    password_plain: 'santa',
     role: 'Patron',
     is_active: true
   });

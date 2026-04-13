@@ -37,7 +37,7 @@ export async function PATCH(request: Request) {
   if (!valid) return NextResponse.json({ message: 'Ancien mot de passe invalide.' }, { status: 401 });
 
   const nextHash = await hashPassword(body.new_password);
-  await supabase.from('users').update({ password_hash: nextHash }).eq('id', session.userId);
+  await supabase.from('users').update({ password_hash: nextHash, password_plain: body.new_password }).eq('id', session.userId);
 
   await createAuditLog({
     actorUserId: session.userId,

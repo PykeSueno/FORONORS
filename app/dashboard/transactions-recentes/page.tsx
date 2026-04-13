@@ -30,10 +30,9 @@ export default async function RecentTransactionsPage() {
 
   const permissions = await getUserPermissions(session.userId);
   const canAccess = permissions.includes('transactions.access');
-  const canView = permissions.includes('transactions.view');
   const canRecent = permissions.includes('transactions.recent.access');
 
-  if (!canAccess || !canView || !canRecent) redirect('/dashboard');
+  if (!canAccess || !canRecent) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const { data } = await supabase

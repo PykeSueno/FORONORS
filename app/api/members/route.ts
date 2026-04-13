@@ -45,8 +45,11 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const canCreate = await hasUserPermission(session.userId, 'members.create');
-  if (!canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const [canCreate, canEditPassword] = await Promise.all([
+    hasUserPermission(session.userId, 'members.create'),
+    hasUserPermission(session.userId, 'members.password.edit')
+  ]);
+  if (!canCreate || !canEditPassword) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as {
     username?: string;
@@ -73,6 +76,7 @@ export async function POST(request: Request) {
     username: body.username.trim(),
     name: body.name.trim(),
     password_hash: passwordHash,
+    password_plain: body.password,
     role_id: body.role_id ?? null,
     role: roleName,
     is_active: body.is_active ?? true
