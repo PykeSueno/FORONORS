@@ -397,13 +397,13 @@ function RoleManageModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-2xl p-6">
+      <div className="glass-card flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xl font-semibold text-[#fff0db]">Gérer rôle</h3>
           <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto pr-1">
           <input className="saas-input w-full" value={name} onChange={(e) => setName(e.target.value)} />
 
           <div className="space-y-3">

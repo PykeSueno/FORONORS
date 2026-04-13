@@ -27,6 +27,17 @@ type RecentActivity = {
 
 type Line = { item_id: number; quantity: number };
 
+
+const TYPE_LABELS: Record<string, string> = {
+  weapons: 'Armes',
+  ammo: 'Munitions',
+  other: 'Autres',
+  seeds: 'Graines',
+  equipment: 'Équipement',
+  bag: 'Pochon',
+  production: 'Production'
+};
+
 const ACTIVITY_META: Record<ActivityType, { label: string; icon: string; subtitle: string }> = {
   mailbox: { label: 'Boîte aux lettres', icon: '📬', subtitle: 'Aucun équipement requis' },
   burglary: { label: 'Cambriolage', icon: '🏠', subtitle: 'Consomme des Kits' },
@@ -60,6 +71,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
 
   function setType(type: ActivityType) {
     setActivityType(type);
+    setError('');
     if (type === 'mailbox') setEquipmentUsed(0);
   }
 
@@ -82,6 +94,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   }
 
   function stepEquipment(delta: number) {
+    setError('');
     setEquipmentUsed((current) => Math.max(0, current + delta));
   }
 
@@ -109,6 +122,11 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   }
 
   async function submit() {
+    if (activityType !== 'mailbox' && equipmentUsed <= 0) {
+      setError(activityType === 'burglary' ? 'Pour un cambriolage, indique le nombre de Kits pris.' : 'Pour un conteneur, indique le nombre de Disqueuses prises.');
+      return;
+    }
+
     const response = await fetch('/api/activity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -164,7 +182,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                   )}
                 </div>
                 <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(-1)}>-</button>
-                <input className="saas-input w-20 text-center" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} inputMode="numeric" />
+                <input className="saas-input w-20 text-center" value={equipmentUsed} onChange={(e) => { setError(''); setEquipmentUsed(Math.max(0, Number(e.target.value || 0))); }} inputMode="numeric" />
                 <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(1)}>+</button>
               </div>
             </>
@@ -198,7 +216,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
             {availableTypes.length > 0 ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 <button className={`filter-pill ${!typeFilter ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter('')}>Tous types</button>
-                {availableTypes.map((type) => <button key={type} className={`filter-pill ${typeFilter === type ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter(type)}>{type}</button>)}
+                {availableTypes.map((type) => <button key={type} className={`filter-pill ${typeFilter === type ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter(type)}>{TYPE_LABELS[type] ?? type}</button>)}
               </div>
             ) : null}
             <div className="mt-2 grid max-h-60 gap-2 overflow-auto sm:grid-cols-2">
@@ -312,7 +330,7 @@ function EditActivityModal({ activity, onClose }: { activity: RecentActivity; on
         </div>
         <div className="space-y-2">
           <input className="saas-input w-full" value={memberLabel} onChange={(e) => setMemberLabel(e.target.value)} />
-          <input className="saas-input w-full" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} />
+          <input className="saas-input w-full" value={equipmentUsed} onChange={(e) => { setError(''); setEquipmentUsed(Math.max(0, Number(e.target.value || 0))); }} />
           <div className="rounded-lg border border-white/10 bg-[#4f3220]/45 p-2 text-xs text-[#efcdab]">
             {lines.map((line, index) => (
               <div key={index} className="flex items-center justify-between gap-2">

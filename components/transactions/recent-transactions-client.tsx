@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { humanStockMovementLabel } from '@/lib/labels';
 
@@ -153,20 +153,41 @@ function EditTransactionModal({ transaction, onClose, onError }: { transaction: 
   const [memberLabel, setMemberLabel] = useState(transaction.member_label);
   const [lines, setLines] = useState(transaction.transaction_lines.map((line) => ({
     item_id: Number(line.item_id ?? 0),
+    item_name: line.item_name_snapshot,
+    image_url: Array.isArray(line.items) ? line.items[0]?.image_url ?? null : line.items?.image_url ?? null,
     movement_type: line.movement_type,
     quantity: Number(line.quantity),
     unit_price: Number(line.unit_price ?? 0)
   })));
+  const [stockByItemId, setStockByItemId] = useState<Record<number, number>>({});
 
   function updateLine(index: number, patch: Partial<typeof lines[number]>) {
     setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   }
 
+
+  useEffect(() => {
+    const ids = Array.from(new Set(lines.map((line) => line.item_id).filter((id) => id > 0)));
+    if (ids.length === 0) return;
+
+    void fetch('/api/items')
+      .then((response) => response.ok ? response.json() as Promise<{ items: Array<{ id: number; quantity: number }> }> : null)
+      .then((data) => {
+        if (!data) return;
+        const next: Record<number, number> = {};
+        for (const item of data.items) {
+          if (ids.includes(item.id)) next[item.id] = Number(item.quantity);
+        }
+        setStockByItemId(next);
+      })
+      .catch(() => undefined);
+  }, [lines]);
+
   async function save() {
     const response = await fetch(`/api/transactions/recent/${transaction.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason, member_label: memberLabel, lines })
+      body: JSON.stringify({ reason, member_label: memberLabel, lines: lines.map((line) => ({ item_id: line.item_id, movement_type: line.movement_type, quantity: line.quantity, unit_price: line.unit_price })) })
     });
 
     if (!response.ok) {
@@ -191,16 +212,40 @@ function EditTransactionModal({ transaction, onClose, onError }: { transaction: 
           <input className="saas-input w-full" value={memberLabel} onChange={(e) => setMemberLabel(e.target.value)} placeholder="Membre" />
 
           {lines.map((line, index) => (
-            <div key={index} className="grid gap-2 rounded-lg border border-white/10 bg-[#4f3220]/45 p-2 md:grid-cols-4">
-              <select className="saas-input" value={line.movement_type} onChange={(e) => updateLine(index, { movement_type: e.target.value as 'purchase' | 'sale' | 'stock_in' | 'stock_out' })}>
-                <option value="stock_in">Entrée</option>
-                <option value="stock_out">Sortie</option>
-                <option value="purchase">Achat</option>
-                <option value="sale">Vente</option>
-              </select>
-              <input className="saas-input" value={line.quantity} onChange={(e) => updateLine(index, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
-              <input className="saas-input" value={line.unit_price} onChange={(e) => updateLine(index, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
-              <p className="flex items-center text-sm text-[#f5d7b6]">Item #{line.item_id}</p>
+            <div key={index} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
+              <div className="flex items-start gap-3">
+                <div className="h-12 w-12 overflow-hidden rounded-lg bg-[#23140e]">
+                  {line.image_url ? <Image src={line.image_url} alt={line.item_name} width={48} height={48} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#efcdab]">🖼️</div>}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-[#ffe9cd]">{line.item_name}</p>
+                  <p className="text-xs text-[#efcdab]">Stock actuel: {stockByItemId[line.item_id] ?? '—'}</p>
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-2 md:grid-cols-4">
+                <div>
+                  <p className="mb-1 text-xs text-[#efcdab]">Type de mouvement</p>
+                  <select className="saas-input" value={line.movement_type} onChange={(e) => updateLine(index, { movement_type: e.target.value as 'purchase' | 'sale' | 'stock_in' | 'stock_out' })}>
+                    <option value="stock_in">Entrée</option>
+                    <option value="stock_out">Sortie</option>
+                    <option value="purchase">Achat</option>
+                    <option value="sale">Vente</option>
+                  </select>
+                </div>
+                <div>
+                  <p className="mb-1 text-xs text-[#efcdab]">Quantité</p>
+                  <input className="saas-input" value={line.quantity} onChange={(e) => updateLine(index, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs text-[#efcdab]">Prix unitaire</p>
+                  <input className="saas-input" value={line.unit_price} onChange={(e) => updateLine(index, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs text-[#efcdab]">Total ligne</p>
+                  <p className="saas-input flex items-center">{formatUsd(line.quantity * line.unit_price)}</p>
+                </div>
+              </div>
             </div>
           ))}
 
