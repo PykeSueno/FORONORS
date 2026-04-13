@@ -1,9 +1,4 @@
-export async function syncMoneyItemToGroupCash(supabase: {
-  from: (table: string) => {
-    select: (columns: string) => { order: (column: string) => { limit: (value: number) => { maybeSingle: () => Promise<{ data: { id: number; balance: number } | null }> } } };
-    update: (values: Record<string, unknown>) => { eq: (column: string, value: unknown) => Promise<unknown> };
-  };
-}) {
+export async function syncMoneyItemToGroupCash(supabase: any) {
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
   if (!cash) return;
 
