@@ -44,7 +44,7 @@ export default async function ActivityPage() {
   const permissions = await getUserPermissions(session.userId);
   const canAccess = permissions.includes('activity.access');
   const canView = permissions.includes('activity.view');
-  if (!canAccess || !canView) redirect('/dashboard');
+  if (!canAccess) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const [{ data: items }, { data: members }, { data: activities }] = await Promise.all([
@@ -85,14 +85,15 @@ export default async function ActivityPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Activité" subtitle="Boîte aux lettres, Cambriolage, Conteneur" />
-      <ActivityTabs active="activity" />
+      <ActivityTabs active="activity" canSeeStats={permissions.includes('activity.stats.view')} />
       <ActivityPageClient
         items={items ?? []}
         members={members ?? []}
-        activities={enrichedActivities}
+        activities={canView ? enrichedActivities : []}
         defaultMemberId={session.userId}
         defaultMemberLabel={currentMember?.name || currentMember?.username || 'Groupe'}
         canCreate={permissions.includes('activity.create')}
+        canViewRecent={canView}
         canEditOwn={permissions.includes('activity.edit.own')}
         canEditAny={permissions.includes('activity.edit.any')}
         canCancelOwn={permissions.includes('activity.cancel.own')}

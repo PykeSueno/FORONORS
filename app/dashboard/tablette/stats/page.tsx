@@ -35,7 +35,7 @@ export default async function TabletStatsPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Stats Tablette" subtitle="Statistiques hebdomadaires (dimanche → dimanche)" />
-      <TabletTabs active="stats" />
+      <TabletTabs active="stats" canSeeStats />
       <section className="glass-card p-5">
         <div className="space-y-2">
           {rows.map((row, index) => (

@@ -63,7 +63,7 @@ export default async function ActivityStatsPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Stats Activité" subtitle="Détail des activités, items et équipements par membre" />
-      <ActivityTabs active="stats" />
+      <ActivityTabs active="stats" canSeeStats />
       <ActivityStatsClient byMember={byMember} total={(data ?? []).length} />
     </div>
   );

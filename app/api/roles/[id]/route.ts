@@ -43,7 +43,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
-  if (body.permission_ids) {
+  if (body.permission_ids !== undefined) {
     const permissionIds = Array.from(new Set(body.permission_ids));
 
     const { error: deleteError } = await supabase.from('role_permissions').delete().eq('role_id', roleId);
@@ -70,7 +70,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     newValues: body as Record<string, unknown>
   });
 
-  return NextResponse.json({ ok: true });
+  const { data: updated } = await supabase
+    .from('roles')
+    .select('id, name, display_order, role_permissions(permission_id)')
+    .eq('id', roleId)
+    .maybeSingle();
+
+  return NextResponse.json({ ok: true, role: updated });
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -99,5 +105,11 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     oldValues: before as Record<string, unknown> | null
   });
 
-  return NextResponse.json({ ok: true });
+  const { data: updated } = await supabase
+    .from('roles')
+    .select('id, name, display_order, role_permissions(permission_id)')
+    .eq('id', roleId)
+    .maybeSingle();
+
+  return NextResponse.json({ ok: true, role: updated });
 }

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useMemo, useState } from 'react';
+import { describePermission, MODULE_ORDER } from '@/lib/permission-catalog';
 
 type Permission = { id: number; name: string };
 type Role = { id: number; name: string; display_order: number; permission_ids: number[] };
@@ -13,61 +14,6 @@ type Member = {
   role_name: string;
   is_active: boolean;
 };
-
-
-const PERMISSION_LABELS: Record<string, { module: string; label: string }> = {
-  'dashboard.access': { module: 'Dashboard', label: 'Accès au dashboard' },
-  'dashboard.view': { module: 'Dashboard', label: 'Voir les bulles du dashboard' },
-  'members.access': { module: 'Membres', label: 'Accéder à la page Membres' },
-  'members.create': { module: 'Membres', label: 'Créer un membre' },
-  'members.edit': { module: 'Membres', label: 'Modifier un membre' },
-  'members.delete': { module: 'Membres', label: 'Supprimer un membre' },
-  'members.activities.view': { module: 'Membres', label: 'Voir les activités d’un membre' },
-  'members.preview': { module: 'Membres', label: 'Voir la bulle Membres' },
-  'money.access': { module: 'Argent', label: 'Accéder au module Argent' },
-  'money.view': { module: 'Argent', label: 'Voir les mouvements d’argent' },
-  'money.edit': { module: 'Argent', label: 'Créer un mouvement d’argent' },
-  'money.preview': { module: 'Argent', label: 'Voir la bulle Argent' },
-  'items.access': { module: 'Items', label: 'Accéder à la page Items' },
-  'items.view': { module: 'Items', label: 'Voir les items' },
-  'items.create': { module: 'Items', label: 'Créer un item' },
-  'items.edit': { module: 'Items', label: 'Modifier un item' },
-  'items.delete': { module: 'Items', label: 'Supprimer un item' },
-  'items.preview': { module: 'Items', label: 'Voir la bulle Items' },
-  'transactions.access': { module: 'Transactions', label: 'Accéder au module Transactions' },
-  'transactions.view': { module: 'Transactions', label: 'Voir les transactions' },
-  'transactions.create': { module: 'Transactions', label: 'Créer une transaction' },
-  'transactions.recent.access': { module: 'Transactions récentes', label: 'Accéder aux transactions récentes' },
-  'transactions.recent.edit': { module: 'Transactions récentes', label: 'Modifier une transaction récente' },
-  'transactions.recent.cancel': { module: 'Transactions récentes', label: 'Annuler une transaction récente' },
-  'transactions.preview': { module: 'Transactions', label: 'Voir la bulle Transactions' },
-  'transactions.recent.preview': { module: 'Transactions récentes', label: 'Voir la bulle Transactions récentes' },
-  'logs.access': { module: 'Logs', label: 'Accéder au module Logs' },
-  'logs.view': { module: 'Logs', label: 'Voir les logs' },
-  'logs.preview': { module: 'Logs', label: 'Voir la bulle Logs' },
-  'tablet.access': { module: 'Tablette', label: 'Accéder à la page Tablette' },
-  'tablet.passage.create': { module: 'Tablette', label: 'Créer un passage tablette' },
-  'tablet.daily.manage': { module: 'Tablette', label: 'Gérer le dépôt du matin' },
-  'tablet.stats.view': { module: 'Tablette', label: 'Voir les stats tablette' },
-  'tablet.preview': { module: 'Tablette', label: 'Voir la bulle Tablette' },
-  'activity.access': { module: 'Activité', label: 'Accéder à la page Activité' },
-  'activity.create': { module: 'Activité', label: 'Créer une activité' },
-  'activity.edit': { module: 'Activité', label: 'Modifier une activité récente' },
-  'activity.cancel': { module: 'Activité', label: 'Annuler une activité récente' },
-  'activity.edit.own': { module: 'Activité', label: 'Modifier ses propres activités' },
-  'activity.edit.any': { module: 'Activité', label: 'Modifier toutes les activités' },
-  'activity.cancel.own': { module: 'Activité', label: 'Annuler ses propres activités' },
-  'activity.cancel.any': { module: 'Activité', label: 'Annuler toutes les activités' },
-  'activity.preview': { module: 'Activité', label: 'Voir la bulle Activité' },
-  'activity.view': { module: 'Activité', label: 'Voir les activités récentes' },
-  'activity.stats.view': { module: 'Activité', label: 'Voir les stats activité' },
-  'account.password.update': { module: 'Compte', label: 'Modifier un mot de passe' },
-  'roles.manage': { module: 'Rôles', label: 'Gérer les rôles et permissions' }
-};
-
-function humanPermission(permission: Permission) {
-  return PERMISSION_LABELS[permission.name] ?? { module: 'Autres', label: permission.name.replace(/\./g, ' · ') };
-}
 
 type MembersPageClientProps = {
   initialMembers: Member[];
@@ -81,7 +27,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const [roles, setRoles] = useState<Role[]>(initialRoles);
   const [permissions, setPermissions] = useState<Permission[]>(initialPermissions);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [newRoleName, setNewRoleName] = useState('');
   const [error, setError] = useState('');
 
@@ -92,12 +38,13 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const canViewActivities = userPermissions.includes('members.activities.view');
 
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
+  const selectedRole = useMemo(() => sortedRoles.find((role) => role.id === selectedRoleId) ?? null, [selectedRoleId, sortedRoles]);
 
   async function refreshAll() {
     const [membersRes, rolesRes, permissionsRes] = await Promise.all([
-      fetch('/api/members'),
-      fetch('/api/roles'),
-      canManageRoles ? fetch('/api/permissions') : Promise.resolve(null)
+      fetch('/api/members', { cache: 'no-store' }),
+      fetch('/api/roles', { cache: 'no-store' }),
+      canManageRoles ? fetch('/api/permissions', { cache: 'no-store' }) : Promise.resolve(null)
     ]);
 
     if (!membersRes.ok || !rolesRes.ok || (permissionsRes && !permissionsRes.ok)) {
@@ -134,23 +81,12 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
     await refreshAll();
   }
 
-  async function openCreateMember() {
-    setSelectedMember({
-      id: '',
-      name: '',
-      username: '',
-      role_id: null,
-      role_name: '',
-      is_active: true
-    });
-  }
-
   return (
     <div className="space-y-6">
       <div className="glass-card p-5">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold text-[#fff2de]">Membres & Rôles</h1>
-          {canCreateMember ? <button className="saas-primary-btn" onClick={() => void openCreateMember()}>Nouveau membre</button> : null}
+          {canCreateMember ? <button className="saas-primary-btn" onClick={() => setSelectedMember({ id: '', name: '', username: '', role_id: null, role_name: '', is_active: true })}>Nouveau membre</button> : null}
         </div>
       </div>
 
@@ -162,30 +98,13 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
           {members.map((member) => (
             <div key={member.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
               <div className="grid min-w-[280px] flex-1 grid-cols-3 gap-3 text-sm">
-                <div>
-                  <p className="text-[#ffe2c1]/80">Nom</p>
-                  <p className="font-medium text-[#fff3df]">{member.name}</p>
-                </div>
-                <div>
-                  <p className="text-[#ffe2c1]/80">User</p>
-                  <p className="font-medium text-[#fff3df]">{member.username}</p>
-                </div>
-                <div>
-                  <p className="text-[#ffe2c1]/80">Rôle</p>
-                  <p className="font-medium text-[#fff3df]">{member.role_name || 'Sans rôle'}</p>
-                </div>
+                <div><p className="text-[#ffe2c1]/80">Nom</p><p className="font-medium text-[#fff3df]">{member.name}</p></div>
+                <div><p className="text-[#ffe2c1]/80">User</p><p className="font-medium text-[#fff3df]">{member.username}</p></div>
+                <div><p className="text-[#ffe2c1]/80">Rôle</p><p className="font-medium text-[#fff3df]">{member.role_name || 'Sans rôle'}</p></div>
               </div>
               <div className="flex items-center gap-2">
-                {canViewActivities ? (
-                  <Link href={`/dashboard/membres/${member.id}/activites`} className="saas-ghost-btn">
-                    Activités
-                  </Link>
-                ) : null}
-                {(canEditMembers || canDeleteMembers) ? (
-                  <button className="saas-ghost-btn" onClick={() => setSelectedMember(member)}>
-                    Gérer
-                  </button>
-                ) : null}
+                {canViewActivities ? <Link href={`/dashboard/membres/${member.id}/activites`} className="saas-ghost-btn">Activités</Link> : null}
+                {(canEditMembers || canDeleteMembers) ? <button className="saas-ghost-btn" onClick={() => setSelectedMember(member)}>Gérer</button> : null}
               </div>
             </div>
           ))}
@@ -206,7 +125,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
             {sortedRoles.map((role) => (
               <div key={role.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
                 <p className="font-medium text-[#fff2df]">{role.name}</p>
-                <button className="saas-ghost-btn" onClick={() => setSelectedRole(role)}>Gérer</button>
+                <button className="saas-ghost-btn" onClick={() => setSelectedRoleId(role.id)}>Gérer</button>
               </div>
             ))}
           </div>
@@ -232,10 +151,10 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
         <RoleManageModal
           role={selectedRole}
           permissions={permissions}
-          onClose={() => setSelectedRole(null)}
-          onSaved={async () => {
-            setSelectedRole(null);
+          onClose={() => setSelectedRoleId(null)}
+          onSaved={async (updatedRoleId) => {
             await refreshAll();
+            setSelectedRoleId(updatedRoleId);
           }}
           onError={setError}
         />
@@ -244,26 +163,11 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   );
 }
 
-function MemberManageModal({
-  member,
-  roles,
-  canDelete,
-  isCreateMode,
-  onClose,
-  onSaved,
-  onError
-}: {
-  member: Member;
-  roles: Role[];
-  canDelete: boolean;
-  isCreateMode: boolean;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-  onError: (message: string) => void;
-}) {
+function MemberManageModal({ member, roles, canDelete, isCreateMode, onClose, onSaved, onError }: { member: Member; roles: Role[]; canDelete: boolean; isCreateMode: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
   const [draft, setDraft] = useState(member);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState('');
 
   function generatePassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -271,17 +175,22 @@ function MemberManageModal({
     setNewPassword(value);
   }
 
+  async function copyCurrentPassword() {
+    try {
+      await navigator.clipboard.writeText('••••••');
+      setCopyFeedback('Copié');
+      setTimeout(() => setCopyFeedback(''), 1200);
+    } catch {
+      setCopyFeedback('Échec');
+      setTimeout(() => setCopyFeedback(''), 1200);
+    }
+  }
+
   async function save() {
     const response = await fetch(isCreateMode ? '/api/members' : `/api/members/${draft.id}`, {
       method: isCreateMode ? 'POST' : 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: draft.name,
-        username: draft.username,
-        role_id: draft.role_id,
-        is_active: draft.is_active,
-        password: newPassword || undefined
-      })
+      body: JSON.stringify({ name: draft.name, username: draft.username, role_id: draft.role_id, is_active: draft.is_active, password: newPassword || undefined })
     });
 
     if (!response.ok) {
@@ -295,45 +204,34 @@ function MemberManageModal({
 
   async function remove() {
     const response = await fetch(`/api/members/${draft.id}`, { method: 'DELETE' });
-    if (!response.ok) {
-      onError('Suppression impossible.');
-      return;
-    }
+    if (!response.ok) return onError('Suppression impossible.');
     await onSaved();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
       <div className="glass-card w-full max-w-lg p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-[#fff0db]">Gérer membre</h3>
-          <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
-        </div>
-
+        <div className="mb-4 flex items-center justify-between"><h3 className="text-xl font-semibold text-[#fff0db]">Gérer membre</h3><button className="saas-ghost-btn" onClick={onClose}>Fermer</button></div>
         <div className="space-y-3">
           <input className="saas-input w-full" placeholder="Nom" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <input className="saas-input w-full" placeholder="User" value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value })} />
           <select className="saas-input w-full" value={draft.role_id ?? ''} onChange={(e) => setDraft({ ...draft, role_id: e.target.value ? Number(e.target.value) : null })}>
             <option value="">Sans rôle</option>
-            {roles.map((role) => (
-              <option key={role.id} value={role.id}>{role.name}</option>
-            ))}
+            {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
           </select>
           <label className="flex items-center gap-2 text-sm text-[#ffe3c1]"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Actif</label>
 
           <div>
-            <p className="mb-1 text-xs text-[#ffe3c1]/80">Mot de passe actuel</p>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-xs text-[#ffe3c1]/80">Mot de passe actuel</p>
+              <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => void copyCurrentPassword()}>Copier</button>
+            </div>
             <input className="saas-input w-full" value="••••••" readOnly />
+            {copyFeedback ? <p className="mt-1 text-xs text-[#efcdab]">{copyFeedback}</p> : null}
           </div>
 
           <div className="relative">
-            <input
-              className="saas-input w-full pr-20"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Nouveau mot de passe"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
+            <input className="saas-input w-full pr-20" type={showPassword ? 'text' : 'password'} placeholder="Nouveau mot de passe" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
             <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
               <button type="button" className="saas-ghost-btn !px-2 !py-1" onClick={() => setShowPassword((v) => !v)}>{showPassword ? '🙈' : '👁️'}</button>
               <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={generatePassword}>Gen</button>
@@ -350,66 +248,75 @@ function MemberManageModal({
   );
 }
 
-function RoleManageModal({
-  role,
-  permissions,
-  onClose,
-  onSaved,
-  onError
-}: {
-  role: Role;
-  permissions: Permission[];
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-  onError: (message: string) => void;
-}) {
+function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { role: Role; permissions: Permission[]; onClose: () => void; onSaved: (roleId: number) => Promise<void>; onError: (message: string) => void; }) {
   const [name, setName] = useState(role.name);
-  const [checked, setChecked] = useState<number[]>(role.permission_ids);
+  const [checked, setChecked] = useState<Record<number, boolean>>(() => Object.fromEntries(role.permission_ids.map((id) => [id, true])));
   const [newPermission, setNewPermission] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const modules = useMemo(() => {
+    const grouped: Record<string, Permission[]> = {};
+    for (const permission of permissions) {
+      const info = describePermission(permission.name);
+      if (!grouped[info.module]) grouped[info.module] = [];
+      grouped[info.module].push(permission);
+    }
+
+    return Object.entries(grouped)
+      .sort(([moduleA], [moduleB]) => {
+        const orderA = MODULE_ORDER.indexOf(moduleA as (typeof MODULE_ORDER)[number]);
+        const orderB = MODULE_ORDER.indexOf(moduleB as (typeof MODULE_ORDER)[number]);
+        const a = orderA === -1 ? MODULE_ORDER.length : orderA;
+        const b = orderB === -1 ? MODULE_ORDER.length : orderB;
+        return a - b || moduleA.localeCompare(moduleB, 'fr');
+      })
+      .map(([moduleName, modulePermissions]) => ({
+        moduleName,
+        permissions: [...modulePermissions].sort((a, b) => describePermission(a.name).label.localeCompare(describePermission(b.name).label, 'fr'))
+      }));
+  }, [permissions]);
 
   async function saveRole() {
+    if (isSaving) return;
+    setIsSaving(true);
+    const permissionIds = permissions.filter((permission) => checked[permission.id]).map((permission) => permission.id);
+
     const response = await fetch(`/api/roles/${role.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, permission_ids: checked })
+      body: JSON.stringify({ name: name.trim(), permission_ids: permissionIds })
     });
 
-    if (!response.ok) {
-      onError('Enregistrement rôle impossible.');
-      return;
-    }
-
-    await onSaved();
+    setIsSaving(false);
+    if (!response.ok) return onError('Enregistrement rôle impossible.');
+    await onSaved(role.id);
   }
 
   async function removeRole() {
     const response = await fetch(`/api/roles/${role.id}`, { method: 'DELETE' });
-    if (!response.ok) {
-      onError('Suppression rôle impossible.');
-      return;
-    }
-    await onSaved();
+    if (!response.ok) return onError('Suppression rôle impossible.');
+    onClose();
+    await onSaved(-1);
   }
 
   async function addPermission() {
+    const permissionName = newPermission.trim().toLowerCase();
+    if (!permissionName) return;
+
     const response = await fetch('/api/permissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newPermission })
+      body: JSON.stringify({ name: permissionName })
     });
 
-    if (!response.ok) {
-      onError('Création permission impossible.');
-      return;
-    }
-
+    if (!response.ok) return onError('Création permission impossible.');
     setNewPermission('');
-    await onSaved();
+    await onSaved(role.id);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
-      <div className="glass-card flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden p-6">
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
+      <div className="glass-card flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xl font-semibold text-[#fff0db]">Gérer rôle</h3>
           <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
@@ -419,28 +326,19 @@ function RoleManageModal({
           <input className="saas-input w-full" value={name} onChange={(e) => setName(e.target.value)} />
 
           <div className="space-y-3">
-            {Object.entries(permissions.reduce((acc, permission) => {
-              const info = humanPermission(permission);
-              if (!acc[info.module]) acc[info.module] = [];
-              acc[info.module].push(permission);
-              return acc;
-            }, {} as Record<string, Permission[]>)).map(([moduleName, modulePermissions]) => (
-              <section key={moduleName} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
-                <h4 className="text-sm font-semibold text-[#ffe9ce]">{moduleName}</h4>
+            {modules.map((module) => (
+              <section key={module.moduleName} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
+                <h4 className="text-sm font-semibold text-[#ffe9ce]">{module.moduleName}</h4>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  {modulePermissions.map((permission) => {
-                    const info = humanPermission(permission);
+                  {module.permissions.map((permission) => {
+                    const info = describePermission(permission.name);
                     return (
                       <label key={permission.id} className="rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
                         <div className="flex items-start gap-2">
                           <input
                             type="checkbox"
-                            checked={checked.includes(permission.id)}
-                            onChange={(e) =>
-                              setChecked((current) =>
-                                e.target.checked ? [...current, permission.id] : current.filter((id) => id !== permission.id)
-                              )
-                            }
+                            checked={Boolean(checked[permission.id])}
+                            onChange={(e) => setChecked((current) => ({ ...current, [permission.id]: e.target.checked }))}
                           />
                           <div>
                             <p className="font-medium">{info.label}</p>
@@ -462,7 +360,7 @@ function RoleManageModal({
 
           <div className="flex justify-end gap-2">
             <button className="saas-ghost-btn" onClick={() => void removeRole()}>Supprimer rôle</button>
-            <button className="saas-primary-btn" onClick={() => void saveRole()}>Enregistrer</button>
+            <button className="saas-primary-btn" disabled={isSaving} onClick={() => void saveRole()}>{isSaving ? 'Enregistrement…' : 'Enregistrer'}</button>
           </div>
         </div>
       </div>

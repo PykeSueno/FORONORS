@@ -175,12 +175,18 @@ export function TransactionsPageClient({
             <input className="saas-input mt-1 w-full" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Vente event, achat stock..." />
 
             <label className="mt-3 block text-xs text-[#efccaa]">Type de mouvement par défaut</label>
-            <select className="saas-input mt-1 w-full" value={defaultMovementType} onChange={(e) => setDefaultMovementType(e.target.value as MovementType)}>
-              <option value="sale">Vente</option>
-              <option value="purchase">Achat</option>
-              <option value="stock_out">Sortie</option>
-              <option value="stock_in">Entrée</option>
-            </select>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(['purchase', 'sale', 'stock_in', 'stock_out'] as MovementType[]).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`filter-pill w-full ${defaultMovementType === type ? 'filter-pill-active' : ''}`}
+                  onClick={() => setDefaultMovementType(type)}
+                >
+                  {MOVEMENT_META[type].label}
+                </button>
+              ))}
+            </div>
           </section>
 
           <section className="glass-card p-5">
@@ -207,25 +213,39 @@ export function TransactionsPageClient({
                       </div>
                     </div>
 
-                    <div className="mt-3 grid gap-2 xl:grid-cols-[1fr_auto_auto_auto_auto_auto] xl:items-center">
-                      <select className="saas-input" value={line.movement_type} onChange={(e) => updateLine(idx, { movement_type: e.target.value as MovementType })}>
-                        <option value="stock_in">Entrée</option>
-                        <option value="stock_out">Sortie</option>
-                        <option value="purchase">Achat</option>
-                        <option value="sale">Vente</option>
-                      </select>
-
-                      <div className="flex items-center gap-1">
-                        <button type="button" className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, { quantity: Math.max(1, line.quantity - 1) })}>-</button>
-                        <input className="saas-input w-16 text-center" value={line.quantity} onChange={(e) => updateLine(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
-                        <button type="button" className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, { quantity: line.quantity + 1 })}>+</button>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                      <div>
+                        <p className="mb-1 text-xs text-[#efcdab]">Type de mouvement</p>
+                        <select className="saas-input w-full" value={line.movement_type} onChange={(e) => updateLine(idx, { movement_type: e.target.value as MovementType })}>
+                          <option value="stock_in">Entrée</option>
+                          <option value="stock_out">Sortie</option>
+                          <option value="purchase">Achat</option>
+                          <option value="sale">Vente</option>
+                        </select>
                       </div>
 
-                      <input className="saas-input w-24" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
+                      <div>
+                        <p className="mb-1 text-xs text-[#efcdab]">Quantité</p>
+                        <div className="flex items-center gap-1">
+                          <button type="button" className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, { quantity: Math.max(1, line.quantity - 1) })}>-</button>
+                          <input className="saas-input w-full text-center" value={line.quantity} onChange={(e) => updateLine(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
+                          <button type="button" className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, { quantity: line.quantity + 1 })}>+</button>
+                        </div>
+                      </div>
 
-                      <p className="text-sm font-semibold text-[#ffe8c9]">{formatUsd(lineTotal)}</p>
+                      <div>
+                        <p className="mb-1 text-xs text-[#efcdab]">Prix unitaire</p>
+                        <input className="saas-input w-full" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
+                      </div>
 
-                      <button type="button" className="saas-ghost-btn !px-2" onClick={() => removeLine(idx)}>🗑️</button>
+                      <div>
+                        <p className="mb-1 text-xs text-[#efcdab]">Total ligne</p>
+                        <p className="saas-input flex items-center">{formatUsd(lineTotal)}</p>
+                      </div>
+
+                      <div className="flex items-end justify-end">
+                        <button type="button" className="saas-ghost-btn !px-2" onClick={() => removeLine(idx)}>🗑️</button>
+                      </div>
                     </div>
                   </article>
                 );

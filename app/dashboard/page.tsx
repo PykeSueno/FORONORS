@@ -26,31 +26,36 @@ export default async function DashboardPage() {
   const session = await getSession();
   const permissions = session ? await getUserPermissions(session.userId) : [];
 
-  const canMoneyAccess = permissions.includes('money.access');
-  const canMoneyPreview = canMoneyAccess || permissions.includes('money.preview');
+  const has = (perm: string) => permissions.includes(perm);
 
-  const canItemsAccess = permissions.includes('items.access');
-  const canItemsPreview = canItemsAccess || permissions.includes('items.preview');
+  const canMoneyAccess = has('money.access');
+  const canMoneyPreview = canMoneyAccess || has('money.preview');
 
-  const canTransactionsAccess = permissions.includes('transactions.access') && permissions.includes('transactions.view');
-  const canTransactionsPreview = canTransactionsAccess || permissions.includes('transactions.preview');
+  const canItemsAccess = has('items.access');
+  const canItemsPreview = canItemsAccess || has('items.preview');
 
-  const canTransactionsRecentAccess = canTransactionsAccess && permissions.includes('transactions.recent.access');
-  const canTransactionsRecentPreview = canTransactionsRecentAccess || permissions.includes('transactions.recent.preview');
+  const canTransactionsAccess = has('transactions.access');
+  const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
 
-  const canMembersAccess = permissions.includes('members.access');
-  const canMembersPreview = canMembersAccess || permissions.includes('members.preview');
+  const canTransactionsRecentAccess = has('transactions.recent.access') && canTransactionsAccess;
+  const canTransactionsRecentPreview = canTransactionsRecentAccess || has('transactions.recent.preview');
 
-  const canLogsAccess = permissions.includes('logs.access') && permissions.includes('logs.view');
-  const canLogsPreview = canLogsAccess || permissions.includes('logs.preview');
+  const canMembersAccess = has('members.access');
+  const canMembersPreview = canMembersAccess || has('members.preview');
 
-  const canTabletAccess = permissions.includes('tablet.access');
-  const canTabletPreview = canTabletAccess || permissions.includes('tablet.preview');
+  const canLogsAccess = has('logs.access');
+  const canLogsPreview = canLogsAccess || has('logs.preview');
 
-  const canActivityAccess = permissions.includes('activity.access');
-  const canActivityPreview = canActivityAccess || permissions.includes('activity.preview');
+  const canTabletAccess = has('tablet.access');
+  const canTabletPreview = canTabletAccess || has('tablet.preview');
 
-  const canUpdatePassword = permissions.includes('account.password.update');
+  const canActivityAccess = has('activity.access');
+  const canActivityPreview = canActivityAccess || has('activity.preview');
+
+  const canShowMoneyMovements = has('dashboard.money.movements.access') || has('dashboard.money.movements.preview') || canMoneyPreview;
+  const canShowStockMovements = has('dashboard.stock.movements.access') || has('dashboard.stock.movements.preview') || canItemsPreview;
+
+  const canUpdatePassword = has('account.password.update');
 
   const supabase = getSupabaseAdmin();
   const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }] = await Promise.all([
@@ -60,14 +65,12 @@ export default async function DashboardPage() {
     canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canMembersPreview ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canLogsPreview ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
-    canMoneyPreview ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
-    canItemsPreview ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] })
+    canShowMoneyMovements ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
+    canShowStockMovements ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] })
   ]);
 
   const cashRows = (recentCash ?? []) as DashboardCashRow[];
-  const stockBaseRows = (recentStock ?? []) as DashboardStockRow[];
-
-  const stockRows = stockBaseRows
+  const stockRows = ((recentStock ?? []) as DashboardStockRow[])
     .map((row) => ({
       created_at: row.created_at,
       member: Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username) || 'Groupe',
@@ -100,11 +103,8 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        {canMoneyPreview ? <article className="glass-card p-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2>
-            <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">💰 Cash</span>
-          </div>
+        {canShowMoneyMovements ? <article className="glass-card p-6">
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2></div>
           <div className="space-y-2">
             {cashRows.slice(0, 4).map((row, idx) => (
               <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
@@ -118,11 +118,8 @@ export default async function DashboardPage() {
           </div>
         </article> : null}
 
-        {canItemsPreview ? <article className="glass-card p-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2>
-            <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">📦 Stock</span>
-          </div>
+        {canShowStockMovements ? <article className="glass-card p-6">
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2></div>
           <div className="space-y-2">
             {stockRows.map((row, idx) => (
               <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
@@ -143,19 +140,12 @@ export default async function DashboardPage() {
 function HubCard({ href, enabled, icon, title, value, subtitle }: { href: string; enabled: boolean; icon: string; title: string; value: string; subtitle: string }) {
   const content = (
     <>
-      <div className="flex items-center justify-between">
-        <p className="text-3xl">{icon}</p>
-        <p className="text-2xl font-semibold text-[#ffe9cd]">{value}</p>
-      </div>
+      <div className="flex items-center justify-between"><p className="text-3xl">{icon}</p><p className="text-2xl font-semibold text-[#ffe9cd]">{value}</p></div>
       <p className="mt-3 text-lg font-semibold text-[#fff2de]">{title}</p>
       <p className="text-sm text-[#f1d1ac]">{subtitle}</p>
-      {!enabled ? <p className="mt-2 text-xs text-[#efcaa7]">Aperçu uniquement</p> : null}
     </>
   );
 
-  if (!enabled) {
-    return <div className="glass-card block cursor-not-allowed opacity-90 p-6">{content}</div>;
-  }
-
+  if (!enabled) return <div className="glass-card block cursor-not-allowed opacity-90 p-6">{content}</div>;
   return <Link href={href} className="glass-card smooth-hover block p-6">{content}</Link>;
 }

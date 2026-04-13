@@ -10,7 +10,7 @@ export default async function MoneyPage() {
   if (!session) redirect('/login');
 
   const permissions = await getUserPermissions(session.userId);
-  if (!permissions.includes('money.access')) redirect('/dashboard');
+  if (!permissions.includes('money.access') || !permissions.includes('money.history.view')) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const [{ data: cash }, { data: movements }] = await Promise.all([

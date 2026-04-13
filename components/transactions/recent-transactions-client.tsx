@@ -200,8 +200,8 @@ function EditTransactionModal({ transaction, onClose, onError }: { transaction: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-3xl p-6">
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+            <div className="glass-card max-h-[90vh] w-full max-w-4xl overflow-y-auto p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xl font-semibold text-[#fff0db]">Modifier transaction #{transaction.id}</h3>
           <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
@@ -223,7 +223,7 @@ function EditTransactionModal({ transaction, onClose, onError }: { transaction: 
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-2 md:grid-cols-4">
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div>
                   <p className="mb-1 text-xs text-[#efcdab]">Type de mouvement</p>
                   <select className="saas-input" value={line.movement_type} onChange={(e) => updateLine(index, { movement_type: e.target.value as 'purchase' | 'sale' | 'stock_in' | 'stock_out' })}>

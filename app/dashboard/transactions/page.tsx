@@ -28,7 +28,7 @@ export default async function TransactionsPage() {
   return (
     <>
       <InternalPageHeader title="Transactions" subtitle="Créer et exécuter des transactions multi-items" />
-      <TransactionsTabs active="transactions" />
+      <TransactionsTabs active="transactions" canSeeRecent={permissions.includes('transactions.recent.access')} />
       <TransactionsPageClient
       canCreate={canCreate}
       items={items ?? []}

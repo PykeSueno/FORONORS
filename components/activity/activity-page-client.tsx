@@ -45,7 +45,7 @@ const ACTIVITY_META: Record<ActivityType, { label: string; icon: string; subtitl
   container: { label: 'Conteneur', icon: '📦', subtitle: 'Consomme des Disqueuses' }
 };
 
-export function ActivityPageClient({ items, members, activities, defaultMemberId, defaultMemberLabel, canCreate, canEditOwn, canEditAny, canCancelOwn, canCancelAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; defaultMemberLabel: string; canCreate: boolean; canEditOwn: boolean; canEditAny: boolean; canCancelOwn: boolean; canCancelAny: boolean; currentUserId: string }) {
+export function ActivityPageClient({ items, members, activities, defaultMemberId, defaultMemberLabel, canCreate, canViewRecent, canEditOwn, canEditAny, canCancelOwn, canCancelAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; defaultMemberLabel: string; canCreate: boolean; canViewRecent: boolean; canEditOwn: boolean; canEditAny: boolean; canCancelOwn: boolean; canCancelAny: boolean; currentUserId: string }) {
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
@@ -269,7 +269,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
         </section>
       </section>
 
-      <section className="glass-card p-5">
+      {canViewRecent ? <section className="glass-card p-5">
         <h3 className="text-base font-semibold text-[#fff1dd]">Activités récentes</h3>
         <div className="mt-2 space-y-2">
           {activities.map((activity) => (
@@ -302,7 +302,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
             </article>
           ))}
         </div>
-      </section>
+      </section> : null}
 
       {editingActivity ? <EditActivityModal activity={editingActivity} onClose={() => setEditingActivity(null)} /> : null}
     </div>

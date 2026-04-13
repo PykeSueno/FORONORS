@@ -26,7 +26,7 @@ export default async function MembersPage() {
   if (!session) redirect('/login');
 
   const userPermissions = await getUserPermissions(session.userId);
-  if (!userPermissions.includes('members.access')) redirect('/dashboard');
+  if (!userPermissions.includes('members.access') || !userPermissions.includes('members.view')) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
 

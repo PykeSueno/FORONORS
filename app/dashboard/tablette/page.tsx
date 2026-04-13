@@ -39,7 +39,7 @@ export default async function TabletPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Tablette" subtitle="Gestion des passages 8h → 8h" />
-      <TabletTabs active="tablet" />
+      <TabletTabs active="tablet" canSeeStats={permissions.includes('tablet.stats.view')} />
       <TabletPageClient
         day={day ?? null}
         businessDay={businessDay}
