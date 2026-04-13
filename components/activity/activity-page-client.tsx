@@ -71,7 +71,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
     setProofImageUrl(data.url);
   }
 
-  async function onPaste(event: React.ClipboardEvent<HTMLDivElement>) {
+  async function onPaste(event: React.ClipboardEvent<HTMLElement>) {
     const item = Array.from(event.clipboardData.items).find((entry) => entry.type.startsWith('image/'));
     if (!item) return;
     const file = item.getAsFile();
