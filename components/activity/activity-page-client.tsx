@@ -162,9 +162,10 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
         ))}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
-        <section className="glass-card p-5" onPaste={(e) => void onPaste(e)}>
-          <h3 className="text-base font-semibold text-[#fff1dd]">A. Session activité</h3>
+      <section className="grid gap-4 lg:grid-cols-[1fr_1.05fr]">
+        <section className="space-y-4">
+          <section className="glass-card p-5" onPaste={(e) => void onPaste(e)}>
+            <h3 className="text-base font-semibold text-[#fff1dd]">A. Session activité</h3>
           <label className="mt-3 block text-xs text-[#efccaa]">Membre</label>
           <select className="saas-input mt-1 w-full" value={memberId} onChange={(e) => { setMemberId(e.target.value); const m = members.find((entry) => entry.id === e.target.value); setMemberLabel(m ? (m.name || m.username) : 'Groupe'); }}>
             <option value="">Groupe</option>
@@ -201,10 +202,9 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
             </div>
           </div>
 
-          {error ? <p className="mt-3 text-sm text-red-100">{error}</p> : null}
-        </section>
+            {error ? <p className="mt-3 text-sm text-red-100">{error}</p> : null}
+          </section>
 
-        <section className="space-y-4">
           <section className="glass-card p-5">
             <h3 className="text-base font-semibold text-[#fff1dd]">B. Items récupérés</h3>
             <input className="saas-input mt-2 w-full" placeholder="Rechercher item" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -233,39 +233,38 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                 </button>
               ))}
             </div>
-          </section>
+        </section>
 
-          <section className="glass-card p-5">
-            <h3 className="text-base font-semibold text-[#fff1dd]">C. Récapitulatif</h3>
-            <div className="mt-2 space-y-2">
-              {lines.map((line, idx) => {
-                const item = itemMap.get(line.item_id);
-                if (!item) return null;
-                return (
-                  <div key={`${line.item_id}-${idx}`} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
-                        {item.image_url ? <Image src={item.image_url} alt={item.name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🖼️</div>}
-                      </div>
-                      <div>
-                        <p className="text-sm text-[#ffe9cd]">{item.name}</p>
-                        <p className="text-xs text-[#efcdab]">Qté: +{line.quantity} · Avant/Après: {item.quantity} → {item.quantity + line.quantity}</p>
-                      </div>
+        <section className="glass-card p-5">
+          <h3 className="text-base font-semibold text-[#fff1dd]">C. Récapitulatif</h3>
+          <div className="mt-2 space-y-2">
+            {lines.map((line, idx) => {
+              const item = itemMap.get(line.item_id);
+              if (!item) return null;
+              return (
+                <div key={`${line.item_id}-${idx}`} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
+                      {item.image_url ? <Image src={item.image_url} alt={item.name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🖼️</div>}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, line.quantity - 1)}>-</button>
-                      <input className="saas-input w-16 text-center" value={line.quantity} onChange={(e) => updateLine(idx, Number(e.target.value || 1))} />
-                      <button className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, line.quantity + 1)}>+</button>
-                      <button className="saas-ghost-btn !px-2" onClick={() => removeLine(idx)}>🗑️</button>
+                    <div>
+                      <p className="text-sm text-[#ffe9cd]">{item.name}</p>
+                      <p className="text-xs text-[#efcdab]">Qté: +{line.quantity} · Avant/Après: {item.quantity} → {item.quantity + line.quantity}</p>
                     </div>
                   </div>
-                );
-              })}
-              {lines.length === 0 ? <p className="text-sm text-[#f1d0ab]">Aucun item ajouté.</p> : null}
-            </div>
+                  <div className="flex items-center gap-1">
+                    <button className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, line.quantity - 1)}>-</button>
+                    <input className="saas-input w-16 text-center" value={line.quantity} onChange={(e) => updateLine(idx, Number(e.target.value || 1))} />
+                    <button className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, line.quantity + 1)}>+</button>
+                    <button className="saas-ghost-btn !px-2" onClick={() => removeLine(idx)}>🗑️</button>
+                  </div>
+                </div>
+              );
+            })}
+            {lines.length === 0 ? <p className="text-sm text-[#f1d0ab]">Aucun item ajouté.</p> : null}
+          </div>
 
-            {canCreate ? <button className="saas-primary-btn mt-4 w-full" onClick={() => void submit()}>Valider activité</button> : null}
-          </section>
+          {canCreate ? <button className="saas-primary-btn mt-4 w-full" onClick={() => void submit()}>Valider activité</button> : null}
         </section>
       </section>
 

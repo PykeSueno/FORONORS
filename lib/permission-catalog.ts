@@ -50,6 +50,7 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
 
   'activity.preview': { module: 'Activité', label: 'Voir la bulle Activité', hint: 'Afficher la bulle Activité.' },
   'activity.access': { module: 'Activité', label: 'Accéder à la page Activité', hint: 'Permet d’ouvrir la page Activité.' },
+  'activity.view': { module: 'Activité', label: 'Voir les activités récentes', hint: 'Permet d’afficher le contenu Activité autorisé pour ce rôle.' },
   'activity.create': { module: 'Activité', label: 'Créer une activité', hint: 'Permet de créer une activité.' },
   'activity.stats.view': { module: 'Activité', label: 'Voir les stats activité', hint: 'Afficher les stats activité.' },
   'activity.logs.view': { module: 'Activité', label: 'Voir les logs activité', hint: 'Afficher les logs activité.' },

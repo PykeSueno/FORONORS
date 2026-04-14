@@ -46,7 +46,7 @@ export default async function ActivityPage() {
   const canManageOwn = permissions.includes('activity.manage.own');
   const canManageAny = permissions.includes('activity.manage.any');
   const canCreate = permissions.includes('activity.create');
-  const canView = canManageOwn || canManageAny;
+  const canView = permissions.includes('activity.view') || canManageOwn || canManageAny;
   if (!canAccess) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();

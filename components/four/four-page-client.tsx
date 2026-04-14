@@ -76,11 +76,6 @@ export function FourPageClient({
   const [activeTab, setActiveTab] = useState<'session' | 'stats' | 'messages'>('session');
 
   const [kind, setKind] = useState<MovementKind>('sell');
-  const [itemId, setItemId] = useState<number | ''>('');
-  const [quantity, setQuantity] = useState(1);
-  const [unitPrice, setUnitPrice] = useState(0);
-  const [counterparty, setCounterparty] = useState('');
-  const [editingMovementId, setEditingMovementId] = useState<number | null>(null);
 
   const [itemQuery, setItemQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -89,8 +84,6 @@ export function FourPageClient({
   const [messageDraft, setMessageDraft] = useState({ id: 0, title: '', content: '', display_order: 100 });
 
   const canManageSession = canAddMovement;
-
-  const selectedItem = useMemo(() => items.find((item) => item.id === itemId), [items, itemId]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -122,13 +115,6 @@ export function FourPageClient({
     return { rows, purchases, sales, profit: sales - purchases, stock };
   }, [session]);
 
-  function applyAutoPrice(nextKind: MovementKind, nextItemId: number | '') {
-    if (!nextItemId) return;
-    const item = items.find((entry) => entry.id === nextItemId);
-    if (!item) return;
-    setUnitPrice(nextKind === 'buy' ? Number(item.buy_price ?? 0) : Number(item.sell_price ?? 0));
-  }
-
   async function reload() {
     const response = await fetch('/api/four', { cache: 'no-store' });
     if (!response.ok) return;
@@ -151,26 +137,44 @@ export function FourPageClient({
     await reload();
   }
 
-  async function saveMovement() {
-    if (!session?.id) return;
+  async function addItemFromCatalog(nextItemId: number) {
+    if (!session?.id || !canManageSession) return;
     setError('');
+    const item = items.find((entry) => entry.id === nextItemId);
+    if (!item) return;
+    const autoPrice = kind === 'buy' ? Number(item.buy_price ?? 0) : Number(item.sell_price ?? 0);
     const response = await fetch('/api/four/movements', {
-      method: editingMovementId ? 'PATCH' : 'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ movement_id: editingMovementId ?? undefined, session_id: session.id, movement_kind: kind, item_id: itemId || null, quantity, unit_price: unitPrice, counterparty })
+      body: JSON.stringify({ session_id: session.id, movement_kind: kind, item_id: nextItemId, quantity: 1, unit_price: autoPrice, counterparty: '' })
     });
-
     if (!response.ok) {
       const data = (await response.json()) as { message?: string };
-      setError(data.message ?? 'Mouvement FOUR impossible.');
+      setError(data.message ?? 'Ajout item FOUR impossible.');
       return;
     }
+    await reload();
+  }
 
-    setEditingMovementId(null);
-    setItemId('');
-    setCounterparty('');
-    setQuantity(1);
-    setUnitPrice(0);
+  async function updateMovementRow(row: FourMovement, patch: Partial<Pick<FourMovement, 'movement_kind' | 'quantity' | 'unit_price' | 'counterparty'>>) {
+    if (!session?.id) return;
+    const movementKind = patch.movement_kind ?? row.movement_kind;
+    const quantityValue = Math.max(1, Number(patch.quantity ?? row.quantity));
+    const unitPriceValue = Math.max(0, Number(patch.unit_price ?? row.unit_price));
+    const response = await fetch('/api/four/movements', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        movement_id: row.id,
+        session_id: session.id,
+        movement_kind: movementKind,
+        item_id: row.item_id,
+        quantity: quantityValue,
+        unit_price: unitPriceValue,
+        counterparty: patch.counterparty ?? row.counterparty ?? ''
+      })
+    });
+    if (!response.ok) return;
     await reload();
   }
 
@@ -260,8 +264,8 @@ export function FourPageClient({
                 {canManageSession ? (
                   <>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      <button className={`filter-pill w-full ${kind === 'buy' ? 'filter-pill-active' : ''}`} onClick={() => { setKind('buy'); applyAutoPrice('buy', itemId); }}>Achat</button>
-                      <button className={`filter-pill w-full ${kind === 'sell' ? 'filter-pill-active' : ''}`} onClick={() => { setKind('sell'); applyAutoPrice('sell', itemId); }}>Vente</button>
+                      <button className={`filter-pill w-full ${kind === 'buy' ? 'filter-pill-active' : ''}`} onClick={() => setKind('buy')}>Achat</button>
+                      <button className={`filter-pill w-full ${kind === 'sell' ? 'filter-pill-active' : ''}`} onClick={() => setKind('sell')}>Vente</button>
                     </div>
 
                     <div className="rounded-xl border border-white/10 bg-[#3f281b]/50 p-3">
@@ -274,7 +278,7 @@ export function FourPageClient({
                       </div>
                       <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
                         {filteredItems.map((item) => (
-                          <button key={item.id} className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left ${item.id === itemId ? 'border-[#c48f61] bg-[#5d3b27]/80' : 'border-white/10 bg-[#2e1d14]/65'}`} onClick={() => { setItemId(item.id); applyAutoPrice(kind, item.id); }}>
+                          <button key={item.id} className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[#2e1d14]/65 px-3 py-2 text-left" onClick={() => void addItemFromCatalog(item.id)}>
                             <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#23140e]">
                               {item.image_url ? <Image src={item.image_url} alt={item.name} width={40} height={40} className="h-full w-full rounded-lg object-cover" unoptimized /> : null}
                             </div>
@@ -287,30 +291,7 @@ export function FourPageClient({
                       </div>
                     </div>
 
-                    {selectedItem ? (
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div>
-                          <p className="mb-1 text-xs text-[#efcdab]">Quantité</p>
-                          <input className="saas-input" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value || 1)))} />
-                        </div>
-                        <div>
-                          <p className="mb-1 text-xs text-[#efcdab]">Prix unitaire</p>
-                          <input className="saas-input" value={unitPrice} onChange={(event) => setUnitPrice(Math.max(0, Number(event.target.value || 0)))} />
-                        </div>
-                        <div>
-                          <p className="mb-1 text-xs text-[#efcdab]">Interlocuteur / groupe</p>
-                          <input className="saas-input" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} />
-                        </div>
-                        <div>
-                          <p className="mb-1 text-xs text-[#efcdab]">Total ligne</p>
-                          <p className="saas-input">{formatUsd(quantity * unitPrice)}</p>
-                        </div>
-                      </div>
-                    ) : <p className="text-sm text-[#f3d5b4]">Sélectionnez un item pour continuer.</p>}
-
-                    <div className="flex justify-end">
-                      <button className="saas-primary-btn" disabled={!itemId} onClick={() => void saveMovement()}>{editingMovementId ? 'Modifier la ligne' : 'Ajouter la ligne'}</button>
-                    </div>
+                    <p className="text-sm text-[#f3d5b4]">Cliquez un item à gauche pour l’ajouter directement avec le type par défaut.</p>
                   </>
                 ) : <p className="text-sm text-[#f3d5b4]">Vous n’avez pas la permission de gérer cette session.</p>}
 
@@ -323,12 +304,23 @@ export function FourPageClient({
                           <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#23140e]">{item?.image_url ? <Image src={item.image_url} alt={item.name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : null}</div>
                           <div className="flex-1">
                             <p className="text-sm text-[#ffe8ca]">{row.movement_kind === 'buy' ? 'Achat' : 'Vente'} · {row.item_name}</p>
-                            <p className="text-xs text-[#efcdab]">Qté: {row.quantity} · PU: {formatUsd(row.unit_price)} · Total: {formatUsd(row.total_amount)}</p>
-                            <p className="text-xs text-[#efcdab]">Interlocuteur: {row.counterparty || '—'}</p>
+                            <div className="mt-1 grid gap-2 md:grid-cols-5">
+                              <select className="saas-input" value={row.movement_kind} onChange={(event) => { void updateMovementRow(row, { movement_kind: event.target.value as MovementKind }); }}>
+                                <option value="buy">Achat</option>
+                                <option value="sell">Vente</option>
+                              </select>
+                              <div className="flex items-center gap-1">
+                                <button className="saas-ghost-btn !px-2" onClick={() => void updateMovementRow(row, { quantity: Number(row.quantity) - 1 })}>-</button>
+                                <input className="saas-input text-center" value={row.quantity} onChange={(event) => { void updateMovementRow(row, { quantity: Number(event.target.value || 1) }); }} />
+                                <button className="saas-ghost-btn !px-2" onClick={() => void updateMovementRow(row, { quantity: Number(row.quantity) + 1 })}>+</button>
+                              </div>
+                              <input className="saas-input" value={row.unit_price} onChange={(event) => { void updateMovementRow(row, { unit_price: Number(event.target.value || 0) }); }} />
+                              <input className="saas-input" placeholder="Interlocuteur" value={row.counterparty ?? ''} onChange={(event) => { void updateMovementRow(row, { counterparty: event.target.value }); }} />
+                              <p className="saas-input">{formatUsd(Number(row.quantity) * Number(row.unit_price))}</p>
+                            </div>
                           </div>
                           {canManageSession ? (
                             <div className="flex gap-1">
-                              <button className="saas-ghost-btn !px-2" onClick={() => { setEditingMovementId(row.id); setKind(row.movement_kind); setItemId(row.item_id ?? ''); setQuantity(Number(row.quantity)); setUnitPrice(Number(row.unit_price)); setCounterparty(row.counterparty ?? ''); }}>✏️</button>
                               <button className="saas-ghost-btn !px-2" onClick={() => void deleteMovement(row.id)}>🗑️</button>
                             </div>
                           ) : null}

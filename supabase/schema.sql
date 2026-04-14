@@ -428,6 +428,7 @@ with check (true);
 insert into public.permissions (name)
 values
   ('activity.access'),
+  ('activity.view'),
   ('activity.create'),
   ('activity.stats.view'),
   ('activity.logs.view'),
