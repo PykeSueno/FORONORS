@@ -67,6 +67,7 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'four.preview': { module: 'FOUR', label: 'Voir la bulle FOUR', hint: 'Afficher la bulle FOUR.' },
   'four.access': { module: 'FOUR', label: 'Accéder à la page FOUR', hint: 'Permet d’ouvrir la page FOUR.' },
   'four.open': { module: 'FOUR', label: 'Ouvrir une session FOUR', hint: 'Permet d’ouvrir une session FOUR avec un cash initial.' },
+  'four.add_movement': { module: 'FOUR', label: 'Ajouter un mouvement FOUR', hint: 'Permet d’ajouter des lignes/mouvements dans la session FOUR en cours.' },
   'four.cash.add': { module: 'FOUR', label: 'Ajouter du cash à la session FOUR', hint: 'Permet d’ajouter de l’argent à la session FOUR ouverte.' },
   'four.transaction.manage': { module: 'FOUR', label: 'Gérer la transaction FOUR en cours', hint: 'Permet de modifier les lignes de la transaction en cours.' },
   'four.transaction.validate': { module: 'FOUR', label: 'Valider une transaction FOUR', hint: 'Permet de valider une transaction client dans la session FOUR.' },

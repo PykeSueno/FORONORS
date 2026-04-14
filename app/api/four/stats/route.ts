@@ -4,11 +4,29 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 type ManagedUser = { name: string | null; username: string | null };
-type SessionTransaction = { counterparty: string | null; total_purchases: number | null; total_sales: number | null; profit_loss: number | null };
+type SessionLine = {
+  id: number;
+  item_id: number | null;
+  item_name: string;
+  movement_kind: 'buy' | 'sell';
+  quantity: number | null;
+  unit_price: number | null;
+  total_amount: number | null;
+};
+type SessionTransaction = {
+  id: number;
+  counterparty: string | null;
+  total_purchases: number | null;
+  total_sales: number | null;
+  profit_loss: number | null;
+  created_at: string;
+  four_transaction_lines: SessionLine[] | null;
+};
 type FourStatsSession = {
   id: number;
   opened_at: string;
   closed_at: string | null;
+  status: 'open' | 'closed';
   managed_by: string | null;
   summary: Record<string, unknown> | null;
   users: ManagedUser | ManagedUser[] | null;
@@ -24,7 +42,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data: sessions } = await supabase
     .from('four_sessions')
-    .select('id, opened_at, closed_at, managed_by, users:managed_by(name, username), summary, four_transactions(id, counterparty, total_purchases, total_sales, profit_loss)')
+    .select('id, status, opened_at, closed_at, managed_by, users:managed_by(name, username), summary, four_transactions(id, counterparty, total_purchases, total_sales, profit_loss, created_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount))')
     .order('opened_at', { ascending: false })
     .limit(100);
 
@@ -33,8 +51,9 @@ export async function GET() {
   let totalPurchases = 0;
   let totalSales = 0;
   const sessionRows = (sessions ?? []) as FourStatsSession[];
+  const closedSessions = sessionRows.filter((entry) => entry.status === 'closed');
 
-  for (const fourSession of sessionRows) {
+  for (const fourSession of closedSessions) {
     const managedUser = Array.isArray(fourSession.users) ? fourSession.users[0] : fourSession.users;
     const memberName = managedUser?.name || managedUser?.username || 'Inconnu';
     if (!byMember[memberName]) byMember[memberName] = { sessions: 0, profit: 0 };
@@ -57,13 +76,13 @@ export async function GET() {
 
   return NextResponse.json({
     totals: {
-      sessions: sessionRows.length,
+      sessions: closedSessions.length,
       purchases: totalPurchases,
       sales: totalSales,
       profit: totalSales - totalPurchases
     },
     byMember,
     byCounterparty,
-    sessions: sessionRows
+    sessions: closedSessions
   });
 }

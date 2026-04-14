@@ -17,13 +17,27 @@ export async function POST(request: Request) {
   if (!canManage || !canValidate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as { session_id?: number; counterparty?: string; lines?: TxLine[] };
-  const sessionId = Number(body.session_id);
+  const requestedSessionId = Number(body.session_id);
   const lines = body.lines ?? [];
-  if (!sessionId || lines.length === 0) return NextResponse.json({ message: 'Transaction FOUR invalide.' }, { status: 400 });
+  if (lines.length === 0) return NextResponse.json({ message: 'Transaction FOUR invalide.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
-  const { data: fourSession } = await supabase.from('four_sessions').select('id, status').eq('id', sessionId).maybeSingle();
-  if (!fourSession || fourSession.status !== 'open') return NextResponse.json({ message: 'Session FOUR non active.' }, { status: 400 });
+  let fourSession: { id: number; status: 'open' | 'closed' } | null = null;
+
+  if (requestedSessionId) {
+    const { data } = await supabase.from('four_sessions').select('id, status').eq('id', requestedSessionId).maybeSingle();
+    fourSession = (data as { id: number; status: 'open' | 'closed' } | null) ?? null;
+  }
+
+  if (!fourSession || fourSession.status !== 'open') {
+    const { data: active } = await supabase.from('four_sessions').select('id, status').eq('status', 'open').order('opened_at', { ascending: false }).limit(1).maybeSingle();
+    fourSession = (active as { id: number; status: 'open' | 'closed' } | null) ?? null;
+  }
+
+  if (!fourSession || fourSession.status !== 'open') {
+    return NextResponse.json({ message: 'Session FOUR non active.' }, { status: 400 });
+  }
+  const sessionId = fourSession.id;
 
   let totalPurchases = 0;
   let totalSales = 0;

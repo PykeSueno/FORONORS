@@ -526,6 +526,7 @@ values
   ('four.preview'),
   ('four.access'),
   ('four.open'),
+  ('four.add_movement'),
   ('four.cash.add'),
   ('four.transaction.manage'),
   ('four.transaction.validate'),

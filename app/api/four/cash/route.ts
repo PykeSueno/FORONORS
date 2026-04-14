@@ -12,13 +12,22 @@ export async function POST(request: Request) {
   if (!canAddCash) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as { session_id?: number; amount?: number };
-  const sessionId = Number(body.session_id);
+  const requestedSessionId = Number(body.session_id);
   const amount = Math.max(0, Number(body.amount ?? 0));
-  if (!sessionId || amount <= 0) return NextResponse.json({ message: 'Montant invalide.' }, { status: 400 });
+  if (amount <= 0) return NextResponse.json({ message: 'Montant invalide.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
-  const { data: fourSession } = await supabase.from('four_sessions').select('id, status, summary').eq('id', sessionId).maybeSingle();
+  let fourSession: { id: number; status: 'open' | 'closed'; summary: Record<string, unknown> | null } | null = null;
+  if (requestedSessionId) {
+    const { data } = await supabase.from('four_sessions').select('id, status, summary').eq('id', requestedSessionId).maybeSingle();
+    fourSession = (data as { id: number; status: 'open' | 'closed'; summary: Record<string, unknown> | null } | null) ?? null;
+  }
+  if (!fourSession || fourSession.status !== 'open') {
+    const { data: active } = await supabase.from('four_sessions').select('id, status, summary').eq('status', 'open').order('opened_at', { ascending: false }).limit(1).maybeSingle();
+    fourSession = (active as { id: number; status: 'open' | 'closed'; summary: Record<string, unknown> | null } | null) ?? null;
+  }
   if (!fourSession || fourSession.status !== 'open') return NextResponse.json({ message: 'Session FOUR non active.' }, { status: 400 });
+  const sessionId = fourSession.id;
 
   const summary = (fourSession.summary ?? {}) as Record<string, unknown>;
   const before = Number(summary.cash_added_total ?? 0);

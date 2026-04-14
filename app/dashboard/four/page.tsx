@@ -38,7 +38,7 @@ export default async function FourPage() {
         history={history ?? []}
         canOpen={permissions.includes('four.open')}
         canCashAdd={permissions.includes('four.cash.add')}
-        canManageTransaction={permissions.includes('four.transaction.manage')}
+        canManageTransaction={permissions.includes('four.transaction.manage') || permissions.includes('four.add_movement')}
         canValidateTransaction={permissions.includes('four.transaction.validate')}
         canClose={permissions.includes('four.close')}
         canViewHistory={permissions.includes('four.history.view')}
