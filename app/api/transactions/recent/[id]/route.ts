@@ -39,11 +39,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canEdit] = await Promise.all([
+  const [canAccess, canManageOwn, canManageAny] = await Promise.all([
     hasUserPermission(session.userId, 'transactions.recent.access'),
-    hasUserPermission(session.userId, 'transactions.recent.edit')
+    hasUserPermission(session.userId, 'transactions.recent.manage.own'),
+    hasUserPermission(session.userId, 'transactions.recent.manage.any')
   ]);
-  if (!canAccess || !canEdit) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canAccess || (!canManageOwn && !canManageAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const txId = Number(id);
@@ -53,11 +54,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const supabase = getSupabaseAdmin();
   const { data: tx } = await supabase
     .from('transactions')
-    .select('id, reason, member_label, total_money_in, total_money_out, profit_loss, transaction_lines(item_id, item_name_snapshot, movement_type, quantity, unit_price, total_amount, money_effect, stock_effect)')
+    .select('id, actor_user_id, reason, member_label, total_money_in, total_money_out, profit_loss, transaction_lines(item_id, item_name_snapshot, movement_type, quantity, unit_price, total_amount, money_effect, stock_effect)')
     .eq('id', txId)
     .maybeSingle();
 
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
+  if (!canManageAny && tx.actor_user_id !== session.userId) return NextResponse.json({ message: 'Vous pouvez gérer uniquement vos propres transactions.' }, { status: 403 });
 
   const oldLines = (tx.transaction_lines ?? []) as TxLine[];
 
@@ -165,7 +167,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   await createAuditLog({
     actorUserId: session.userId,
-    action: 'transactions.recent.edit',
+    action: 'transactions.recent.manage',
     entityType: 'transaction',
     entityId: txId,
     summary: `Correction transaction #${txId}`,
@@ -180,11 +182,12 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canCancel] = await Promise.all([
+  const [canAccess, canManageOwn, canManageAny] = await Promise.all([
     hasUserPermission(session.userId, 'transactions.recent.access'),
-    hasUserPermission(session.userId, 'transactions.recent.cancel')
+    hasUserPermission(session.userId, 'transactions.recent.manage.own'),
+    hasUserPermission(session.userId, 'transactions.recent.manage.any')
   ]);
-  if (!canAccess || !canCancel) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canAccess || (!canManageOwn && !canManageAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const txId = Number(id);
@@ -192,11 +195,12 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const supabase = getSupabaseAdmin();
   const { data: tx } = await supabase
     .from('transactions')
-    .select('id, reason, total_money_in, total_money_out, transaction_lines(item_id, item_name_snapshot, stock_effect, movement_type, quantity)')
+    .select('id, actor_user_id, reason, total_money_in, total_money_out, transaction_lines(item_id, item_name_snapshot, stock_effect, movement_type, quantity)')
     .eq('id', txId)
     .maybeSingle();
 
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
+  if (!canManageAny && tx.actor_user_id !== session.userId) return NextResponse.json({ message: 'Vous pouvez gérer uniquement vos propres transactions.' }, { status: 403 });
 
   const lines = (tx.transaction_lines ?? []) as TxLine[];
   const rollback = await applyDeltaToItems(lines, -1);
@@ -223,7 +227,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
   await createAuditLog({
     actorUserId: session.userId,
-    action: 'transactions.recent.cancel',
+    action: 'transactions.recent.manage',
     entityType: 'transaction',
     entityId: txId,
     summary: `Annulation transaction #${txId}`,

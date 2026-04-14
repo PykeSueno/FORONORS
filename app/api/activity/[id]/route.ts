@@ -15,12 +15,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canEditOwn, canEditAny] = await Promise.all([
+  const [canAccess, canManageOwn, canManageAny] = await Promise.all([
     hasUserPermission(session.userId, 'activity.access'),
-    hasUserPermission(session.userId, 'activity.edit.own'),
-    hasUserPermission(session.userId, 'activity.edit.any')
+    hasUserPermission(session.userId, 'activity.manage.own'),
+    hasUserPermission(session.userId, 'activity.manage.any')
   ]);
-  if (!canAccess || (!canEditOwn && !canEditAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canAccess || (!canManageOwn && !canManageAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const activityId = Number(id);
@@ -41,7 +41,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .maybeSingle();
 
   if (!activity) return NextResponse.json({ message: 'Activité introuvable.' }, { status: 404 });
-  if (!canEditAny && activity.member_user_id !== session.userId) {
+  if (!canManageAny && activity.member_user_id !== session.userId) {
     return NextResponse.json({ message: 'Vous pouvez modifier uniquement vos propres activités.' }, { status: 403 });
   }
 
@@ -121,7 +121,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   await createAuditLog({
     actorUserId: session.userId,
-    action: 'activity.edit',
+    action: 'activity.manage',
     entityType: 'activity',
     entityId: activityId,
     summary: `Correction activité #${activityId}`,
@@ -136,12 +136,12 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canCancelOwn, canCancelAny] = await Promise.all([
+  const [canAccess, canManageOwn, canManageAny] = await Promise.all([
     hasUserPermission(session.userId, 'activity.access'),
-    hasUserPermission(session.userId, 'activity.cancel.own'),
-    hasUserPermission(session.userId, 'activity.cancel.any')
+    hasUserPermission(session.userId, 'activity.manage.own'),
+    hasUserPermission(session.userId, 'activity.manage.any')
   ]);
-  if (!canAccess || (!canCancelOwn && !canCancelAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canAccess || (!canManageOwn && !canManageAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const activityId = Number(id);
@@ -154,7 +154,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     .maybeSingle();
 
   if (!activity) return NextResponse.json({ message: 'Activité introuvable.' }, { status: 404 });
-  if (!canCancelAny && activity.member_user_id !== session.userId) {
+  if (!canManageAny && activity.member_user_id !== session.userId) {
     return NextResponse.json({ message: 'Vous pouvez annuler uniquement vos propres activités.' }, { status: 403 });
   }
 
@@ -185,7 +185,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
   await createAuditLog({
     actorUserId: session.userId,
-    action: 'activity.cancel',
+    action: 'activity.manage',
     entityType: 'activity',
     entityId: activityId,
     summary: `Annulation activité #${activityId}`,

@@ -21,7 +21,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data: active } = await supabase
     .from('four_sessions')
-    .select('id, status, managed_by, opened_at, closed_at, summary, users:managed_by(name, username), four_movements(id, movement_kind, item_id, item_name, quantity, unit_price, total_amount, note, counterparty, created_at)')
+    .select('id, status, managed_by, opened_at, closed_at, summary, users:managed_by(name, username), four_movements(id, created_by, movement_kind, item_id, item_name, quantity, unit_price, total_amount, counterparty, created_at)')
     .eq('status', 'open')
     .order('opened_at', { ascending: false })
     .limit(1)
@@ -40,19 +40,19 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const access = await ensureAccess('four.open');
+  const access = await ensureAccess('four.create');
   if ('error' in access) return access.error;
 
   const supabase = getSupabaseAdmin();
   const { data: active } = await supabase.from('four_sessions').select('id').eq('status', 'open').limit(1).maybeSingle();
   if (active) return NextResponse.json({ message: 'Une session FOUR est déjà ouverte.' }, { status: 409 });
 
-  const body = (await request.json()) as { managed_by?: string; note?: string };
+  const body = (await request.json()) as { managed_by?: string };
   const managedBy = body.managed_by ?? access.session.userId;
 
   const { data: created, error } = await supabase
     .from('four_sessions')
-    .insert({ status: 'open', opened_by: access.session.userId, managed_by: managedBy, summary: { note: body.note ?? '' } })
+    .insert({ status: 'open', opened_by: access.session.userId, managed_by: managedBy, summary: {} })
     .select('id, managed_by, opened_at, status')
     .maybeSingle();
 
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
   await createAuditLog({
     actorUserId: access.session.userId,
-    action: 'four.open',
+    action: 'four.create',
     entityType: 'four_session',
     entityId: created.id,
     summary: `Ouverture session FOUR #${created.id}`,
@@ -78,14 +78,22 @@ export async function PATCH(request: Request) {
   const sessionId = Number(body.session_id);
   if (!sessionId) return NextResponse.json({ message: 'Session invalide.' }, { status: 400 });
 
+  const [canAny, canOwn] = await Promise.all([
+    hasUserPermission(access.session.userId, 'four.manage.any'),
+    hasUserPermission(access.session.userId, 'four.manage.own')
+  ]);
+
   const supabase = getSupabaseAdmin();
   const { data: session } = await supabase
     .from('four_sessions')
-    .select('id, status, four_movements(id, movement_kind, item_id, item_name, quantity, total_amount, counterparty)')
+    .select('id, status, managed_by, four_movements(id, movement_kind, item_id, item_name, quantity, total_amount, counterparty)')
     .eq('id', sessionId)
     .maybeSingle();
 
   if (!session || session.status !== 'open') return NextResponse.json({ message: 'Session introuvable ou déjà fermée.' }, { status: 404 });
+  if (!canAny && !(canOwn && session.managed_by === access.session.userId)) {
+    return NextResponse.json({ message: 'Vous pouvez clôturer uniquement votre session FOUR.' }, { status: 403 });
+  }
 
   const itemDelta = new Map<number, number>();
   let cashDelta = 0;
@@ -94,13 +102,10 @@ export async function PATCH(request: Request) {
     const qty = Number(movement.quantity ?? 0);
     const total = Number(movement.total_amount ?? 0);
 
-    if (movement.movement_kind === 'cash_out') cashDelta -= total || qty;
-    if (movement.movement_kind === 'cash_in') cashDelta += total || qty;
-
     if (movement.item_id) {
       const current = itemDelta.get(movement.item_id) ?? 0;
-      if (movement.movement_kind === 'item_out' || movement.movement_kind === 'sell') itemDelta.set(movement.item_id, current - qty);
-      if (movement.movement_kind === 'item_in' || movement.movement_kind === 'buy') itemDelta.set(movement.item_id, current + qty);
+      if (movement.movement_kind === 'sell') itemDelta.set(movement.item_id, current - qty);
+      if (movement.movement_kind === 'buy') itemDelta.set(movement.item_id, current + qty);
     }
 
     if (movement.movement_kind === 'buy') cashDelta -= total;

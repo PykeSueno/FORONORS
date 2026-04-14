@@ -94,10 +94,8 @@ export default async function ActivityPage() {
         defaultMemberLabel={currentMember?.name || currentMember?.username || 'Groupe'}
         canCreate={permissions.includes('activity.create')}
         canViewRecent={canView}
-        canEditOwn={permissions.includes('activity.edit.own')}
-        canEditAny={permissions.includes('activity.edit.any')}
-        canCancelOwn={permissions.includes('activity.cancel.own')}
-        canCancelAny={permissions.includes('activity.cancel.any')}
+        canManageOwn={permissions.includes('activity.manage.own')}
+        canManageAny={permissions.includes('activity.manage.any')}
         currentUserId={session.userId}
       />
     </div>

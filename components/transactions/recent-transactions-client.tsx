@@ -7,6 +7,7 @@ import { humanStockMovementLabel } from '@/lib/labels';
 
 type RecentTransaction = {
   id: number;
+  actor_user_id: string | null;
   reason: string;
   member_label: string;
   total_money_in: number;
@@ -23,7 +24,7 @@ type RecentTransaction = {
   }>;
 };
 
-export function RecentTransactionsClient({ transactions, canEditRecent, canCancelRecent }: { transactions: RecentTransaction[]; canEditRecent: boolean; canCancelRecent: boolean }) {
+export function RecentTransactionsClient({ transactions, canManageOwn, canManageAny, currentUserId }: { transactions: RecentTransaction[]; canManageOwn: boolean; canManageAny: boolean; currentUserId: string }) {
   const [query, setQuery] = useState('');
   const [member, setMember] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -131,12 +132,15 @@ export function RecentTransactionsClient({ transactions, canEditRecent, canCance
               <p className={`rounded-xl px-3 py-2 ${Number(transaction.profit_loss) >= 0 ? 'bg-[#83d89f]/10 text-[#cbf5d6]' : 'bg-[#e08f8f]/10 text-[#f8caca]'}`}>Résultat: {formatUsd(Number(transaction.profit_loss))}</p>
             </div>
 
-            {(canEditRecent || canCancelRecent) ? (
+            {(() => {
+              const canManageThis = canManageAny || (canManageOwn && transaction.actor_user_id === currentUserId);
+              return canManageThis ? (
               <div className="mt-3 flex flex-wrap justify-end gap-2">
-                {canEditRecent ? <button className="saas-ghost-btn" onClick={() => setEditing(transaction)}>Modifier</button> : null}
-                {canCancelRecent ? <button className="saas-ghost-btn" onClick={() => void cancelTransaction(transaction.id)}>Annuler</button> : null}
+                <button className="saas-ghost-btn" onClick={() => setEditing(transaction)}>Modifier</button>
+                <button className="saas-ghost-btn" onClick={() => void cancelTransaction(transaction.id)}>Annuler</button>
               </div>
-            ) : null}
+            ) : null;
+            })()}
           </article>
         ))}
 

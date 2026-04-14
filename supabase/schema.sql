@@ -311,11 +311,12 @@ insert into public.permissions (name)
 values
   ('transactions.access'),
   ('transactions.create'),
-  ('transactions.edit'),
-  ('transactions.manage'),
+  ('transactions.manage.own'),
+  ('transactions.manage.any'),
   ('transactions.recent.access'),
-  ('transactions.recent.edit'),
-  ('transactions.recent.cancel'),
+  ('transactions.recent.create'),
+  ('transactions.recent.manage.own'),
+  ('transactions.recent.manage.any'),
   ('transactions.preview'),
   ('transactions.recent.preview')
 on conflict (name) do nothing;
@@ -431,10 +432,8 @@ values
   ('activity.view'),
   ('activity.stats.view'),
   ('activity.logs.view'),
-  ('activity.edit.own'),
-  ('activity.edit.any'),
-  ('activity.cancel.own'),
-  ('activity.cancel.any'),
+  ('activity.manage.own'),
+  ('activity.manage.any'),
   ('activity.preview')
 on conflict (name) do nothing;
 
@@ -457,7 +456,6 @@ create table if not exists public.four_movements (
   quantity numeric(12,2) not null default 0,
   unit_price numeric(12,2) not null default 0,
   total_amount numeric(12,2) not null default 0,
-  note text,
   created_by uuid references public.users(id) on delete set null,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
@@ -487,8 +485,9 @@ insert into public.permissions (name)
 values
   ('four.preview'),
   ('four.access'),
-  ('four.open'),
-  ('four.manage'),
+  ('four.create'),
+  ('four.manage.own'),
+  ('four.manage.any'),
   ('four.close'),
   ('four.logs.view'),
   ('four.history.view')
@@ -514,6 +513,38 @@ on public.four_messages
 for all
 using (true)
 with check (true);
+
+
+delete from public.role_permissions
+where permission_id in (
+  select id from public.permissions
+  where name in (
+    'transactions.edit',
+    'transactions.manage',
+    'transactions.recent.edit',
+    'transactions.recent.cancel',
+    'activity.edit.own',
+    'activity.edit.any',
+    'activity.cancel.own',
+    'activity.cancel.any',
+    'four.open',
+    'four.manage'
+  )
+);
+
+delete from public.permissions
+where name in (
+  'transactions.edit',
+  'transactions.manage',
+  'transactions.recent.edit',
+  'transactions.recent.cancel',
+  'activity.edit.own',
+  'activity.edit.any',
+  'activity.cancel.own',
+  'activity.cancel.any',
+  'four.open',
+  'four.manage'
+);
 
 insert into public.permissions (name)
 values

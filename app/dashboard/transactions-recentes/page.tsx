@@ -8,6 +8,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 type RecentTransaction = {
   id: number;
+  actor_user_id: string | null;
   reason: string;
   member_label: string;
   total_money_in: number;
@@ -37,7 +38,7 @@ export default async function RecentTransactionsPage() {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from('transactions')
-    .select('id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, item_id, unit_price, items(image_url))')
+    .select('id, actor_user_id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, item_id, unit_price, items(image_url))')
     .order('created_at', { ascending: false })
     .limit(200);
   const transactions = (data ?? []) as RecentTransaction[];
@@ -48,8 +49,9 @@ export default async function RecentTransactionsPage() {
       <TransactionsTabs active="recent" canSeeRecent />
       <RecentTransactionsClient
         transactions={transactions}
-        canEditRecent={permissions.includes('transactions.recent.edit')}
-        canCancelRecent={permissions.includes('transactions.recent.cancel')}
+        canManageOwn={permissions.includes('transactions.recent.manage.own')}
+        canManageAny={permissions.includes('transactions.recent.manage.any')}
+        currentUserId={session.userId}
       />
     </div>
   );
