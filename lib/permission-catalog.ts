@@ -66,14 +66,16 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
 
   'four.preview': { module: 'FOUR', label: 'Voir la bulle FOUR', hint: 'Afficher la bulle FOUR.' },
   'four.access': { module: 'FOUR', label: 'Accéder à la page FOUR', hint: 'Permet d’ouvrir la page FOUR.' },
-  'four.open': { module: 'FOUR', label: 'Ouvrir une session FOUR', hint: 'Permet d’ouvrir une session FOUR.' },
-  'four.add_movement': { module: 'FOUR', label: 'Ajouter un mouvement FOUR', hint: 'Permet d’ajouter/modifier/supprimer des lignes dans la session FOUR.' },
-  'four.close': { module: 'FOUR', label: 'Fermer une session FOUR', hint: 'Permet de clôturer la session FOUR.' },
-  'four.stats.view': { module: 'FOUR', label: 'Voir les stats FOUR', hint: 'Afficher les stats FOUR.' },
-  'four.history.view': { module: 'FOUR', label: 'Voir l’historique FOUR', hint: 'Afficher l’historique FOUR.' },
+  'four.open': { module: 'FOUR', label: 'Ouvrir une session FOUR', hint: 'Permet d’ouvrir une session FOUR avec un cash initial.' },
+  'four.cash.add': { module: 'FOUR', label: 'Ajouter du cash à la session FOUR', hint: 'Permet d’ajouter de l’argent à la session FOUR ouverte.' },
+  'four.transaction.manage': { module: 'FOUR', label: 'Gérer la transaction FOUR en cours', hint: 'Permet de modifier les lignes de la transaction en cours.' },
+  'four.transaction.validate': { module: 'FOUR', label: 'Valider une transaction FOUR', hint: 'Permet de valider une transaction client dans la session FOUR.' },
+  'four.close': { module: 'FOUR', label: 'Fermer une session FOUR', hint: 'Permet de clôturer la session FOUR et consolider les données.' },
+  'four.stats.view': { module: 'FOUR', label: 'Voir les stats FOUR', hint: 'Afficher les stats des sessions FOUR.' },
+  'four.history.view': { module: 'FOUR', label: 'Voir l’historique FOUR', hint: 'Afficher l’historique des sessions FOUR.' },
   'four.messages.view': { module: 'FOUR', label: 'Voir les messages FOUR', hint: 'Afficher les messages prédéfinis FOUR.' },
   'four.messages.manage': { module: 'FOUR', label: 'Gérer les messages FOUR', hint: 'Créer/modifier/supprimer les messages FOUR.' },
-  'four.logs.view': { module: 'FOUR', label: 'Voir les logs FOUR', hint: 'Voir les logs FOUR.' },
+  'four.logs.view': { module: 'FOUR', label: 'Voir les logs FOUR', hint: 'Afficher les logs FOUR.' },
 
   'account.password.update': { module: 'Compte', label: 'Modifier son mot de passe', hint: 'Modifier son mot de passe.' }
 };

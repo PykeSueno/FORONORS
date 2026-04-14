@@ -15,10 +15,10 @@ export default async function FourPage() {
   const supabase = getSupabaseAdmin();
   const [{ data: members }, { data: items }, { data: active }, { data: history }] = await Promise.all([
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
-    supabase.from('items').select('id, name, image_url, quantity, buy_price, sell_price, category_key, type_key').order('name', { ascending: true }),
+    supabase.from('items').select('id, name, image_url, quantity, buy_price, sell_price, category_key').order('name', { ascending: true }),
     supabase
       .from('four_sessions')
-      .select('id, status, managed_by, opened_at, closed_at, summary, four_movements(id, created_by, movement_kind, item_id, item_name, quantity, unit_price, total_amount, counterparty, created_at)')
+      .select('id, status, managed_by, opened_at, closed_at, summary, four_transactions(id, counterparty, total_purchases, total_sales, profit_loss, created_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount))')
       .eq('status', 'open')
       .order('opened_at', { ascending: false })
       .limit(1)
@@ -30,14 +30,16 @@ export default async function FourPage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="FOUR" subtitle="Session achat/vente simplifiée avec consolidation à la clôture" />
+      <InternalPageHeader title="FOUR" subtitle="Session commerciale: ouverture, transactions successives, fermeture consolidée" />
       <FourPageClient
         members={members ?? []}
         items={items ?? []}
         activeSession={active ?? null}
         history={history ?? []}
         canOpen={permissions.includes('four.open')}
-        canAddMovement={permissions.includes('four.add_movement')}
+        canCashAdd={permissions.includes('four.cash.add')}
+        canManageTransaction={permissions.includes('four.transaction.manage')}
+        canValidateTransaction={permissions.includes('four.transaction.validate')}
         canClose={permissions.includes('four.close')}
         canViewHistory={permissions.includes('four.history.view')}
         canViewStats={permissions.includes('four.stats.view')}

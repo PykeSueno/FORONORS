@@ -461,11 +461,37 @@ create table if not exists public.four_movements (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.four_transactions (
+  id bigint generated always as identity primary key,
+  session_id bigint not null references public.four_sessions(id) on delete cascade,
+  counterparty text,
+  total_purchases numeric(12,2) not null default 0,
+  total_sales numeric(12,2) not null default 0,
+  profit_loss numeric(12,2) not null default 0,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.four_transaction_lines (
+  id bigint generated always as identity primary key,
+  transaction_id bigint not null references public.four_transactions(id) on delete cascade,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text not null,
+  movement_kind text not null,
+  quantity numeric(12,2) not null default 0,
+  unit_price numeric(12,2) not null default 0,
+  total_amount numeric(12,2) not null default 0
+);
+
 create index if not exists idx_four_sessions_status_opened_at on public.four_sessions(status, opened_at desc);
 create index if not exists idx_four_movements_session_id on public.four_movements(session_id, created_at desc);
+create index if not exists idx_four_transactions_session_id on public.four_transactions(session_id, created_at desc);
+create index if not exists idx_four_transaction_lines_tx_id on public.four_transaction_lines(transaction_id);
 
 alter table public.four_sessions enable row level security;
 alter table public.four_movements enable row level security;
+alter table public.four_transactions enable row level security;
+alter table public.four_transaction_lines enable row level security;
 
 drop policy if exists "allow_service_role_all_four_sessions" on public.four_sessions;
 create policy "allow_service_role_all_four_sessions"
@@ -481,12 +507,28 @@ for all
 using (true)
 with check (true);
 
+drop policy if exists "allow_service_role_all_four_transactions" on public.four_transactions;
+create policy "allow_service_role_all_four_transactions"
+on public.four_transactions
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_four_transaction_lines" on public.four_transaction_lines;
+create policy "allow_service_role_all_four_transaction_lines"
+on public.four_transaction_lines
+for all
+using (true)
+with check (true);
+
 insert into public.permissions (name)
 values
   ('four.preview'),
   ('four.access'),
   ('four.open'),
-  ('four.add_movement'),
+  ('four.cash.add'),
+  ('four.transaction.manage'),
+  ('four.transaction.validate'),
   ('four.close'),
   ('four.logs.view'),
   ('four.history.view')

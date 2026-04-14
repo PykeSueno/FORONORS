@@ -21,7 +21,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data: active } = await supabase
     .from('four_sessions')
-    .select('id, status, managed_by, opened_at, closed_at, summary, users:managed_by(name, username), four_movements(id, created_by, movement_kind, item_id, item_name, quantity, unit_price, total_amount, counterparty, created_at)')
+    .select('id, status, managed_by, opened_at, closed_at, summary, users:managed_by(name, username), four_transactions(id, counterparty, total_purchases, total_sales, profit_loss, created_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount))')
     .eq('status', 'open')
     .order('opened_at', { ascending: false })
     .limit(1)
@@ -47,13 +47,14 @@ export async function POST(request: Request) {
   const { data: active } = await supabase.from('four_sessions').select('id').eq('status', 'open').limit(1).maybeSingle();
   if (active) return NextResponse.json({ message: 'Une session FOUR est déjà ouverte.' }, { status: 409 });
 
-  const body = (await request.json()) as { managed_by?: string };
+  const body = (await request.json()) as { managed_by?: string; initial_cash?: number };
   const managedBy = body.managed_by ?? access.session.userId;
+  const initialCash = Math.max(0, Number(body.initial_cash ?? 0));
 
   const { data: created, error } = await supabase
     .from('four_sessions')
-    .insert({ status: 'open', opened_by: access.session.userId, managed_by: managedBy, summary: {} })
-    .select('id, managed_by, opened_at, status')
+    .insert({ status: 'open', opened_by: access.session.userId, managed_by: managedBy, summary: { initial_cash: initialCash, cash_added_total: 0 } })
+    .select('id, managed_by, opened_at, status, summary')
     .maybeSingle();
 
   if (error || !created) return NextResponse.json({ message: 'Ouverture FOUR impossible.' }, { status: 400 });
@@ -81,26 +82,25 @@ export async function PATCH(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: session } = await supabase
     .from('four_sessions')
-    .select('id, status, managed_by, four_movements(id, movement_kind, item_id, item_name, quantity, total_amount, counterparty)')
+    .select('id, status, summary, four_transactions(id, total_purchases, total_sales, four_transaction_lines(item_id, movement_kind, quantity))')
     .eq('id', sessionId)
     .maybeSingle();
 
   if (!session || session.status !== 'open') return NextResponse.json({ message: 'Session introuvable ou déjà fermée.' }, { status: 404 });
+
   const itemDelta = new Map<number, number>();
-  let cashDelta = 0;
+  let totalPurchases = 0;
+  let totalSales = 0;
 
-  for (const movement of session.four_movements ?? []) {
-    const qty = Number(movement.quantity ?? 0);
-    const total = Number(movement.total_amount ?? 0);
-
-    if (movement.item_id) {
-      const current = itemDelta.get(movement.item_id) ?? 0;
-      if (movement.movement_kind === 'sell') itemDelta.set(movement.item_id, current - qty);
-      if (movement.movement_kind === 'buy') itemDelta.set(movement.item_id, current + qty);
+  for (const tx of session.four_transactions ?? []) {
+    totalPurchases += Number(tx.total_purchases ?? 0);
+    totalSales += Number(tx.total_sales ?? 0);
+    for (const line of tx.four_transaction_lines ?? []) {
+      if (!line.item_id) continue;
+      const current = itemDelta.get(line.item_id) ?? 0;
+      if (line.movement_kind === 'sell') itemDelta.set(line.item_id, current - Number(line.quantity ?? 0));
+      if (line.movement_kind === 'buy') itemDelta.set(line.item_id, current + Number(line.quantity ?? 0));
     }
-
-    if (movement.movement_kind === 'buy') cashDelta -= total;
-    if (movement.movement_kind === 'sell') cashDelta += total;
   }
 
   for (const [itemId, delta] of itemDelta.entries()) {
@@ -114,12 +114,28 @@ export async function PATCH(request: Request) {
 
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
   if (!cash) return NextResponse.json({ message: 'Caisse introuvable.' }, { status: 404 });
+  const cashDelta = totalSales - totalPurchases;
   const nextBalance = Number(cash.balance) + cashDelta;
   if (nextBalance < 0) return NextResponse.json({ message: 'Solde insuffisant pour clôturer FOUR.' }, { status: 400 });
   await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
   await syncMoneyItemToGroupCash(supabase);
 
-  await supabase.from('four_sessions').update({ status: 'closed', closed_at: new Date().toISOString(), summary: { cash_delta: cashDelta, item_delta: Object.fromEntries(itemDelta) } }).eq('id', sessionId);
+  const initialCash = Number((session.summary as Record<string, unknown> | null)?.initial_cash ?? 0);
+  const cashAdded = Number((session.summary as Record<string, unknown> | null)?.cash_added_total ?? 0);
+  const cashFinal = initialCash + cashAdded + cashDelta;
+
+  await supabase.from('four_sessions').update({
+    status: 'closed',
+    closed_at: new Date().toISOString(),
+    summary: {
+      ...(session.summary as Record<string, unknown> | null),
+      total_purchases: totalPurchases,
+      total_sales: totalSales,
+      profit_loss: cashDelta,
+      cash_final: cashFinal,
+      item_delta: Object.fromEntries(itemDelta)
+    }
+  }).eq('id', sessionId);
 
   await createAuditLog({
     actorUserId: access.session.userId,
@@ -127,7 +143,7 @@ export async function PATCH(request: Request) {
     entityType: 'four_session',
     entityId: sessionId,
     summary: `Clôture session FOUR #${sessionId}`,
-    newValues: { cash_delta: cashDelta, item_delta: Object.fromEntries(itemDelta), movements: (session.four_movements ?? []).length }
+    newValues: { initialCash, cashAdded, totalPurchases, totalSales, profit: cashDelta, cashFinal, itemDelta: Object.fromEntries(itemDelta) }
   });
 
   return NextResponse.json({ ok: true });
