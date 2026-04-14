@@ -42,11 +42,12 @@ export default async function ActivityPage() {
   if (!session) redirect('/login');
 
   const permissions = await getUserPermissions(session.userId);
+  const canAccess = permissions.includes('activity.access');
   const canManageOwn = permissions.includes('activity.manage.own');
   const canManageAny = permissions.includes('activity.manage.any');
   const canCreate = permissions.includes('activity.create');
   const canView = canManageOwn || canManageAny;
-  if (!canCreate && !canManageOwn && !canManageAny) redirect('/dashboard');
+  if (!canAccess) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const [{ data: items }, { data: members }, { data: activities }] = await Promise.all([

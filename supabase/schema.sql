@@ -33,6 +33,7 @@ alter table public.roles add column if not exists display_order integer not null
 alter table public.users add column if not exists role_id bigint references public.roles(id) on delete set null;
 alter table public.users add column if not exists name text not null default '';
 alter table public.users add column if not exists password_plain text;
+alter table public.users add column if not exists dashboard_layout jsonb;
 
 alter table public.roles enable row level security;
 alter table public.permissions enable row level security;
@@ -309,6 +310,7 @@ with check (true);
 
 insert into public.permissions (name)
 values
+  ('transactions.access'),
   ('transactions.create'),
   ('transactions.manage.own'),
   ('transactions.manage.any'),
@@ -425,6 +427,7 @@ with check (true);
 
 insert into public.permissions (name)
 values
+  ('activity.access'),
   ('activity.create'),
   ('activity.stats.view'),
   ('activity.logs.view'),
@@ -481,7 +484,9 @@ insert into public.permissions (name)
 values
   ('four.preview'),
   ('four.access'),
-  ('four.manage'),
+  ('four.open'),
+  ('four.add_movement'),
+  ('four.close'),
   ('four.logs.view'),
   ('four.history.view')
 on conflict (name) do nothing;
@@ -523,11 +528,10 @@ where permission_id in (
     'activity.edit.any',
     'activity.cancel.own',
     'activity.cancel.any',
-    'four.open',
     'four.create',
     'four.manage.own',
     'four.manage.any',
-    'four.close'
+    'four.manage'
   )
 );
 
@@ -544,11 +548,10 @@ where name in (
   'activity.edit.any',
   'activity.cancel.own',
   'activity.cancel.any',
-  'four.open',
   'four.create',
   'four.manage.own',
   'four.manage.any',
-  'four.close'
+  'four.manage'
 );
 
 insert into public.permissions (name)

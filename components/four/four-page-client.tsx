@@ -48,7 +48,9 @@ export function FourPageClient({
   items,
   activeSession,
   history,
-  canManage,
+  canOpen,
+  canAddMovement,
+  canClose,
   canViewHistory,
   canViewStats,
   canViewMessages,
@@ -59,7 +61,9 @@ export function FourPageClient({
   items: Item[];
   activeSession: FourSession | null;
   history: FourHistoryEntry[];
-  canManage: boolean;
+  canOpen: boolean;
+  canAddMovement: boolean;
+  canClose: boolean;
   canViewHistory: boolean;
   canViewStats: boolean;
   canViewMessages: boolean;
@@ -84,7 +88,7 @@ export function FourPageClient({
   const [messages, setMessages] = useState<FourMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState({ id: 0, title: '', content: '', display_order: 100 });
 
-  const canManageSession = canManage;
+  const canManageSession = canAddMovement;
 
   const selectedItem = useMemo(() => items.find((item) => item.id === itemId), [items, itemId]);
 
@@ -241,7 +245,7 @@ export function FourPageClient({
               <span className={`rounded-full px-3 py-1 text-xs ${session ? 'bg-[#83d89f]/20 text-[#c7f5d8]' : 'bg-[#e08f8f]/20 text-[#ffd4d4]'}`}>{session ? 'FOUR en cours' : 'FOUR fermé'}</span>
             </div>
             {session ? <p className="mt-2 text-sm text-[#f3d5b4]">Session #{session.id} · ouverte {new Date(session.opened_at).toLocaleString('fr-FR')}</p> : null}
-            {!session && canManage ? (
+            {!session && canOpen ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <select className="saas-input" value={openingMemberId} onChange={(event) => setOpeningMemberId(event.target.value)}>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select>
                 <button className="saas-primary-btn" onClick={() => void openSession()}>Ouvrir le FOUR</button>
@@ -268,14 +272,16 @@ export function FourPageClient({
                           {ITEM_CATEGORIES.map((category) => <option key={category.key} value={category.key}>{category.label}</option>)}
                         </select>
                       </div>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
                         {filteredItems.map((item) => (
-                          <button key={item.id} className={`rounded-xl border p-3 text-left ${item.id === itemId ? 'border-[#c48f61] bg-[#5d3b27]/80' : 'border-white/10 bg-[#2e1d14]/65'}`} onClick={() => { setItemId(item.id); applyAutoPrice(kind, item.id); }}>
-                            <div className="mb-2 h-16 rounded-lg bg-[#23140e]">
-                              {item.image_url ? <Image src={item.image_url} alt={item.name} width={240} height={80} className="h-full w-full rounded-lg object-cover" unoptimized /> : null}
+                          <button key={item.id} className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left ${item.id === itemId ? 'border-[#c48f61] bg-[#5d3b27]/80' : 'border-white/10 bg-[#2e1d14]/65'}`} onClick={() => { setItemId(item.id); applyAutoPrice(kind, item.id); }}>
+                            <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#23140e]">
+                              {item.image_url ? <Image src={item.image_url} alt={item.name} width={40} height={40} className="h-full w-full rounded-lg object-cover" unoptimized /> : null}
                             </div>
-                            <p className="text-sm font-medium text-[#ffe8ca]">{item.name}</p>
-                            <p className="text-xs text-[#efcdab]">{ITEM_CATEGORIES.find((entry) => entry.key === item.category_key)?.label ?? item.category_key ?? 'Catégorie'}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-[#ffe8ca]">{item.name}</p>
+                              <p className="text-xs text-[#efcdab]">{ITEM_CATEGORIES.find((entry) => entry.key === item.category_key)?.label ?? item.category_key ?? 'Catégorie'} · Stock {item.quantity}</p>
+                            </div>
                           </button>
                         ))}
                       </div>
@@ -332,7 +338,7 @@ export function FourPageClient({
                   })}
                 </div>
 
-                {canManageSession ? <button className="saas-ghost-btn" onClick={() => void closeSession()}>Clôturer la session FOUR</button> : null}
+                {canClose ? <button className="saas-ghost-btn" onClick={() => void closeSession()}>Clôturer la session FOUR</button> : null}
               </article>
 
               <article className="glass-card p-5 space-y-2">

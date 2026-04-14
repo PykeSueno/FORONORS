@@ -38,11 +38,12 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canManageOwn, canManageAny] = await Promise.all([
+  const [canAccess, canManageOwn, canManageAny] = await Promise.all([
+    hasUserPermission(session.userId, 'activity.access'),
     hasUserPermission(session.userId, 'activity.manage.own'),
     hasUserPermission(session.userId, 'activity.manage.any')
   ]);
-  if (!canManageOwn && !canManageAny) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canAccess || (!canManageOwn && !canManageAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -59,8 +60,11 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const canCreate = await hasUserPermission(session.userId, 'activity.create');
-  if (!canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const [canAccess, canCreate] = await Promise.all([
+    hasUserPermission(session.userId, 'activity.access'),
+    hasUserPermission(session.userId, 'activity.create')
+  ]);
+  if (!canAccess || !canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as {
     activity_type?: ActivityType;

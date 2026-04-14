@@ -17,7 +17,7 @@ async function ensureManageScope(sessionId?: number) {
   const session = await getSession();
   if (!session) return { error: NextResponse.json({ message: 'Non autorisé.' }, { status: 401 }) };
 
-  const canManage = await hasUserPermission(session.userId, 'four.manage');
+  const canManage = await hasUserPermission(session.userId, 'four.add_movement');
   if (!canManage) return { error: NextResponse.json({ message: 'Accès refusé.' }, { status: 403 }) };
 
   if (!sessionId) return { session };
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
   await createAuditLog({
     actorUserId: access.session.userId,
-    action: 'four.manage',
+    action: 'four.add_movement',
     entityType: 'four_session',
     entityId: sessionId,
     summary: `Ajout ${movement.movement_kind === 'buy' ? 'achat' : 'vente'} FOUR ${movement.item_name} x${movement.quantity}`,
@@ -124,7 +124,7 @@ export async function PATCH(request: Request) {
 
   await createAuditLog({
     actorUserId: access.session.userId,
-    action: 'four.manage',
+    action: 'four.add_movement',
     entityType: 'four_session',
     entityId: existing.session_id,
     summary: `Modification mouvement FOUR #${movementId}`,
@@ -151,7 +151,7 @@ export async function DELETE(request: Request) {
 
   await createAuditLog({
     actorUserId: access.session.userId,
-    action: 'four.manage',
+    action: 'four.add_movement',
     entityType: 'four_session',
     entityId: existing.session_id,
     summary: `Suppression mouvement FOUR #${movementId}`,

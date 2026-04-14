@@ -36,7 +36,9 @@ export default async function FourPage() {
         items={items ?? []}
         activeSession={active ?? null}
         history={history ?? []}
-        canManage={permissions.includes('four.manage')}
+        canOpen={permissions.includes('four.open')}
+        canAddMovement={permissions.includes('four.add_movement')}
+        canClose={permissions.includes('four.close')}
         canViewHistory={permissions.includes('four.history.view')}
         canViewStats={permissions.includes('four.stats.view')}
         canViewMessages={permissions.includes('four.messages.view')}

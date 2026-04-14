@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import { formatUsd } from '@/lib/currency';
 import { getSession } from '@/lib/auth';
 import { WelcomeCardActions } from '@/components/dashboard/welcome-card-actions';
+import { DashboardHubGrid } from '@/components/dashboard/dashboard-hub-grid';
 import { getUserPermissions } from '@/lib/permissions';
 import { humanMoneyMovementLabel, humanStockMovementLabel } from '@/lib/labels';
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -22,6 +22,8 @@ type DashboardStockRow = {
   users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null;
 };
 
+const DEFAULT_ORDER = ['money', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'activity', 'four'];
+
 export default async function DashboardPage() {
   const session = await getSession();
   const permissions = session ? await getUserPermissions(session.userId) : [];
@@ -34,7 +36,7 @@ export default async function DashboardPage() {
   const canItemsAccess = has('items.access');
   const canItemsPreview = canItemsAccess || has('items.preview');
 
-  const canTransactionsAccess = has('transactions.create') || has('transactions.manage.own') || has('transactions.manage.any');
+  const canTransactionsAccess = has('transactions.access');
   const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
 
   const canTransactionsRecentAccess = has('transactions.recent.access');
@@ -49,7 +51,7 @@ export default async function DashboardPage() {
   const canTabletAccess = has('tablet.access');
   const canTabletPreview = canTabletAccess || has('tablet.preview');
 
-  const canActivityAccess = has('activity.create') || has('activity.manage.own') || has('activity.manage.any');
+  const canActivityAccess = has('activity.access');
   const canActivityPreview = canActivityAccess || has('activity.preview');
 
   const canFourAccess = has('four.access');
@@ -62,7 +64,7 @@ export default async function DashboardPage() {
 
   const supabase = getSupabaseAdmin();
   const [{ data: user }, { data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: fourActive }] = await Promise.all([
-    session ? supabase.from('users').select('name, role').eq('id', session.userId).maybeSingle() : Promise.resolve({ data: null }),
+    session ? supabase.from('users').select('name, role, dashboard_layout').eq('id', session.userId).maybeSingle() : Promise.resolve({ data: null }),
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItemsPreview ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
@@ -72,6 +74,20 @@ export default async function DashboardPage() {
     canShowStockMovements ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
     canFourPreview ? supabase.from('four_sessions').select('id, status').eq('status', 'open').order('opened_at', { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null })
   ]);
+
+  const cards = [
+    canMoneyPreview ? { id: 'money', href: '/dashboard/argent', enabled: canMoneyAccess, icon: '💰', title: 'Argent', value: formatUsd(Number(cash?.balance ?? 0)), subtitle: 'Caisse actuelle' } : null,
+    canItemsPreview ? { id: 'items', href: '/dashboard/items', enabled: canItemsAccess, icon: '📦', title: 'Items', value: String(itemsCount ?? 0), subtitle: 'Catalogue' } : null,
+    canTransactionsPreview ? { id: 'transactions', href: '/dashboard/transactions', enabled: canTransactionsAccess, icon: '🔄', title: 'Transactions', value: String(txCount ?? 0), subtitle: 'Créer et gérer' } : null,
+    canTransactionsRecentPreview ? { id: 'transactions_recent', href: '/dashboard/transactions-recentes', enabled: canTransactionsRecentAccess, icon: '🕒', title: 'Transactions récentes', value: String(txCount ?? 0), subtitle: 'Historique' } : null,
+    canMembersPreview ? { id: 'members', href: '/dashboard/membres', enabled: canMembersAccess, icon: '👥', title: 'Membres', value: String(membersCount ?? 0), subtitle: 'Gestion équipe' } : null,
+    canLogsPreview ? { id: 'logs', href: '/dashboard/logs', enabled: canLogsAccess, icon: '🧾', title: 'Logs', value: String(logsCount ?? 0), subtitle: 'Traçabilité' } : null,
+    canTabletPreview ? { id: 'tablet', href: '/dashboard/tablette', enabled: canTabletAccess, icon: '📱', title: 'Tablette', value: 'Module', subtitle: 'Passages 8h → 8h' } : null,
+    canActivityPreview ? { id: 'activity', href: '/dashboard/activite', enabled: canActivityAccess, icon: '🎯', title: 'Activité', value: 'Module', subtitle: 'Boîte / Cambriolage / Conteneur' } : null,
+    canFourPreview ? { id: 'four', href: '/dashboard/four', enabled: canFourAccess, icon: '🔥', title: 'FOUR', value: fourActive ? 'Ouvert' : 'Fermé', subtitle: 'Session vente / achat' } : null
+  ].filter(Boolean) as Array<{ id: string; href: string; enabled: boolean; icon: string; title: string; value: string; subtitle: string }>;
+
+  const initialOrder = (Array.isArray(user?.dashboard_layout) ? user?.dashboard_layout.filter((v: unknown) => typeof v === 'string') : DEFAULT_ORDER) as string[];
 
   const cashRows = (recentCash ?? []) as DashboardCashRow[];
   const stockRows = ((recentStock ?? []) as DashboardStockRow[])
@@ -95,17 +111,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {canMoneyPreview ? <HubCard href="/dashboard/argent" enabled={canMoneyAccess} icon="💰" title="Argent" value={formatUsd(Number(cash?.balance ?? 0))} subtitle="Caisse actuelle" /> : null}
-        {canItemsPreview ? <HubCard href="/dashboard/items" enabled={canItemsAccess} icon="📦" title="Items" value={String(itemsCount ?? 0)} subtitle="Catalogue" /> : null}
-        {canTransactionsPreview ? <HubCard href="/dashboard/transactions" enabled={canTransactionsAccess} icon="🔄" title="Transactions" value={String(txCount ?? 0)} subtitle="Créer et gérer" /> : null}
-        {canTransactionsRecentPreview ? <HubCard href="/dashboard/transactions-recentes" enabled={canTransactionsRecentAccess} icon="🕒" title="Transactions récentes" value={String(txCount ?? 0)} subtitle="Historique" /> : null}
-        {canMembersPreview ? <HubCard href="/dashboard/membres" enabled={canMembersAccess} icon="👥" title="Membres" value={String(membersCount ?? 0)} subtitle="Gestion équipe" /> : null}
-        {canLogsPreview ? <HubCard href="/dashboard/logs" enabled={canLogsAccess} icon="🧾" title="Logs" value={String(logsCount ?? 0)} subtitle="Traçabilité" /> : null}
-        {canTabletPreview ? <HubCard href="/dashboard/tablette" enabled={canTabletAccess} icon="📱" title="Tablette" value="Module" subtitle="Passages 8h → 8h" /> : null}
-        {canActivityPreview ? <HubCard href="/dashboard/activite" enabled={canActivityAccess} icon="🎯" title="Activité" value="Module" subtitle="Boîte / Cambriolage / Conteneur" /> : null}
-        {canFourPreview ? <HubCard href="/dashboard/four" enabled={canFourAccess} icon="🔥" title="FOUR" value={fourActive ? 'Ouvert' : 'Fermé'} subtitle="Session vente / achat" /> : null}
-      </section>
+      <DashboardHubGrid cards={cards} initialOrder={initialOrder} />
 
       <section className="grid gap-4 lg:grid-cols-2">
         {canShowMoneyMovements ? <article className="glass-card p-6">
@@ -140,17 +146,4 @@ export default async function DashboardPage() {
       </section>
     </div>
   );
-}
-
-function HubCard({ href, enabled, icon, title, value, subtitle }: { href: string; enabled: boolean; icon: string; title: string; value: string; subtitle: string }) {
-  const content = (
-    <>
-      <div className="flex items-center justify-between"><p className="text-3xl">{icon}</p><p className="text-2xl font-semibold text-[#ffe9cd]">{value}</p></div>
-      <p className="mt-3 text-lg font-semibold text-[#fff2de]">{title}</p>
-      <p className="text-sm text-[#f1d1ac]">{subtitle}</p>
-    </>
-  );
-
-  if (!enabled) return <div className="glass-card block cursor-not-allowed opacity-90 p-6">{content}</div>;
-  return <Link href={href} className="glass-card smooth-hover block p-6">{content}</Link>;
 }

@@ -21,6 +21,7 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'items.delete': { module: 'Items', label: 'Supprimer un item', hint: 'Supprimer un item.' },
 
   'transactions.preview': { module: 'Transactions', label: 'Voir la bulle Transactions', hint: 'Afficher la bulle Transactions.' },
+  'transactions.access': { module: 'Transactions', label: 'Accéder à la page Transactions', hint: 'Permet d’ouvrir la page Transactions.' },
   'transactions.create': { module: 'Transactions', label: 'Créer une transaction', hint: 'Permet de créer une transaction.' },
   'transactions.manage.own': { module: 'Transactions', label: 'Modifier/annuler ses transactions', hint: 'Permet de modifier ou annuler uniquement les transactions créées par ce membre.' },
   'transactions.manage.any': { module: 'Transactions', label: 'Modifier/annuler toutes les transactions', hint: 'Permet de modifier ou annuler toutes les transactions, peu importe l’auteur.' },
@@ -48,6 +49,7 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'roles.manage': { module: 'Membres', label: 'Gérer rôles et permissions', hint: 'Créer/modifier les rôles et leurs permissions.' },
 
   'activity.preview': { module: 'Activité', label: 'Voir la bulle Activité', hint: 'Afficher la bulle Activité.' },
+  'activity.access': { module: 'Activité', label: 'Accéder à la page Activité', hint: 'Permet d’ouvrir la page Activité.' },
   'activity.create': { module: 'Activité', label: 'Créer une activité', hint: 'Permet de créer une activité.' },
   'activity.stats.view': { module: 'Activité', label: 'Voir les stats activité', hint: 'Afficher les stats activité.' },
   'activity.logs.view': { module: 'Activité', label: 'Voir les logs activité', hint: 'Afficher les logs activité.' },
@@ -63,7 +65,9 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
 
   'four.preview': { module: 'FOUR', label: 'Voir la bulle FOUR', hint: 'Afficher la bulle FOUR.' },
   'four.access': { module: 'FOUR', label: 'Accéder à la page FOUR', hint: 'Permet d’ouvrir la page FOUR.' },
-  'four.manage': { module: 'FOUR', label: 'Gérer la session FOUR active', hint: 'Permet de gérer les mouvements de la session FOUR.' },
+  'four.open': { module: 'FOUR', label: 'Ouvrir une session FOUR', hint: 'Permet d’ouvrir une session FOUR.' },
+  'four.add_movement': { module: 'FOUR', label: 'Ajouter un mouvement FOUR', hint: 'Permet d’ajouter/modifier/supprimer des lignes dans la session FOUR.' },
+  'four.close': { module: 'FOUR', label: 'Fermer une session FOUR', hint: 'Permet de clôturer la session FOUR.' },
   'four.stats.view': { module: 'FOUR', label: 'Voir les stats FOUR', hint: 'Afficher les stats FOUR.' },
   'four.history.view': { module: 'FOUR', label: 'Voir l’historique FOUR', hint: 'Afficher l’historique FOUR.' },
   'four.messages.view': { module: 'FOUR', label: 'Voir les messages FOUR', hint: 'Afficher les messages prédéfinis FOUR.' },

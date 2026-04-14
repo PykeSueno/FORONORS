@@ -40,7 +40,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const access = await ensureAccess('four.manage');
+  const access = await ensureAccess('four.open');
   if ('error' in access) return access.error;
 
   const supabase = getSupabaseAdmin();
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
   await createAuditLog({
     actorUserId: access.session.userId,
-    action: 'four.manage',
+    action: 'four.open',
     entityType: 'four_session',
     entityId: created.id,
     summary: `Ouverture session FOUR #${created.id}`,
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const access = await ensureAccess('four.manage');
+  const access = await ensureAccess('four.close');
   if ('error' in access) return access.error;
 
   const body = (await request.json()) as { session_id?: number };
@@ -123,7 +123,7 @@ export async function PATCH(request: Request) {
 
   await createAuditLog({
     actorUserId: access.session.userId,
-    action: 'four.manage',
+    action: 'four.close',
     entityType: 'four_session',
     entityId: sessionId,
     summary: `Clôture session FOUR #${sessionId}`,
