@@ -59,6 +59,7 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
   const [activeTab, setActiveTab] = useState<'session' | 'stats' | 'messages'>('session');
   const [stats, setStats] = useState<FourStats | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [expandedTxId, setExpandedTxId] = useState<number | null>(null);
   const [messages, setMessages] = useState<FourMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState({ id: 0, title: '', content: '', display_order: 100 });
 
@@ -264,28 +265,26 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
                   const categoryLabel = ITEM_CATEGORIES.find((entry) => entry.key === item?.category_key)?.label ?? item?.category_key ?? 'Catégorie';
                   return (
                     <div key={`${line.item_id}-${index}`} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
-                      <div className="grid gap-3 lg:grid-cols-[auto_1fr_auto]">
+                      <div className="grid gap-3 lg:grid-cols-[auto_1fr]">
                         <div className="h-14 w-14 overflow-hidden rounded-lg bg-[#23140e]">{item?.image_url ? <Image src={item.image_url} alt={line.item_name} width={56} height={56} className="h-full w-full object-cover" unoptimized /> : null}</div>
                         <div className="min-w-0 space-y-2">
                           <div>
                             <p className="font-medium text-[#ffe8ca]">{line.item_name}</p>
                             <p className="text-xs text-[#efcdab]">{categoryLabel} · Stock actuel {item?.quantity ?? 0}</p>
                           </div>
-                          <div className="grid gap-2 md:grid-cols-4">
+                          <div className="flex flex-wrap items-center gap-2">
                             <select className="saas-input" value={line.movement_kind} onChange={(e) => updateDraftLine(index, { movement_kind: e.target.value as LineKind })}>
                               <option value="buy">Achat</option>
                               <option value="sell">Vente</option>
                             </select>
-                            <div className="flex items-center gap-1">
-                              <button className="saas-ghost-btn !px-2" onClick={() => updateDraftLine(index, { quantity: Math.max(1, line.quantity - 1) })}>-</button>
-                              <input className="saas-input text-center" value={line.quantity} onChange={(e) => updateDraftLine(index, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
-                              <button className="saas-ghost-btn !px-2" onClick={() => updateDraftLine(index, { quantity: line.quantity + 1 })}>+</button>
-                            </div>
-                            <input className="saas-input" value={line.unit_price} onChange={(e) => updateDraftLine(index, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
-                            <p className="saas-input">{formatUsd(line.quantity * line.unit_price)}</p>
+                            <button className="saas-ghost-btn !px-2 !py-1" onClick={() => updateDraftLine(index, { quantity: Math.max(1, line.quantity - 1) })}>-</button>
+                            <input className="saas-input w-20 text-center" value={line.quantity} onChange={(e) => updateDraftLine(index, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
+                            <button className="saas-ghost-btn !px-2 !py-1" onClick={() => updateDraftLine(index, { quantity: line.quantity + 1 })}>+</button>
+                            <input className="saas-input w-28 text-center" value={line.unit_price} onChange={(e) => updateDraftLine(index, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
+                            <p className="rounded-lg border border-[#f8d7a2]/35 bg-[#5a3825]/70 px-3 py-2 text-sm font-semibold text-[#ffe8ca]">{formatUsd(line.quantity * line.unit_price)}</p>
+                            <button className="saas-ghost-btn !px-2 !py-1" onClick={() => removeDraftLine(index)}>🗑️</button>
                           </div>
                         </div>
-                        <button className="saas-ghost-btn !px-2 h-fit" onClick={() => removeDraftLine(index)}>🗑️</button>
                       </div>
                     </div>
                   );
@@ -303,8 +302,36 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
 
               <div className="rounded-xl border border-white/10 bg-[#2e1d14]/45 p-3">
                 <p className="text-sm font-semibold text-[#fff1dd]">Transactions validées ({session?.four_transactions?.length ?? 0})</p>
-                <div className="mt-2 max-h-48 space-y-2 overflow-y-auto">
-                  {(session?.four_transactions ?? []).map((tx) => <p key={tx.id} className="text-xs text-[#efcdab]">#{tx.id} · {tx.counterparty || '—'} · +{formatUsd(Number(tx.total_sales))} / -{formatUsd(Number(tx.total_purchases))}</p>)}
+                <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
+                  {(session?.four_transactions ?? []).map((tx) => {
+                    const expanded = expandedTxId === tx.id;
+                    return (
+                      <div key={tx.id} className="rounded-lg border border-white/10 bg-[#3f281b]/50">
+                        <button className="w-full px-3 py-2 text-left" onClick={() => setExpandedTxId(expanded ? null : tx.id)}>
+                          <p className="text-sm font-semibold text-[#ffe8ca]">Transaction #{tx.id}</p>
+                          <p className="text-xs text-[#efcdab]">🧑 Interlocuteur : {tx.counterparty || 'Inconnu'} · 🕒 {new Date(tx.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+                          <p className="text-xs text-[#efcdab]">Ventes {formatUsd(Number(tx.total_sales))} · Achats {formatUsd(Number(tx.total_purchases))} · Résultat {formatUsd(Number(tx.profit_loss))}</p>
+                        </button>
+                        {expanded ? (
+                          <div className="space-y-2 border-t border-white/10 px-3 py-2">
+                            <p className="text-xs font-semibold text-[#fff1dd]">📦 Détail</p>
+                            <div className="space-y-1">
+                              {(tx.four_transaction_lines ?? []).map((line, idx) => (
+                                <p key={`${tx.id}-${line.id ?? idx}`} className={`rounded-md px-2 py-1 text-xs ${line.movement_kind === 'sell' ? 'bg-[#2d4a34]/45 text-[#d4ffd8]' : 'bg-[#5a2f2f]/45 text-[#ffd6d6]'}`}>
+                                  {line.movement_kind === 'sell' ? 'Vente' : 'Achat'} : {line.item_name} x{line.quantity} → {formatUsd(Number(line.total_amount ?? 0))}
+                                </p>
+                              ))}
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <SummaryLine label="Total ventes" value={formatUsd(Number(tx.total_sales))} positive />
+                              <SummaryLine label="Total achats" value={formatUsd(Number(tx.total_purchases))} danger />
+                              <SummaryLine label="Résultat" value={formatUsd(Number(tx.profit_loss))} positive={Number(tx.profit_loss) >= 0} danger={Number(tx.profit_loss) < 0} />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </article>
