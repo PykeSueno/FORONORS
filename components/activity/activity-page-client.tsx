@@ -233,6 +233,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                 </button>
               ))}
             </div>
+          </section>
         </section>
 
         <section className="glass-card p-5">
