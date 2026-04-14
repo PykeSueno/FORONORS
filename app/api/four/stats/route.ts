@@ -3,6 +3,18 @@ import { getSession } from '@/lib/auth';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+type ManagedUser = { name: string | null; username: string | null };
+type SessionTransaction = { counterparty: string | null; total_purchases: number | null; total_sales: number | null; profit_loss: number | null };
+type FourStatsSession = {
+  id: number;
+  opened_at: string;
+  closed_at: string | null;
+  managed_by: string | null;
+  summary: Record<string, unknown> | null;
+  users: ManagedUser | ManagedUser[] | null;
+  four_transactions: SessionTransaction[] | null;
+};
+
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
@@ -20,9 +32,11 @@ export async function GET() {
   const byMember: Record<string, { sessions: number; profit: number }> = {};
   let totalPurchases = 0;
   let totalSales = 0;
+  const sessionRows = (sessions ?? []) as FourStatsSession[];
 
-  for (const fourSession of sessions ?? []) {
-    const memberName = Array.isArray(fourSession.users) ? (fourSession.users[0]?.name || fourSession.users[0]?.username || 'Inconnu') : (fourSession.users?.name || fourSession.users?.username || 'Inconnu');
+  for (const fourSession of sessionRows) {
+    const managedUser = Array.isArray(fourSession.users) ? fourSession.users[0] : fourSession.users;
+    const memberName = managedUser?.name || managedUser?.username || 'Inconnu';
     if (!byMember[memberName]) byMember[memberName] = { sessions: 0, profit: 0 };
     byMember[memberName].sessions += 1;
 
@@ -43,13 +57,13 @@ export async function GET() {
 
   return NextResponse.json({
     totals: {
-      sessions: (sessions ?? []).length,
+      sessions: sessionRows.length,
       purchases: totalPurchases,
       sales: totalSales,
       profit: totalSales - totalPurchases
     },
     byMember,
     byCounterparty,
-    sessions: sessions ?? []
+    sessions: sessionRows
   });
 }
