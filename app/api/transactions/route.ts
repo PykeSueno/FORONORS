@@ -31,8 +31,12 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const canAccess = await hasUserPermission(session.userId, 'transactions.access');
-  if (!canAccess) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const [canCreate, canManageOwn, canManageAny] = await Promise.all([
+    hasUserPermission(session.userId, 'transactions.create'),
+    hasUserPermission(session.userId, 'transactions.manage.own'),
+    hasUserPermission(session.userId, 'transactions.manage.any')
+  ]);
+  if (!canCreate && !canManageOwn && !canManageAny) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -50,11 +54,8 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canCreate] = await Promise.all([
-    hasUserPermission(session.userId, 'transactions.access'),
-    hasUserPermission(session.userId, 'transactions.create')
-  ]);
-  if (!canAccess || !canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const canCreate = await hasUserPermission(session.userId, 'transactions.create');
+  if (!canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as {
     reason?: string;

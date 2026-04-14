@@ -17,24 +17,16 @@ async function ensureManageScope(sessionId?: number) {
   const session = await getSession();
   if (!session) return { error: NextResponse.json({ message: 'Non autorisé.' }, { status: 401 }) };
 
-  const [canAny, canOwn] = await Promise.all([
-    hasUserPermission(session.userId, 'four.manage.any'),
-    hasUserPermission(session.userId, 'four.manage.own')
-  ]);
+  const canManage = await hasUserPermission(session.userId, 'four.manage');
+  if (!canManage) return { error: NextResponse.json({ message: 'Accès refusé.' }, { status: 403 }) };
 
-  if (!canAny && !canOwn) return { error: NextResponse.json({ message: 'Accès refusé.' }, { status: 403 }) };
-
-  if (!sessionId) return { session, canAny };
+  if (!sessionId) return { session };
 
   const supabase = getSupabaseAdmin();
-  const { data: fourSession } = await supabase.from('four_sessions').select('id, managed_by').eq('id', sessionId).maybeSingle();
+  const { data: fourSession } = await supabase.from('four_sessions').select('id').eq('id', sessionId).maybeSingle();
   if (!fourSession) return { error: NextResponse.json({ message: 'Session FOUR introuvable.' }, { status: 404 }) };
 
-  if (!canAny && fourSession.managed_by !== session.userId) {
-    return { error: NextResponse.json({ message: 'Vous pouvez gérer uniquement votre session FOUR.' }, { status: 403 }) };
-  }
-
-  return { session, canAny, fourSession };
+  return { session, fourSession };
 }
 
 async function resolveMovementPayload(body: MovementPayload, sessionId: number) {

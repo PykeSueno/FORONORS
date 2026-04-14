@@ -15,12 +15,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canManageOwn, canManageAny] = await Promise.all([
-    hasUserPermission(session.userId, 'activity.access'),
+  const [canManageOwn, canManageAny] = await Promise.all([
     hasUserPermission(session.userId, 'activity.manage.own'),
     hasUserPermission(session.userId, 'activity.manage.any')
   ]);
-  if (!canAccess || (!canManageOwn && !canManageAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canManageOwn && !canManageAny) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const activityId = Number(id);
@@ -136,12 +135,11 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canManageOwn, canManageAny] = await Promise.all([
-    hasUserPermission(session.userId, 'activity.access'),
+  const [canManageOwn, canManageAny] = await Promise.all([
     hasUserPermission(session.userId, 'activity.manage.own'),
     hasUserPermission(session.userId, 'activity.manage.any')
   ]);
-  if (!canAccess || (!canManageOwn && !canManageAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canManageOwn && !canManageAny) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const activityId = Number(id);

@@ -309,12 +309,10 @@ with check (true);
 
 insert into public.permissions (name)
 values
-  ('transactions.access'),
   ('transactions.create'),
   ('transactions.manage.own'),
   ('transactions.manage.any'),
   ('transactions.recent.access'),
-  ('transactions.recent.create'),
   ('transactions.recent.manage.own'),
   ('transactions.recent.manage.any'),
   ('transactions.preview'),
@@ -427,9 +425,7 @@ with check (true);
 
 insert into public.permissions (name)
 values
-  ('activity.access'),
   ('activity.create'),
-  ('activity.view'),
   ('activity.stats.view'),
   ('activity.logs.view'),
   ('activity.manage.own'),
@@ -485,10 +481,7 @@ insert into public.permissions (name)
 values
   ('four.preview'),
   ('four.access'),
-  ('four.create'),
-  ('four.manage.own'),
-  ('four.manage.any'),
-  ('four.close'),
+  ('four.manage'),
   ('four.logs.view'),
   ('four.history.view')
 on conflict (name) do nothing;
@@ -519,31 +512,43 @@ delete from public.role_permissions
 where permission_id in (
   select id from public.permissions
   where name in (
+    'transactions.view',
     'transactions.edit',
     'transactions.manage',
     'transactions.recent.edit',
     'transactions.recent.cancel',
+    'activity.edit',
+    'activity.cancel',
     'activity.edit.own',
     'activity.edit.any',
     'activity.cancel.own',
     'activity.cancel.any',
     'four.open',
-    'four.manage'
+    'four.create',
+    'four.manage.own',
+    'four.manage.any',
+    'four.close'
   )
 );
 
 delete from public.permissions
 where name in (
+  'transactions.view',
   'transactions.edit',
   'transactions.manage',
   'transactions.recent.edit',
   'transactions.recent.cancel',
+  'activity.edit',
+  'activity.cancel',
   'activity.edit.own',
   'activity.edit.any',
   'activity.cancel.own',
   'activity.cancel.any',
   'four.open',
-  'four.manage'
+  'four.create',
+  'four.manage.own',
+  'four.manage.any',
+  'four.close'
 );
 
 insert into public.permissions (name)

@@ -20,7 +20,7 @@ export default async function ActivityStatsPage() {
   if (!session) redirect('/login');
 
   const permissions = await getUserPermissions(session.userId);
-  if (!permissions.includes('activity.access') || !permissions.includes('activity.stats.view')) redirect('/dashboard');
+  if (!permissions.includes('activity.stats.view')) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const [{ data }, { data: itemImages }] = await Promise.all([

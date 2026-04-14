@@ -34,10 +34,10 @@ export default async function DashboardPage() {
   const canItemsAccess = has('items.access');
   const canItemsPreview = canItemsAccess || has('items.preview');
 
-  const canTransactionsAccess = has('transactions.access');
+  const canTransactionsAccess = has('transactions.create') || has('transactions.manage.own') || has('transactions.manage.any');
   const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
 
-  const canTransactionsRecentAccess = has('transactions.recent.access') && canTransactionsAccess;
+  const canTransactionsRecentAccess = has('transactions.recent.access');
   const canTransactionsRecentPreview = canTransactionsRecentAccess || has('transactions.recent.preview');
 
   const canMembersAccess = has('members.access');
@@ -49,7 +49,7 @@ export default async function DashboardPage() {
   const canTabletAccess = has('tablet.access');
   const canTabletPreview = canTabletAccess || has('tablet.preview');
 
-  const canActivityAccess = has('activity.access');
+  const canActivityAccess = has('activity.create') || has('activity.manage.own') || has('activity.manage.any');
   const canActivityPreview = canActivityAccess || has('activity.preview');
 
   const canFourAccess = has('four.access');

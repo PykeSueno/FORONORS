@@ -48,10 +48,7 @@ export function FourPageClient({
   items,
   activeSession,
   history,
-  canCreate,
-  canManageOwn,
-  canManageAny,
-  canClose,
+  canManage,
   canViewHistory,
   canViewStats,
   canViewMessages,
@@ -62,10 +59,7 @@ export function FourPageClient({
   items: Item[];
   activeSession: FourSession | null;
   history: FourHistoryEntry[];
-  canCreate: boolean;
-  canManageOwn: boolean;
-  canManageAny: boolean;
-  canClose: boolean;
+  canManage: boolean;
   canViewHistory: boolean;
   canViewStats: boolean;
   canViewMessages: boolean;
@@ -90,10 +84,7 @@ export function FourPageClient({
   const [messages, setMessages] = useState<FourMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState({ id: 0, title: '', content: '', display_order: 100 });
 
-  const canManageSession = useMemo(() => {
-    if (!session) return false;
-    return canManageAny || (canManageOwn && session.managed_by === currentUserId);
-  }, [session, canManageAny, canManageOwn, currentUserId]);
+  const canManageSession = canManage;
 
   const selectedItem = useMemo(() => items.find((item) => item.id === itemId), [items, itemId]);
 
@@ -250,7 +241,7 @@ export function FourPageClient({
               <span className={`rounded-full px-3 py-1 text-xs ${session ? 'bg-[#83d89f]/20 text-[#c7f5d8]' : 'bg-[#e08f8f]/20 text-[#ffd4d4]'}`}>{session ? 'FOUR en cours' : 'FOUR fermé'}</span>
             </div>
             {session ? <p className="mt-2 text-sm text-[#f3d5b4]">Session #{session.id} · ouverte {new Date(session.opened_at).toLocaleString('fr-FR')}</p> : null}
-            {!session && canCreate ? (
+            {!session && canManage ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <select className="saas-input" value={openingMemberId} onChange={(event) => setOpeningMemberId(event.target.value)}>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select>
                 <button className="saas-primary-btn" onClick={() => void openSession()}>Ouvrir le FOUR</button>
@@ -341,7 +332,7 @@ export function FourPageClient({
                   })}
                 </div>
 
-                {canClose && canManageSession ? <button className="saas-ghost-btn" onClick={() => void closeSession()}>Clôturer la session FOUR</button> : null}
+                {canManageSession ? <button className="saas-ghost-btn" onClick={() => void closeSession()}>Clôturer la session FOUR</button> : null}
               </article>
 
               <article className="glass-card p-5 space-y-2">

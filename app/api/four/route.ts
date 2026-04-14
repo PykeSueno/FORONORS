@@ -40,7 +40,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const access = await ensureAccess('four.create');
+  const access = await ensureAccess('four.manage');
   if ('error' in access) return access.error;
 
   const supabase = getSupabaseAdmin();
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
   await createAuditLog({
     actorUserId: access.session.userId,
-    action: 'four.create',
+    action: 'four.manage',
     entityType: 'four_session',
     entityId: created.id,
     summary: `Ouverture session FOUR #${created.id}`,
@@ -71,17 +71,12 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const access = await ensureAccess('four.close');
+  const access = await ensureAccess('four.manage');
   if ('error' in access) return access.error;
 
   const body = (await request.json()) as { session_id?: number };
   const sessionId = Number(body.session_id);
   if (!sessionId) return NextResponse.json({ message: 'Session invalide.' }, { status: 400 });
-
-  const [canAny, canOwn] = await Promise.all([
-    hasUserPermission(access.session.userId, 'four.manage.any'),
-    hasUserPermission(access.session.userId, 'four.manage.own')
-  ]);
 
   const supabase = getSupabaseAdmin();
   const { data: session } = await supabase
@@ -91,10 +86,6 @@ export async function PATCH(request: Request) {
     .maybeSingle();
 
   if (!session || session.status !== 'open') return NextResponse.json({ message: 'Session introuvable ou déjà fermée.' }, { status: 404 });
-  if (!canAny && !(canOwn && session.managed_by === access.session.userId)) {
-    return NextResponse.json({ message: 'Vous pouvez clôturer uniquement votre session FOUR.' }, { status: 403 });
-  }
-
   const itemDelta = new Map<number, number>();
   let cashDelta = 0;
 
@@ -132,7 +123,7 @@ export async function PATCH(request: Request) {
 
   await createAuditLog({
     actorUserId: access.session.userId,
-    action: 'four.close',
+    action: 'four.manage',
     entityType: 'four_session',
     entityId: sessionId,
     summary: `Clôture session FOUR #${sessionId}`,
