@@ -14,6 +14,12 @@ type FourTx = { id: number; counterparty: string | null; total_purchases: number
 type FourSession = { id: number; status: 'open' | 'closed'; opened_at: string; summary?: Record<string, unknown> | null; four_transactions: FourTx[] };
 type FourHistory = { id: number; closed_at: string | null; summary?: Record<string, unknown> | null };
 type FourMessage = { id: number; title: string; content: string; display_order: number };
+type FourStats = {
+  totals: { sessions: number; purchases: number; sales: number; profit: number };
+  byMember: Record<string, { sessions: number; profit: number }>;
+  byCounterparty: Record<string, { purchases: number; sales: number; count: number }>;
+  sessions: Array<{ id: number; opened_at: string; closed_at: string | null }>;
+};
 
 export function FourPageClient({ members, items, activeSession, history, canOpen, canCashAdd, canManageTransaction, canValidateTransaction, canClose, canViewHistory, canViewStats, canViewMessages, canManageMessages, currentUserId }: {
   members: Member[];
@@ -42,7 +48,7 @@ export function FourPageClient({ members, items, activeSession, history, canOpen
   const [categoryFilter, setCategoryFilter] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'session' | 'stats' | 'messages'>('session');
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<FourStats | null>(null);
   const [messages, setMessages] = useState<FourMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState({ id: 0, title: '', content: '', display_order: 100 });
 

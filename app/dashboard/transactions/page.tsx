@@ -13,8 +13,6 @@ export default async function TransactionsPage() {
   const permissions = await getUserPermissions(session.userId);
   const canAccess = permissions.includes('transactions.access');
   const canCreate = permissions.includes('transactions.create');
-  const canManageOwn = permissions.includes('transactions.manage.own');
-  const canManageAny = permissions.includes('transactions.manage.any');
 
   if (!canAccess) redirect('/dashboard');
 
