@@ -15,27 +15,39 @@ export default function LoginPage() {
     event.preventDefault();
     setError('');
     setLoading(true);
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, remember })
+      });
 
-    const response = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, remember })
-    });
+      if (!response.ok) {
+        const data = (await response.json()) as { message?: string };
+        setError(data.message ?? 'Connexion impossible.');
+        setLoading(false);
+        return;
+      }
 
-    if (!response.ok) {
-      const data = (await response.json()) as { message?: string };
-      setError(data.message ?? 'Connexion impossible.');
+      const data = (await response.json()) as { sessionToken?: string };
+      if (data.sessionToken) {
+        try {
+          localStorage.setItem('foronors_session_token', data.sessionToken);
+          sessionStorage.setItem('foronors_session_token', data.sessionToken);
+        } catch {
+          // no-op for environments with restricted storage
+        }
+        document.cookie = `foronors_session=${encodeURIComponent(data.sessionToken)}; Path=/; Max-Age=${remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7}; SameSite=Lax`;
+      }
+
+      router.push('/dashboard');
+      router.refresh();
+    } catch {
+      setError('Connexion impossible. Vérifiez la connexion puis réessayez.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const data = (await response.json()) as { sessionToken?: string };
-    if (data.sessionToken) {
-      localStorage.setItem('foronors_session_token', data.sessionToken);
-    }
-
-    router.push('/dashboard');
-    router.refresh();
   }
 
   return (
@@ -44,12 +56,13 @@ export default function LoginPage() {
         className="pointer-events-none absolute inset-0 bg-center bg-no-repeat"
         style={{
           backgroundImage: "url('/foronors-logo.svg')",
-          backgroundSize: '70%',
-          opacity: 0.05,
-          filter: 'blur(16px)',
+          backgroundSize: 'min(76vw, 760px)',
+          opacity: 0.09,
+          filter: 'blur(10px)',
           transform: 'scale(1.1)'
         }}
       />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#2d1b11]/70 via-[#412819]/62 to-[#22130d]/78" />
 
       <div className="glass-card relative z-10 w-full max-w-md p-8">
         <h1 className="mb-6 text-center text-2xl font-semibold tracking-wide text-[#fff1dc]">FORONORS</h1>
@@ -73,7 +86,7 @@ export default function LoginPage() {
           </label>
 
           <button type="submit" disabled={loading} className="saas-primary-btn w-full disabled:opacity-70">
-            {loading ? 'Connexion...' : 'Se connecter'}
+            {loading ? 'Connexion...' : 'Connexion'}
           </button>
 
         </form>
