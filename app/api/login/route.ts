@@ -3,6 +3,7 @@ import { comparePassword, createSessionCookie, hashPassword } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 function logLogin(context: string, details?: unknown) {
+  if (process.env.AUTH_DEBUG !== '1') return;
   if (details !== undefined) {
     console.info(`[LOGIN] ${context}`, details);
     return;
@@ -37,6 +38,7 @@ async function ensureInitialPykeUser() {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { username?: string; password?: string; remember?: boolean };
+    logLogin('Tentative de connexion reçue', { username: body.username, remember: Boolean(body.remember) });
 
     if (!body.username || !body.password) {
       return NextResponse.json({ message: "Nom d'utilisateur et mot de passe requis." }, { status: 400 });
@@ -77,9 +79,11 @@ export async function POST(request: Request) {
     if (!isValidPassword) return NextResponse.json({ message: 'Mot de passe invalide.' }, { status: 401 });
 
     const sessionToken = await createSessionCookie(user, Boolean(body.remember));
+    logLogin('Connexion réussie', { userId: user.id, username: user.username, remember: Boolean(body.remember) });
 
     return NextResponse.json({ ok: true, redirectTo: '/dashboard', sessionToken, tokenType: 'Bearer' });
   } catch (error) {
+    logLogin('Erreur serveur login', error instanceof Error ? { message: error.message } : { unknown: true });
     if (error instanceof Error) {
       return NextResponse.json({ message: `Erreur serveur: ${error.message}` }, { status: 500 });
     }

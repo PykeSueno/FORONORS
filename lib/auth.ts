@@ -90,6 +90,13 @@ export async function getSession() {
   if (!token) {
     const cookieStore = await cookies();
     token = cookieStore.get(COOKIE_NAME)?.value ?? '';
+    if (token) {
+      try {
+        token = decodeURIComponent(token);
+      } catch {
+        // keep raw token if it is not URI-encoded
+      }
+    }
   }
 
   if (!token) return null;

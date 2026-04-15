@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const authDebug = process.env.NEXT_PUBLIC_AUTH_DEBUG === '1';
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -16,16 +17,20 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
+      if (authDebug) console.info('[LOGIN:UI] click', { username, remember });
       const response = await fetch('/api/login', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, remember })
       });
+      if (authDebug) console.info('[LOGIN:UI] response', { status: response.status });
 
       if (!response.ok) {
         const data = (await response.json()) as { message?: string };
-        setError(data.message ?? 'Connexion impossible.');
+        if (response.status === 401) setError('Identifiant ou mot de passe incorrect.');
+        else if (response.status === 403) setError('Compte inactif ou accès refusé.');
+        else setError(data.message ?? 'Connexion impossible.');
         setLoading(false);
         return;
       }
@@ -43,8 +48,9 @@ export default function LoginPage() {
 
       router.push('/dashboard');
       router.refresh();
+      if (authDebug) console.info('[LOGIN:UI] redirection dashboard');
     } catch {
-      setError('Connexion impossible. Vérifiez la connexion puis réessayez.');
+      setError('Impossible de joindre le serveur depuis cet environnement (réseau FiveM / API).');
     } finally {
       setLoading(false);
     }
