@@ -211,6 +211,24 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
     }
   }
 
+  async function copyTabletAccessMessage() {
+    const passwordValue = newPassword || currentPassword;
+    if (!draft.username || !passwordValue) {
+      setCopyFeedback('User/MDP manquant');
+      setTimeout(() => setCopyFeedback(''), 1200);
+      return;
+    }
+    const message = `Voici le lien de la tablette : https://foronors.vercel.app/\n\nFait un clic drpoot sur ta tablette IG et colle cette url pour acceder directement en jeu\n\nVoici tes identifgients :\n\nUser ; ${draft.username}\n\nMDP ; ${passwordValue}\n\nSi tu veux cvhanger en haut a doite clic sur la clee a cotee de deconnexion pour changer ton mdp si tu le souhaite`;
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopyFeedback('Message copié');
+      setTimeout(() => setCopyFeedback(''), 1300);
+    } catch {
+      setCopyFeedback('Échec copie');
+      setTimeout(() => setCopyFeedback(''), 1300);
+    }
+  }
+
   async function save() {
     const response = await fetch(isCreateMode ? '/api/members' : `/api/members/${draft.id}`, {
       method: isCreateMode ? 'POST' : 'PATCH',
@@ -277,6 +295,7 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
           ) : null}
 
           <div className="flex flex-wrap justify-end gap-2 pt-2">
+            {!isCreateMode && canCopyPassword ? <button className="saas-ghost-btn" onClick={() => void copyTabletAccessMessage()}>Copier</button> : null}
             {!isCreateMode && canDelete ? <button className="saas-ghost-btn" onClick={() => void remove()}>Supprimer</button> : null}
             <button className="saas-primary-btn" onClick={() => void save()}>Enregistrer</button>
           </div>

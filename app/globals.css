@@ -26,8 +26,8 @@ body::before {
   background-position: center;
   background-size: min(78vw, 900px);
   background-repeat: no-repeat;
-  opacity: 0.07;
-  filter: blur(14px) saturate(0.85);
+  opacity: 0.06;
+  filter: blur(8px) saturate(0.85);
   transform: scale(1.08);
   pointer-events: none;
   z-index: 0;
@@ -56,10 +56,10 @@ button {
 
 .glass-card {
   border-radius: 20px;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(6px);
   background: rgba(82, 53, 33, 0.58);
   border: 1px solid rgba(255, 245, 231, 0.16);
-  box-shadow: 0 12px 35px rgba(48, 26, 13, 0.2);
+  box-shadow: 0 8px 24px rgba(48, 26, 13, 0.18);
 }
 
 .smooth-hover {
@@ -68,7 +68,7 @@ button {
 
 .smooth-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 36px rgba(50, 27, 14, 0.28), 0 0 18px rgba(195, 143, 95, 0.22);
+  box-shadow: 0 12px 26px rgba(50, 27, 14, 0.22), 0 0 10px rgba(195, 143, 95, 0.16);
 }
 
 .saas-input {

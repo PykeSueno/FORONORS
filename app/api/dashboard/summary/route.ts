@@ -1,0 +1,69 @@
+import { NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth';
+import { getUserPermissions } from '@/lib/permissions';
+import { getSupabaseAdmin } from '@/lib/supabase';
+
+export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+
+  const permissions = await getUserPermissions(session.userId);
+  const has = (perm: string) => permissions.includes(perm);
+
+  const canMoneyAccess = has('money.access');
+  const canMoneyPreview = canMoneyAccess || has('money.preview');
+
+  const canItemsAccess = has('items.access');
+  const canItemsPreview = canItemsAccess || has('items.preview');
+
+  const canTransactionsAccess = has('transactions.access');
+  const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
+
+  const canTransactionsRecentAccess = has('transactions.recent.access');
+  const canTransactionsRecentPreview = canTransactionsRecentAccess || has('transactions.recent.preview');
+
+  const canMembersAccess = has('members.access');
+  const canMembersPreview = canMembersAccess || has('members.preview');
+
+  const canLogsAccess = has('logs.access');
+  const canLogsPreview = canLogsAccess || has('logs.preview');
+
+  const canTabletAccess = has('tablet.access');
+  const canTabletPreview = canTabletAccess || has('tablet.preview');
+
+  const canActivityAccess = has('activity.access');
+  const canActivityPreview = canActivityAccess || has('activity.preview');
+
+  const canFourAccess = has('four.access');
+  const canFourPreview = canFourAccess || has('four.preview');
+
+  const canShowMoneyMovements = has('dashboard.money.movements.access') || has('dashboard.money.movements.preview') || canMoneyPreview;
+  const canShowStockMovements = has('dashboard.stock.movements.access') || has('dashboard.stock.movements.preview') || canItemsPreview;
+
+  const supabase = getSupabaseAdmin();
+  const [{ data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: fourActive }] = await Promise.all([
+    canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
+    canItemsPreview ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canMembersPreview ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canLogsPreview ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canShowMoneyMovements ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
+    canShowStockMovements ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
+    canFourPreview ? supabase.from('four_sessions').select('id, status').eq('status', 'open').order('opened_at', { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null })
+  ]);
+
+  return NextResponse.json({
+    canShowMoneyMovements,
+    canShowStockMovements,
+    values: {
+      cashBalance: Number(cash?.balance ?? 0),
+      itemsCount: itemsCount ?? 0,
+      txCount: txCount ?? 0,
+      membersCount: membersCount ?? 0,
+      logsCount: logsCount ?? 0,
+      fourOpen: Boolean(fourActive)
+    },
+    recentCash: recentCash ?? [],
+    recentStock: recentStock ?? []
+  });
+}
