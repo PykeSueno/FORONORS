@@ -174,6 +174,7 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState('');
+  const [copyFallbackText, setCopyFallbackText] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 
@@ -199,16 +200,48 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
     setNewPassword(value);
   }
 
+  async function copyTextRobust(text: string, successMessage: string) {
+    setCopyFallbackText('');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback(successMessage);
+      setTimeout(() => setCopyFeedback(''), 1400);
+      return true;
+    } catch {
+      // clipboard API unavailable (notably in some FiveM webviews)
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', 'true');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      textarea.style.pointerEvents = 'none';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (ok) {
+        setCopyFeedback(successMessage);
+        setTimeout(() => setCopyFeedback(''), 1400);
+        return true;
+      }
+    } catch {
+      // ignored: fallback below
+    }
+
+    setCopyFallbackText(text);
+    setCopyFeedback('Copie directe impossible, texte affiché ci-dessous.');
+    setTimeout(() => setCopyFeedback(''), 2400);
+    return false;
+  }
+
   async function copyCurrentPassword() {
     if (!currentPassword) return;
-    try {
-      await navigator.clipboard.writeText(currentPassword);
-      setCopyFeedback('Copié');
-      setTimeout(() => setCopyFeedback(''), 1200);
-    } catch {
-      setCopyFeedback('Échec');
-      setTimeout(() => setCopyFeedback(''), 1200);
-    }
+    await copyTextRobust(currentPassword, 'Mot de passe copié');
   }
 
   async function copyTabletAccessMessage() {
@@ -219,14 +252,14 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
       return;
     }
     const message = `Voici le lien de la tablette : https://foronors.vercel.app/\n\nFait un clic drpoot sur ta tablette IG et colle cette url pour acceder directement en jeu\n\nVoici tes identifgients :\n\nUser ; ${draft.username}\n\nMDP ; ${passwordValue}\n\nSi tu veux cvhanger en haut a doite clic sur la clee a cotee de deconnexion pour changer ton mdp si tu le souhaite`;
-    try {
-      await navigator.clipboard.writeText(message);
-      setCopyFeedback('Message copié');
-      setTimeout(() => setCopyFeedback(''), 1300);
-    } catch {
-      setCopyFeedback('Échec copie');
-      setTimeout(() => setCopyFeedback(''), 1300);
-    }
+    await copyTextRobust(message, 'Identifiants copiés');
+  }
+
+  function selectAllFallbackText() {
+    const el = document.getElementById(`fallback-copy-${draft.id || 'new'}`) as HTMLTextAreaElement | null;
+    if (!el) return;
+    el.focus();
+    el.select();
   }
 
   async function save() {
@@ -299,6 +332,21 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
             {!isCreateMode && canDelete ? <button className="saas-ghost-btn" onClick={() => void remove()}>Supprimer</button> : null}
             <button className="saas-primary-btn" onClick={() => void save()}>Enregistrer</button>
           </div>
+
+          {copyFallbackText ? (
+            <div className="rounded-xl border border-white/10 bg-[#4a2f20]/55 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs text-[#efcdab]">Copie manuelle (fallback)</p>
+                <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={selectAllFallbackText}>Sélectionner tout</button>
+              </div>
+              <textarea
+                id={`fallback-copy-${draft.id || 'new'}`}
+                className="saas-input h-36 w-full resize-none text-xs leading-relaxed"
+                readOnly
+                value={copyFallbackText}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
