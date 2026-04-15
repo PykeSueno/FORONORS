@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -11,6 +11,39 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function restoreSession() {
+      try {
+        const token = localStorage.getItem('foronors_session_token') || sessionStorage.getItem('foronors_session_token');
+        if (!token) return;
+        const response = await fetch('/api/session/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({ remember: true })
+        });
+        if (!response.ok) return;
+        const data = (await response.json()) as { sessionToken?: string };
+        if (data.sessionToken) {
+          localStorage.setItem('foronors_session_token', data.sessionToken);
+          sessionStorage.setItem('foronors_session_token', data.sessionToken);
+          document.cookie = `foronors_session=${encodeURIComponent(data.sessionToken)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+        }
+        if (!cancelled) {
+          router.replace('/dashboard');
+          router.refresh();
+        }
+      } catch {
+        // ignore restore errors on login page
+      } finally {
+        if (!cancelled) setRestoring(false);
+      }
+    }
+    void restoreSession();
+    return () => { cancelled = true; };
+  }, [router]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,13 +118,14 @@ export default function LoginPage() {
           />
 
           {error ? <p className="text-sm text-red-100">{error}</p> : null}
+          {restoring ? <p className="text-xs text-[#f4d4ae]">Restauration de session…</p> : null}
 
           <label className="flex items-center gap-2 text-sm text-[#f4d4ae]">
             <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
             Rester connecté
           </label>
 
-          <button type="submit" disabled={loading} className="saas-primary-btn w-full disabled:opacity-70">
+          <button type="submit" disabled={loading || restoring} className="saas-primary-btn w-full disabled:opacity-70">
             {loading ? 'Connexion...' : 'Connexion'}
           </button>
 

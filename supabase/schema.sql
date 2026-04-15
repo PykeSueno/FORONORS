@@ -80,6 +80,7 @@ values
   ('members.view'),
   ('members.password.view'),
   ('members.password.copy'),
+  ('members.credentials.copy'),
   ('members.password.edit'),
   ('account.password.update'),
   ('roles.manage'),

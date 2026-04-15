@@ -45,6 +45,7 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'members.activities.view': { module: 'Membres', label: 'Voir les activités d’un membre', hint: 'Ouvrir la page activités d’un membre.' },
   'members.password.view': { module: 'Membres', label: 'Voir le mot de passe membre', hint: 'Afficher le mot de passe membre.' },
   'members.password.copy': { module: 'Membres', label: 'Copier le mot de passe membre', hint: 'Copier le mot de passe membre.' },
+  'members.credentials.copy': { module: 'Membres', label: 'Copier les identifiants membre', hint: 'Copier le message complet d’accès tablette (user + mot de passe).' },
   'members.password.edit': { module: 'Membres', label: 'Modifier le mot de passe membre', hint: 'Modifier le mot de passe membre.' },
   'roles.manage': { module: 'Membres', label: 'Gérer rôles et permissions', hint: 'Créer/modifier les rôles et leurs permissions.' },
 

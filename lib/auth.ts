@@ -75,6 +75,12 @@ export async function clearSessionCookie() {
   cookieStore.delete(COOKIE_NAME);
 }
 
+export async function restoreSessionFromToken(token: string, remember = true) {
+  const { payload } = await jwtVerify(token, getSecret());
+  const session = payload as SessionPayload;
+  return createSessionCookie({ id: session.sub, username: session.username, role: session.role }, remember);
+}
+
 export async function getSession() {
   const headerStore = await headers();
   const authorization = headerStore.get('authorization');

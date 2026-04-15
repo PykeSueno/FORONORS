@@ -7,10 +7,12 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canView, canCopy] = await Promise.all([
+  const [canView, canCopyPassword, canCopyCredentials] = await Promise.all([
     hasUserPermission(session.userId, 'members.password.view'),
-    hasUserPermission(session.userId, 'members.password.copy')
+    hasUserPermission(session.userId, 'members.password.copy'),
+    hasUserPermission(session.userId, 'members.credentials.copy')
   ]);
+  const canCopy = canCopyPassword || canCopyCredentials;
 
   if (!canView && !canCopy) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 

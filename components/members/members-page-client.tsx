@@ -22,6 +22,37 @@ type MembersPageClientProps = {
   userPermissions: string[];
 };
 
+function buildCredentialsMessage(username: string, password: string) {
+  return `Voici le lien de la tablette : https://foronors.vercel.app/\n\nFais un glisser-déposer sur ta tablette IG puis colle cette URL pour y accéder directement en jeu.\n\nVoici tes identifiants :\n\nUser : ${username}\n\nMDP : ${password}\n\nSi tu veux changer ton mot de passe, clique sur la clé en haut à droite, à côté du bouton de déconnexion.`;
+}
+
+async function tryCopyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // clipboard API unavailable (common in restricted webviews)
+  }
+
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', 'true');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.pointerEvents = 'none';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 export function MembersPageClient({ initialMembers, initialRoles, initialPermissions, userPermissions }: MembersPageClientProps) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [roles, setRoles] = useState<Role[]>(initialRoles);
@@ -30,6 +61,8 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [newRoleName, setNewRoleName] = useState('');
   const [error, setError] = useState('');
+  const [copyFeedback, setCopyFeedback] = useState('');
+  const [copyFallbackText, setCopyFallbackText] = useState('');
 
   const canCreateMember = userPermissions.includes('members.create');
   const canEditMembers = userPermissions.includes('members.edit');
@@ -38,6 +71,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const canViewActivities = userPermissions.includes('members.activities.view');
   const canViewMemberPassword = userPermissions.includes('members.password.view');
   const canCopyMemberPassword = userPermissions.includes('members.password.copy');
+  const canCopyCredentials = userPermissions.includes('members.credentials.copy');
   const canEditMemberPassword = userPermissions.includes('members.password.edit');
 
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
@@ -84,6 +118,43 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
     await refreshAll();
   }
 
+  async function copyMemberCredentials(member: Member) {
+    setCopyFallbackText('');
+    setCopyFeedback('');
+    const response = await fetch(`/api/members/${member.id}/password`, { cache: 'no-store' });
+    if (!response.ok) {
+      setCopyFeedback('Impossible de récupérer les identifiants.');
+      setTimeout(() => setCopyFeedback(''), 2000);
+      return;
+    }
+    const data = (await response.json()) as { password?: string };
+    const password = data.password ?? '';
+    if (!member.username || !password) {
+      setCopyFeedback('Identifiants incomplets.');
+      setTimeout(() => setCopyFeedback(''), 1800);
+      return;
+    }
+
+    const text = buildCredentialsMessage(member.username, password);
+    const copied = await tryCopyText(text);
+    if (copied) {
+      setCopyFeedback('Identifiants copiés');
+      setTimeout(() => setCopyFeedback(''), 1600);
+      return;
+    }
+
+    setCopyFallbackText(text);
+    setCopyFeedback('Copie directe impossible, texte affiché ci-dessous');
+    setTimeout(() => setCopyFeedback(''), 2400);
+  }
+
+  function selectAllFallbackText() {
+    const el = document.getElementById('member-credentials-fallback') as HTMLTextAreaElement | null;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }
+
   return (
     <div className="space-y-6">
       <div className="glass-card p-5">
@@ -94,6 +165,16 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
       </div>
 
       {error ? <p className="rounded-xl border border-red-300/45 bg-red-500/10 px-4 py-2 text-sm text-red-100">{error}</p> : null}
+      {copyFeedback ? <p className="rounded-xl border border-white/10 bg-[#4a2f20]/45 px-4 py-2 text-sm text-[#efcdab]">{copyFeedback}</p> : null}
+      {copyFallbackText ? (
+        <section className="glass-card p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs text-[#efcdab]">Copie manuelle</p>
+            <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={selectAllFallbackText}>Sélectionner tout</button>
+          </div>
+          <textarea id="member-credentials-fallback" className="saas-input h-36 w-full resize-none text-xs leading-relaxed" readOnly value={copyFallbackText} />
+        </section>
+      ) : null}
 
       <section className="glass-card p-5">
         <h2 className="text-lg font-semibold text-[#fff0d9]">Membres</h2>
@@ -106,6 +187,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
                 <div><p className="text-[#ffe2c1]/80">Rôle</p><p className="font-medium text-[#fff3df]">{member.role_name || 'Sans rôle'}</p></div>
               </div>
               <div className="flex items-center gap-2">
+                {canCopyCredentials ? <button className="saas-ghost-btn" onClick={() => void copyMemberCredentials(member)}>Copier</button> : null}
                 {canViewActivities ? <Link href={`/dashboard/membres/${member.id}/activites`} className="saas-ghost-btn">Activités</Link> : null}
                 {(canEditMembers || canDeleteMembers) ? <button className="saas-ghost-btn" onClick={() => setSelectedMember(member)}>Gérer</button> : null}
               </div>
@@ -142,6 +224,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
           canDelete={canDeleteMembers}
           canViewPassword={canViewMemberPassword}
           canCopyPassword={canCopyMemberPassword}
+          canCopyCredentials={canCopyCredentials}
           canEditPassword={canEditMemberPassword}
           isCreateMode={!selectedMember.id}
           onClose={() => setSelectedMember(null)}
@@ -169,7 +252,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   );
 }
 
-function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyPassword, canEditPassword, isCreateMode, onClose, onSaved, onError }: { member: Member; roles: Role[]; canDelete: boolean; canViewPassword: boolean; canCopyPassword: boolean; canEditPassword: boolean; isCreateMode: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
+function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyPassword, canCopyCredentials, canEditPassword, isCreateMode, onClose, onSaved, onError }: { member: Member; roles: Role[]; canDelete: boolean; canViewPassword: boolean; canCopyPassword: boolean; canCopyCredentials: boolean; canEditPassword: boolean; isCreateMode: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
   const [draft, setDraft] = useState(member);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -180,7 +263,7 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
 
   useEffect(() => {
     async function loadCurrentPassword() {
-      if (isCreateMode || !member.id || (!canViewPassword && !canCopyPassword)) {
+      if (isCreateMode || !member.id || (!canViewPassword && !canCopyPassword && !canCopyCredentials)) {
         setCurrentPassword('');
         return;
       }
@@ -192,7 +275,7 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
     }
 
     void loadCurrentPassword();
-  }, [isCreateMode, member.id, canViewPassword, canCopyPassword]);
+  }, [isCreateMode, member.id, canViewPassword, canCopyPassword, canCopyCredentials]);
 
   function generatePassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -202,35 +285,11 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
 
   async function copyTextRobust(text: string, successMessage: string) {
     setCopyFallbackText('');
-    try {
-      await navigator.clipboard.writeText(text);
+    const copied = await tryCopyText(text);
+    if (copied) {
       setCopyFeedback(successMessage);
       setTimeout(() => setCopyFeedback(''), 1400);
       return true;
-    } catch {
-      // clipboard API unavailable (notably in some FiveM webviews)
-    }
-
-    try {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.setAttribute('readonly', 'true');
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      textarea.style.pointerEvents = 'none';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(textarea);
-      if (ok) {
-        setCopyFeedback(successMessage);
-        setTimeout(() => setCopyFeedback(''), 1400);
-        return true;
-      }
-    } catch {
-      // ignored: fallback below
     }
 
     setCopyFallbackText(text);
@@ -251,7 +310,7 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
       setTimeout(() => setCopyFeedback(''), 1200);
       return;
     }
-    const message = `Voici le lien de la tablette : https://foronors.vercel.app/\n\nFait un clic drpoot sur ta tablette IG et colle cette url pour acceder directement en jeu\n\nVoici tes identifgients :\n\nUser ; ${draft.username}\n\nMDP ; ${passwordValue}\n\nSi tu veux cvhanger en haut a doite clic sur la clee a cotee de deconnexion pour changer ton mdp si tu le souhaite`;
+    const message = buildCredentialsMessage(draft.username, passwordValue);
     await copyTextRobust(message, 'Identifiants copiés');
   }
 
@@ -328,7 +387,7 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
           ) : null}
 
           <div className="flex flex-wrap justify-end gap-2 pt-2">
-            {!isCreateMode && canCopyPassword ? <button className="saas-ghost-btn" onClick={() => void copyTabletAccessMessage()}>Copier</button> : null}
+            {!isCreateMode && canCopyCredentials ? <button className="saas-ghost-btn" onClick={() => void copyTabletAccessMessage()}>Copier</button> : null}
             {!isCreateMode && canDelete ? <button className="saas-ghost-btn" onClick={() => void remove()}>Supprimer</button> : null}
             <button className="saas-primary-btn" onClick={() => void save()}>Enregistrer</button>
           </div>
