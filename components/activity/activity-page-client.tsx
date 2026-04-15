@@ -24,6 +24,7 @@ type RecentActivity = {
     after_quantity: number;
     item_image_url?: string | null;
   }>;
+  activity_members?: Array<{ member_user_id: string | null; member_label: string }>;
 };
 
 type Line = { item_id: number; quantity: number };
@@ -47,8 +48,8 @@ const ACTIVITY_META: Record<ActivityType, { label: string; icon: string; subtitl
 
 export function ActivityPageClient({ items, members, activities, defaultMemberId, defaultMemberLabel, canCreate, canViewRecent, canManageOwn, canManageAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; defaultMemberLabel: string; canCreate: boolean; canViewRecent: boolean; canManageOwn: boolean; canManageAny: boolean; currentUserId: string }) {
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
-  const [memberId, setMemberId] = useState(defaultMemberId);
-  const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(defaultMemberId ? [defaultMemberId] : []);
+  const [memberLabel, setMemberLabel] = useState(defaultMemberLabel || 'Groupe');
   const [equipmentUsed, setEquipmentUsed] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
   const [proofImageUrl, setProofImageUrl] = useState('');
@@ -128,13 +129,19 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
       return;
     }
 
+    const selectedMembers = members.filter((entry) => selectedMemberIds.includes(entry.id));
+    const memberLabels = selectedMembers.map((entry) => entry.name || entry.username);
+    const mergedLabel = memberLabels.length > 0 ? memberLabels.join(' + ') : 'Groupe';
+
     const response = await fetch('/api/activity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         activity_type: activityType,
-        member_user_id: memberId,
-        member_label: memberLabel,
+        member_user_id: selectedMemberIds[0] || null,
+        member_user_ids: selectedMemberIds,
+        member_labels: memberLabels,
+        member_label: mergedLabel,
         equipment_used: activityType === 'mailbox' ? 0 : equipmentUsed,
         proof_image_url: proofImageUrl || null,
         lines
@@ -167,10 +174,32 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
           <section className="glass-card p-5" onPaste={(e) => void onPaste(e)}>
             <h3 className="text-base font-semibold text-[#fff1dd]">A. Session activité</h3>
           <label className="mt-3 block text-xs text-[#efccaa]">Membre</label>
-          <select className="saas-input mt-1 w-full" value={memberId} onChange={(e) => { setMemberId(e.target.value); const m = members.find((entry) => entry.id === e.target.value); setMemberLabel(m ? (m.name || m.username) : 'Groupe'); }}>
-            <option value="">Groupe</option>
-            {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
-          </select>
+          <div className="mt-1 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">
+            <button className={`filter-pill ${selectedMemberIds.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => { setSelectedMemberIds([]); setMemberLabel('Groupe'); }}>Groupe</button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {members.map((member) => {
+                const selected = selectedMemberIds.includes(member.id);
+                return (
+                  <button
+                    key={member.id}
+                    className={`filter-pill ${selected ? 'filter-pill-active' : ''}`}
+                    onClick={() => {
+                      setSelectedMemberIds((current) => {
+                        const exists = current.includes(member.id);
+                        const next = exists ? current.filter((id) => id !== member.id) : [...current, member.id];
+                        const labels = members.filter((entry) => next.includes(entry.id)).map((entry) => entry.name || entry.username);
+                        setMemberLabel(labels.length > 0 ? labels.join(' + ') : 'Groupe');
+                        return next;
+                      });
+                    }}
+                  >
+                    {member.name || member.username}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-[#efcdab]">Sélection: {memberLabel || 'Groupe'}</p>
+          </div>
 
           {activityType !== 'mailbox' ? (
             <>
@@ -274,7 +303,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
         <div className="mt-2 space-y-2">
           {activities.map((activity) => (
             <article key={activity.id} className="rounded-xl border border-white/10 bg-[#4f3220]/55 p-3 text-sm text-[#f3d4b0]">
-              <p className="font-medium">👤 {activity.member_label} — {ACTIVITY_META[activity.activity_type].label} — {new Date(activity.created_at).toLocaleString('fr-FR')}</p>
+              <p className="font-medium">👤 {(activity.activity_members ?? []).length > 0 ? activity.activity_members?.map((entry) => entry.member_label).join(' + ') : activity.member_label} — {ACTIVITY_META[activity.activity_type].label} — {new Date(activity.created_at).toLocaleString('fr-FR')}</p>
               {activity.equipment_item_name ? <p>🧰 {activity.equipment_item_name}: {activity.equipment_before} → {activity.equipment_after} (utilisé {activity.equipment_used})</p> : <p>🧰 Aucun équipement requis</p>}
               <div className="mt-2 space-y-1 text-xs text-[#f1cfaa]">
                 {activity.activity_items.map((line, index) => (

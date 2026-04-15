@@ -17,6 +17,7 @@ type DashboardFlags = {
   canTabletAccess: boolean; canTabletPreview: boolean;
   canActivityAccess: boolean; canActivityPreview: boolean;
   canFourAccess: boolean; canFourPreview: boolean;
+  canDrugsAccess: boolean; canDrugsPreview: boolean;
 };
 
 type SummaryPayload = {
@@ -47,7 +48,8 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
     flags.canLogsPreview ? { id: 'logs', href: '/dashboard/logs', enabled: flags.canLogsAccess, icon: '🧾', title: 'Logs', value: summary ? String(summary.values.logsCount) : '…', subtitle: 'Traçabilité' } : null,
     flags.canTabletPreview ? { id: 'tablet', href: '/dashboard/tablette', enabled: flags.canTabletAccess, icon: '📱', title: 'Tablette', value: 'Module', subtitle: 'Passages 8h → 8h' } : null,
     flags.canActivityPreview ? { id: 'activity', href: '/dashboard/activite', enabled: flags.canActivityAccess, icon: '🎯', title: 'Activité', value: 'Module', subtitle: 'Boîte / Cambriolage / Conteneur' } : null,
-    flags.canFourPreview ? { id: 'four', href: '/dashboard/four', enabled: flags.canFourAccess, icon: '🔥', title: 'FOUR', value: summary ? (summary.values.fourOpen ? 'Ouvert' : 'Fermé') : '…', subtitle: 'Session vente / achat' } : null
+    flags.canFourPreview ? { id: 'four', href: '/dashboard/four', enabled: flags.canFourAccess, icon: '🔥', title: 'FOUR', value: summary ? (summary.values.fourOpen ? 'Ouvert' : 'Fermé') : '…', subtitle: 'Session vente / achat' } : null,
+    flags.canDrugsPreview ? { id: 'drugs', href: '/dashboard/drogues', enabled: flags.canDrugsAccess, icon: '🧪', title: 'Drogues', value: 'Module', subtitle: 'Transfo + vente' } : null
   ].filter(Boolean) as Card[], [flags, summary]);
 
   const stockRows = useMemo(() => (summary?.recentStock ?? []).map((row) => ({

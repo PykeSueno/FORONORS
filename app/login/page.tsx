@@ -103,6 +103,12 @@ export default function LoginPage() {
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#2d1b11]/70 via-[#412819]/62 to-[#22130d]/78" />
 
+      {restoring ? (
+        <div className="glass-card relative z-10 w-full max-w-md p-8 text-center">
+          <h1 className="text-2xl font-semibold tracking-wide text-[#fff1dc]">FORONORS</h1>
+          <p className="mt-3 text-sm text-[#f4d4ae]">Chargement de la session…</p>
+        </div>
+      ) : (
       <div className="glass-card relative z-10 w-full max-w-md p-8">
         <h1 className="mb-6 text-center text-2xl font-semibold tracking-wide text-[#fff1dc]">FORONORS</h1>
 
@@ -118,7 +124,6 @@ export default function LoginPage() {
           />
 
           {error ? <p className="text-sm text-red-100">{error}</p> : null}
-          {restoring ? <p className="text-xs text-[#f4d4ae]">Restauration de session…</p> : null}
 
           <label className="flex items-center gap-2 text-sm text-[#f4d4ae]">
             <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
@@ -131,6 +136,7 @@ export default function LoginPage() {
 
         </form>
       </div>
+      )}
     </main>
   );
 }

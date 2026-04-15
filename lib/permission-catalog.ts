@@ -1,4 +1,4 @@
-export const MODULE_ORDER = ['Dashboard', 'Argent', 'Items', 'Transactions', 'Transactions récentes', 'Logs', 'Membres', 'Activité', 'Tablette', 'FOUR', 'Compte', 'Autres'] as const;
+export const MODULE_ORDER = ['Dashboard', 'Argent', 'Items', 'Transactions', 'Transactions récentes', 'Logs', 'Membres', 'Activité', 'Tablette', 'FOUR', 'Drogues', 'Compte', 'Autres'] as const;
 
 export const PERMISSION_LABELS: Record<string, { module: string; label: string; hint: string }> = {
   'dashboard.preview': { module: 'Dashboard', label: 'Voir le dashboard', hint: 'Afficher le dashboard.' },
@@ -78,6 +78,27 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'four.messages.view': { module: 'FOUR', label: 'Voir les messages FOUR', hint: 'Afficher les messages prédéfinis FOUR.' },
   'four.messages.manage': { module: 'FOUR', label: 'Gérer les messages FOUR', hint: 'Créer/modifier/supprimer les messages FOUR.' },
   'four.logs.view': { module: 'FOUR', label: 'Voir les logs FOUR', hint: 'Afficher les logs FOUR.' },
+
+  'drugs.preview': { module: 'Drogues', label: 'Voir la bulle Drogues', hint: 'Afficher la bulle Drogues.' },
+  'drugs.access': { module: 'Drogues', label: 'Accéder à Drogues', hint: 'Entrer dans le module Drogues.' },
+  'drugs.transfo.view': { module: 'Drogues', label: 'Voir les transfos', hint: 'Afficher les sessions de transformation.' },
+  'drugs.transfo.create': { module: 'Drogues', label: 'Créer une transfo', hint: 'Créer une session de transfo.' },
+  'drugs.transfo.validate': { module: 'Drogues', label: 'Valider une transfo', hint: 'Valider la réception de transfo.' },
+  'drugs.transfo.cancel.own': { module: 'Drogues', label: 'Annuler sa transfo', hint: 'Annuler une transfo créée par soi.' },
+  'drugs.transfo.cancel.any': { module: 'Drogues', label: 'Annuler toutes les transfos', hint: 'Annuler n’importe quelle transfo.' },
+  'drugs.transfo.edit.own': { module: 'Drogues', label: 'Modifier sa transfo', hint: 'Modifier une transfo créée par soi.' },
+  'drugs.transfo.edit.any': { module: 'Drogues', label: 'Modifier toutes les transfos', hint: 'Modifier n’importe quelle transfo.' },
+  'drugs.transfo.logs.view': { module: 'Drogues', label: 'Voir les logs transfo', hint: 'Afficher les logs des transfos.' },
+  'drugs.transfo.stats.view': { module: 'Drogues', label: 'Voir stats transfo', hint: 'Afficher les statistiques transfo.' },
+  'drugs.sales.preview': { module: 'Drogues', label: 'Voir vente drogue', hint: 'Afficher la partie ventes drogue.' },
+  'drugs.sales.view': { module: 'Drogues', label: 'Voir ventes drogue', hint: 'Afficher les ventes drogue.' },
+  'drugs.sales.create': { module: 'Drogues', label: 'Créer vente drogue', hint: 'Créer une session de vente drogue.' },
+  'drugs.sales.edit.own': { module: 'Drogues', label: 'Modifier sa vente drogue', hint: 'Modifier ses ventes drogue.' },
+  'drugs.sales.edit.any': { module: 'Drogues', label: 'Modifier toutes les ventes drogue', hint: 'Modifier toutes les ventes drogue.' },
+  'drugs.sales.cancel.own': { module: 'Drogues', label: 'Annuler sa vente drogue', hint: 'Annuler ses ventes drogue.' },
+  'drugs.sales.cancel.any': { module: 'Drogues', label: 'Annuler toutes les ventes drogue', hint: 'Annuler toutes les ventes drogue.' },
+  'drugs.sales.logs.view': { module: 'Drogues', label: 'Voir logs vente drogue', hint: 'Afficher les logs des ventes drogue.' },
+  'drugs.sales.stats.view': { module: 'Drogues', label: 'Voir stats vente drogue', hint: 'Afficher les statistiques vente drogue.' },
 
   'account.password.update': { module: 'Compte', label: 'Modifier son mot de passe', hint: 'Modifier son mot de passe.' }
 };

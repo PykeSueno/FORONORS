@@ -3,7 +3,7 @@ import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { DashboardShellClient } from '@/components/dashboard/dashboard-shell-client';
 
-const DEFAULT_ORDER = ['money', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'activity', 'four'];
+const DEFAULT_ORDER = ['money', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'activity', 'four', 'drugs'];
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -28,6 +28,8 @@ export default async function DashboardPage() {
   const canActivityPreview = canActivityAccess || has('activity.preview');
   const canFourAccess = has('four.access');
   const canFourPreview = canFourAccess || has('four.preview');
+  const canDrugsAccess = has('drugs.access');
+  const canDrugsPreview = canDrugsAccess || has('drugs.preview');
   const canUpdatePassword = has('account.password.update');
 
   const supabase = getSupabaseAdmin();
@@ -52,7 +54,8 @@ export default async function DashboardPage() {
         canLogsAccess, canLogsPreview,
         canTabletAccess, canTabletPreview,
         canActivityAccess, canActivityPreview,
-        canFourAccess, canFourPreview
+        canFourAccess, canFourPreview,
+        canDrugsAccess, canDrugsPreview
       }}
     />
   );

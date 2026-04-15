@@ -25,6 +25,7 @@ type ActivityRow = {
     after_quantity: number;
     item_image_url: string | null;
   }>;
+  activity_members: Array<{ member_user_id: string | null; member_label: string }>;
 };
 
 type ActivityDbRow = Omit<ActivityRow, 'activity_items'> & {
@@ -55,7 +56,7 @@ export default async function ActivityPage() {
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
     supabase
       .from('activities')
-      .select('id, activity_type, member_user_id, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_id, item_name, quantity_added, before_quantity, after_quantity)')
+      .select('id, activity_type, member_user_id, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_id, item_name, quantity_added, before_quantity, after_quantity), activity_members(member_user_id, member_label)')
       .order('created_at', { ascending: false })
       .limit(50)
   ]);
@@ -73,6 +74,7 @@ export default async function ActivityPage() {
     equipment_before: activity.equipment_before,
     equipment_after: activity.equipment_after,
     created_at: activity.created_at,
+    activity_members: activity.activity_members ?? [],
     activity_items: activity.activity_items.map((line) => ({
       item_id: line.item_id,
       item_name: line.item_name,

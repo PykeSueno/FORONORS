@@ -48,7 +48,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from('activities')
-    .select('id, activity_type, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_name, quantity_added, before_quantity, after_quantity)')
+    .select('id, activity_type, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_name, quantity_added, before_quantity, after_quantity), activity_members(member_user_id, member_label)')
     .order('created_at', { ascending: false })
     .limit(100);
 
@@ -69,6 +69,8 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     activity_type?: ActivityType;
     member_user_id?: string | null;
+    member_user_ids?: string[];
+    member_labels?: string[];
     member_label?: string;
     proof_image_url?: string | null;
     equipment_used?: number;
@@ -87,8 +89,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Boîte aux lettres ne consomme aucun équipement.' }, { status: 400 });
   }
 
-  const memberId = body.member_user_id || session.userId;
-  const memberLabel = body.member_label?.trim() || session.username;
+  const uniqueMemberIds = Array.from(new Set((body.member_user_ids ?? []).map((entry) => entry.trim()).filter(Boolean)));
+  const uniqueLabels = Array.from(new Set((body.member_labels ?? []).map((entry) => entry.trim()).filter(Boolean)));
+  const memberId = body.member_user_id || uniqueMemberIds[0] || session.userId;
+  const memberLabel = uniqueLabels.length > 0 ? uniqueLabels.join(' + ') : (body.member_label?.trim() || session.username);
 
   const supabase = getSupabaseAdmin();
 
@@ -170,6 +174,20 @@ export async function POST(request: Request) {
       after_quantity: row.after
     }))
   );
+  if (uniqueMemberIds.length > 0 || uniqueLabels.length > 0) {
+    const labelsById = new Map<string, string>();
+    for (const id of uniqueMemberIds) {
+      const member = (body.member_labels ?? []).find((_, idx) => body.member_user_ids?.[idx] === id);
+      if (member) labelsById.set(id, member);
+    }
+    await supabase.from('activity_members').insert(
+      (uniqueMemberIds.length > 0 ? uniqueMemberIds : [memberId]).map((id) => ({
+        activity_id: activity.id,
+        member_user_id: id || null,
+        member_label: labelsById.get(id) || uniqueLabels[0] || memberLabel
+      }))
+    );
+  }
 
   const lootStockRows = resolvedItems.filter((row) => !row.isMoneyItem).map((row) => ({
     item_id: row.item_id,
@@ -205,6 +223,8 @@ export async function POST(request: Request) {
     newValues: {
       activityType: body.activity_type,
       memberLabel,
+      memberIds: uniqueMemberIds,
+      memberLabels: uniqueLabels,
       proofImageUrl: body.proof_image_url ?? null,
       equipment: equipmentRow ? { name: equipmentRow.name, used: equipmentUsed, before: equipmentBefore, after: equipmentAfter } : null,
       items: resolvedItems.map((row) => ({ name: row.item_name, before: row.before, added: row.quantity, after: row.after }))

@@ -406,11 +406,20 @@ create table if not exists public.activity_items (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.activity_members (
+  id bigint generated always as identity primary key,
+  activity_id bigint not null references public.activities(id) on delete cascade,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null
+);
+
 create index if not exists idx_activities_created_at on public.activities(created_at desc);
 create index if not exists idx_activity_items_activity on public.activity_items(activity_id);
+create index if not exists idx_activity_members_activity on public.activity_members(activity_id);
 
 alter table public.activities enable row level security;
 alter table public.activity_items enable row level security;
+alter table public.activity_members enable row level security;
 
 drop policy if exists "allow_service_role_all_activities" on public.activities;
 create policy "allow_service_role_all_activities"
@@ -422,6 +431,13 @@ with check (true);
 drop policy if exists "allow_service_role_all_activity_items" on public.activity_items;
 create policy "allow_service_role_all_activity_items"
 on public.activity_items
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_activity_members" on public.activity_members;
+create policy "allow_service_role_all_activity_members"
+on public.activity_members
 for all
 using (true)
 with check (true);
@@ -556,6 +572,84 @@ on public.four_messages
 for all
 using (true)
 with check (true);
+
+create table if not exists public.drug_transfos (
+  id bigint generated always as identity primary key,
+  transfo_type text not null,
+  target_group text,
+  quantity_sent numeric(12,2) not null default 0,
+  quantity_expected numeric(12,2) not null default 0,
+  quantity_received numeric(12,2),
+  status text not null default 'pending',
+  reference_value numeric(12,2) default 0,
+  note text,
+  sent_at timestamptz not null default timezone('utc', now()),
+  received_at timestamptz,
+  created_by uuid references public.users(id) on delete set null,
+  canceled_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.drug_sales (
+  id bigint generated always as identity primary key,
+  drug_type text not null,
+  quantity_sold numeric(12,2) not null default 0,
+  is_group_sale boolean not null default false,
+  member_user_ids jsonb not null default '[]'::jsonb,
+  member_labels jsonb not null default '[]'::jsonb,
+  estimated_min numeric(12,2) not null default 0,
+  estimated_max numeric(12,2) not null default 0,
+  estimated_avg numeric(12,2) not null default 0,
+  actual_amount numeric(12,2) not null default 0,
+  status text not null default 'validated',
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_drug_transfos_status_sent_at on public.drug_transfos(status, sent_at desc);
+create index if not exists idx_drug_sales_type_created_at on public.drug_sales(drug_type, created_at desc);
+
+alter table public.drug_transfos enable row level security;
+alter table public.drug_sales enable row level security;
+
+drop policy if exists "allow_service_role_all_drug_transfos" on public.drug_transfos;
+create policy "allow_service_role_all_drug_transfos"
+on public.drug_transfos
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_drug_sales" on public.drug_sales;
+create policy "allow_service_role_all_drug_sales"
+on public.drug_sales
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('drugs.preview'),
+  ('drugs.access'),
+  ('drugs.transfo.view'),
+  ('drugs.transfo.create'),
+  ('drugs.transfo.validate'),
+  ('drugs.transfo.cancel.own'),
+  ('drugs.transfo.cancel.any'),
+  ('drugs.transfo.edit.own'),
+  ('drugs.transfo.edit.any'),
+  ('drugs.transfo.logs.view'),
+  ('drugs.transfo.stats.view'),
+  ('drugs.sales.preview'),
+  ('drugs.sales.view'),
+  ('drugs.sales.create'),
+  ('drugs.sales.edit.own'),
+  ('drugs.sales.edit.any'),
+  ('drugs.sales.cancel.own'),
+  ('drugs.sales.cancel.any'),
+  ('drugs.sales.logs.view'),
+  ('drugs.sales.stats.view')
+on conflict (name) do nothing;
 
 
 delete from public.role_permissions
