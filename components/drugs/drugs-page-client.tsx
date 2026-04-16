@@ -175,6 +175,7 @@ export function DrugsPageClient({
 
   const [saleLines, setSaleLines] = useState<Array<{ id: number; drug_type: 'coke' | 'meth' | 'fentanyl'; quantity_sold: number; actual_amount: number }>>([{ id: 1, drug_type: 'coke', quantity_sold: 10, actual_amount: 0 }]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [detailSale, setDetailSale] = useState<Sale | null>(null);
   const [cokeSeeds, setCokeSeeds] = useState(9);
   const [cokeZones, setCokeZones] = useState(1);
   const [cokeHarvest, setCokeHarvest] = useState(9);
@@ -600,25 +601,29 @@ export function DrugsPageClient({
                             );
                           })}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-xs text-[#efcdab]">Quantité vendue</p>
+                        <div className="space-y-1">
+                          <p className="text-center text-xs text-[#efcdab]">Quantité vendue</p>
+                          <div className="flex flex-wrap items-center justify-center gap-2">
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: Math.max(1, line.quantity_sold - 1) } : line))}>-1</button>
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: Math.max(1, line.quantity_sold - 10) } : line))}>-10</button>
                           <input className="saas-input w-24 text-center" value={row.quantity_sold} onChange={(event) => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: Math.max(1, Number(event.target.value || 1)) } : line))} />
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 10 } : line))}>+10</button>
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 1 } : line))}>+1</button>
                           {saleLines.length > 1 ? <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.filter((line) => line.id !== row.id))}>Supprimer</button> : null}
+                          </div>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-3">
                           <Metric label="Est. min" value={formatUsd(row.estimate.min)} icon="📉" />
                           <Metric label="Est. max" value={formatUsd(row.estimate.max)} icon="📈" />
                           <Metric label="Est. moyenne" value={formatUsd(row.estimate.avg)} icon="🧮" />
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-xs text-[#efcdab]">Argent réel récupéré</p>
+                        <div className="space-y-1">
+                          <p className="text-center text-xs text-[#efcdab]">Argent réel récupéré</p>
+                          <div className="flex flex-wrap items-center justify-center gap-2">
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: Math.max(0, line.actual_amount - 100) } : line))}>-100</button>
                           <input className="saas-input w-28 text-center" value={row.actual_amount} onChange={(event) => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: Math.max(0, Number(event.target.value || 0)) } : line))} />
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: line.actual_amount + 100 } : line))}>+100</button>
+                          </div>
                         </div>
                       </div>
                       <div />
@@ -629,7 +634,7 @@ export function DrugsPageClient({
               </div>
             </Field>
 
-            <Field label="3. Membre(s) vendeur(s) ou Groupe" hint="Laisse Groupe si vente collective">
+            <Field label="3. Membre(s) vendeur(s) ou Groupe" hint="Optionnel · Groupe par défaut">
               <div className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
                 <button className={`filter-pill ${selectedMembers.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => setSelectedMembers([])}>Groupe</button>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -688,20 +693,11 @@ export function DrugsPageClient({
                         <ItemThumb item={{ id: -1, name: sale.item_name ?? '', image_url: sale.item_image_url ?? saleItemRef?.image_url ?? null, quantity: 0 }} fallback="💊" />
                         <div className="text-xs text-[#efcdab]">
                           <p>Vendeur(s): <span className="text-[#ffe9cd]">{sale.is_group_sale ? 'Groupe' : (sale.member_labels ?? []).join(' + ')}</span></p>
-                          <p>Quantité: {sale.quantity_sold}</p>
-                          <p>Estimation: {formatUsd(sale.estimated_min)} - {formatUsd(sale.estimated_max)} · Moyenne {formatUsd(sale.estimated_avg)}</p>
-                          <p>Réel récupéré: {formatUsd(sale.actual_amount)}</p>
-                          <p>Stock: {sale.stock_before ?? '-'} → {sale.stock_after ?? '-'}</p>
-                          <p>Argent groupe: {typeof sale.cash_before === 'number' ? formatUsd(sale.cash_before) : '-'} → {typeof sale.cash_after === 'number' ? formatUsd(sale.cash_after) : '-'}</p>
+                          <p>Quantité vendue: <span className="text-[#ffe9cd]">{sale.quantity_sold}</span></p>
+                          <p>Réel récupéré: <span className="text-[#ffe9cd]">{formatUsd(sale.actual_amount)}</span></p>
                         </div>
                       </div>
-                      {(sale.sale_lines ?? []).length > 0 ? (
-                        <div className="mt-2 space-y-1 rounded-lg border border-white/10 bg-[#2b1a12]/50 p-2 text-xs text-[#efcdab]">
-                          {(sale.sale_lines ?? []).map((line, idx) => (
-                            <p key={`${sale.id}-${idx}`}>• {line.itemName} · Qté {line.quantity} · Est {formatUsd(line.estimatedMin)}-{formatUsd(line.estimatedMax)} · Réel {formatUsd(line.actualAmount)} · Stock {line.stockBefore}→{line.stockAfter}</p>
-                          ))}
-                        </div>
-                      ) : null}
+                      {(sale.sale_lines ?? []).length > 0 ? <button className="saas-ghost-btn mt-3 !py-2 !px-3" onClick={() => setDetailSale(sale)}>Voir détail</button> : null}
                     </article>
                   );
                 })}
@@ -895,6 +891,34 @@ export function DrugsPageClient({
               </div>
               <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateReception()}>Valider la réception</button>
             </div>
+          </section>
+        </div>
+      ) : null}
+
+      {detailSale ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <section className="glass-card max-h-[92vh] w-full max-w-2xl overflow-y-auto p-5">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-lg font-semibold text-[#fff1dd]">Détail vente #{detailSale.id}</h3>
+              <button className="saas-ghost-btn" onClick={() => setDetailSale(null)}>Fermer</button>
+            </div>
+            <div className="mt-3 space-y-2 text-xs text-[#efcdab]">
+              <p>Vendeur(s): <span className="text-[#ffe9cd]">{detailSale.is_group_sale ? 'Groupe' : (detailSale.member_labels ?? []).join(' + ')}</span></p>
+              <p>Montant réel: <span className="text-[#ffe9cd]">{formatUsd(detailSale.actual_amount)}</span></p>
+              <p>Argent groupe: <span className="text-[#ffe9cd]">{typeof detailSale.cash_before === 'number' ? formatUsd(detailSale.cash_before) : '-'} → {typeof detailSale.cash_after === 'number' ? formatUsd(detailSale.cash_after) : '-'}</span></p>
+            </div>
+            {(detailSale.sale_lines ?? []).length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {(detailSale.sale_lines ?? []).map((line, idx) => (
+                  <article key={`${detailSale.id}-${idx}`} className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-3 text-xs text-[#efcdab]">
+                    <p className="text-[#ffe9cd]">{line.itemName}</p>
+                    <p>Qté {line.quantity} · Réel {formatUsd(line.actualAmount)}</p>
+                    <p>Estimation {formatUsd(line.estimatedMin)} - {formatUsd(line.estimatedMax)} · Moyenne {formatUsd(line.estimatedAvg)}</p>
+                    <p>Stock {line.stockBefore} → {line.stockAfter}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}

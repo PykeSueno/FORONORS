@@ -25,7 +25,7 @@ type Passage = {
 };
 
 export function TabletPageClient({ day, businessDay, members, passages, groupCash, kitsInStock, cuttersInStock, canManageDaily, canCreatePassage, defaultMemberId, defaultMemberLabel }: { day: Day; businessDay: string; members: Array<{ id: string; name: string; username: string }>; passages: Passage[]; groupCash: number; kitsInStock: number; cuttersInStock: number; canManageDaily: boolean; canCreatePassage: boolean; defaultMemberId: string; defaultMemberLabel: string }) {
-  const [deposit, setDeposit] = useState(String(day?.deposited_amount ?? 0));
+  const [deposit, setDeposit] = useState(String(day?.deposited_amount ?? 4000));
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
   const [error, setError] = useState('');

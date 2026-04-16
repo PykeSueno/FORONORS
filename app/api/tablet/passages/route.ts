@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   if (!day) {
     const { data: created } = await supabase
       .from('tablet_days')
-      .insert({ business_day: businessDay, deposited_amount: 0, chest_amount: 0, created_by: session.userId })
+      .insert({ business_day: businessDay, deposited_amount: 4000, chest_amount: 4000, created_by: session.userId })
       .select('*')
       .maybeSingle();
     day = created;
