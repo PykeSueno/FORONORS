@@ -577,16 +577,30 @@ create table if not exists public.drug_transfos (
   id bigint generated always as identity primary key,
   transfo_type text not null,
   target_group text,
+  source_item_id bigint references public.items(id) on delete set null,
+  source_item_name text,
+  target_item_id bigint references public.items(id) on delete set null,
+  target_item_name text,
   quantity_sent numeric(12,2) not null default 0,
   quantity_expected numeric(12,2) not null default 0,
   quantity_received numeric(12,2),
+  source_stock_before numeric(12,2),
+  source_stock_after_send numeric(12,2),
+  source_stock_after_cancel numeric(12,2),
+  target_stock_before numeric(12,2),
+  target_stock_after_receive numeric(12,2),
   status text not null default 'pending',
-  reference_value numeric(12,2) default 0,
+  paid_amount numeric(12,2) not null default 0,
+  compensation_amount numeric(12,2) not null default 0,
+  cash_before_compensation numeric(12,2),
+  cash_after_compensation numeric(12,2),
   note text,
   sent_at timestamptz not null default timezone('utc', now()),
   received_at timestamptz,
   created_by uuid references public.users(id) on delete set null,
+  received_by uuid references public.users(id) on delete set null,
   canceled_by uuid references public.users(id) on delete set null,
+  updated_by uuid references public.users(id) on delete set null,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
@@ -594,6 +608,9 @@ create table if not exists public.drug_transfos (
 create table if not exists public.drug_sales (
   id bigint generated always as identity primary key,
   drug_type text not null,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text,
+  item_image_url text,
   quantity_sold numeric(12,2) not null default 0,
   is_group_sale boolean not null default false,
   member_user_ids jsonb not null default '[]'::jsonb,
@@ -602,10 +619,38 @@ create table if not exists public.drug_sales (
   estimated_max numeric(12,2) not null default 0,
   estimated_avg numeric(12,2) not null default 0,
   actual_amount numeric(12,2) not null default 0,
+  stock_before numeric(12,2),
+  stock_after numeric(12,2),
+  cash_before numeric(12,2),
+  cash_after numeric(12,2),
   status text not null default 'validated',
   created_by uuid references public.users(id) on delete set null,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.drug_transfos add column if not exists source_item_id bigint references public.items(id) on delete set null;
+alter table public.drug_transfos add column if not exists source_item_name text;
+alter table public.drug_transfos add column if not exists target_item_id bigint references public.items(id) on delete set null;
+alter table public.drug_transfos add column if not exists target_item_name text;
+alter table public.drug_transfos add column if not exists source_stock_before numeric(12,2);
+alter table public.drug_transfos add column if not exists source_stock_after_send numeric(12,2);
+alter table public.drug_transfos add column if not exists source_stock_after_cancel numeric(12,2);
+alter table public.drug_transfos add column if not exists target_stock_before numeric(12,2);
+alter table public.drug_transfos add column if not exists target_stock_after_receive numeric(12,2);
+alter table public.drug_transfos add column if not exists paid_amount numeric(12,2) not null default 0;
+alter table public.drug_transfos add column if not exists compensation_amount numeric(12,2) not null default 0;
+alter table public.drug_transfos add column if not exists cash_before_compensation numeric(12,2);
+alter table public.drug_transfos add column if not exists cash_after_compensation numeric(12,2);
+alter table public.drug_transfos add column if not exists received_by uuid references public.users(id) on delete set null;
+alter table public.drug_transfos add column if not exists updated_by uuid references public.users(id) on delete set null;
+
+alter table public.drug_sales add column if not exists item_id bigint references public.items(id) on delete set null;
+alter table public.drug_sales add column if not exists item_name text;
+alter table public.drug_sales add column if not exists item_image_url text;
+alter table public.drug_sales add column if not exists stock_before numeric(12,2);
+alter table public.drug_sales add column if not exists stock_after numeric(12,2);
+alter table public.drug_sales add column if not exists cash_before numeric(12,2);
+alter table public.drug_sales add column if not exists cash_after numeric(12,2);
 
 create index if not exists idx_drug_transfos_status_sent_at on public.drug_transfos(status, sent_at desc);
 create index if not exists idx_drug_sales_type_created_at on public.drug_sales(drug_type, created_at desc);
@@ -633,7 +678,7 @@ values
   ('drugs.access'),
   ('drugs.transfo.view'),
   ('drugs.transfo.create'),
-  ('drugs.transfo.validate'),
+  ('drugs.transfo.receive.validate'),
   ('drugs.transfo.cancel.own'),
   ('drugs.transfo.cancel.any'),
   ('drugs.transfo.edit.own'),
@@ -650,6 +695,8 @@ values
   ('drugs.sales.logs.view'),
   ('drugs.sales.stats.view')
 on conflict (name) do nothing;
+
+delete from public.permissions where name = 'drugs.transfo.validate';
 
 
 delete from public.role_permissions

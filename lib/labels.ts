@@ -19,5 +19,10 @@ export function humanStockMovementLabel(type: string) {
   if (type === 'tablet_passage') return 'Passage Tablette';
   if (type === 'activity_loot_in') return 'Activité (loot entré)';
   if (type === 'activity_equipment_out') return 'Activité (équipement sorti)';
+  if (type === 'drugs_transfo_send') return 'Transfo drogue (envoi)';
+  if (type === 'drugs_transfo_adjust') return 'Transfo drogue (ajustement)';
+  if (type === 'drugs_transfo_cancel') return 'Transfo drogue (annulation)';
+  if (type === 'drugs_transfo_receive') return 'Transfo drogue (réception)';
+  if (type === 'drugs_sale_out') return 'Vente drogue (sortie)';
   return type;
 }

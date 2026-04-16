@@ -4,10 +4,11 @@ import Image from 'next/image';
 import { useMemo, useState } from 'react';
 
 type ActivityType = 'mailbox' | 'burglary' | 'container';
+type ActivityDisplayType = ActivityType | 'drug_sale';
 type Item = { id: number; name: string; image_url: string | null; quantity: number; category_key: string; type_key: string | null };
 type RecentActivity = {
   id: number;
-  activity_type: ActivityType;
+  activity_type: ActivityDisplayType;
   member_user_id: string | null;
   member_label: string;
   proof_image_url: string | null;
@@ -40,11 +41,14 @@ const TYPE_LABELS: Record<string, string> = {
   production: 'Production'
 };
 
-const ACTIVITY_META: Record<ActivityType, { label: string; icon: string; subtitle: string }> = {
+const ACTIVITY_META: Record<ActivityDisplayType, { label: string; icon: string; subtitle: string }> = {
   mailbox: { label: 'Boîte aux lettres', icon: '📬', subtitle: 'Aucun équipement requis' },
   burglary: { label: 'Cambriolage', icon: '🏠', subtitle: 'Consomme des Kits' },
-  container: { label: 'Conteneur', icon: '📦', subtitle: 'Consomme des Disqueuses' }
+  container: { label: 'Conteneur', icon: '📦', subtitle: 'Consomme des Disqueuses' },
+  drug_sale: { label: 'Vente drogue', icon: '🧪', subtitle: 'Session de vente validée' }
 };
+
+const CREATE_ACTIVITY_TYPES: ActivityType[] = ['mailbox', 'burglary', 'container'];
 
 export function ActivityPageClient({ items, members, activities, defaultMemberId, defaultMemberLabel, canCreate, canViewRecent, canManageOwn, canManageAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; defaultMemberLabel: string; canCreate: boolean; canViewRecent: boolean; canManageOwn: boolean; canManageAny: boolean; currentUserId: string }) {
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
@@ -160,7 +164,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   return (
     <div className="space-y-4">
       <section className="grid gap-3 md:grid-cols-3">
-        {(Object.keys(ACTIVITY_META) as ActivityType[]).map((key) => (
+        {CREATE_ACTIVITY_TYPES.map((key) => (
           <button key={key} className={`glass-card p-4 text-left ${activityType === key ? 'activity-card-active' : ''}`} onClick={() => setType(key)}>
             <p className="text-2xl">{ACTIVITY_META[key].icon}</p>
             <p className="mt-1 text-base font-semibold text-[#fff1dd]">{ACTIVITY_META[key].label}</p>

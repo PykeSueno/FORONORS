@@ -8,7 +8,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 type ActivityRow = {
   id: number;
-  activity_type: 'mailbox' | 'burglary' | 'container';
+  activity_type: 'mailbox' | 'burglary' | 'container' | 'drug_sale';
   member_user_id: string | null;
   member_label: string;
   proof_image_url: string | null;

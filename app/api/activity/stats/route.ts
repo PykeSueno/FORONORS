@@ -6,7 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 type StatsRow = {
   member_label: string | null;
   activity_members?: Array<{ member_user_id: string | null; member_label: string }>;
-  activity_type: 'mailbox' | 'burglary' | 'container';
+  activity_type: 'mailbox' | 'burglary' | 'container' | 'drug_sale';
   equipment_item_id: number | null;
   equipment_item_name: string | null;
   equipment_used: number | null;
