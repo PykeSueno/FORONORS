@@ -25,6 +25,10 @@ export function humanStockMovementLabel(type: string) {
   if (type === 'drugs_transfo_cancel') return 'Transfo drogue (annulation)';
   if (type === 'drugs_transfo_receive') return 'Transfo drogue (réception)';
   if (type === 'drugs_sale_out') return 'Vente drogue (sortie)';
+  if (type === 'drugs_production_coke_use') return 'Production Coke (consommation)';
+  if (type === 'drugs_production_coke_output') return 'Production Coke (récolte)';
+  if (type === 'drugs_production_meth_use') return 'Production Meth (consommation)';
+  if (type === 'drugs_production_meth_output') return 'Production Meth (récolte)';
   if (type === 'four_close') return 'FOUR (clôture session)';
   return type;
 }

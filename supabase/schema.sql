@@ -629,6 +629,34 @@ create table if not exists public.drug_sales (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.drug_sale_lines (
+  id bigint generated always as identity primary key,
+  sale_id bigint not null references public.drug_sales(id) on delete cascade,
+  drug_type text not null,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text,
+  item_image_url text,
+  quantity_sold numeric(12,2) not null default 0,
+  estimated_min numeric(12,2) not null default 0,
+  estimated_max numeric(12,2) not null default 0,
+  estimated_avg numeric(12,2) not null default 0,
+  actual_amount numeric(12,2) not null default 0,
+  stock_before numeric(12,2),
+  stock_after numeric(12,2),
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.drug_productions (
+  id bigint generated always as identity primary key,
+  production_type text not null,
+  input_snapshot jsonb not null default '{}'::jsonb,
+  output_snapshot jsonb not null default '{}'::jsonb,
+  note text,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
 alter table public.drug_transfos add column if not exists source_item_id bigint references public.items(id) on delete set null;
 alter table public.drug_transfos add column if not exists source_item_name text;
 alter table public.drug_transfos add column if not exists target_item_id bigint references public.items(id) on delete set null;
@@ -653,6 +681,12 @@ alter table public.drug_sales add column if not exists stock_after numeric(12,2)
 alter table public.drug_sales add column if not exists cash_before numeric(12,2);
 alter table public.drug_sales add column if not exists cash_after numeric(12,2);
 alter table public.drug_sales add column if not exists sale_lines jsonb not null default '[]'::jsonb;
+alter table public.drug_sale_lines add column if not exists item_image_url text;
+alter table public.drug_sale_lines add column if not exists stock_before numeric(12,2);
+alter table public.drug_sale_lines add column if not exists stock_after numeric(12,2);
+alter table public.drug_productions add column if not exists input_snapshot jsonb not null default '{}'::jsonb;
+alter table public.drug_productions add column if not exists output_snapshot jsonb not null default '{}'::jsonb;
+alter table public.drug_productions add column if not exists note text;
 
 insert into public.items (name, image_url, buy_price, sell_price, quantity, category_key, category_label, type_key, type_label)
 select 'Pack Meth', null, 0, 0, 0, 'drugs', 'Drogues', 'seeds', 'Graines'
@@ -660,9 +694,13 @@ where not exists (select 1 from public.items where lower(name) = 'pack meth');
 
 create index if not exists idx_drug_transfos_status_sent_at on public.drug_transfos(status, sent_at desc);
 create index if not exists idx_drug_sales_type_created_at on public.drug_sales(drug_type, created_at desc);
+create index if not exists idx_drug_sale_lines_sale_id on public.drug_sale_lines(sale_id, created_at desc);
+create index if not exists idx_drug_productions_type_created_at on public.drug_productions(production_type, created_at desc);
 
 alter table public.drug_transfos enable row level security;
 alter table public.drug_sales enable row level security;
+alter table public.drug_sale_lines enable row level security;
+alter table public.drug_productions enable row level security;
 
 drop policy if exists "allow_service_role_all_drug_transfos" on public.drug_transfos;
 create policy "allow_service_role_all_drug_transfos"
@@ -674,6 +712,20 @@ with check (true);
 drop policy if exists "allow_service_role_all_drug_sales" on public.drug_sales;
 create policy "allow_service_role_all_drug_sales"
 on public.drug_sales
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_drug_sale_lines" on public.drug_sale_lines;
+create policy "allow_service_role_all_drug_sale_lines"
+on public.drug_sale_lines
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_drug_productions" on public.drug_productions;
+create policy "allow_service_role_all_drug_productions"
+on public.drug_productions
 for all
 using (true)
 with check (true);
@@ -699,7 +751,11 @@ values
   ('drugs.sales.cancel.own'),
   ('drugs.sales.cancel.any'),
   ('drugs.sales.logs.view'),
-  ('drugs.sales.stats.view')
+  ('drugs.sales.stats.view'),
+  ('drugs.production.access'),
+  ('drugs.production.coke.create'),
+  ('drugs.production.meth.create'),
+  ('drugs.logs.view')
 on conflict (name) do nothing;
 
 delete from public.permissions where name = 'drugs.transfo.validate';

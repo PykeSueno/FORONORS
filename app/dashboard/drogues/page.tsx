@@ -13,9 +13,10 @@ export default async function DrugsPage() {
   if (!permissions.includes('drugs.access')) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: transfos }, { data: sales }, { data: members }, { data: items }] = await Promise.all([
+  const [{ data: transfos }, { data: sales }, { data: productions }, { data: members }, { data: items }] = await Promise.all([
     supabase.from('drug_transfos').select('*').order('created_at', { ascending: false }).limit(300),
     supabase.from('drug_sales').select('*').order('created_at', { ascending: false }).limit(300),
+    supabase.from('drug_productions').select('*').order('created_at', { ascending: false }).limit(200),
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
     supabase.from('items').select('id, name, image_url, quantity').order('name', { ascending: true })
   ]);
@@ -27,6 +28,7 @@ export default async function DrugsPage() {
         currentUserId={session.userId}
         transfos={transfos ?? []}
         sales={sales ?? []}
+        productions={productions ?? []}
         members={members ?? []}
         items={items ?? []}
         canTransfoView={permissions.includes('drugs.transfo.view')}
@@ -38,6 +40,9 @@ export default async function DrugsPage() {
         canTransfoEditAny={permissions.includes('drugs.transfo.edit.any')}
         canSalesView={permissions.includes('drugs.sales.view')}
         canSalesCreate={permissions.includes('drugs.sales.create')}
+        canProductionAccess={permissions.includes('drugs.production.access')}
+        canProductionCokeCreate={permissions.includes('drugs.production.coke.create')}
+        canProductionMethCreate={permissions.includes('drugs.production.meth.create')}
       />
     </div>
   );

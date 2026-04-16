@@ -99,6 +99,10 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'drugs.sales.cancel.any': { module: 'Drogues', label: 'Annuler toutes les ventes drogue', hint: 'Annuler toutes les ventes drogue.' },
   'drugs.sales.logs.view': { module: 'Drogues', label: 'Voir logs vente drogue', hint: 'Afficher les logs des ventes drogue.' },
   'drugs.sales.stats.view': { module: 'Drogues', label: 'Voir stats vente drogue', hint: 'Afficher les statistiques vente drogue.' },
+  'drugs.production.access': { module: 'Drogues', label: 'Accéder à Production', hint: 'Afficher la section production Drogues.' },
+  'drugs.production.coke.create': { module: 'Drogues', label: 'Créer / valider production Coke', hint: 'Valider une production Coke.' },
+  'drugs.production.meth.create': { module: 'Drogues', label: 'Créer / valider production Meth', hint: 'Valider une production Meth.' },
+  'drugs.logs.view': { module: 'Drogues', label: 'Voir les logs Drogues', hint: 'Afficher les logs du module Drogues.' },
 
   'account.password.update': { module: 'Compte', label: 'Modifier son mot de passe', hint: 'Modifier son mot de passe.' }
 };

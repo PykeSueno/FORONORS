@@ -191,6 +191,26 @@ export async function POST(request: Request) {
     .select('*')
     .maybeSingle();
 
+  if (created?.id) {
+    await supabase.from('drug_sale_lines').insert(
+      resolved.map((row) => ({
+        sale_id: created.id,
+        drug_type: row.drugType,
+        item_id: row.itemId,
+        item_name: row.itemName,
+        item_image_url: row.itemImageUrl,
+        quantity_sold: row.quantity,
+        estimated_min: row.estimatedMin,
+        estimated_max: row.estimatedMax,
+        estimated_avg: row.estimatedAvg,
+        actual_amount: row.actualAmount,
+        stock_before: row.stockBefore,
+        stock_after: row.stockAfter,
+        created_by: session.userId
+      }))
+    );
+  }
+
   const { data: activity } = await supabase
     .from('activities')
     .insert({

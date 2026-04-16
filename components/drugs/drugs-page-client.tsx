@@ -50,8 +50,9 @@ type Sale = {
   cash_after?: number | null;
   sale_lines?: Array<{ itemName: string; itemImageUrl: string | null; quantity: number; estimatedMin: number; estimatedMax: number; estimatedAvg: number; actualAmount: number; stockBefore: number; stockAfter: number }>;
 };
+type Production = { id: number; production_type: 'coke' | 'meth'; input_snapshot: Record<string, unknown>; output_snapshot: Record<string, unknown>; note?: string | null; created_at: string };
 
-type Tab = 'transfo' | 'sales';
+type Tab = 'transfo' | 'sales' | 'production';
 
 type DrugDef = {
   key: 'coke' | 'meth' | 'fentanyl';
@@ -100,6 +101,7 @@ export function DrugsPageClient({
   currentUserId,
   transfos,
   sales,
+  productions,
   members,
   items,
   canTransfoView,
@@ -110,11 +112,15 @@ export function DrugsPageClient({
   canTransfoEditOwn,
   canTransfoEditAny,
   canSalesView,
-  canSalesCreate
+  canSalesCreate,
+  canProductionAccess,
+  canProductionCokeCreate,
+  canProductionMethCreate
 }: {
   currentUserId: string;
   transfos: Transfo[];
   sales: Sale[];
+  productions: Production[];
   members: Member[];
   items: Item[];
   canTransfoView: boolean;
@@ -126,9 +132,13 @@ export function DrugsPageClient({
   canTransfoEditAny: boolean;
   canSalesView: boolean;
   canSalesCreate: boolean;
+  canProductionAccess: boolean;
+  canProductionCokeCreate: boolean;
+  canProductionMethCreate: boolean;
 }) {
   const [tab, setTab] = useState<Tab>('transfo');
   const [error, setError] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const itemByKeyword = useMemo(() => {
     return (keyword: string) => items.find((entry) => entry.name.toLowerCase().includes(keyword.toLowerCase())) ?? null;
@@ -150,6 +160,12 @@ export function DrugsPageClient({
 
   const [saleLines, setSaleLines] = useState<Array<{ id: number; drug_type: 'coke' | 'meth' | 'fentanyl'; quantity_sold: number; actual_amount: number }>>([{ id: 1, drug_type: 'coke', quantity_sold: 10, actual_amount: 0 }]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [cokeSeeds, setCokeSeeds] = useState(9);
+  const [cokeZones, setCokeZones] = useState(1);
+  const [cokeHarvest, setCokeHarvest] = useState(9);
+  const [methMachines, setMethMachines] = useState(3);
+  const [methHarvest, setMethHarvest] = useState(30);
+  const [prodNote, setProdNote] = useState('');
 
   const selectedTransfoDef = useMemo(() => TRANSFO_DEFS.find((entry) => entry.key === transfoType) ?? TRANSFO_DEFS[0], [transfoType]);
   const sourceItem = itemByKeyword(selectedTransfoDef.sourceKeyword);
@@ -172,6 +188,10 @@ export function DrugsPageClient({
     avg: saleRows.reduce((sum, row) => sum + row.estimate.avg, 0),
     actual: saleRows.reduce((sum, row) => sum + (row.actual_amount > 0 ? row.actual_amount : row.estimate.avg), 0)
   }), [saleRows]);
+  const visibleTransfos = useMemo(() => transfos.filter((entry) => !(entry.id === 1 && entry.transfo_type === 'meth' && !entry.source_item_name)), [transfos]);
+
+  const cokeNeed = useMemo(() => ({ pots: cokeSeeds, fert: cokeSeeds, water: cokeSeeds * 3, uv: cokeZones * 2, leavesTheo: cokeSeeds }), [cokeSeeds, cokeZones]);
+  const methNeed = useMemo(() => ({ tables: methMachines, machines: methMachines, batteries: methMachines * 2, ammoniaque: methMachines * 6, methylamine: methMachines * 5, theoMin: methMachines * 10, theoMax: methMachines * 20 }), [methMachines]);
 
   function openManage(entry: Transfo) {
     setManageTransfo(entry);
@@ -201,6 +221,11 @@ export function DrugsPageClient({
     return false;
   }
 
+  async function syncView() {
+    setIsSyncing(true);
+    window.location.reload();
+  }
+
   async function createTransfo() {
     if (!sourceItem || !targetItem) {
       setError('Item de transfo introuvable dans le stock. Vérifie les noms des items.');
@@ -223,7 +248,7 @@ export function DrugsPageClient({
       setError(data.message ?? 'Création transfo impossible.');
       return;
     }
-    window.location.reload();
+    await syncView();
   }
 
   async function updateTransfo() {
@@ -246,7 +271,7 @@ export function DrugsPageClient({
       setError(data.message ?? 'Modification impossible.');
       return;
     }
-    window.location.reload();
+    await syncView();
   }
 
   async function cancelTransfo() {
@@ -262,7 +287,7 @@ export function DrugsPageClient({
       setError(data.message ?? 'Annulation impossible.');
       return;
     }
-    window.location.reload();
+    await syncView();
   }
 
   async function validateReception() {
@@ -283,7 +308,7 @@ export function DrugsPageClient({
       setError(data.message ?? 'Validation réception impossible.');
       return;
     }
-    window.location.reload();
+    await syncView();
   }
 
   async function createSale() {
@@ -311,7 +336,20 @@ export function DrugsPageClient({
       setError(data.message ?? 'Création vente impossible.');
       return;
     }
-    window.location.reload();
+    await syncView();
+  }
+
+  async function validateProduction(type: 'coke' | 'meth') {
+    const payload = type === 'coke'
+      ? { production_type: 'coke', seeds_count: cokeSeeds, zones_count: cokeZones, harvested_leaves: cokeHarvest, note: prodNote }
+      : { production_type: 'meth', meth_machines_count: methMachines, harvested_meth_raw: methHarvest, note: prodNote };
+    const response = await fetch('/api/drugs/production', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!response.ok) {
+      const data = await response.json();
+      setError(data.message ?? 'Validation production impossible.');
+      return;
+    }
+    await syncView();
   }
 
   return (
@@ -320,8 +358,9 @@ export function DrugsPageClient({
         <div className="flex gap-2">
           <button className={`filter-pill ${tab === 'transfo' ? 'filter-pill-active' : ''}`} onClick={() => setTab('transfo')}>🧪 Transfo</button>
           <button className={`filter-pill ${tab === 'sales' ? 'filter-pill-active' : ''}`} onClick={() => setTab('sales')}>💸 Vente drogue</button>
+          {canProductionAccess ? <button className={`filter-pill ${tab === 'production' ? 'filter-pill-active' : ''}`} onClick={() => setTab('production')}>🏭 Production</button> : null}
         </div>
-        <p className="text-xs text-[#f1d2ad]">Module détaillé — stock, argent, membres, logs</p>
+        <p className="text-xs text-[#f1d2ad]">Module détaillé — stock, argent, membres, logs {isSyncing ? '· synchronisation…' : ''}</p>
       </section>
 
       {tab === 'transfo' ? (
@@ -427,7 +466,7 @@ export function DrugsPageClient({
             {!canTransfoView ? <p className="text-sm text-[#f1d2ad]">Permission manquante: voir les transfos.</p> : null}
             {canTransfoView ? (
               <div className="max-h-[980px] space-y-3 overflow-y-auto pr-1">
-                {transfos.map((entry) => {
+                {visibleTransfos.map((entry) => {
                   const def = TRANSFO_DEFS.find((it) => it.key === entry.transfo_type) ?? TRANSFO_DEFS[0];
                   const source = itemByKeyword(def.sourceKeyword);
                   const target = itemByKeyword(def.targetKeyword);
@@ -458,12 +497,14 @@ export function DrugsPageClient({
                     </article>
                   );
                 })}
-                {transfos.length === 0 ? <p className="text-sm text-[#f1d2ad]">Aucune transfo pour le moment.</p> : null}
+                {visibleTransfos.length === 0 ? <p className="text-sm text-[#f1d2ad]">Aucune transfo pour le moment.</p> : null}
               </div>
             ) : null}
           </article>
         </section>
-      ) : (
+      ) : null}
+
+      {tab === 'sales' ? (
         <section className="grid gap-4 xl:grid-cols-[1.08fr_1fr]">
           <article className="glass-card space-y-4 p-5">
             <h3 className="text-lg font-semibold text-[#fff1dd]">Nouvelle vente drogue</h3>
@@ -502,6 +543,7 @@ export function DrugsPageClient({
                           <input className="saas-input w-24 text-center" value={row.quantity_sold} onChange={(event) => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: Math.max(1, Number(event.target.value || 1)) } : line))} />
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 10 } : line))}>+10</button>
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 1 } : line))}>+1</button>
+                          {saleLines.length > 1 ? <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.filter((line) => line.id !== row.id))}>Supprimer</button> : null}
                         </div>
                         <div className="grid gap-2 sm:grid-cols-3">
                           <Metric label="Est. min" value={formatUsd(row.estimate.min)} icon="📉" />
@@ -515,9 +557,7 @@ export function DrugsPageClient({
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: line.actual_amount + 100 } : line))}>+100</button>
                         </div>
                       </div>
-                      <div className="flex items-start justify-end">
-                        {saleLines.length > 1 ? <button className="saas-ghost-btn" onClick={() => setSaleLines((current) => current.filter((line) => line.id !== row.id))}>Supprimer</button> : null}
-                      </div>
+                      <div />
                     </div>
                   </div>
                 ))}
@@ -606,7 +646,84 @@ export function DrugsPageClient({
             ) : null}
           </article>
         </section>
-      )}
+      ) : null}
+
+      {tab === 'production' ? (
+        <section className="grid gap-4 xl:grid-cols-[1.08fr_1fr]">
+          <article className="glass-card space-y-4 p-5">
+            <h3 className="text-lg font-semibold text-[#fff1dd]">Production drogues</h3>
+            {!canProductionAccess ? <p className="text-sm text-[#f1d2ad]">Permission manquante: accès production.</p> : null}
+            {canProductionAccess ? (
+              <div className="space-y-4">
+                <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
+                  <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Coke</h4>
+                  <p className="text-xs text-[#efcdab]">1 cycle = multiple de 9 graines.</p>
+                  <div className="mt-2 grid gap-2 md:grid-cols-3">
+                    <input className="saas-input" inputMode="numeric" value={cokeSeeds} onChange={(event) => setCokeSeeds(Math.max(9, Number(event.target.value || 9)))} />
+                    <input className="saas-input" inputMode="numeric" value={cokeZones} onChange={(event) => setCokeZones(Math.max(1, Number(event.target.value || 1)))} />
+                    <input className="saas-input" inputMode="numeric" value={cokeHarvest} onChange={(event) => setCokeHarvest(Math.max(0, Number(event.target.value || 0)))} />
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <Metric label="Pots" value={String(cokeNeed.pots)} icon="🪴" />
+                    <Metric label="Fertilisant" value={String(cokeNeed.fert)} icon="🧪" />
+                    <Metric label="Bouteilles" value={String(cokeNeed.water)} icon="💧" />
+                    <Metric label="Lampes UV" value={String(cokeNeed.uv)} icon="💡" />
+                    <Metric label="Récolte théorique" value={String(cokeNeed.leavesTheo)} icon="🌿" />
+                    <Metric label="Récolte réelle" value={String(cokeHarvest)} icon="📦" />
+                  </div>
+                  {canProductionCokeCreate ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('coke')}>Valider production Coke</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Coke.</p>}
+                </section>
+
+                <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
+                  <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Meth</h4>
+                  <p className="text-xs text-[#efcdab]">1 cycle = multiple de 3 machines.</p>
+                  <div className="mt-2 grid gap-2 md:grid-cols-2">
+                    <input className="saas-input" inputMode="numeric" value={methMachines} onChange={(event) => setMethMachines(Math.max(3, Number(event.target.value || 3)))} />
+                    <input className="saas-input" inputMode="numeric" value={methHarvest} onChange={(event) => setMethHarvest(Math.max(0, Number(event.target.value || 0)))} />
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <Metric label="Tables" value={String(methNeed.tables)} icon="🧱" />
+                    <Metric label="Machines" value={String(methNeed.machines)} icon="⚙️" />
+                    <Metric label="Batteries" value={String(methNeed.batteries)} icon="🔋" />
+                    <Metric label="Ammoniaque" value={String(methNeed.ammoniaque)} icon="🧴" />
+                    <Metric label="Methylamine" value={String(methNeed.methylamine)} icon="🧪" />
+                    <Metric label="Théorique" value={`${methNeed.theoMin}-${methNeed.theoMax}`} icon="📈" />
+                  </div>
+                  <p className="mt-2 text-xs text-[#efcdab]">Récolte réelle: {methHarvest}</p>
+                  {canProductionMethCreate ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('meth')}>Valider production Meth</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Meth.</p>}
+                </section>
+
+                <Field label="Note production (facultative)" hint="Ajoutée à la validation Coke ou Meth">
+                  <textarea className="saas-input w-full" rows={2} placeholder="Note production" value={prodNote} onChange={(event) => setProdNote(event.target.value)} />
+                </Field>
+              </div>
+            ) : null}
+          </article>
+
+          <article className="glass-card space-y-3 p-5">
+            <h3 className="text-lg font-semibold text-[#fff1dd]">Historique productions</h3>
+            {!canProductionAccess ? <p className="text-sm text-[#f1d2ad]">Permission manquante: voir les productions.</p> : null}
+            {canProductionAccess ? (
+              <div className="max-h-[980px] space-y-3 overflow-y-auto pr-1">
+                {productions.map((entry) => (
+                  <article key={entry.id} className="rounded-2xl border border-white/10 bg-[#3f281b]/55 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-[#ffe8ca]">#{entry.id} · {entry.production_type === 'coke' ? 'Production Coke' : 'Production Meth'}</p>
+                      <p className="text-xs text-[#efcdab]">{new Date(entry.created_at).toLocaleString('fr-FR')}</p>
+                    </div>
+                    <div className="mt-2 text-xs text-[#efcdab]">
+                      <p>Entrées: {JSON.stringify(entry.input_snapshot)}</p>
+                      <p>Sorties: {JSON.stringify(entry.output_snapshot)}</p>
+                      {entry.note ? <p>Note: {entry.note}</p> : null}
+                    </div>
+                  </article>
+                ))}
+                {productions.length === 0 ? <p className="text-sm text-[#f1d2ad]">Aucune production pour le moment.</p> : null}
+              </div>
+            ) : null}
+          </article>
+        </section>
+      ) : null}
 
       <section className="glass-card p-5">
         <h3 className="text-base font-semibold text-[#fff1dd]">Repères stock drogues</h3>
