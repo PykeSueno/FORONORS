@@ -753,9 +753,16 @@ values
   ('drugs.sales.logs.view'),
   ('drugs.sales.stats.view'),
   ('drugs.production.access'),
+  ('drugs.production.create'),
   ('drugs.production.coke.create'),
   ('drugs.production.meth.create'),
-  ('drugs.logs.view')
+  ('drugs.production.edit.own'),
+  ('drugs.production.edit.any'),
+  ('drugs.production.cancel.own'),
+  ('drugs.production.cancel.any'),
+  ('drugs.production.history.view'),
+  ('drugs.logs.view'),
+  ('drugs.stats.view')
 on conflict (name) do nothing;
 
 delete from public.permissions where name = 'drugs.transfo.validate';

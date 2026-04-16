@@ -100,9 +100,16 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'drugs.sales.logs.view': { module: 'Drogues', label: 'Voir logs vente drogue', hint: 'Afficher les logs des ventes drogue.' },
   'drugs.sales.stats.view': { module: 'Drogues', label: 'Voir stats vente drogue', hint: 'Afficher les statistiques vente drogue.' },
   'drugs.production.access': { module: 'Drogues', label: 'Accéder à Production', hint: 'Afficher la section production Drogues.' },
+  'drugs.production.create': { module: 'Drogues', label: 'Créer une production drogue', hint: 'Créer / valider une production drogue.' },
   'drugs.production.coke.create': { module: 'Drogues', label: 'Créer / valider production Coke', hint: 'Valider une production Coke.' },
   'drugs.production.meth.create': { module: 'Drogues', label: 'Créer / valider production Meth', hint: 'Valider une production Meth.' },
+  'drugs.production.edit.own': { module: 'Drogues', label: 'Modifier ses propres productions', hint: 'Modifier une production créée par soi.' },
+  'drugs.production.edit.any': { module: 'Drogues', label: 'Modifier toutes les productions', hint: 'Modifier toutes les productions drogues.' },
+  'drugs.production.cancel.own': { module: 'Drogues', label: 'Annuler ses propres productions', hint: 'Annuler une production créée par soi.' },
+  'drugs.production.cancel.any': { module: 'Drogues', label: 'Annuler toutes les productions', hint: 'Annuler toutes les productions drogues.' },
+  'drugs.production.history.view': { module: 'Drogues', label: 'Voir l’historique des productions', hint: 'Afficher l’historique des productions drogues.' },
   'drugs.logs.view': { module: 'Drogues', label: 'Voir les logs Drogues', hint: 'Afficher les logs du module Drogues.' },
+  'drugs.stats.view': { module: 'Drogues', label: 'Voir les stats Drogues', hint: 'Afficher les statistiques du module Drogues.' },
 
   'account.password.update': { module: 'Compte', label: 'Modifier son mot de passe', hint: 'Modifier son mot de passe.' }
 };

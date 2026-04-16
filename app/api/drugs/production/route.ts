@@ -25,8 +25,11 @@ async function findItem(keyword: string) {
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
-  const canAccess = await hasUserPermission(session.userId, 'drugs.production.access');
-  if (!canAccess) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const [canAccess, canHistory] = await Promise.all([
+    hasUserPermission(session.userId, 'drugs.production.access'),
+    hasUserPermission(session.userId, 'drugs.production.history.view')
+  ]);
+  if (!(canAccess || canHistory)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
   const { data } = await supabase.from('drug_productions').select('*').order('created_at', { ascending: false }).limit(120);
@@ -41,10 +44,14 @@ export async function POST(request: Request) {
   const type = body.production_type;
   if (!type) return NextResponse.json({ message: 'Type production requis.' }, { status: 400 });
 
-  const canCreate = await hasUserPermission(session.userId, type === 'coke' ? 'drugs.production.coke.create' : 'drugs.production.meth.create');
-  if (!canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const [canCreateGlobal, canCreateType] = await Promise.all([
+    hasUserPermission(session.userId, 'drugs.production.create'),
+    hasUserPermission(session.userId, type === 'coke' ? 'drugs.production.coke.create' : 'drugs.production.meth.create')
+  ]);
+  if (!(canCreateGlobal || canCreateType)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
+  const { data: actor } = await supabase.from('users').select('id, name, username, role').eq('id', session.userId).maybeSingle();
 
   if (type === 'coke') {
     const seeds = Math.max(9, Number(body.seeds_count ?? 9));
@@ -97,7 +104,22 @@ export async function POST(request: Request) {
       entityType: 'drug_production',
       entityId: production?.id ?? null,
       summary: `Production Coke validée (${seeds} graines, ${zones} zones, récolte ${harvestedLeaves})`,
-      newValues: { seeds, zones, requirements: resolvedNeeds, theoreticalLeaves, harvestedLeaves, leavesBefore, leavesAfter }
+      newValues: {
+        member: actor?.name || actor?.username || session.userId,
+        role: actor?.role || null,
+        type: 'production coke',
+        seeds,
+        zones,
+        potsUsed: seeds,
+        fertilizersUsed: seeds,
+        waterUsed: seeds * 3,
+        uvUsed: zones * 2,
+        requirements: resolvedNeeds,
+        theoreticalLeaves,
+        harvestedLeaves,
+        leavesBefore,
+        leavesAfter
+      }
     });
 
     return NextResponse.json({ ok: true, production });
@@ -151,7 +173,22 @@ export async function POST(request: Request) {
     entityType: 'drug_production',
     entityId: production?.id ?? null,
     summary: `Production Meth validée (${machineCount} machines, récolte ${methRawReal})`,
-    newValues: { machineCount, requirements: resolvedNeeds, theoreticalRange: [machineCount * 10, machineCount * 20], methRawReal, methBefore, methAfter }
+    newValues: {
+      member: actor?.name || actor?.username || session.userId,
+      role: actor?.role || null,
+      type: 'production meth',
+      machineCount,
+      tablesUsed: machineCount,
+      machinesUsed: machineCount,
+      batteriesUsed: machineCount * 2,
+      ammoniaUsed: machineCount * 6,
+      methylamineUsed: machineCount * 5,
+      requirements: resolvedNeeds,
+      theoreticalRange: [machineCount * 10, machineCount * 20],
+      methRawReal,
+      methBefore,
+      methAfter
+    }
   });
 
   return NextResponse.json({ ok: true, production });

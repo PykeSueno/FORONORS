@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { formatUsd } from '@/lib/currency';
 
@@ -114,8 +115,10 @@ export function DrugsPageClient({
   canSalesView,
   canSalesCreate,
   canProductionAccess,
+  canProductionCreate,
   canProductionCokeCreate,
-  canProductionMethCreate
+  canProductionMethCreate,
+  canProductionHistoryView
 }: {
   currentUserId: string;
   transfos: Transfo[];
@@ -133,9 +136,12 @@ export function DrugsPageClient({
   canSalesView: boolean;
   canSalesCreate: boolean;
   canProductionAccess: boolean;
+  canProductionCreate: boolean;
   canProductionCokeCreate: boolean;
   canProductionMethCreate: boolean;
+  canProductionHistoryView: boolean;
 }) {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('transfo');
   const [error, setError] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -190,8 +196,30 @@ export function DrugsPageClient({
   }), [saleRows]);
   const visibleTransfos = useMemo(() => transfos.filter((entry) => !(entry.id === 1 && entry.transfo_type === 'meth' && !entry.source_item_name)), [transfos]);
 
-  const cokeNeed = useMemo(() => ({ pots: cokeSeeds, fert: cokeSeeds, water: cokeSeeds * 3, uv: cokeZones * 2, leavesTheo: cokeSeeds }), [cokeSeeds, cokeZones]);
-  const methNeed = useMemo(() => ({ tables: methMachines, machines: methMachines, batteries: methMachines * 2, ammoniaque: methMachines * 6, methylamine: methMachines * 5, theoMin: methMachines * 10, theoMax: methMachines * 20 }), [methMachines]);
+  const safeCokeSeeds = Number.isFinite(cokeSeeds) ? Math.max(0, cokeSeeds) : 0;
+  const safeCokeZones = Number.isFinite(cokeZones) ? Math.max(0, cokeZones) : 0;
+  const safeCokeHarvest = Number.isFinite(cokeHarvest) ? Math.max(0, cokeHarvest) : 0;
+  const safeMethMachines = Number.isFinite(methMachines) ? Math.max(0, methMachines) : 0;
+  const safeMethHarvest = Number.isFinite(methHarvest) ? Math.max(0, methHarvest) : 0;
+  const seedsPerZone = safeCokeZones > 0 ? Math.floor((safeCokeSeeds / safeCokeZones) * 100) / 100 : 0;
+
+  const cokeNeed = useMemo(() => ({ pots: safeCokeSeeds, fert: safeCokeSeeds, water: safeCokeSeeds * 3, uv: safeCokeZones * 2, leavesTheo: safeCokeSeeds }), [safeCokeSeeds, safeCokeZones]);
+  const methNeed = useMemo(() => ({ tables: safeMethMachines, machines: safeMethMachines, batteries: safeMethMachines * 2, ammoniaque: safeMethMachines * 6, methylamine: safeMethMachines * 5, theoMin: safeMethMachines * 10, theoMax: safeMethMachines * 20 }), [safeMethMachines]);
+
+  const productionItems = useMemo(() => ({
+    cokeSeeds: itemByKeyword('graine de coke'),
+    cokePots: itemByKeyword('pot'),
+    cokeFert: itemByKeyword('fertilisant'),
+    cokeWater: itemByKeyword('bouteille'),
+    cokeUv: itemByKeyword('lampe uv'),
+    cokeLeaves: itemByKeyword('feuille de coke'),
+    methTable: itemByKeyword('table'),
+    methMachine: itemByKeyword('machine de meth'),
+    methBattery: itemByKeyword('batterie'),
+    methAmmonia: itemByKeyword('ammoniaque'),
+    methMethylamine: itemByKeyword('methylamine'),
+    methRaw: itemByKeyword('meth brut')
+  }), [itemByKeyword]);
 
   function openManage(entry: Transfo) {
     setManageTransfo(entry);
@@ -221,9 +249,10 @@ export function DrugsPageClient({
     return false;
   }
 
-  async function syncView() {
+  function syncView() {
     setIsSyncing(true);
-    window.location.reload();
+    router.refresh();
+    setTimeout(() => setIsSyncing(false), 800);
   }
 
   async function createTransfo() {
@@ -248,7 +277,7 @@ export function DrugsPageClient({
       setError(data.message ?? 'Création transfo impossible.');
       return;
     }
-    await syncView();
+    syncView();
   }
 
   async function updateTransfo() {
@@ -271,7 +300,7 @@ export function DrugsPageClient({
       setError(data.message ?? 'Modification impossible.');
       return;
     }
-    await syncView();
+    syncView();
   }
 
   async function cancelTransfo() {
@@ -287,7 +316,7 @@ export function DrugsPageClient({
       setError(data.message ?? 'Annulation impossible.');
       return;
     }
-    await syncView();
+    syncView();
   }
 
   async function validateReception() {
@@ -308,7 +337,7 @@ export function DrugsPageClient({
       setError(data.message ?? 'Validation réception impossible.');
       return;
     }
-    await syncView();
+    syncView();
   }
 
   async function createSale() {
@@ -336,20 +365,20 @@ export function DrugsPageClient({
       setError(data.message ?? 'Création vente impossible.');
       return;
     }
-    await syncView();
+    syncView();
   }
 
   async function validateProduction(type: 'coke' | 'meth') {
     const payload = type === 'coke'
-      ? { production_type: 'coke', seeds_count: cokeSeeds, zones_count: cokeZones, harvested_leaves: cokeHarvest, note: prodNote }
-      : { production_type: 'meth', meth_machines_count: methMachines, harvested_meth_raw: methHarvest, note: prodNote };
+      ? { production_type: 'coke', seeds_count: safeCokeSeeds, zones_count: safeCokeZones, harvested_leaves: safeCokeHarvest, note: prodNote }
+      : { production_type: 'meth', meth_machines_count: safeMethMachines, harvested_meth_raw: safeMethHarvest, note: prodNote };
     const response = await fetch('/api/drugs/production', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!response.ok) {
       const data = await response.json();
       setError(data.message ?? 'Validation production impossible.');
       return;
     }
-    await syncView();
+    syncView();
   }
 
   return (
@@ -358,7 +387,7 @@ export function DrugsPageClient({
         <div className="flex gap-2">
           <button className={`filter-pill ${tab === 'transfo' ? 'filter-pill-active' : ''}`} onClick={() => setTab('transfo')}>🧪 Transfo</button>
           <button className={`filter-pill ${tab === 'sales' ? 'filter-pill-active' : ''}`} onClick={() => setTab('sales')}>💸 Vente drogue</button>
-          {canProductionAccess ? <button className={`filter-pill ${tab === 'production' ? 'filter-pill-active' : ''}`} onClick={() => setTab('production')}>🏭 Production</button> : null}
+          {(canProductionAccess || canProductionHistoryView) ? <button className={`filter-pill ${tab === 'production' ? 'filter-pill-active' : ''}`} onClick={() => setTab('production')}>🏭 Production</button> : null}
         </div>
         <p className="text-xs text-[#f1d2ad]">Module détaillé — stock, argent, membres, logs {isSyncing ? '· synchronisation…' : ''}</p>
       </section>
@@ -472,23 +501,34 @@ export function DrugsPageClient({
                   const target = itemByKeyword(def.targetKeyword);
                   const status = statusVisual(entry.status);
                   return (
-                    <article key={entry.id} className="rounded-2xl border border-white/10 bg-[#3f281b]/55 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm font-semibold text-[#ffe8ca]">#{entry.id} · {def.transfoLabel}</p>
+                    <article key={entry.id} className="rounded-2xl border border-white/10 bg-[#3f281b]/55 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <p className="text-base font-semibold text-[#ffe8ca]">#{entry.id} · {def.transfoLabel}</p>
                         <span className={`rounded-full border px-2 py-1 text-xs ${status.cls}`}>{status.label}</span>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <ItemThumb item={source} fallback="📤" />
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <ItemThumb item={source} fallback="📤" sizeClass="h-14 w-14" />
                         <span className="text-[#efcdab]">→</span>
-                        <ItemThumb item={target} fallback="📥" />
-                        <div className="min-w-[180px] flex-1 text-xs text-[#efcdab]">
-                          <p>Groupe: <span className="text-[#ffe9cd]">{entry.target_group || 'Non renseigné'}</span></p>
-                          <p>Envoi: {new Date(entry.sent_at).toLocaleString('fr-FR')}</p>
-                          <p>Envoyé: {entry.quantity_sent} · Attendu: {entry.quantity_expected} · Reçu: {entry.quantity_received ?? '-'}</p>
-                          <p>Argent payé: {formatUsd(Number(entry.paid_amount ?? 0))} · Compensation: {formatUsd(Number(entry.compensation_amount ?? 0))}</p>
-                        </div>
+                        <ItemThumb item={target} fallback="📥" sizeClass="h-14 w-14" />
                       </div>
+
+                      <div className="mt-4 grid gap-2 text-xs text-[#efcdab] sm:grid-cols-2">
+                        <p>Groupe destinataire: <span className="text-[#ffe9cd]">{entry.target_group || 'Non renseigné'}</span></p>
+                        <p>Date d’envoi: <span className="text-[#ffe9cd]">{new Date(entry.sent_at).toLocaleString('fr-FR')}</span></p>
+                        <p>Quantité envoyée: <span className="text-[#ffe9cd]">{entry.quantity_sent}</span></p>
+                        <p>Quantité attendue: <span className="text-[#ffe9cd]">{entry.quantity_expected}</span></p>
+                        <p>Quantité reçue: <span className="text-[#ffe9cd]">{entry.quantity_received ?? 0}</span></p>
+                        <p>Statut: <span className="text-[#ffe9cd]">{status.label}</span></p>
+                        <p>Argent payé: <span className="text-[#ffe9cd]">{formatUsd(Number(entry.paid_amount ?? 0))}</span></p>
+                        <p>Compensation argent: <span className="text-[#ffe9cd]">{formatUsd(Number(entry.compensation_amount ?? 0))}</span></p>
+                      </div>
+
+                      {entry.note ? (
+                        <div className="mt-3 rounded-xl border border-white/10 bg-[#2b1a12]/55 px-3 py-2 text-xs text-[#efcdab]">
+                          Note: <span className="text-[#ffe9cd]">{entry.note}</span>
+                        </div>
+                      ) : null}
 
                       <div className="mt-3 flex justify-end gap-2">
                         {canManageTransfo(entry) ? <button className="saas-ghost-btn" onClick={() => openManage(entry)}>Gérer</button> : null}
@@ -511,7 +551,7 @@ export function DrugsPageClient({
 
             <Field label="1. Sélection drogue (multi-lignes)" hint="Ajoute plusieurs drogues dans la même vente">
               <div className="space-y-3">
-                {saleRows.map((row, idx) => (
+                {saleRows.map((row) => (
                   <div key={row.id} className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-3">
                     <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
                       <div className="space-y-3">
@@ -657,40 +697,42 @@ export function DrugsPageClient({
               <div className="space-y-4">
                 <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
                   <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Coke</h4>
-                  <p className="text-xs text-[#efcdab]">1 cycle = multiple de 9 graines.</p>
-                  <div className="mt-2 grid gap-2 md:grid-cols-3">
-                    <input className="saas-input" inputMode="numeric" value={cokeSeeds} onChange={(event) => setCokeSeeds(Math.max(9, Number(event.target.value || 9)))} />
-                    <input className="saas-input" inputMode="numeric" value={cokeZones} onChange={(event) => setCokeZones(Math.max(1, Number(event.target.value || 1)))} />
-                    <input className="saas-input" inputMode="numeric" value={cokeHarvest} onChange={(event) => setCokeHarvest(Math.max(0, Number(event.target.value || 0)))} />
+                  <p className="text-xs text-[#efcdab]">1 zone = 9 graines + 2 lampes UV · 1 graine = 1 feuille théorique.</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <NumberField label="Nombre de zones" value={safeCokeZones} onMinus={() => setCokeZones((current) => Math.max(0, current - 1))} onPlus={() => setCokeZones((current) => current + 1)} onChange={(value) => setCokeZones(value)} />
+                    <NumberField label="Nombre de graines" value={safeCokeSeeds} onMinus={() => setCokeSeeds((current) => Math.max(0, current - 9))} onPlus={() => setCokeSeeds((current) => current + 9)} onChange={(value) => setCokeSeeds(value)} />
+                    <NumberField label="Récolte réelle" value={safeCokeHarvest} onMinus={() => setCokeHarvest((current) => Math.max(0, current - 1))} onPlus={() => setCokeHarvest((current) => current + 1)} onChange={(value) => setCokeHarvest(value)} />
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <Metric label="Pots" value={String(cokeNeed.pots)} icon="🪴" />
-                    <Metric label="Fertilisant" value={String(cokeNeed.fert)} icon="🧪" />
-                    <Metric label="Bouteilles" value={String(cokeNeed.water)} icon="💧" />
-                    <Metric label="Lampes UV" value={String(cokeNeed.uv)} icon="💡" />
-                    <Metric label="Récolte théorique" value={String(cokeNeed.leavesTheo)} icon="🌿" />
-                    <Metric label="Récolte réelle" value={String(cokeHarvest)} icon="📦" />
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <RequirementCard label="Graines par zone" value={String(seedsPerZone)} item={productionItems.cokeSeeds} fallback="🌱" />
+                    <RequirementCard label="Pots nécessaires" value={String(cokeNeed.pots)} item={productionItems.cokePots} fallback="🪴" />
+                    <RequirementCard label="Fertilisants nécessaires" value={String(cokeNeed.fert)} item={productionItems.cokeFert} fallback="🧪" />
+                    <RequirementCard label="Bouteilles d’eau nécessaires" value={String(cokeNeed.water)} item={productionItems.cokeWater} fallback="💧" />
+                    <RequirementCard label="Lampes UV nécessaires" value={String(cokeNeed.uv)} item={productionItems.cokeUv} fallback="💡" />
+                    <RequirementCard label="Récolte théorique" value={String(cokeNeed.leavesTheo)} item={productionItems.cokeLeaves} fallback="🌿" />
+                    <RequirementCard label="Récolte réelle" value={String(safeCokeHarvest)} item={productionItems.cokeLeaves} fallback="📦" />
                   </div>
-                  {canProductionCokeCreate ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('coke')}>Valider production Coke</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Coke.</p>}
+                  {(canProductionCreate || canProductionCokeCreate) ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('coke')}>Valider production Coke</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Coke.</p>}
                 </section>
 
                 <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
                   <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Meth</h4>
-                  <p className="text-xs text-[#efcdab]">1 cycle = multiple de 3 machines.</p>
-                  <div className="mt-2 grid gap-2 md:grid-cols-2">
-                    <input className="saas-input" inputMode="numeric" value={methMachines} onChange={(event) => setMethMachines(Math.max(3, Number(event.target.value || 3)))} />
-                    <input className="saas-input" inputMode="numeric" value={methHarvest} onChange={(event) => setMethHarvest(Math.max(0, Number(event.target.value || 0)))} />
+                  <p className="text-xs text-[#efcdab]">1 cycle = 1 table + 1 machine + 2 batteries + 6 ammoniaques + 5 methylamines.</p>
+                  <p className="text-xs text-[#efcdab]">1 table donne environ 10 à 20 meth brut.</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <NumberField label="Nombre de cycles / machines" value={safeMethMachines} onMinus={() => setMethMachines((current) => Math.max(0, current - 1))} onPlus={() => setMethMachines((current) => current + 1)} onChange={(value) => setMethMachines(value)} />
+                    <NumberField label="Récolte réelle" value={safeMethHarvest} onMinus={() => setMethHarvest((current) => Math.max(0, current - 1))} onPlus={() => setMethHarvest((current) => current + 1)} onChange={(value) => setMethHarvest(value)} />
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <Metric label="Tables" value={String(methNeed.tables)} icon="🧱" />
-                    <Metric label="Machines" value={String(methNeed.machines)} icon="⚙️" />
-                    <Metric label="Batteries" value={String(methNeed.batteries)} icon="🔋" />
-                    <Metric label="Ammoniaque" value={String(methNeed.ammoniaque)} icon="🧴" />
-                    <Metric label="Methylamine" value={String(methNeed.methylamine)} icon="🧪" />
-                    <Metric label="Théorique" value={`${methNeed.theoMin}-${methNeed.theoMax}`} icon="📈" />
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <RequirementCard label="Tables nécessaires" value={String(methNeed.tables)} item={productionItems.methTable} fallback="🧱" />
+                    <RequirementCard label="Machines nécessaires" value={String(methNeed.machines)} item={productionItems.methMachine} fallback="⚙️" />
+                    <RequirementCard label="Batteries nécessaires" value={String(methNeed.batteries)} item={productionItems.methBattery} fallback="🔋" />
+                    <RequirementCard label="Ammoniaque nécessaire" value={String(methNeed.ammoniaque)} item={productionItems.methAmmonia} fallback="🧴" />
+                    <RequirementCard label="Methylamine nécessaire" value={String(methNeed.methylamine)} item={productionItems.methMethylamine} fallback="🧪" />
+                    <RequirementCard label="Récolte théorique" value={`${methNeed.theoMin}-${methNeed.theoMax}`} item={productionItems.methRaw} fallback="📈" />
+                    <RequirementCard label="Récolte réelle" value={String(safeMethHarvest)} item={productionItems.methRaw} fallback="📦" />
                   </div>
-                  <p className="mt-2 text-xs text-[#efcdab]">Récolte réelle: {methHarvest}</p>
-                  {canProductionMethCreate ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('meth')}>Valider production Meth</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Meth.</p>}
+                  {(canProductionCreate || canProductionMethCreate) ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('meth')}>Valider production Meth</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Meth.</p>}
                 </section>
 
                 <Field label="Note production (facultative)" hint="Ajoutée à la validation Coke ou Meth">
@@ -702,8 +744,8 @@ export function DrugsPageClient({
 
           <article className="glass-card space-y-3 p-5">
             <h3 className="text-lg font-semibold text-[#fff1dd]">Historique productions</h3>
-            {!canProductionAccess ? <p className="text-sm text-[#f1d2ad]">Permission manquante: voir les productions.</p> : null}
-            {canProductionAccess ? (
+            {!canProductionHistoryView ? <p className="text-sm text-[#f1d2ad]">Permission manquante: voir les productions.</p> : null}
+            {canProductionHistoryView ? (
               <div className="max-h-[980px] space-y-3 overflow-y-auto pr-1">
                 {productions.map((entry) => (
                   <article key={entry.id} className="rounded-2xl border border-white/10 bg-[#3f281b]/55 p-4">
@@ -711,11 +753,20 @@ export function DrugsPageClient({
                       <p className="text-sm font-semibold text-[#ffe8ca]">#{entry.id} · {entry.production_type === 'coke' ? 'Production Coke' : 'Production Meth'}</p>
                       <p className="text-xs text-[#efcdab]">{new Date(entry.created_at).toLocaleString('fr-FR')}</p>
                     </div>
-                    <div className="mt-2 text-xs text-[#efcdab]">
-                      <p>Entrées: {JSON.stringify(entry.input_snapshot)}</p>
-                      <p>Sorties: {JSON.stringify(entry.output_snapshot)}</p>
-                      {entry.note ? <p>Note: {entry.note}</p> : null}
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {entry.production_type === 'coke' ? (
+                        <>
+                          <RequirementCard label="Graines" value={String(Number((entry.input_snapshot?.seeds as number) ?? 0))} item={productionItems.cokeSeeds} fallback="🌱" />
+                          <RequirementCard label="Récolte réelle" value={String(Number((entry.output_snapshot?.harvestedLeaves as number) ?? 0))} item={productionItems.cokeLeaves} fallback="🌿" />
+                        </>
+                      ) : (
+                        <>
+                          <RequirementCard label="Cycles / machines" value={String(Number((entry.input_snapshot?.machineCount as number) ?? 0))} item={productionItems.methMachine} fallback="⚙️" />
+                          <RequirementCard label="Récolte réelle" value={String(Number((entry.output_snapshot?.methRawReal as number) ?? 0))} item={productionItems.methRaw} fallback="📦" />
+                        </>
+                      )}
                     </div>
+                    {entry.note ? <p className="mt-2 text-xs text-[#efcdab]">Note: {entry.note}</p> : null}
                   </article>
                 ))}
                 {productions.length === 0 ? <p className="text-sm text-[#f1d2ad]">Aucune production pour le moment.</p> : null}
@@ -835,9 +886,56 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-function ItemThumb({ item, fallback }: { item: Item | null; fallback: string }) {
+function NumberField({
+  label,
+  value,
+  onMinus,
+  onPlus,
+  onChange
+}: {
+  label: string;
+  value: number;
+  onMinus: () => void;
+  onPlus: () => void;
+  onChange: (value: number) => void;
+}) {
   return (
-    <div className="h-12 w-12 overflow-hidden rounded-xl border border-white/10 bg-[#22140e]">
+    <div className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
+      <p className="text-xs text-[#efcdab]">{label}</p>
+      <div className="mt-2 flex items-center gap-2">
+        <button className="saas-ghost-btn !px-2 !py-1" onClick={onMinus}>-</button>
+        <input
+          className="saas-input w-20 text-center"
+          inputMode="numeric"
+          value={value}
+          onChange={(event) => {
+            const parsed = Number(event.target.value || 0);
+            onChange(Number.isFinite(parsed) ? Math.max(0, parsed) : 0);
+          }}
+        />
+        <button className="saas-ghost-btn !px-2 !py-1" onClick={onPlus}>+</button>
+      </div>
+    </div>
+  );
+}
+
+function RequirementCard({ label, value, item, fallback }: { label: string; value: string; item: Item | null; fallback: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#342116]/60 p-3">
+      <div className="flex items-center gap-2">
+        <ItemThumb item={item} fallback={fallback} />
+        <div>
+          <p className="text-xs text-[#efcdab]">{label}</p>
+          <p className="text-sm font-semibold text-[#ffe8ca]">{value || '0'}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ItemThumb({ item, fallback, sizeClass = 'h-12 w-12' }: { item: Item | null; fallback: string; sizeClass?: string }) {
+  return (
+    <div className={`${sizeClass} overflow-hidden rounded-xl border border-white/10 bg-[#22140e]`}>
       {item?.image_url ? <Image src={item.image_url} alt={item.name} width={48} height={48} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xl">{fallback}</div>}
     </div>
   );

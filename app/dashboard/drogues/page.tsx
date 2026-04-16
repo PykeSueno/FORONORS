@@ -23,7 +23,7 @@ export default async function DrugsPage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Drogues" subtitle="Transfo et vente drogue — suivi stock / argent / membres" />
+      <InternalPageHeader title="Drogues" subtitle="Transfo, vente et production — suivi stock / argent / membres" />
       <DrugsPageClient
         currentUserId={session.userId}
         transfos={transfos ?? []}
@@ -41,8 +41,10 @@ export default async function DrugsPage() {
         canSalesView={permissions.includes('drugs.sales.view')}
         canSalesCreate={permissions.includes('drugs.sales.create')}
         canProductionAccess={permissions.includes('drugs.production.access')}
+        canProductionCreate={permissions.includes('drugs.production.create')}
         canProductionCokeCreate={permissions.includes('drugs.production.coke.create')}
         canProductionMethCreate={permissions.includes('drugs.production.meth.create')}
+        canProductionHistoryView={permissions.includes('drugs.production.history.view') || permissions.includes('drugs.production.access')}
       />
     </div>
   );
