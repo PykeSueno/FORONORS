@@ -90,6 +90,7 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
   }, [session, validatedTotals]);
 
   const selectedHistory = useMemo(() => (stats?.sessions ?? []).find((entry) => entry.id === selectedSessionId) ?? null, [stats, selectedSessionId]);
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
   async function fetchActiveSession() {
     const response = await fetch('/api/four', { cache: 'no-store' });
@@ -356,10 +357,10 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
           <section className="glass-card p-5">
             <h3 className="text-base font-semibold text-[#fff1dd] mb-3">Stats FOUR</h3>
             <div className="grid gap-2 md:grid-cols-4">
-              <SummaryLine label="Sessions fermées" value={String(stats?.totals.sessions ?? 0)} />
-              <SummaryLine label="Total achats" value={formatUsd(stats?.totals.purchases ?? 0)} danger />
-              <SummaryLine label="Total ventes" value={formatUsd(stats?.totals.sales ?? 0)} positive />
-              <SummaryLine label="Résultat global" value={formatUsd(stats?.totals.profit ?? 0)} positive={(stats?.totals.profit ?? 0) >= 0} danger={(stats?.totals.profit ?? 0) < 0} />
+              <SummaryLine label="📚 Sessions fermées" value={String(stats?.totals.sessions ?? 0)} />
+              <SummaryLine label="🛒 Total achats" value={formatUsd(stats?.totals.purchases ?? 0)} danger />
+              <SummaryLine label="💸 Total ventes" value={formatUsd(stats?.totals.sales ?? 0)} positive />
+              <SummaryLine label="📈 Résultat global" value={formatUsd(stats?.totals.profit ?? 0)} positive={(stats?.totals.profit ?? 0) >= 0} danger={(stats?.totals.profit ?? 0) < 0} />
             </div>
             {!stats ? <button className="saas-primary-btn mt-3" onClick={() => void loadStats()}>Charger les stats</button> : null}
           </section>
@@ -374,8 +375,8 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
                     return (
                       <button key={entry.id} className={`w-full rounded-xl border px-3 py-2 text-left ${selectedSessionId === entry.id ? 'border-[#f8d7a2] bg-[#4b2e1f]/70' : 'border-white/10 bg-[#2e1d14]/45'}`} onClick={() => setSelectedSessionId(entry.id)}>
                         <p className="text-sm font-medium text-[#ffe8ca]">Session #{entry.id}</p>
-                        <p className="text-xs text-[#efcdab]">Fermée: {entry.closed_at ? new Date(entry.closed_at).toLocaleString('fr-FR') : '-'}</p>
-                        <p className={`text-xs ${profit >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>Résultat: {formatUsd(profit)}</p>
+                        <p className="text-xs text-[#efcdab]">🗓️ Fermée: {entry.closed_at ? new Date(entry.closed_at).toLocaleString('fr-FR') : '-'}</p>
+                        <p className={`text-xs ${profit >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>📊 Résultat: {formatUsd(profit)}</p>
                       </button>
                     );
                   })}
@@ -405,7 +406,14 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
                             <p className="text-xs font-semibold text-[#ffe8ca]">#{tx.id} · {tx.counterparty || '—'} · {new Date(tx.created_at).toLocaleString('fr-FR')}</p>
                             <p className="text-xs text-[#efcdab]">Achats {formatUsd(Number(tx.total_purchases))} · Ventes {formatUsd(Number(tx.total_sales))} · Résultat {formatUsd(Number(tx.profit_loss))}</p>
                             <div className="mt-1 space-y-1">
-                              {(tx.four_transaction_lines ?? []).map((line) => <p key={line.id} className="text-xs text-[#efcdab]">• {line.movement_kind === 'buy' ? 'Achat' : 'Vente'} {line.item_name} · Qté {line.quantity} · PU {formatUsd(Number(line.unit_price))} · Total {formatUsd(Number(line.total_amount))}</p>)}
+                              {(tx.four_transaction_lines ?? []).map((line) => (
+                                <div key={line.id} className="flex items-center gap-2 rounded-md border border-white/10 bg-[#2b1a12]/55 px-2 py-1">
+                                  <div className="h-8 w-8 overflow-hidden rounded-md bg-[#23140e]">
+                                    {line.item_id && itemById.get(line.item_id)?.image_url ? <Image src={itemById.get(line.item_id)?.image_url as string} alt={line.item_name} width={32} height={32} className="h-full w-full object-cover" unoptimized /> : null}
+                                  </div>
+                                  <p className="text-xs text-[#efcdab]">{line.movement_kind === 'buy' ? '🟥 Achat' : '🟩 Vente'} · {line.item_name} · Qté {line.quantity} · PU {formatUsd(Number(line.unit_price))} · Total {formatUsd(Number(line.total_amount))}</p>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         ))}
@@ -427,6 +435,9 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
               </article>
               <article className="glass-card p-5">
                 <h4 className="text-sm font-semibold text-[#fff1dd] mb-2">Stats par client / groupe</h4>
+                {Object.entries(stats.byCounterparty).length > 0 ? (
+                  <p className="mb-2 text-xs text-[#bff0b9]">🏆 Top client: {Object.entries(stats.byCounterparty).sort((a, b) => (b[1].sales - b[1].purchases) - (a[1].sales - a[1].purchases))[0][0]}</p>
+                ) : null}
                 <div className="space-y-1">
                   {Object.entries(stats.byCounterparty).map(([name, data]) => <p key={name} className="text-xs text-[#efcdab]">{name} · Tx {data.count} · Achats {formatUsd(data.purchases)} · Ventes {formatUsd(data.sales)}</p>)}
                 </div>

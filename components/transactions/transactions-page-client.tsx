@@ -155,6 +155,7 @@ export function TransactionsPageClient({
                 </div>
                 <p className="font-medium text-[#ffe8c9]">{item.name}</p>
                 <p className="text-xs text-[#f3d2ad]">Stock: {item.quantity}</p>
+                {item.name.toLowerCase() === 'pack meth' ? <p className="text-[11px] text-[#bff0b9]">🧪 1 Pack Meth = 1 table de meth</p> : null}
               </button>
             ))}
           </div>
@@ -209,6 +210,7 @@ export function TransactionsPageClient({
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-[#ffe8c9]">{item.name}</p>
                         <p className={`mt-0.5 text-xs ${meta.tone}`}>{meta.icon} {meta.label}</p>
+                        {item.name.toLowerCase() === 'pack meth' ? <p className="mt-0.5 text-xs text-[#bff0b9]">🧪 Équivalence: 1 Pack = 1 table meth</p> : null}
                         <p className="mt-0.5 text-xs text-[#f4d4b0]">📦 Stock actuel: <span className="font-semibold text-[#ffe9cd]">{item.quantity}</span></p>
                       </div>
                     </div>

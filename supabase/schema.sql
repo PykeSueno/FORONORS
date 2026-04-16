@@ -623,6 +623,7 @@ create table if not exists public.drug_sales (
   stock_after numeric(12,2),
   cash_before numeric(12,2),
   cash_after numeric(12,2),
+  sale_lines jsonb not null default '[]'::jsonb,
   status text not null default 'validated',
   created_by uuid references public.users(id) on delete set null,
   created_at timestamptz not null default timezone('utc', now())
@@ -651,6 +652,11 @@ alter table public.drug_sales add column if not exists stock_before numeric(12,2
 alter table public.drug_sales add column if not exists stock_after numeric(12,2);
 alter table public.drug_sales add column if not exists cash_before numeric(12,2);
 alter table public.drug_sales add column if not exists cash_after numeric(12,2);
+alter table public.drug_sales add column if not exists sale_lines jsonb not null default '[]'::jsonb;
+
+insert into public.items (name, image_url, buy_price, sell_price, quantity, category_key, type_key)
+select 'Pack Meth', null, 0, 0, 0, 'drugs', 'seeds'
+where not exists (select 1 from public.items where lower(name) = 'pack meth');
 
 create index if not exists idx_drug_transfos_status_sent_at on public.drug_transfos(status, sent_at desc);
 create index if not exists idx_drug_sales_type_created_at on public.drug_sales(drug_type, created_at desc);

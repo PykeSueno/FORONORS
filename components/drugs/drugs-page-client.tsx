@@ -48,6 +48,7 @@ type Sale = {
   stock_after?: number | null;
   cash_before?: number | null;
   cash_after?: number | null;
+  sale_lines?: Array<{ itemName: string; itemImageUrl: string | null; quantity: number; estimatedMin: number; estimatedMax: number; estimatedAvg: number; actualAmount: number; stockBefore: number; stockAfter: number }>;
 };
 
 type Tab = 'transfo' | 'sales';
@@ -138,7 +139,8 @@ export function DrugsPageClient({
   const [quantitySent, setQuantitySent] = useState(100);
   const [paidAmount, setPaidAmount] = useState(0);
   const [note, setNote] = useState('');
-  const [selectedTransfo, setSelectedTransfo] = useState<Transfo | null>(null);
+  const [manageTransfo, setManageTransfo] = useState<Transfo | null>(null);
+  const [validateTransfo, setValidateTransfo] = useState<Transfo | null>(null);
   const [manageQtyReceived, setManageQtyReceived] = useState(0);
   const [manageCompensation, setManageCompensation] = useState(0);
   const [manageQuantitySent, setManageQuantitySent] = useState(1);
@@ -146,10 +148,8 @@ export function DrugsPageClient({
   const [managePaidAmount, setManagePaidAmount] = useState(0);
   const [manageNote, setManageNote] = useState('');
 
-  const [saleType, setSaleType] = useState<'coke' | 'meth' | 'fentanyl'>('coke');
-  const [saleQty, setSaleQty] = useState(10);
+  const [saleLines, setSaleLines] = useState<Array<{ id: number; drug_type: 'coke' | 'meth' | 'fentanyl'; quantity_sold: number; actual_amount: number }>>([{ id: 1, drug_type: 'coke', quantity_sold: 10, actual_amount: 0 }]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  const [actualAmount, setActualAmount] = useState(0);
 
   const selectedTransfoDef = useMemo(() => TRANSFO_DEFS.find((entry) => entry.key === transfoType) ?? TRANSFO_DEFS[0], [transfoType]);
   const sourceItem = itemByKeyword(selectedTransfoDef.sourceKeyword);
@@ -158,23 +158,38 @@ export function DrugsPageClient({
   const sourceStock = Number(sourceItem?.quantity ?? 0);
   const stockAfterSend = Math.max(0, sourceStock - quantitySent);
 
-  const selectedSaleDef = useMemo(() => DRUG_DEFS.find((entry) => entry.key === saleType) ?? DRUG_DEFS[0], [saleType]);
-  const saleItem = itemByKeyword(selectedSaleDef.itemKeyword);
-  const saleStock = Number(saleItem?.quantity ?? 0);
-  const saleEstimation = useMemo(() => {
-    const min = saleQty * selectedSaleDef.unitPrice.min;
-    const max = saleQty * selectedSaleDef.unitPrice.max;
-    return { min, max, avg: Math.round((min + max) / 2) };
-  }, [saleQty, selectedSaleDef]);
+  const saleRows = useMemo(() => saleLines.map((line) => {
+    const def = DRUG_DEFS.find((entry) => entry.key === line.drug_type) ?? DRUG_DEFS[0];
+    const item = itemByKeyword(def.itemKeyword);
+    const min = line.quantity_sold * def.unitPrice.min;
+    const max = line.quantity_sold * def.unitPrice.max;
+    const avg = Math.round((min + max) / 2);
+    return { ...line, def, item, stock: Number(item?.quantity ?? 0), estimate: { min, max, avg } };
+  }), [saleLines, itemByKeyword]);
+  const saleTotals = useMemo(() => ({
+    min: saleRows.reduce((sum, row) => sum + row.estimate.min, 0),
+    max: saleRows.reduce((sum, row) => sum + row.estimate.max, 0),
+    avg: saleRows.reduce((sum, row) => sum + row.estimate.avg, 0),
+    actual: saleRows.reduce((sum, row) => sum + (row.actual_amount > 0 ? row.actual_amount : row.estimate.avg), 0)
+  }), [saleRows]);
 
   function openManage(entry: Transfo) {
-    setSelectedTransfo(entry);
+    setManageTransfo(entry);
+    setValidateTransfo(null);
     setManageQtyReceived(Math.max(0, Number(entry.quantity_expected ?? 0)));
     setManageCompensation(0);
     setManageQuantitySent(Math.max(1, Number(entry.quantity_sent ?? 1)));
     setManageTargetGroup(entry.target_group ?? '');
     setManagePaidAmount(Math.max(0, Number(entry.paid_amount ?? 0)));
     setManageNote(entry.note ?? '');
+    setError('');
+  }
+
+  function openValidate(entry: Transfo) {
+    setValidateTransfo(entry);
+    setManageTransfo(null);
+    setManageQtyReceived(Math.max(0, Number(entry.quantity_expected ?? 0)));
+    setManageCompensation(0);
     setError('');
   }
 
@@ -212,12 +227,12 @@ export function DrugsPageClient({
   }
 
   async function updateTransfo() {
-    if (!selectedTransfo) return;
+    if (!manageTransfo) return;
     const response = await fetch('/api/drugs/transfo', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        transfo_id: selectedTransfo.id,
+        transfo_id: manageTransfo.id,
         action: 'edit',
         quantity_sent: manageQuantitySent,
         target_group: manageTargetGroup,
@@ -235,11 +250,11 @@ export function DrugsPageClient({
   }
 
   async function cancelTransfo() {
-    if (!selectedTransfo) return;
+    if (!manageTransfo) return;
     const response = await fetch('/api/drugs/transfo', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transfo_id: selectedTransfo.id, action: 'cancel' })
+      body: JSON.stringify({ transfo_id: manageTransfo.id, action: 'cancel' })
     });
 
     if (!response.ok) {
@@ -251,12 +266,12 @@ export function DrugsPageClient({
   }
 
   async function validateReception() {
-    if (!selectedTransfo) return;
+    if (!validateTransfo) return;
     const response = await fetch('/api/drugs/transfo', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        transfo_id: selectedTransfo.id,
+        transfo_id: validateTransfo.id,
         action: 'validate_receive',
         quantity_received: manageQtyReceived,
         compensation_amount: manageCompensation
@@ -272,8 +287,8 @@ export function DrugsPageClient({
   }
 
   async function createSale() {
-    if (!saleItem) {
-      setError('Drogue introuvable dans le stock.');
+    if (saleRows.some((row) => !row.item)) {
+      setError('Au moins une drogue sélectionnée est introuvable dans le stock.');
       return;
     }
     const selected = members.filter((member) => selectedMembers.includes(member.id));
@@ -283,12 +298,11 @@ export function DrugsPageClient({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        drug_type: saleType,
-        quantity_sold: saleQty,
+        lines: saleRows.map((row) => ({ drug_type: row.drug_type, quantity_sold: row.quantity_sold, actual_amount: row.actual_amount })),
         is_group_sale: labels.length === 0,
         member_user_ids: selectedMembers,
         member_labels: labels,
-        actual_amount: actualAmount > 0 ? actualAmount : saleEstimation.avg
+        actual_amount: saleTotals.actual
       })
     });
 
@@ -437,8 +451,9 @@ export function DrugsPageClient({
                         </div>
                       </div>
 
-                      <div className="mt-3 flex justify-end">
+                      <div className="mt-3 flex justify-end gap-2">
                         {canManageTransfo(entry) ? <button className="saas-ghost-btn" onClick={() => openManage(entry)}>Gérer</button> : null}
+                        {entry.status === 'pending' && canTransfoReceiveValidate ? <button className="saas-primary-btn !py-2 !px-3" onClick={() => openValidate(entry)}>Valider</button> : null}
                       </div>
                     </article>
                   );
@@ -453,38 +468,60 @@ export function DrugsPageClient({
           <article className="glass-card space-y-4 p-5">
             <h3 className="text-lg font-semibold text-[#fff1dd]">Nouvelle vente drogue</h3>
 
-            <Field label="1. Sélection drogue" hint="Stock réel + estimation intégrée">
-              <div className="grid gap-3 md:grid-cols-3">
-                {DRUG_DEFS.map((drug) => {
-                  const item = itemByKeyword(drug.itemKeyword);
-                  const active = saleType === drug.key;
-                  return (
-                    <button
-                      key={drug.key}
-                      className={`rounded-2xl border p-3 text-left transition ${active ? 'border-[#f7d6ad] bg-[#6e472b]/55 shadow-[0_0_0_1px_rgba(247,214,173,0.4)]' : 'border-white/10 bg-[#2f1d14]/50 hover:border-white/25'}`}
-                      onClick={() => setSaleType(drug.key)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <ItemThumb item={item} fallback="💊" />
-                        <div>
-                          <p className="text-sm font-semibold text-[#ffe9cd]">{drug.label}</p>
-                          <p className="text-xs text-[#efcdab]">Stock: {item?.quantity ?? 0}</p>
+            <Field label="1. Sélection drogue (multi-lignes)" hint="Ajoute plusieurs drogues dans la même vente">
+              <div className="space-y-3">
+                {saleRows.map((row, idx) => (
+                  <div key={row.id} className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-3">
+                    <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+                      <div className="space-y-3">
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          {DRUG_DEFS.map((drug) => {
+                            const item = itemByKeyword(drug.itemKeyword);
+                            const active = row.drug_type === drug.key;
+                            return (
+                              <button
+                                key={`${row.id}-${drug.key}`}
+                                className={`rounded-xl border p-2 text-left ${active ? 'border-[#f7d6ad] bg-[#6e472b]/55' : 'border-white/10 bg-[#2b1a12]/50'}`}
+                                onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, drug_type: drug.key } : line))}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <ItemThumb item={item} fallback="💊" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-[#ffe9cd]">{drug.label}</p>
+                                    <p className="text-[11px] text-[#efcdab]">Stock {item?.quantity ?? 0}</p>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs text-[#efcdab]">Quantité vendue</p>
+                          <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: Math.max(1, line.quantity_sold - 1) } : line))}>-1</button>
+                          <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: Math.max(1, line.quantity_sold - 10) } : line))}>-10</button>
+                          <input className="saas-input w-24 text-center" value={row.quantity_sold} onChange={(event) => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: Math.max(1, Number(event.target.value || 1)) } : line))} />
+                          <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 10 } : line))}>+10</button>
+                          <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 1 } : line))}>+1</button>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <Metric label="Est. min" value={formatUsd(row.estimate.min)} icon="📉" />
+                          <Metric label="Est. max" value={formatUsd(row.estimate.max)} icon="📈" />
+                          <Metric label="Est. moyenne" value={formatUsd(row.estimate.avg)} icon="🧮" />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs text-[#efcdab]">Argent réel récupéré</p>
+                          <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: Math.max(0, line.actual_amount - 100) } : line))}>-100</button>
+                          <input className="saas-input w-28 text-center" value={row.actual_amount} onChange={(event) => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: Math.max(0, Number(event.target.value || 0)) } : line))} />
+                          <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: line.actual_amount + 100 } : line))}>+100</button>
                         </div>
                       </div>
-                      <p className="mt-2 text-xs text-[#efcdab]">Prix unitaire: {drug.unitPrice.min}$ - {drug.unitPrice.max}$</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-
-            <Field label="2. Quantité vendue" hint="Nombre de pochons sortis du stock">
-              <div className="flex items-center gap-2">
-                <button className="saas-ghost-btn !px-3" onClick={() => setSaleQty((current) => Math.max(1, current - 1))}>-1</button>
-                <button className="saas-ghost-btn !px-3" onClick={() => setSaleQty((current) => Math.max(1, current - 10))}>-10</button>
-                <input className="saas-input w-32 text-center" inputMode="numeric" value={saleQty} onChange={(event) => setSaleQty(Math.max(1, Number(event.target.value || 1)))} />
-                <button className="saas-ghost-btn !px-3" onClick={() => setSaleQty((current) => current + 10)}>+10</button>
-                <button className="saas-ghost-btn !px-3" onClick={() => setSaleQty((current) => current + 1)}>+1</button>
+                      <div className="flex items-start justify-end">
+                        {saleLines.length > 1 ? <button className="saas-ghost-btn" onClick={() => setSaleLines((current) => current.filter((line) => line.id !== row.id))}>Supprimer</button> : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button className="saas-ghost-btn w-full" onClick={() => setSaleLines((current) => [...current, { id: Date.now() + current.length, drug_type: 'coke', quantity_sold: 1, actual_amount: 0 }])}>+ Ajouter une drogue</button>
               </div>
             </Field>
 
@@ -508,38 +545,20 @@ export function DrugsPageClient({
               </div>
             </Field>
 
-            <Field label="4. Estimation auto" hint="Mini / Maxi / Moyenne">
+            <Field label="4. Estimation auto globale" hint="Mini / Maxi / Moyenne">
               <div className="grid gap-2 sm:grid-cols-3">
-                <Metric label="Estimation mini" value={formatUsd(saleEstimation.min)} icon="📉" />
-                <Metric label="Estimation maxi" value={formatUsd(saleEstimation.max)} icon="📈" />
-                <Metric label="Estimation moyenne" value={formatUsd(saleEstimation.avg)} icon="🧮" />
-              </div>
-            </Field>
-
-            <Field label="5. Argent réel récupéré" hint="Montant réellement ramené">
-              <p className="mb-1 text-xs text-[#efcdab]">Argent réel récupéré</p>
-              <div className="flex items-center gap-2">
-                <button className="saas-ghost-btn !px-3" onClick={() => setActualAmount((current) => Math.max(0, current - 100))}>-100</button>
-                <button className="saas-ghost-btn !px-3" onClick={() => setActualAmount((current) => Math.max(0, current - 10))}>-10</button>
-                <input
-                  className="saas-input w-40 text-center"
-                  inputMode="decimal"
-                  placeholder="Montant réel récupéré"
-                  value={actualAmount}
-                  onChange={(event) => setActualAmount(Math.max(0, Number(event.target.value || 0)))}
-                />
-                <button className="saas-ghost-btn !px-3" onClick={() => setActualAmount((current) => current + 10)}>+10</button>
-                <button className="saas-ghost-btn !px-3" onClick={() => setActualAmount((current) => current + 100)}>+100</button>
+                <Metric label="Estimation mini" value={formatUsd(saleTotals.min)} icon="📉" />
+                <Metric label="Estimation maxi" value={formatUsd(saleTotals.max)} icon="📈" />
+                <Metric label="Estimation moyenne" value={formatUsd(saleTotals.avg)} icon="🧮" />
               </div>
             </Field>
 
             <Field label="6. Résumé avant validation" hint="Contrôle stock et cash">
               <div className="grid gap-2 rounded-2xl border border-white/10 bg-[#3b2518]/60 p-3 sm:grid-cols-2 lg:grid-cols-3">
-                <Metric label="Drogue" value={selectedSaleDef.label} icon="🧷" />
-                <Metric label="Qté vendue" value={String(saleQty)} icon="📦" />
-                <Metric label="Stock avant" value={String(saleStock)} icon="📚" />
-                <Metric label="Stock après" value={String(Math.max(0, saleStock - saleQty))} icon="📉" />
-                <Metric label="Réel récupéré" value={formatUsd(actualAmount || saleEstimation.avg)} icon="💰" />
+                <Metric label="Lignes drogues" value={String(saleRows.length)} icon="🧷" />
+                <Metric label="Qté vendue" value={String(saleRows.reduce((sum, row) => sum + row.quantity_sold, 0))} icon="📦" />
+                <Metric label="Estimation moyenne" value={formatUsd(saleTotals.avg)} icon="🧮" />
+                <Metric label="Réel récupéré" value={formatUsd(saleTotals.actual)} icon="💰" />
                 <Metric label="Vendeurs" value={selectedMembers.length ? String(selectedMembers.length) : 'Groupe'} icon="👥" />
               </div>
             </Field>
@@ -572,6 +591,13 @@ export function DrugsPageClient({
                           <p>Argent groupe: {typeof sale.cash_before === 'number' ? formatUsd(sale.cash_before) : '-'} → {typeof sale.cash_after === 'number' ? formatUsd(sale.cash_after) : '-'}</p>
                         </div>
                       </div>
+                      {(sale.sale_lines ?? []).length > 0 ? (
+                        <div className="mt-2 space-y-1 rounded-lg border border-white/10 bg-[#2b1a12]/50 p-2 text-xs text-[#efcdab]">
+                          {(sale.sale_lines ?? []).map((line, idx) => (
+                            <p key={`${sale.id}-${idx}`}>• {line.itemName} · Qté {line.quantity} · Est {formatUsd(line.estimatedMin)}-{formatUsd(line.estimatedMax)} · Réel {formatUsd(line.actualAmount)} · Stock {line.stockBefore}→{line.stockAfter}</p>
+                          ))}
+                        </div>
+                      ) : null}
                     </article>
                   );
                 })}
@@ -599,24 +625,30 @@ export function DrugsPageClient({
         </div>
       </section>
 
-      {selectedTransfo ? (
+      {manageTransfo ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <section className="glass-card max-h-[92vh] w-full max-w-2xl overflow-y-auto p-5">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-lg font-semibold text-[#fff1dd]">Gérer transfo #{selectedTransfo.id}</h3>
-              <button className="saas-ghost-btn" onClick={() => setSelectedTransfo(null)}>Fermer</button>
+              <h3 className="text-lg font-semibold text-[#fff1dd]">Gérer transfo #{manageTransfo.id}</h3>
+              <button className="saas-ghost-btn" onClick={() => setManageTransfo(null)}>Fermer</button>
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <Metric label="Type" value={selectedTransfo.transfo_type === 'coke' ? 'Coke' : 'Meth'} icon="🧪" />
-              <Metric label="Statut" value={statusVisual(selectedTransfo.status).label} icon="🏷️" />
-              <Metric label="Envoyé" value={String(selectedTransfo.quantity_sent)} icon="📤" />
-              <Metric label="Attendu" value={String(selectedTransfo.quantity_expected)} icon="🎯" />
+              <Metric label="Type" value={manageTransfo.transfo_type === 'coke' ? 'Coke' : 'Meth'} icon="🧪" />
+              <Metric label="Statut" value={statusVisual(manageTransfo.status).label} icon="🏷️" />
+              <Metric label="Envoyé" value={String(manageTransfo.quantity_sent)} icon="📤" />
+              <Metric label="Attendu" value={String(manageTransfo.quantity_expected)} icon="🎯" />
+            </div>
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
+              <ItemThumb item={itemByKeyword(manageTransfo.transfo_type === 'coke' ? 'feuille de coke' : 'meth brut')} fallback="📤" />
+              <span className="text-[#efcdab]">→</span>
+              <ItemThumb item={itemByKeyword(manageTransfo.transfo_type === 'coke' ? 'pochon de coke' : 'pochon de meth')} fallback="📥" />
+              <p className="text-xs text-[#efcdab]">Envoi / Réception</p>
             </div>
 
-            {selectedTransfo.status === 'pending' ? (
+            {manageTransfo.status === 'pending' ? (
               <div className="mt-4 space-y-4">
-                {(canTransfoEditAny || (canTransfoEditOwn && selectedTransfo.created_by === currentUserId)) ? (
+                {(canTransfoEditAny || (canTransfoEditOwn && manageTransfo.created_by === currentUserId)) ? (
                   <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
                     <h4 className="text-sm font-semibold text-[#ffe9cd]">Modifier la transfo</h4>
                     <div className="mt-2 grid gap-2 md:grid-cols-2">
@@ -629,24 +661,44 @@ export function DrugsPageClient({
                   </section>
                 ) : null}
 
-                {canTransfoReceiveValidate ? (
-                  <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
-                    <h4 className="text-sm font-semibold text-[#ffe9cd]">Valider la réception</h4>
-                    <div className="mt-2 grid gap-2 md:grid-cols-2">
-                      <input className="saas-input" inputMode="numeric" placeholder="Nombre réel de pochons récupérés" value={manageQtyReceived} onChange={(event) => setManageQtyReceived(Math.max(0, Number(event.target.value || 0)))} />
-                      <input className="saas-input" inputMode="decimal" placeholder="Argent compensation reçu" value={manageCompensation} onChange={(event) => setManageCompensation(Math.max(0, Number(event.target.value || 0)))} />
-                    </div>
-                    <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateReception()}>Valider réception</button>
-                  </section>
-                ) : null}
-
-                {(canTransfoCancelAny || (canTransfoCancelOwn && selectedTransfo.created_by === currentUserId)) ? (
+                {(canTransfoCancelAny || (canTransfoCancelOwn && manageTransfo.created_by === currentUserId)) ? (
                   <button className="saas-ghost-btn w-full" onClick={() => void cancelTransfo()}>Annuler la transfo</button>
                 ) : null}
               </div>
             ) : (
               <p className="mt-4 text-sm text-[#f2d2ad]">Cette transfo est clôturée, aucune action possible.</p>
             )}
+          </section>
+        </div>
+      ) : null}
+
+      {validateTransfo ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <section className="glass-card max-h-[92vh] w-full max-w-2xl overflow-y-auto p-5">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-lg font-semibold text-[#fff1dd]">Valider la réception · transfo #{validateTransfo.id}</h3>
+              <button className="saas-ghost-btn" onClick={() => setValidateTransfo(null)}>Fermer</button>
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <Metric label="Groupe destinataire" value={validateTransfo.target_group || '—'} icon="👥" />
+              <Metric label="Statut" value={statusVisual(validateTransfo.status).label} icon="🏷️" />
+              <Metric label="Quantité envoyée" value={String(validateTransfo.quantity_sent)} icon="📤" />
+              <Metric label="Quantité attendue" value={String(validateTransfo.quantity_expected)} icon="🎯" />
+            </div>
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
+              <ItemThumb item={itemByKeyword(validateTransfo.transfo_type === 'coke' ? 'feuille de coke' : 'meth brut')} fallback="📤" />
+              <span className="text-[#efcdab]">→</span>
+              <ItemThumb item={itemByKeyword(validateTransfo.transfo_type === 'coke' ? 'pochon de coke' : 'pochon de meth')} fallback="📥" />
+              <p className="text-xs text-[#efcdab]">Item envoyé / item reçu</p>
+            </div>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
+              <p className="text-sm font-semibold text-[#ffe9cd]">Validation réception</p>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <input className="saas-input" inputMode="numeric" placeholder="Quantité réelle reçue" value={manageQtyReceived} onChange={(event) => setManageQtyReceived(Math.max(0, Number(event.target.value || 0)))} />
+                <input className="saas-input" inputMode="decimal" placeholder="Compensation argent (optionnel)" value={manageCompensation} onChange={(event) => setManageCompensation(Math.max(0, Number(event.target.value || 0)))} />
+              </div>
+              <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateReception()}>Valider la réception</button>
+            </div>
           </section>
         </div>
       ) : null}

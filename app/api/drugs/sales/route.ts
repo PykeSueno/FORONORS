@@ -6,6 +6,13 @@ import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 
 type DrugType = 'coke' | 'meth' | 'fentanyl';
+
+type SaleLineInput = {
+  drug_type: DrugType;
+  quantity_sold: number;
+  actual_amount?: number;
+};
+
 const PRICE_RANGES: Record<DrugType, { min: number; max: number; itemKeyword: string; label: string }> = {
   coke: { min: 75, max: 85, itemKeyword: 'pochon de coke', label: 'Pochon de Coke' },
   meth: { min: 120, max: 140, itemKeyword: 'pochon de meth', label: 'Pochon de Meth' },
@@ -42,26 +49,15 @@ export async function POST(request: Request) {
   if (!canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as {
-    drug_type?: DrugType;
-    quantity_sold?: number;
+    lines?: SaleLineInput[];
     member_user_ids?: string[];
     member_labels?: string[];
     is_group_sale?: boolean;
     actual_amount?: number;
   };
-  const type = body.drug_type;
-  const quantity = Math.max(1, Number(body.quantity_sold ?? 0));
-  if (!type || !PRICE_RANGES[type]) return NextResponse.json({ message: 'Type de drogue invalide.' }, { status: 400 });
 
-  const item = await findDrugItem(type);
-  if (!item) return NextResponse.json({ message: 'Item drogue introuvable.' }, { status: 404 });
-  if (Number(item.quantity) < quantity) return NextResponse.json({ message: 'Stock insuffisant pour cette vente.' }, { status: 400 });
-
-  const range = PRICE_RANGES[type];
-  const estimatedMin = quantity * range.min;
-  const estimatedMax = quantity * range.max;
-  const estimatedAvg = Math.round((estimatedMin + estimatedMax) / 2);
-  const actual = Math.max(0, Number(body.actual_amount ?? estimatedAvg));
+  const lines = (body.lines ?? []).filter((line) => PRICE_RANGES[line.drug_type] && Number(line.quantity_sold) > 0);
+  if (lines.length === 0) return NextResponse.json({ message: 'Ajoute au moins une drogue à vendre.' }, { status: 400 });
 
   const memberIds = Array.from(new Set((body.member_user_ids ?? []).map((entry) => entry.trim()).filter(Boolean)));
   const memberLabels = Array.from(new Set((body.member_labels ?? []).map((entry) => entry.trim()).filter(Boolean)));
@@ -70,50 +66,126 @@ export async function POST(request: Request) {
 
   const supabase = getSupabaseAdmin();
 
-  const stockBefore = Number(item.quantity);
-  const stockAfter = stockBefore - quantity;
-  await supabase.from('items').update({ quantity: stockAfter, updated_at: new Date().toISOString() }).eq('id', item.id);
+  const resolved = [] as Array<{
+    drugType: DrugType;
+    quantity: number;
+    itemId: number;
+    itemName: string;
+    itemImageUrl: string | null;
+    stockBefore: number;
+    stockAfter: number;
+    estimatedMin: number;
+    estimatedMax: number;
+    estimatedAvg: number;
+    actualAmount: number;
+  }>;
+
+  let estimatedTotalAvg = 0;
+  for (const line of lines) {
+    const qty = Math.max(1, Number(line.quantity_sold));
+    const item = await findDrugItem(line.drug_type);
+    if (!item) return NextResponse.json({ message: `Item introuvable pour ${line.drug_type}.` }, { status: 404 });
+    if (Number(item.quantity) < qty) return NextResponse.json({ message: `Stock insuffisant pour ${item.name}.` }, { status: 400 });
+
+    const range = PRICE_RANGES[line.drug_type];
+    const estimatedMin = qty * range.min;
+    const estimatedMax = qty * range.max;
+    const estimatedAvg = Math.round((estimatedMin + estimatedMax) / 2);
+    estimatedTotalAvg += estimatedAvg;
+
+    resolved.push({
+      drugType: line.drug_type,
+      quantity: qty,
+      itemId: item.id,
+      itemName: item.name,
+      itemImageUrl: item.image_url,
+      stockBefore: Number(item.quantity),
+      stockAfter: Number(item.quantity) - qty,
+      estimatedMin,
+      estimatedMax,
+      estimatedAvg,
+      actualAmount: Math.max(0, Number(line.actual_amount ?? 0))
+    });
+  }
+
+  const providedActualTotal = Math.max(0, Number(body.actual_amount ?? 0));
+  const finalActualTotal = providedActualTotal > 0 ? providedActualTotal : resolved.reduce((sum, row) => sum + row.estimatedAvg, 0);
+
+  let distributed = 0;
+  for (let idx = 0; idx < resolved.length; idx += 1) {
+    if (resolved[idx].actualAmount > 0) {
+      distributed += resolved[idx].actualAmount;
+      continue;
+    }
+    const ratio = estimatedTotalAvg > 0 ? (resolved[idx].estimatedAvg / estimatedTotalAvg) : (1 / resolved.length);
+    const allocated = idx === resolved.length - 1 ? Math.max(0, finalActualTotal - distributed) : Math.round(finalActualTotal * ratio);
+    resolved[idx].actualAmount = allocated;
+    distributed += allocated;
+  }
+
+  for (const row of resolved) {
+    await supabase.from('items').update({ quantity: row.stockAfter, updated_at: new Date().toISOString() }).eq('id', row.itemId);
+  }
 
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
   if (!cash) return NextResponse.json({ message: 'Caisse groupe introuvable.' }, { status: 404 });
   const cashBefore = Number(cash.balance);
-  const cashAfter = cashBefore + actual;
+  const cashAfter = cashBefore + finalActualTotal;
   await supabase.from('group_cash').update({ balance: cashAfter, updated_at: new Date().toISOString() }).eq('id', cash.id);
   await supabase.from('cash_movements').insert({
     type: 'entry',
-    amount: actual,
-    label: `Vente drogue ${range.label}`,
+    amount: finalActualTotal,
+    label: `Vente drogue multi (${resolved.length} ligne${resolved.length > 1 ? 's' : ''})`,
     user_id: memberIds[0] ?? session.userId
   });
   await syncMoneyItemToGroupCash(supabase);
 
-  await supabase.from('item_stock_movements').insert({
-    item_id: item.id,
-    item_name: item.name,
-    quantity_delta: -quantity,
-    transaction_type: 'drugs_sale_out',
-    user_id: memberIds[0] ?? session.userId
-  });
+  await supabase.from('item_stock_movements').insert(
+    resolved.map((row) => ({
+      item_id: row.itemId,
+      item_name: row.itemName,
+      quantity_delta: -row.quantity,
+      transaction_type: 'drugs_sale_out',
+      user_id: memberIds[0] ?? session.userId
+    }))
+  );
+
+  const estimatedMinTotal = resolved.reduce((sum, row) => sum + row.estimatedMin, 0);
+  const estimatedMaxTotal = resolved.reduce((sum, row) => sum + row.estimatedMax, 0);
+  const estimatedAvgTotal = resolved.reduce((sum, row) => sum + row.estimatedAvg, 0);
 
   const { data: created } = await supabase
     .from('drug_sales')
     .insert({
-      drug_type: type,
-      item_id: item.id,
-      item_name: item.name,
-      item_image_url: item.image_url,
-      quantity_sold: quantity,
+      drug_type: resolved[0].drugType,
+      item_id: resolved[0].itemId,
+      item_name: resolved.length > 1 ? 'Vente multi-drogues' : resolved[0].itemName,
+      item_image_url: resolved[0].itemImageUrl,
+      quantity_sold: resolved.reduce((sum, row) => sum + row.quantity, 0),
       is_group_sale: isGroupSale,
       member_user_ids: memberIds,
       member_labels: memberLabels,
-      estimated_min: estimatedMin,
-      estimated_max: estimatedMax,
-      estimated_avg: estimatedAvg,
-      actual_amount: actual,
-      stock_before: stockBefore,
-      stock_after: stockAfter,
+      estimated_min: estimatedMinTotal,
+      estimated_max: estimatedMaxTotal,
+      estimated_avg: estimatedAvgTotal,
+      actual_amount: finalActualTotal,
+      stock_before: null,
+      stock_after: null,
       cash_before: cashBefore,
       cash_after: cashAfter,
+      sale_lines: resolved.map((row) => ({
+        drugType: row.drugType,
+        itemId: row.itemId,
+        itemName: row.itemName,
+        itemImageUrl: row.itemImageUrl,
+        quantity: row.quantity,
+        estimatedMin: row.estimatedMin,
+        estimatedMax: row.estimatedMax,
+        estimatedAvg: row.estimatedAvg,
+        actualAmount: row.actualAmount,
+        stockBefore: row.stockBefore,
+        stockAfter: row.stockAfter
+      })),
       created_by: session.userId
     })
     .select('*')
@@ -137,14 +209,16 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (activity?.id) {
-    await supabase.from('activity_items').insert({
-      activity_id: activity.id,
-      item_id: item.id,
-      item_name: item.name,
-      quantity_added: quantity,
-      before_quantity: stockBefore,
-      after_quantity: stockAfter
-    });
+    await supabase.from('activity_items').insert(
+      resolved.map((row) => ({
+        activity_id: activity.id,
+        item_id: row.itemId,
+        item_name: row.itemName,
+        quantity_added: row.quantity,
+        before_quantity: row.stockBefore,
+        after_quantity: row.stockAfter
+      }))
+    );
 
     const membersRows = memberIds.length > 0
       ? memberIds.map((id, idx) => ({
@@ -162,20 +236,16 @@ export async function POST(request: Request) {
     action: 'drugs.sales.create',
     entityType: 'drug_sale',
     entityId: created?.id ?? null,
-    summary: `Vente ${range.label} (${quantity}) par ${actorLabel}`,
+    summary: `Vente drogue multi (${resolved.length} ligne${resolved.length > 1 ? 's' : ''}) par ${actorLabel}`,
     newValues: {
       seller: actorLabel,
-      drugType: type,
-      itemName: item.name,
-      quantity,
-      estimatedMin,
-      estimatedMax,
-      estimatedAvg,
-      actualAmount: actual,
-      stockBefore,
-      stockAfter,
-      cashBefore,
-      cashAfter,
+      lines: resolved,
+      estimatedMinTotal,
+      estimatedMaxTotal,
+      estimatedAvgTotal,
+      actualTotal: finalActualTotal,
+      groupCashBefore: cashBefore,
+      groupCashAfter: cashAfter,
       memberIds,
       memberLabels
     }
