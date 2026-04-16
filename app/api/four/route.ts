@@ -103,13 +103,15 @@ export async function PATCH(request: Request) {
     }
   }
 
+  const itemMovementRows: Array<{ item_id: number; item_name: string; quantity_delta: number }> = [];
   for (const [itemId, delta] of itemDelta.entries()) {
     if (delta === 0) continue;
-    const { data: item } = await supabase.from('items').select('id, quantity').eq('id', itemId).maybeSingle();
+    const { data: item } = await supabase.from('items').select('id, name, quantity').eq('id', itemId).maybeSingle();
     if (!item) return NextResponse.json({ message: `Item #${itemId} introuvable.` }, { status: 404 });
     const next = Number(item.quantity) + delta;
     if (next < 0) return NextResponse.json({ message: `Stock insuffisant pour l'item #${itemId}.` }, { status: 400 });
     await supabase.from('items').update({ quantity: next, updated_at: new Date().toISOString() }).eq('id', itemId);
+    itemMovementRows.push({ item_id: itemId, item_name: item.name, quantity_delta: delta });
   }
 
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
@@ -118,7 +120,58 @@ export async function PATCH(request: Request) {
   const nextBalance = Number(cash.balance) + cashDelta;
   if (nextBalance < 0) return NextResponse.json({ message: 'Solde insuffisant pour clôturer FOUR.' }, { status: 400 });
   await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
+  await supabase.from('cash_movements').insert({
+    type: cashDelta >= 0 ? 'entry' : 'exit',
+    amount: Math.abs(cashDelta),
+    label: `Clôture FOUR #${sessionId} (${cashDelta >= 0 ? 'gain' : 'perte'})`,
+    user_id: access.session.userId
+  });
   await syncMoneyItemToGroupCash(supabase);
+
+  const { data: globalTx } = await supabase
+    .from('transactions')
+    .insert({
+      actor_user_id: access.session.userId,
+      member_user_id: null,
+      member_label: 'Groupe',
+      reason: `Clôture FOUR #${sessionId}`,
+      total_money_in: totalSales,
+      total_money_out: totalPurchases,
+      stock_in_count: itemMovementRows.filter((row) => row.quantity_delta > 0).reduce((sum, row) => sum + row.quantity_delta, 0),
+      stock_out_count: Math.abs(itemMovementRows.filter((row) => row.quantity_delta < 0).reduce((sum, row) => sum + row.quantity_delta, 0)),
+      profit_loss: cashDelta,
+      summary: `FOUR #${sessionId} clôturé · Achats ${totalPurchases}$ · Ventes ${totalSales}$ · Résultat ${cashDelta}$`
+    })
+    .select('id')
+    .maybeSingle();
+
+  if (globalTx?.id) {
+    await supabase.from('transaction_lines').insert(
+      itemMovementRows.map((row) => ({
+        transaction_id: globalTx.id,
+        item_id: row.item_id,
+        item_name_snapshot: row.item_name,
+        movement_type: row.quantity_delta > 0 ? 'stock_in' : 'stock_out',
+        quantity: Math.abs(row.quantity_delta),
+        unit_price: 0,
+        total_amount: 0,
+        money_effect: 0,
+        stock_effect: row.quantity_delta,
+        metadata: { source: 'four_close', session_id: sessionId }
+      }))
+    );
+
+    await supabase.from('item_stock_movements').insert(
+      itemMovementRows.map((row) => ({
+        item_id: row.item_id,
+        transaction_id: globalTx.id,
+        item_name: row.item_name,
+        transaction_type: 'four_close',
+        quantity_delta: row.quantity_delta,
+        user_id: access.session.userId
+      }))
+    );
+  }
 
   const initialCash = Number((session.summary as Record<string, unknown> | null)?.initial_cash ?? 0);
   const cashAdded = Number((session.summary as Record<string, unknown> | null)?.cash_added_total ?? 0);

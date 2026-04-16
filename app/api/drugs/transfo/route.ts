@@ -10,7 +10,7 @@ type TransfoType = 'coke' | 'meth';
 type TransfoAction = 'edit' | 'cancel' | 'validate_receive';
 
 function expectedQty(type: TransfoType, quantity: number) {
-  if (type === 'coke') return Math.floor(quantity * 0.95);
+  if (type === 'coke') return Math.floor(quantity * 9.5);
   return quantity * 2;
 }
 
@@ -146,6 +146,7 @@ export async function POST(request: Request) {
       type,
       sourceItem: sourceItem.name,
       targetItem: targetItem.name,
+      ratioUsed: type === 'coke' ? 'x9.5' : 'x2',
       quantitySent,
       expected,
       paidAmount,
@@ -366,6 +367,7 @@ export async function PATCH(request: Request) {
     summary: `Réception validée pour transfo #${transfoId}`,
     newValues: {
       transfoType: transfo.transfo_type,
+      ratioUsed: transfo.transfo_type === 'coke' ? 'x9.5' : 'x2',
       targetGroup: transfo.target_group,
       quantitySent: transfo.quantity_sent,
       quantityExpected: transfo.quantity_expected,

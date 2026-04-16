@@ -173,8 +173,8 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
         ))}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1fr_1.05fr]">
-        <section className="space-y-4">
+      <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <section className="grid gap-4 lg:grid-rows-[auto_1fr]">
           <section className="glass-card p-5" onPaste={(e) => void onPaste(e)}>
             <h3 className="text-base font-semibold text-[#fff1dd]">A. Session activité</h3>
           <label className="mt-3 block text-xs text-[#efccaa]">Membre</label>
@@ -238,7 +238,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
             {error ? <p className="mt-3 text-sm text-red-100">{error}</p> : null}
           </section>
 
-          <section className="glass-card p-5">
+          <section className="glass-card p-5 min-h-[520px]">
             <h3 className="text-base font-semibold text-[#fff1dd]">B. Items récupérés</h3>
             <input className="saas-input mt-2 w-full" placeholder="Rechercher item" value={query} onChange={(e) => setQuery(e.target.value)} />
             <div className="mt-2 flex flex-wrap gap-2">
@@ -253,7 +253,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                 {availableTypes.map((type) => <button key={type} className={`filter-pill ${typeFilter === type ? 'filter-pill-active' : ''}`} onClick={() => setTypeFilter(type)}>{TYPE_LABELS[type] ?? type}</button>)}
               </div>
             ) : null}
-            <div className="mt-2 grid max-h-60 gap-2 overflow-auto sm:grid-cols-2">
+            <div className="mt-2 grid max-h-[420px] gap-2 overflow-auto sm:grid-cols-2">
               {availableItems.map((item) => (
                 <button key={item.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#3f281b]/60 px-3 py-2 text-left" onClick={() => addItem(item.id)}>
                   <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
@@ -269,7 +269,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
           </section>
         </section>
 
-        <section className="glass-card p-5">
+        <section className="glass-card p-5 min-h-[700px]">
           <h3 className="text-base font-semibold text-[#fff1dd]">C. Récapitulatif</h3>
           <div className="mt-2 space-y-2">
             {lines.map((line, idx) => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { formatUsd } from '@/lib/currency';
 import { humanMoneyMovementLabel, humanStockMovementLabel } from '@/lib/labels';
 import { WelcomeCardActions } from '@/components/dashboard/welcome-card-actions';
@@ -25,7 +26,7 @@ type SummaryPayload = {
   canShowStockMovements: boolean;
   values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; fourOpen: boolean };
   recentCash: Array<{ type: string; amount: number; label: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null }>;
-  recentStock: Array<{ item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null }>;
+  recentStock: Array<{ item_id?: number | null; item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null; items?: { image_url: string | null } | { image_url: string | null }[] | null }>;
 };
 
 export function DashboardShellClient({ name, role, canUpdatePassword, initialOrder, flags }: { name: string; role: string; canUpdatePassword: boolean; initialOrder: string[]; flags: DashboardFlags }) {
@@ -56,7 +57,11 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
     created_at: row.created_at,
     member: Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username) || 'Groupe',
     description: `${humanStockMovementLabel(row.transaction_type)} — ${row.item_name}`,
-    value: `${row.quantity_delta > 0 ? '+' : ''}${row.quantity_delta}`
+    value: `${row.quantity_delta > 0 ? '+' : ''}${row.quantity_delta}`,
+    quantity: row.quantity_delta,
+    type: row.transaction_type,
+    item: row.item_name,
+    image: Array.isArray(row.items) ? row.items[0]?.image_url : row.items?.image_url
   })).slice(0, 4), [summary]);
 
   return (
@@ -78,12 +83,19 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
           <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2><span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">💰 Cash</span></div>
           <div className="space-y-2">
             {summary.recentCash.slice(0, 4).map((row, idx) => (
-              <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
+              <div key={idx} className="group relative rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-[#ffe8c9]">{(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'} — {humanMoneyMovementLabel(row.type)} — {row.label}</p>
                   <p className={`text-sm font-semibold ${Number(row.amount) >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{formatUsd(Number(row.amount))}</p>
                 </div>
                 <p className="mt-1 text-xs text-[#f2d2ae]">{new Date(row.created_at).toLocaleString('fr-FR')}</p>
+                <div className="pointer-events-none absolute left-3 top-full z-20 mt-1 hidden min-w-64 rounded-xl border border-white/10 bg-[#2a180f]/95 p-3 text-xs text-[#f2d2ae] shadow-xl group-hover:block">
+                  <p className="font-semibold text-[#ffe8c9]">Détail mouvement</p>
+                  <p>Type: {humanMoneyMovementLabel(row.type)}</p>
+                  <p>Montant: {formatUsd(Number(row.amount))}</p>
+                  <p>Libellé: {row.label}</p>
+                  <p>Utilisateur: {(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -93,12 +105,20 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
           <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2><span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">📦 Stock</span></div>
           <div className="space-y-2">
             {stockRows.map((row, idx) => (
-              <div key={idx} className="rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
+              <div key={idx} className="group relative rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-[#ffe8c9]">{row.member} — {row.description}</p>
                   <p className={`text-sm font-semibold ${row.value.startsWith('+') ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{row.value}</p>
                 </div>
                 <p className="mt-1 text-xs text-[#f2d2ae]">{new Date(row.created_at).toLocaleString('fr-FR')}</p>
+                <div className="pointer-events-none absolute left-3 top-full z-20 mt-1 hidden min-w-64 rounded-xl border border-white/10 bg-[#2a180f]/95 p-3 text-xs text-[#f2d2ae] shadow-xl group-hover:block">
+                  <p className="font-semibold text-[#ffe8c9]">Détail mouvement</p>
+                  <p>Type: {humanStockMovementLabel(row.type)}</p>
+                  <p>Item: {row.item}</p>
+                  <p>Quantité: {row.quantity > 0 ? '+' : ''}{row.quantity}</p>
+                  <p>Utilisateur: {row.member}</p>
+                  {row.image ? <Image src={row.image} alt={row.item} width={48} height={48} className="mt-2 h-12 w-12 rounded-md border border-white/10 object-cover" unoptimized /> : null}
+                </div>
               </div>
             ))}
           </div>

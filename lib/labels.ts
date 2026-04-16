@@ -8,6 +8,7 @@ export function humanMoneyMovementLabel(type: string) {
   if (type === 'tablet_passage') return 'Passage Tablette';
   if (type === 'tablet_morning_deposit') return 'Dépôt matin Tablette';
   if (type === 'item_money_sync') return 'Sync Item Argent';
+  if (type === 'four_close') return 'Clôture FOUR';
   return type;
 }
 
@@ -24,5 +25,6 @@ export function humanStockMovementLabel(type: string) {
   if (type === 'drugs_transfo_cancel') return 'Transfo drogue (annulation)';
   if (type === 'drugs_transfo_receive') return 'Transfo drogue (réception)';
   if (type === 'drugs_sale_out') return 'Vente drogue (sortie)';
+  if (type === 'four_close') return 'FOUR (clôture session)';
   return type;
 }

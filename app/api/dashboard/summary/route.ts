@@ -19,20 +19,11 @@ export async function GET() {
   const canTransactionsAccess = has('transactions.access');
   const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
 
-  const canTransactionsRecentAccess = has('transactions.recent.access');
-  const canTransactionsRecentPreview = canTransactionsRecentAccess || has('transactions.recent.preview');
-
   const canMembersAccess = has('members.access');
   const canMembersPreview = canMembersAccess || has('members.preview');
 
   const canLogsAccess = has('logs.access');
   const canLogsPreview = canLogsAccess || has('logs.preview');
-
-  const canTabletAccess = has('tablet.access');
-  const canTabletPreview = canTabletAccess || has('tablet.preview');
-
-  const canActivityAccess = has('activity.access');
-  const canActivityPreview = canActivityAccess || has('activity.preview');
 
   const canFourAccess = has('four.access');
   const canFourPreview = canFourAccess || has('four.preview');
@@ -48,7 +39,7 @@ export async function GET() {
     canMembersPreview ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canLogsPreview ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canShowMoneyMovements ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
-    canShowStockMovements ? supabase.from('item_stock_movements').select('item_name, quantity_delta, transaction_type, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
+    canShowStockMovements ? supabase.from('item_stock_movements').select('item_id, item_name, quantity_delta, transaction_type, created_at, users(name, username), items(image_url)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
     canFourPreview ? supabase.from('four_sessions').select('id, status').eq('status', 'open').order('opened_at', { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null })
   ]);
 

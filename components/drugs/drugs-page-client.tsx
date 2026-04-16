@@ -72,10 +72,10 @@ const TRANSFO_DEFS = [
     transfoLabel: 'Transfo Coke',
     sourceLabel: 'Feuille de Coke',
     sourceKeyword: 'feuille de coke',
-    sourceHint: 'Envoi de feuilles vers pochons avec taxe 5%',
+    sourceHint: '1 feuille = 9.5 pochons (arrondi inférieur)',
     targetLabel: 'Pochon de Coke',
     targetKeyword: 'pochon de coke',
-    calc: (qty: number) => Math.floor(qty * 0.95)
+    calc: (qty: number) => Math.floor(qty * 9.5)
   },
   {
     key: 'meth' as const,
@@ -375,7 +375,7 @@ export function DrugsPageClient({
                   <Metric label="Stock actuel" value={String(sourceStock)} icon="📦" />
                 </Field>
 
-                <Field label="5. Quantité attendue automatique" hint="Coke -5% | Meth x2">
+                <Field label="5. Quantité attendue automatique" hint="Coke x9.5 | Meth x2">
                   <Metric label={selectedTransfoDef.targetLabel} value={String(transfoExpected)} icon="🎯" />
                 </Field>
 
@@ -479,7 +479,13 @@ export function DrugsPageClient({
             </Field>
 
             <Field label="2. Quantité vendue" hint="Nombre de pochons sortis du stock">
-              <input className="saas-input w-full" inputMode="numeric" value={saleQty} onChange={(event) => setSaleQty(Math.max(1, Number(event.target.value || 1)))} />
+              <div className="flex items-center gap-2">
+                <button className="saas-ghost-btn !px-3" onClick={() => setSaleQty((current) => Math.max(1, current - 1))}>-1</button>
+                <button className="saas-ghost-btn !px-3" onClick={() => setSaleQty((current) => Math.max(1, current - 10))}>-10</button>
+                <input className="saas-input w-32 text-center" inputMode="numeric" value={saleQty} onChange={(event) => setSaleQty(Math.max(1, Number(event.target.value || 1)))} />
+                <button className="saas-ghost-btn !px-3" onClick={() => setSaleQty((current) => current + 10)}>+10</button>
+                <button className="saas-ghost-btn !px-3" onClick={() => setSaleQty((current) => current + 1)}>+1</button>
+              </div>
             </Field>
 
             <Field label="3. Membre(s) vendeur(s) ou Groupe" hint="Laisse Groupe si vente collective">
@@ -512,13 +518,19 @@ export function DrugsPageClient({
 
             <Field label="5. Argent réel récupéré" hint="Montant réellement ramené">
               <p className="mb-1 text-xs text-[#efcdab]">Argent réel récupéré</p>
-              <input
-                className="saas-input w-full"
-                inputMode="decimal"
-                placeholder="Montant réel récupéré"
-                value={actualAmount}
-                onChange={(event) => setActualAmount(Math.max(0, Number(event.target.value || 0)))}
-              />
+              <div className="flex items-center gap-2">
+                <button className="saas-ghost-btn !px-3" onClick={() => setActualAmount((current) => Math.max(0, current - 100))}>-100</button>
+                <button className="saas-ghost-btn !px-3" onClick={() => setActualAmount((current) => Math.max(0, current - 10))}>-10</button>
+                <input
+                  className="saas-input w-40 text-center"
+                  inputMode="decimal"
+                  placeholder="Montant réel récupéré"
+                  value={actualAmount}
+                  onChange={(event) => setActualAmount(Math.max(0, Number(event.target.value || 0)))}
+                />
+                <button className="saas-ghost-btn !px-3" onClick={() => setActualAmount((current) => current + 10)}>+10</button>
+                <button className="saas-ghost-btn !px-3" onClick={() => setActualAmount((current) => current + 100)}>+100</button>
+              </div>
             </Field>
 
             <Field label="6. Résumé avant validation" hint="Contrôle stock et cash">
