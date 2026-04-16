@@ -147,7 +147,16 @@ export function DrugsPageClient({
   const [isSyncing, setIsSyncing] = useState(false);
 
   const itemByKeyword = useMemo(() => {
-    return (keyword: string) => items.find((entry) => entry.name.toLowerCase().includes(keyword.toLowerCase())) ?? null;
+    const normalize = (value: string) => value.toLowerCase().replace(/[’]/g, '\'').trim();
+    return (keyword: string) => {
+      const normalizedKeyword = normalize(keyword);
+      return items.find((entry) => normalize(entry.name).includes(normalizedKeyword)) ?? null;
+    };
+  }, [items]);
+
+  const itemByExactName = useMemo(() => {
+    const normalize = (value: string) => value.toLowerCase().replace(/[’]/g, '\'').trim();
+    return (name: string) => items.find((entry) => normalize(entry.name) === normalize(name)) ?? null;
   }, [items]);
 
   const [transfoType, setTransfoType] = useState<'coke' | 'meth'>('coke');
@@ -210,7 +219,7 @@ export function DrugsPageClient({
     cokeSeeds: itemByKeyword('graine de coke'),
     cokePots: itemByKeyword('pot'),
     cokeFert: itemByKeyword('fertilisant'),
-    cokeWater: itemByKeyword('bouteille'),
+    cokeWater: itemByExactName("Bouteille d'Eau") ?? itemByKeyword("bouteille d'eau"),
     cokeUv: itemByKeyword('lampe uv'),
     cokeLeaves: itemByKeyword('feuille de coke'),
     methTable: itemByKeyword('table'),
@@ -219,7 +228,22 @@ export function DrugsPageClient({
     methAmmonia: itemByKeyword('ammoniaque'),
     methMethylamine: itemByKeyword('methylamine'),
     methRaw: itemByKeyword('meth brut')
-  }), [itemByKeyword]);
+  }), [itemByExactName, itemByKeyword]);
+
+  const transfoTitleById = useMemo(() => {
+    const counters = new Map<string, number>();
+    const labels = new Map<number, string>();
+    const ordered = [...visibleTransfos].sort((a, b) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime() || a.id - b.id);
+    for (const entry of ordered) {
+      const drugLabel = entry.transfo_type === 'coke' ? 'Coke' : 'Meth';
+      const groupLabel = entry.target_group?.trim() || 'Groupe';
+      const key = `${entry.transfo_type}::${groupLabel.toLowerCase()}`;
+      const next = (counters.get(key) ?? 0) + 1;
+      counters.set(key, next);
+      labels.set(entry.id, `${drugLabel} - ${groupLabel} #${next}`);
+    }
+    return labels;
+  }, [visibleTransfos]);
 
   function openManage(entry: Transfo) {
     setManageTransfo(entry);
@@ -503,7 +527,7 @@ export function DrugsPageClient({
                   return (
                     <article key={entry.id} className="rounded-2xl border border-white/10 bg-[#3f281b]/55 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <p className="text-base font-semibold text-[#ffe8ca]">#{entry.id} · {def.transfoLabel}</p>
+                        <p className="text-base font-semibold text-[#ffe8ca]">{transfoTitleById.get(entry.id) ?? `${def.transfoLabel} #${entry.id}`}</p>
                         <span className={`rounded-full border px-2 py-1 text-xs ${status.cls}`}>{status.label}</span>
                       </div>
 
@@ -514,14 +538,14 @@ export function DrugsPageClient({
                       </div>
 
                       <div className="mt-4 grid gap-2 text-xs text-[#efcdab] sm:grid-cols-2">
-                        <p>Groupe destinataire: <span className="text-[#ffe9cd]">{entry.target_group || 'Non renseigné'}</span></p>
-                        <p>Date d’envoi: <span className="text-[#ffe9cd]">{new Date(entry.sent_at).toLocaleString('fr-FR')}</span></p>
-                        <p>Quantité envoyée: <span className="text-[#ffe9cd]">{entry.quantity_sent}</span></p>
-                        <p>Quantité attendue: <span className="text-[#ffe9cd]">{entry.quantity_expected}</span></p>
-                        <p>Quantité reçue: <span className="text-[#ffe9cd]">{entry.quantity_received ?? 0}</span></p>
-                        <p>Statut: <span className="text-[#ffe9cd]">{status.label}</span></p>
-                        <p>Argent payé: <span className="text-[#ffe9cd]">{formatUsd(Number(entry.paid_amount ?? 0))}</span></p>
-                        <p>Compensation argent: <span className="text-[#ffe9cd]">{formatUsd(Number(entry.compensation_amount ?? 0))}</span></p>
+                        <p>👥 Groupe: <span className="text-[#ffe9cd]">{entry.target_group || 'Non renseigné'}</span></p>
+                        <p>📅 Date: <span className="text-[#ffe9cd]">{new Date(entry.sent_at).toLocaleString('fr-FR')}</span></p>
+                        <p>📤 Envoyé: <span className="text-[#ffe9cd]">{entry.quantity_sent}</span></p>
+                        <p>🎯 Attendu: <span className="text-[#ffe9cd]">{entry.quantity_expected}</span></p>
+                        <p>📥 Reçu: <span className="text-[#ffe9cd]">{entry.quantity_received ?? 0}</span></p>
+                        <p>🏷️ Statut: <span className="text-[#ffe9cd]">{status.label}</span></p>
+                        <p>💸 Argent payé: <span className="text-[#ffe9cd]">{formatUsd(Number(entry.paid_amount ?? 0))}</span></p>
+                        <p>💰 Compensation: <span className="text-[#ffe9cd]">{formatUsd(Number(entry.compensation_amount ?? 0))}</span></p>
                       </div>
 
                       {entry.note ? (
@@ -698,11 +722,13 @@ export function DrugsPageClient({
                 <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
                   <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Coke</h4>
                   <p className="text-xs text-[#efcdab]">1 zone = 9 graines + 2 lampes UV · 1 graine = 1 feuille théorique.</p>
+                  <p className="mt-2 text-xs font-semibold text-[#ffe9cd]">1) Input (quantités)</p>
                   <div className="mt-3 grid gap-3 md:grid-cols-3">
-                    <NumberField label="Nombre de zones" value={safeCokeZones} onMinus={() => setCokeZones((current) => Math.max(0, current - 1))} onPlus={() => setCokeZones((current) => current + 1)} onChange={(value) => setCokeZones(value)} />
-                    <NumberField label="Nombre de graines" value={safeCokeSeeds} onMinus={() => setCokeSeeds((current) => Math.max(0, current - 9))} onPlus={() => setCokeSeeds((current) => current + 9)} onChange={(value) => setCokeSeeds(value)} />
-                    <NumberField label="Récolte réelle" value={safeCokeHarvest} onMinus={() => setCokeHarvest((current) => Math.max(0, current - 1))} onPlus={() => setCokeHarvest((current) => current + 1)} onChange={(value) => setCokeHarvest(value)} />
+                    <NumberField label="Nombre de zones" item={productionItems.cokeUv} fallback="🗺️" value={safeCokeZones} onMinus={() => setCokeZones((current) => Math.max(0, current - 1))} onPlus={() => setCokeZones((current) => current + 1)} onChange={(value) => setCokeZones(value)} />
+                    <NumberField label="Nombre de graines" item={productionItems.cokeSeeds} fallback="🌱" value={safeCokeSeeds} onMinus={() => setCokeSeeds((current) => Math.max(0, current - 9))} onPlus={() => setCokeSeeds((current) => current + 9)} onChange={(value) => setCokeSeeds(value)} />
+                    <NumberField label="Récolte réelle" item={productionItems.cokeLeaves} fallback="🌿" value={safeCokeHarvest} onMinus={() => setCokeHarvest((current) => Math.max(0, current - 1))} onPlus={() => setCokeHarvest((current) => current + 1)} onChange={(value) => setCokeHarvest(value)} />
                   </div>
+                  <p className="mt-3 text-xs font-semibold text-[#ffe9cd]">2) Calcul besoins + stock actuel + résultat</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     <RequirementCard label="Graines par zone" value={String(seedsPerZone)} item={productionItems.cokeSeeds} fallback="🌱" />
                     <RequirementCard label="Pots nécessaires" value={String(cokeNeed.pots)} item={productionItems.cokePots} fallback="🪴" />
@@ -719,10 +745,12 @@ export function DrugsPageClient({
                   <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Meth</h4>
                   <p className="text-xs text-[#efcdab]">1 cycle = 1 table + 1 machine + 2 batteries + 6 ammoniaques + 5 methylamines.</p>
                   <p className="text-xs text-[#efcdab]">1 table donne environ 10 à 20 meth brut.</p>
+                  <p className="mt-2 text-xs font-semibold text-[#ffe9cd]">1) Input (quantités)</p>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <NumberField label="Nombre de cycles / machines" value={safeMethMachines} onMinus={() => setMethMachines((current) => Math.max(0, current - 1))} onPlus={() => setMethMachines((current) => current + 1)} onChange={(value) => setMethMachines(value)} />
-                    <NumberField label="Récolte réelle" value={safeMethHarvest} onMinus={() => setMethHarvest((current) => Math.max(0, current - 1))} onPlus={() => setMethHarvest((current) => current + 1)} onChange={(value) => setMethHarvest(value)} />
+                    <NumberField label="Nombre de cycles / machines" item={productionItems.methMachine} fallback="⚙️" value={safeMethMachines} onMinus={() => setMethMachines((current) => Math.max(0, current - 1))} onPlus={() => setMethMachines((current) => current + 1)} onChange={(value) => setMethMachines(value)} />
+                    <NumberField label="Récolte réelle" item={productionItems.methRaw} fallback="📦" value={safeMethHarvest} onMinus={() => setMethHarvest((current) => Math.max(0, current - 1))} onPlus={() => setMethHarvest((current) => current + 1)} onChange={(value) => setMethHarvest(value)} />
                   </div>
+                  <p className="mt-3 text-xs font-semibold text-[#ffe9cd]">2) Calcul besoins + stock actuel + résultat</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     <RequirementCard label="Tables nécessaires" value={String(methNeed.tables)} item={productionItems.methTable} fallback="🧱" />
                     <RequirementCard label="Machines nécessaires" value={String(methNeed.machines)} item={productionItems.methMachine} fallback="⚙️" />
@@ -888,12 +916,16 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 function NumberField({
   label,
+  item,
+  fallback,
   value,
   onMinus,
   onPlus,
   onChange
 }: {
   label: string;
+  item: Item | null;
+  fallback: string;
   value: number;
   onMinus: () => void;
   onPlus: () => void;
@@ -901,7 +933,10 @@ function NumberField({
 }) {
   return (
     <div className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
-      <p className="text-xs text-[#efcdab]">{label}</p>
+      <div className="flex items-center gap-2">
+        <ItemThumb item={item} fallback={fallback} />
+        <p className="text-xs text-[#efcdab]">{label}</p>
+      </div>
       <div className="mt-2 flex items-center gap-2">
         <button className="saas-ghost-btn !px-2 !py-1" onClick={onMinus}>-</button>
         <input
@@ -927,6 +962,7 @@ function RequirementCard({ label, value, item, fallback }: { label: string; valu
         <div>
           <p className="text-xs text-[#efcdab]">{label}</p>
           <p className="text-sm font-semibold text-[#ffe8ca]">{value || '0'}</p>
+          <p className="text-[11px] text-[#d3b590]">Stock actuel: {Math.max(0, Number(item?.quantity ?? 0))}</p>
         </div>
       </div>
     </div>
