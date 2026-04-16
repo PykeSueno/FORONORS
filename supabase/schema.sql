@@ -654,8 +654,8 @@ alter table public.drug_sales add column if not exists cash_before numeric(12,2)
 alter table public.drug_sales add column if not exists cash_after numeric(12,2);
 alter table public.drug_sales add column if not exists sale_lines jsonb not null default '[]'::jsonb;
 
-insert into public.items (name, image_url, buy_price, sell_price, quantity, category_key, type_key)
-select 'Pack Meth', null, 0, 0, 0, 'drugs', 'seeds'
+insert into public.items (name, image_url, buy_price, sell_price, quantity, category_key, category_label, type_key, type_label)
+select 'Pack Meth', null, 0, 0, 0, 'drugs', 'Drogues', 'seeds', 'Graines'
 where not exists (select 1 from public.items where lower(name) = 'pack meth');
 
 create index if not exists idx_drug_transfos_status_sent_at on public.drug_transfos(status, sent_at desc);
