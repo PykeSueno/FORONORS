@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
-import { humanStockMovementLabel, stockMovementIcon, stockMovementSource } from '@/lib/labels';
+import { humanStockMovementLabel, stockMovementIcon } from '@/lib/labels';
 
 type Row = {
   id: number;

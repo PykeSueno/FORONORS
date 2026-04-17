@@ -6,6 +6,15 @@ import { InternalPageHeader } from '@/components/dashboard/internal-page-header'
 import { MoneyMovementsPageClient } from '@/components/dashboard/money-movements-page-client';
 import { moneyMovementSource } from '@/lib/labels';
 
+type CashMovementRow = {
+  id: number;
+  type: string;
+  amount: number;
+  label: string;
+  created_at: string;
+  users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null;
+};
+
 export default async function MoneyMovementsGlobalPage() {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -19,7 +28,7 @@ export default async function MoneyMovementsGlobalPage() {
     supabase.from('items').select('image_url').eq('is_money_item', true).order('id').limit(1).maybeSingle()
   ]);
 
-  const prepared = (rows ?? []).map((row) => ({
+  const prepared = ((rows ?? []) as CashMovementRow[]).map((row) => ({
     id: row.id,
     type: row.type,
     amount: Number(row.amount ?? 0),

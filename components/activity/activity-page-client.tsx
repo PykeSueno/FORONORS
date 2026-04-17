@@ -50,10 +50,9 @@ const ACTIVITY_META: Record<ActivityDisplayType, { label: string; icon: string; 
 
 const CREATE_ACTIVITY_TYPES: ActivityType[] = ['mailbox', 'burglary', 'container'];
 
-export function ActivityPageClient({ items, members, activities, defaultMemberId, defaultMemberLabel, canCreate, canViewRecent, canManageOwn, canManageAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; defaultMemberLabel: string; canCreate: boolean; canViewRecent: boolean; canManageOwn: boolean; canManageAny: boolean; currentUserId: string }) {
+export function ActivityPageClient({ items, members, activities, defaultMemberId, canCreate, canViewRecent, canManageOwn, canManageAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; canCreate: boolean; canViewRecent: boolean; canManageOwn: boolean; canManageAny: boolean; currentUserId: string }) {
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(defaultMemberId ? [defaultMemberId] : []);
-  const [memberLabel, setMemberLabel] = useState(defaultMemberLabel || 'Groupe');
   const [equipmentUsed, setEquipmentUsed] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
   const [proofImageUrl, setProofImageUrl] = useState('');
@@ -180,7 +179,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
           <label className="mt-3 block text-xs text-[#efccaa]">Membre</label>
           <div className="mt-1 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">
             <div className="flex flex-wrap gap-2">
-              <button className={`filter-pill ${selectedMemberIds.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => { setSelectedMemberIds([]); setMemberLabel('Groupe'); }}>Groupe</button>
+              <button className={`filter-pill ${selectedMemberIds.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => { setSelectedMemberIds([]); }}>Groupe</button>
               {members.map((member) => {
                 const selected = selectedMemberIds.includes(member.id);
                 return (
@@ -191,8 +190,6 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                       setSelectedMemberIds((current) => {
                         const exists = current.includes(member.id);
                         const next = exists ? current.filter((id) => id !== member.id) : [...current, member.id];
-                        const labels = members.filter((entry) => next.includes(entry.id)).map((entry) => entry.name || entry.username);
-                        setMemberLabel(labels.length > 0 ? labels.join(' + ') : 'Groupe');
                         return next;
                       });
                     }}

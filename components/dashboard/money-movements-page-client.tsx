@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { formatUsd } from '@/lib/currency';
-import { humanMoneyMovementLabel, moneyMovementIcon, moneyMovementSource } from '@/lib/labels';
+import { humanMoneyMovementLabel, moneyMovementIcon } from '@/lib/labels';
 
 type Row = {
   id: number;
