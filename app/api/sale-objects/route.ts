@@ -50,7 +50,13 @@ export async function POST(request: Request) {
   ]);
   if (!canAccess || !canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
-  const body = (await request.json()) as { lines?: SaleLineInput[]; buyer_type?: 'pawnshop_sud' | 'pawnshop_nord' | 'group'; buyer_name?: string };
+  const body = (await request.json()) as {
+    lines?: SaleLineInput[];
+    buyer_type?: 'pawnshop_sud' | 'pawnshop_nord' | 'group';
+    buyer_name?: string;
+    seller_user_id?: string | null;
+    seller_label?: string | null;
+  };
   const lines = (body.lines ?? []).filter((line) => Number(line.item_id) > 0 && Number(line.quantity) > 0);
   if (lines.length === 0) return NextResponse.json({ message: 'Ajoute au moins un objet.' }, { status: 400 });
 
@@ -59,7 +65,12 @@ export async function POST(request: Request) {
   const buyerName = buyerNameFromType(buyerType, body.buyer_name);
   if (buyerType === 'group' && !buyerName.trim()) return NextResponse.json({ message: 'Nom du groupe acheteur requis.' }, { status: 400 });
 
+  const sellerUserId = body.seller_user_id || session.userId;
+  const sellerLabel = (body.seller_label ?? '').trim() || session.username;
+
   const supabase = getSupabaseAdmin();
+  const { data: sellerExists } = await supabase.from('users').select('id').eq('id', sellerUserId).maybeSingle();
+  if (!sellerExists) return NextResponse.json({ message: 'Vendeur invalide.' }, { status: 400 });
   const itemIds = Array.from(new Set(lines.map((line) => Number(line.item_id))));
   const { data: items } = await supabase.from('items').select('id, name, quantity, sell_price, image_url, category_label, category_key').in('id', itemIds).eq('category_key', 'objects');
   if (!items || items.length === 0) return NextResponse.json({ message: 'Objets introuvables.' }, { status: 404 });
@@ -103,7 +114,7 @@ export async function POST(request: Request) {
       type: 'sale_objects_immediate',
       amount: total,
       label: `Vente objets #temp (${buyerName})`,
-      user_id: session.userId
+      user_id: sellerUserId
     });
     await syncMoneyItemToGroupCash(supabase);
   }
@@ -127,8 +138,8 @@ export async function POST(request: Request) {
     })),
     cash_before: cashBefore,
     cash_after: cashAfter,
-    created_by: session.userId,
-    received_by: !pawnshop ? session.userId : null,
+    created_by: sellerUserId,
+    received_by: !pawnshop ? sellerUserId : null,
     received_at: !pawnshop ? new Date().toISOString() : null
   }).select('*').maybeSingle();
 
@@ -137,9 +148,9 @@ export async function POST(request: Request) {
     action: pawnshop ? 'sale.objects.create.pending' : 'sale.objects.create.paid',
     entityType: 'sale_object_order',
     entityId: sale?.id ?? null,
-    summary: `Vente objets ${pawnshop ? 'pawnshop' : 'groupe'} #${sale?.id ?? 'N/A'} · ${total}$`,
+    summary: `Vente objets ${pawnshop ? 'pawnshop' : 'groupe'} #${sale?.id ?? 'N/A'} · ${total}$ · vendeur ${sellerLabel}`,
     oldValues: { cashBefore },
-    newValues: { cashAfter, buyerName, buyerType, status, total, lines: resolved }
+    newValues: { cashAfter, buyerName, buyerType, status, total, lines: resolved, sellerUserId, sellerLabel }
   });
 
   return NextResponse.json({ ok: true, sale });

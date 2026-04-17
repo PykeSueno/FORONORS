@@ -27,6 +27,7 @@ type SaleRow = {
 };
 
 type CartLine = { item_id: number; item_name: string; image_url: string | null; stock: number; quantity: number; unit_price: number; line_total: number };
+type Member = { id: string; name: string | null; username: string | null };
 
 export function SaleObjectsPageClient({
   items,
@@ -38,7 +39,10 @@ export function SaleObjectsPageClient({
   canCancelOwn,
   canCancelAny,
   canHistoryView,
-  currentUserId
+  currentUserId,
+  members,
+  defaultSellerId,
+  defaultSellerLabel
 }: {
   items: Item[];
   initialSales: SaleRow[];
@@ -50,6 +54,9 @@ export function SaleObjectsPageClient({
   canCancelAny: boolean;
   canHistoryView: boolean;
   currentUserId: string;
+  members: Member[];
+  defaultSellerId: string;
+  defaultSellerLabel: string;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -60,6 +67,8 @@ export function SaleObjectsPageClient({
   const [sales, setSales] = useState<SaleRow[]>(initialSales);
   const [detail, setDetail] = useState<SaleRow | null>(null);
   const [editingSaleId, setEditingSaleId] = useState<number | null>(null);
+  const [sellerId, setSellerId] = useState(defaultSellerId);
+  const [sellerLabel, setSellerLabel] = useState(defaultSellerLabel);
 
   const filteredItems = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(query.toLowerCase())), [items, query]);
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.line_total, 0), [cart]);
@@ -109,7 +118,13 @@ export function SaleObjectsPageClient({
     const response = await fetch(endpoint, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lines, buyer_type: buyerType, buyer_name: buyerType === 'group' ? customBuyer : undefined })
+      body: JSON.stringify({
+        lines,
+        buyer_type: buyerType,
+        buyer_name: buyerType === 'group' ? customBuyer : undefined,
+        seller_user_id: sellerId || null,
+        seller_label: sellerLabel || null
+      })
     });
     if (!response.ok) return setError((await response.json()).message ?? 'Validation impossible.');
 
@@ -152,6 +167,9 @@ export function SaleObjectsPageClient({
     setCart(editableLines);
     setBuyerType(sale.buyer_type);
     setCustomBuyer(sale.buyer_type === 'group' ? sale.buyer_name : '');
+    setSellerId(sale.created_by ?? '');
+    const creator = Array.isArray(sale.creator) ? sale.creator[0] : sale.creator;
+    setSellerLabel(creator?.name || creator?.username || 'Groupe');
   }
 
   return (
@@ -167,9 +185,13 @@ export function SaleObjectsPageClient({
               <div className="h-10 w-10 overflow-hidden rounded-lg border border-white/10 bg-[#2b1a12]">
                 {item.image_url ? <Image src={item.image_url} alt={item.name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#f2d2ad]">📦</div>}
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[#ffe8ca]">{item.name}</p>
-                <p className="text-xs text-[#efcdab]">Stock {item.quantity} · Prix {formatUsd(Number(item.sell_price ?? 0))}</p>
+                <p className="text-[11px] text-[#efcdab]">{item.category_label || 'Objet'}</p>
+              </div>
+              <div className="ml-auto flex items-center gap-1.5">
+                <span className="rounded-full border border-white/15 bg-[#2d1b12]/80 px-2 py-1 text-[11px] font-semibold text-[#f8d9b7]">📦 {item.quantity}</span>
+                <span className="rounded-full border border-white/15 bg-[#2d1b12]/80 px-2 py-1 text-[11px] font-semibold text-[#c8f3be]">💵 {formatUsd(Number(item.sell_price ?? 0))}</span>
               </div>
             </button>
           ))}
@@ -182,32 +204,52 @@ export function SaleObjectsPageClient({
 
           <div className="grid gap-2">
             <label className="text-xs text-[#efcdab]">Acheteur</label>
-            <select className="saas-input" value={buyerType} onChange={(e) => setBuyerType(e.target.value as 'pawnshop_sud' | 'pawnshop_nord' | 'group')}>
-              <option value="group">Groupe (texte libre)</option>
-              <option value="pawnshop_sud">Pawnshop Sud</option>
-              <option value="pawnshop_nord">Pawnshop Nord</option>
-            </select>
+            <div className="grid grid-cols-3 gap-2">
+              <button type="button" className={`filter-pill w-full ${buyerType === 'group' ? 'filter-pill-active' : ''}`} onClick={() => setBuyerType('group')}>👥 Groupe</button>
+              <button type="button" className={`filter-pill w-full ${buyerType === 'pawnshop_nord' ? 'filter-pill-active' : ''}`} onClick={() => setBuyerType('pawnshop_nord')}>🧰 Pawnshop Nord</button>
+              <button type="button" className={`filter-pill w-full ${buyerType === 'pawnshop_sud' ? 'filter-pill-active' : ''}`} onClick={() => setBuyerType('pawnshop_sud')}>🧰 Pawnshop Sud</button>
+            </div>
             {buyerType === 'group' ? <input className="saas-input" placeholder="Nom du groupe" value={customBuyer} onChange={(e) => setCustomBuyer(e.target.value)} /> : null}
-            <p className="text-xs text-[#efcdab]">Statut paiement: {buyerType === 'group' ? 'Payé immédiatement' : 'En attente de réception'}</p>
+            <p className="text-xs text-[#efcdab]">Statut paiement: {buyerType === 'group' ? '✅ Payé immédiatement' : '⏳ En attente de réception'}</p>
+            <label className="text-xs text-[#efcdab]">Membre vendeur</label>
+            <select className="saas-input" value={sellerId} onChange={(e) => { setSellerId(e.target.value); const m = members.find((entry) => entry.id === e.target.value); setSellerLabel(m ? (m.name || m.username || 'Groupe') : 'Groupe'); }}>
+              <option value="">Groupe</option>
+              {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
+            </select>
+            <p className="text-[11px] text-[#efcdab]">Vendeur sélectionné: <span className="font-semibold text-[#ffe8ca]">{sellerLabel || 'Groupe'}</span></p>
           </div>
 
           <div className="space-y-2">
             {cart.map((line) => (
-              <div key={line.item_id} className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-[#ffe8ca]">{line.item_name}</p>
-                  <button className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => removeLine(line.item_id)}>Suppr</button>
+              <div key={line.item_id} className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2.5">
+                <div className="flex items-start gap-2">
+                  <div className="h-10 w-10 overflow-hidden rounded-lg border border-white/10 bg-[#1f120d]">
+                    {line.image_url ? <Image src={line.image_url} alt={line.item_name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#f2d2ad]">📦</div>}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-[#ffe8ca]">{line.item_name}</p>
+                    <p className="text-[11px] text-[#efcdab]">Stock actuel: {line.stock}</p>
+                  </div>
+                  <button className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => removeLine(line.item_id)}>🗑️</button>
                 </div>
-                <p className="text-xs text-[#efcdab]">Stock: {line.stock}</p>
-                <div className="mt-2 flex items-center gap-1">
-                  <button className="saas-ghost-btn !px-2 !py-1" onClick={() => patchLine(line.item_id, { quantity: line.quantity - 1 })}>-</button>
-                  <input className="saas-input w-20 text-center" value={line.quantity} onChange={(e) => patchLine(line.item_id, { quantity: Number(e.target.value || 0) })} />
-                  <button className="saas-ghost-btn !px-2 !py-1" onClick={() => patchLine(line.item_id, { quantity: line.quantity + 1 })}>+</button>
-                  <button className="saas-primary-btn !px-2 !py-1 text-xs" onClick={() => patchLine(line.item_id, { quantity: line.stock })}>MAX</button>
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <input className="saas-input w-28 text-center" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
-                  <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(line.line_total)}</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-[1.1fr_0.9fr_0.9fr]">
+                  <div className="rounded-lg border border-white/10 bg-[#21140e]/55 p-2">
+                    <p className="mb-1 text-[11px] text-[#efcdab]">Quantité</p>
+                    <div className="flex items-center gap-1">
+                      <button className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0 text-xs" onClick={() => patchLine(line.item_id, { quantity: line.quantity - 1 })}>-</button>
+                      <input className="saas-input !h-7 w-14 text-center text-sm" value={line.quantity} onChange={(e) => patchLine(line.item_id, { quantity: Number(e.target.value || 0) })} />
+                      <button className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0 text-xs" onClick={() => patchLine(line.item_id, { quantity: line.quantity + 1 })}>+</button>
+                      <button className="saas-primary-btn !h-7 !min-h-7 !px-2 !py-0 text-[10px]" onClick={() => patchLine(line.item_id, { quantity: line.stock })}>MAX</button>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-[#21140e]/55 p-2">
+                    <p className="mb-1 text-[11px] text-[#efcdab]">Prix unité</p>
+                    <input className="saas-input !h-7 w-full text-center text-sm" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-[#21140e]/55 p-2">
+                    <p className="mb-1 text-[11px] text-[#efcdab]">Total ligne</p>
+                    <p className="text-sm font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
+                  </div>
                 </div>
               </div>
             ))}

@@ -7,6 +7,7 @@ import { TransactionsTabs } from '@/components/dashboard/transactions-tabs';
 import { SaleObjectsPageClient } from '@/components/sale-objects/sale-objects-page-client';
 
 type SaleObjectPageItem = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
+type SaleMember = { id: string; name: string | null; username: string | null };
 type SaleObjectHistoryRow = {
   id: number;
   buyer_name: string;
@@ -34,12 +35,14 @@ export default async function SaleObjectsPage() {
   if (!canAccess) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: sellableItems }, { data: sales }] = await Promise.all([
+  const [{ data: sellableItems }, { data: sales }, { data: members }] = await Promise.all([
     supabase.from('items').select('id, name, image_url, quantity, sell_price, category_label, category_key').eq('category_key', 'objects').gt('quantity', 0).order('name', { ascending: true }).limit(400),
     permissions.includes('sale.objects.history.view')
       ? supabase.from('sale_object_orders').select('id, buyer_name, buyer_type, status, total_amount, sale_lines, cash_before, cash_after, created_by, received_by, canceled_by, received_at, canceled_at, created_at, updated_at, creator:created_by(name, username), receiver:received_by(name, username), canceler:canceled_by(name, username)').order('created_at', { ascending: false }).limit(100)
-      : Promise.resolve({ data: [] })
+      : Promise.resolve({ data: [] }),
+    supabase.from('users').select('id, name, username').order('username', { ascending: true })
   ]);
+  const currentMember = members?.find((member) => member.id === session.userId);
 
   return (
     <div className="space-y-5">
@@ -60,6 +63,9 @@ export default async function SaleObjectsPage() {
         canCancelAny={permissions.includes('sale.objects.cancel.any')}
         canHistoryView={permissions.includes('sale.objects.history.view')}
         currentUserId={session.userId}
+        members={(members ?? []) as SaleMember[]}
+        defaultSellerId={session.userId}
+        defaultSellerLabel={currentMember?.name || currentMember?.username || 'Groupe'}
       />
     </div>
   );

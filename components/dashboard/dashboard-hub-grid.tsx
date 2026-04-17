@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { DragEvent, useMemo, useState } from 'react';
+import { DragEvent, useEffect, useMemo, useState } from 'react';
 
 type HubCardItem = {
   id: string;
@@ -11,13 +11,25 @@ type HubCardItem = {
   title: string;
   value: string;
   subtitle: string;
-  hoverDetails?: string[];
 };
 
 export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]; initialOrder: string[] }) {
-  const [order, setOrder] = useState<string[]>(initialOrder);
+  const initialNormalizedOrder = useMemo(() => {
+    const cardIds = cards.map((card) => card.id);
+    const validStored = initialOrder.filter((id) => cardIds.includes(id));
+    const missing = cardIds.filter((id) => !validStored.includes(id));
+    return [...validStored, ...missing];
+  }, [cards, initialOrder]);
+
+  const [order, setOrder] = useState<string[]>(initialNormalizedOrder);
   const [dragging, setDragging] = useState<string | null>(null);
-  const [draftOrder, setDraftOrder] = useState<string[]>(initialOrder);
+  const [draftOrder, setDraftOrder] = useState<string[]>(initialNormalizedOrder);
+  const [hasDragged, setHasDragged] = useState(false);
+
+  useEffect(() => {
+    setOrder(initialNormalizedOrder);
+    setDraftOrder(initialNormalizedOrder);
+  }, [initialNormalizedOrder]);
 
   const orderedCards = useMemo(() => {
     const map = new Map(cards.map((card) => [card.id, card]));
@@ -38,6 +50,7 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
 
   function moveCard(targetId: string) {
     if (!dragging || dragging === targetId) return;
+    setHasDragged(true);
     const next = [...draftOrder];
     const from = next.indexOf(dragging);
     const to = next.indexOf(targetId);
@@ -50,6 +63,7 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   function endDrag() {
     if (!dragging) return;
     setDragging(null);
+    setHasDragged(false);
     if (draftOrder.join('|') !== order.join('|')) void persist(draftOrder);
   }
 
@@ -87,8 +101,8 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
           onPointerEnter={() => moveCard(card.id)}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          onClickCapture={(event) => { if (dragging) event.preventDefault(); }}
-          className={dragging === card.id ? 'opacity-70' : ''}
+          onClickCapture={(event) => { if (hasDragged || dragging) event.preventDefault(); }}
+          className={`cursor-grab active:cursor-grabbing ${dragging === card.id ? 'opacity-70' : ''}`}
         >
           <HubCard {...card} />
         </div>
@@ -97,20 +111,15 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   );
 }
 
-function HubCard({ href, enabled, icon, title, value, subtitle, hoverDetails }: Omit<HubCardItem, 'id'>) {
+function HubCard({ href, enabled, icon, title, value, subtitle }: Omit<HubCardItem, 'id'>) {
   const content = (
-    <div className="relative">
+    <>
       <div className="flex items-center justify-between"><p className="text-3xl">{icon}</p><p className="text-2xl font-semibold text-[#ffe9cd]">{value}</p></div>
       <p className="mt-3 text-lg font-semibold text-[#fff2de]">{title}</p>
       <p className="text-sm text-[#f1d1ac]">{subtitle}</p>
-      {hoverDetails && hoverDetails.length > 0 ? (
-        <div className="pointer-events-none absolute inset-x-0 top-full z-40 mt-2 hidden rounded-xl border border-white/10 bg-[#2a180f]/95 p-2 text-xs text-[#f4d7b6] shadow-xl group-hover:block">
-          {hoverDetails.map((line) => <p key={line}>{line}</p>)}
-        </div>
-      ) : null}
-    </div>
+    </>
   );
 
-  if (!enabled) return <div className="glass-card group block cursor-not-allowed opacity-90 p-6">{content}</div>;
-  return <Link href={href} className="glass-card smooth-hover group block p-6">{content}</Link>;
+  if (!enabled) return <div className="glass-card block cursor-not-allowed opacity-90 p-6">{content}</div>;
+  return <Link href={href} className="glass-card smooth-hover block p-6">{content}</Link>;
 }

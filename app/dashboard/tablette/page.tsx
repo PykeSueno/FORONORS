@@ -16,23 +16,21 @@ export default async function TabletPage() {
 
   const businessDay = getTabletBusinessDate();
   const supabase = getSupabaseAdmin();
-  const [{ data: day }, { data: members }, { data: cash }, { data: passages }, { data: kitItem }, { data: cutterItem }] = await Promise.all([
+  const [{ data: day }, { data: members }, { data: cash }, { data: kitItem }, { data: cutterItem }] = await Promise.all([
     supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle(),
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
-    supabase.from('tablet_passages').select('id, member_label, before_cash, after_cash, before_kits, after_kits, before_cutters, after_cutters, created_at').eq('tablet_day_id', -1).limit(0),
     supabase.from('items').select('name, quantity').ilike('name', '%kit%').limit(1).maybeSingle(),
     supabase.from('items').select('name, quantity').ilike('name', '%disqueuse%').limit(1).maybeSingle()
   ]);
 
-  const dayId = day?.id;
-  const dayPassages = dayId
-    ? (await supabase
+  const { data: dayPassages } = day?.id
+    ? await supabase
         .from('tablet_passages')
         .select('id, member_label, before_cash, after_cash, before_kits, after_kits, before_cutters, after_cutters, created_at')
-        .eq('tablet_day_id', dayId)
-        .order('created_at', { ascending: false })).data ?? []
-    : passages ?? [];
+        .eq('tablet_day_id', day.id)
+        .order('created_at', { ascending: false })
+    : { data: [] };
 
   const currentMember = members?.find((member) => member.id === session.userId);
 
@@ -44,7 +42,7 @@ export default async function TabletPage() {
         day={day ?? null}
         businessDay={businessDay}
         members={members ?? []}
-        passages={dayPassages}
+        passages={dayPassages ?? []}
         groupCash={Number(cash?.balance ?? 0)}
         kitsInStock={Number(kitItem?.quantity ?? 0)}
         cuttersInStock={Number(cutterItem?.quantity ?? 0)}

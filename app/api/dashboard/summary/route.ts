@@ -35,7 +35,7 @@ export async function GET() {
   const canShowStockMovements = has('dashboard.stock.movements.access') || has('dashboard.stock.movements.preview') || canItemsPreview;
 
   const supabase = getSupabaseAdmin();
-  const [{ data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: fourActive }, { data: moneyItem }, { count: saleObjectsToday }, { data: itemCategories }] = await Promise.all([
+  const [{ data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: fourActive }, { data: moneyItem }, { count: saleObjectsToday }] = await Promise.all([
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItemsPreview ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
@@ -47,22 +47,9 @@ export async function GET() {
     canShowMoneyMovements ? supabase.from('items').select('image_url').eq('is_money_item', true).order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canSaleObjectsPreview
       ? supabase.from('sale_object_orders').select('id', { count: 'exact', head: true }).neq('status', 'canceled').gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-      : Promise.resolve({ count: 0 }),
-    canItemsPreview
-      ? supabase.from('items').select('category_key, quantity')
-      : Promise.resolve({ data: [] })
+      : Promise.resolve({ count: 0 })
 
   ]);
-
-
-  const categoryTotals = { objects: 0, weapons: 0, equipment: 0, drugs: 0, other: 0, total: 0 };
-  for (const row of itemCategories ?? []) {
-    const qty = Number((row as { quantity?: number }).quantity ?? 0);
-    const key = ((row as { category_key?: string }).category_key ?? 'other') as 'objects' | 'weapons' | 'equipment' | 'drugs' | 'other';
-    if (key in categoryTotals) categoryTotals[key] += qty;
-    else categoryTotals.other += qty;
-    categoryTotals.total += qty;
-  }
 
   return NextResponse.json({
     canShowMoneyMovements,
@@ -74,8 +61,7 @@ export async function GET() {
       membersCount: membersCount ?? 0,
       logsCount: logsCount ?? 0,
       fourOpen: Boolean(fourActive),
-      saleObjectsToday: Number(saleObjectsToday ?? 0),
-      itemCategoryTotals: categoryTotals
+      saleObjectsToday: Number(saleObjectsToday ?? 0)
     },
     moneyItemImageUrl: moneyItem?.image_url ?? null,
     recentCash: recentCash ?? [],

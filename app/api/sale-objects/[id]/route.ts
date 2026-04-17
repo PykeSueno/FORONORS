@@ -37,12 +37,23 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (existing.status === 'canceled') return NextResponse.json({ message: 'Vente annulée non modifiable.' }, { status: 400 });
   if (!canAny && existing.created_by !== session.userId) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
-  const body = (await request.json()) as { lines?: SaleLineInput[]; buyer_type?: 'pawnshop_sud' | 'pawnshop_nord' | 'group'; buyer_name?: string };
+  const body = (await request.json()) as {
+    lines?: SaleLineInput[];
+    buyer_type?: 'pawnshop_sud' | 'pawnshop_nord' | 'group';
+    buyer_name?: string;
+    seller_user_id?: string | null;
+    seller_label?: string | null;
+  };
   const lines = (body.lines ?? []).filter((line) => Number(line.item_id) > 0 && Number(line.quantity) > 0);
   if (lines.length === 0) return NextResponse.json({ message: 'Aucune ligne de vente.' }, { status: 400 });
   const buyerType = body.buyer_type ?? existing.buyer_type;
   if (!['pawnshop_sud', 'pawnshop_nord', 'group'].includes(buyerType)) return NextResponse.json({ message: 'Acheteur invalide.' }, { status: 400 });
   const buyerName = buyerNameFromType(buyerType, body.buyer_name ?? existing.buyer_name);
+  const sellerUserId = body.seller_user_id || existing.created_by || session.userId;
+  const sellerLabel = (body.seller_label ?? '').trim() || session.username;
+
+  const { data: sellerExists } = await supabase.from('users').select('id').eq('id', sellerUserId).maybeSingle();
+  if (!sellerExists) return NextResponse.json({ message: 'Vendeur invalide.' }, { status: 400 });
 
   const previousLines = (existing.sale_lines ?? []) as Array<{ itemId: number; itemName: string; quantity: number }>;
   const previousQtyByItem = new Map<number, number>();
@@ -85,7 +96,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       type: 'sale_objects_edit',
       amount: cashDelta,
       label: `Modification vente objets #${saleId}`,
-      user_id: session.userId
+      user_id: sellerUserId
     });
     await syncMoneyItemToGroupCash(supabase);
   }
@@ -109,7 +120,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     cash_before: cashBefore,
     cash_after: cashAfter,
     received_at: newStatus === 'paid' ? new Date().toISOString() : null,
-    received_by: newStatus === 'paid' ? session.userId : null,
+    received_by: newStatus === 'paid' ? sellerUserId : null,
+    created_by: sellerUserId,
     updated_at: new Date().toISOString()
   }).eq('id', saleId);
 
@@ -128,7 +140,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     entityId: saleId,
     summary: `Modification vente objets #${saleId}`,
     oldValues: { oldTotal, oldStatus: existing.status, oldBuyer: existing.buyer_name, oldLines: existing.sale_lines },
-    newValues: { newTotal, newStatus, newBuyer: buyerName, lines: resolved, cashDelta }
+    newValues: { newTotal, newStatus, newBuyer: buyerName, lines: resolved, cashDelta, sellerUserId, sellerLabel }
   });
 
   return NextResponse.json({ ok: true });

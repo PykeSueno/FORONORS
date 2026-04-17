@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 type Day = {
@@ -25,6 +26,7 @@ type Passage = {
 };
 
 export function TabletPageClient({ day, businessDay, members, passages, groupCash, kitsInStock, cuttersInStock, canManageDaily, canCreatePassage, defaultMemberId, defaultMemberLabel }: { day: Day; businessDay: string; members: Array<{ id: string; name: string; username: string }>; passages: Passage[]; groupCash: number; kitsInStock: number; cuttersInStock: number; canManageDaily: boolean; canCreatePassage: boolean; defaultMemberId: string; defaultMemberLabel: string }) {
+  const router = useRouter();
   const [deposit, setDeposit] = useState(String(day?.deposited_amount ?? 4000));
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
@@ -36,7 +38,7 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
       setError('Dépôt impossible.');
       return;
     }
-    window.location.reload();
+    router.refresh();
   }
 
   async function createPassage() {
@@ -46,14 +48,14 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
       setError(data.message ?? 'Passage impossible.');
       return;
     }
-    window.location.reload();
+    router.refresh();
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <section className="glass-card p-5">
         <h2 className="text-lg font-semibold text-[#fff1dd]">Journée tablette ({businessDay})</h2>
-        <div className="mt-3 grid gap-3 md:grid-cols-7">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat icon="💰" tone="from-emerald-700/40 to-emerald-500/10" label="Dépôt restant" value={`${day?.chest_amount ?? 0}$`} />
           <Stat icon="🏦" tone="from-amber-700/40 to-amber-500/10" label="Dépôt matin" value={`${day?.deposited_amount ?? 0}$`} />
           <Stat icon="💵" tone="from-green-700/40 to-green-500/10" label="Argent groupe réel" value={`${groupCash}$`} />
@@ -67,7 +69,7 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
 
       {canManageDaily ? (
         <section className="glass-card p-5">
-          <h3 className="text-base font-semibold text-[#fff1dd]">Dépôt du matin (8h)</h3>
+          <h3 className="text-base font-semibold text-[#fff1dd]">🏦 Dépôt du matin (8h)</h3>
           <p className="mt-1 text-xs text-[#efcdab]">Allocation interne uniquement (ne modifie pas le solde réel du groupe).</p>
           <div className="mt-2 flex gap-2">
             <input className="saas-input w-full" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
@@ -78,7 +80,7 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
 
       {canCreatePassage ? (
         <section className="glass-card p-5">
-          <h3 className="text-base font-semibold text-[#fff1dd]">Enregistrer un passage tablette</h3>
+          <h3 className="text-base font-semibold text-[#fff1dd]">🧾 Enregistrer un passage tablette</h3>
           <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto]">
             <select className="saas-input" value={memberId} onChange={(e) => { setMemberId(e.target.value); const m = members.find((entry) => entry.id === e.target.value); setMemberLabel(m ? (m.name || m.username) : 'Groupe'); }}>
               <option value="">Groupe</option>
@@ -86,19 +88,25 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
             </select>
             <button className="saas-primary-btn" onClick={() => void createPassage()}>Valider passage</button>
           </div>
+          <p className="mt-1 text-[11px] text-[#efcdab]">Membre sélectionné: <span className="font-semibold text-[#ffe8ca]">{memberLabel || 'Groupe'}</span></p>
         </section>
       ) : null}
 
       {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
 
       <section className="glass-card p-5">
-        <h3 className="text-base font-semibold text-[#fff1dd]">Historique passages</h3>
+        <h3 className="text-base font-semibold text-[#fff1dd]">📚 Historique passages</h3>
         <div className="mt-2 space-y-2">
           {passages.map((passage) => (
             <article key={passage.id} className="rounded-xl border border-white/10 bg-[#4f3220]/55 p-3 text-sm text-[#f3d4b0]">
-              <p className="font-medium">👤 {passage.member_label} · {new Date(passage.created_at).toLocaleString('fr-FR')}</p>
-              <p className="mt-1">💰 {passage.before_cash}$ → {passage.after_cash}$</p>
-              <p>🧰 Kits {passage.before_kits} → {passage.after_kits} · 🛠️ Disqueuses {passage.before_cutters} → {passage.after_cutters}</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium">👤 {passage.member_label}</p>
+                <p className="text-xs text-[#efcdab]">{new Date(passage.created_at).toLocaleString('fr-FR')}</p>
+              </div>
+              <div className="mt-1 grid gap-2 md:grid-cols-2">
+                <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">💰 {passage.before_cash}$ → {passage.after_cash}$</p>
+                <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">🧰 {passage.before_kits} → {passage.after_kits} · 🛠️ {passage.before_cutters} → {passage.after_cutters}</p>
+              </div>
             </article>
           ))}
         </div>

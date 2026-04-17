@@ -8,7 +8,7 @@ import { humanMoneyMovementLabel, humanStockMovementLabel, moneyMovementIcon, st
 import { WelcomeCardActions } from '@/components/dashboard/welcome-card-actions';
 import { DashboardHubGrid } from '@/components/dashboard/dashboard-hub-grid';
 
-type Card = { id: string; href: string; enabled: boolean; icon: string; title: string; value: string; subtitle: string; hoverDetails?: string[] };
+type Card = { id: string; href: string; enabled: boolean; icon: string; title: string; value: string; subtitle: string };
 type DashboardFlags = {
   canMoneyAccess: boolean; canMoneyPreview: boolean;
   canItemsAccess: boolean; canItemsPreview: boolean;
@@ -28,7 +28,7 @@ type SummaryPayload = {
   canShowMoneyMovements: boolean;
   canShowStockMovements: boolean;
   moneyItemImageUrl: string | null;
-  values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; fourOpen: boolean; saleObjectsToday: number; itemCategoryTotals: { objects: number; weapons: number; equipment: number; drugs: number; other: number; total: number } };
+  values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; fourOpen: boolean; saleObjectsToday: number };
   recentCash: Array<{ type: string; amount: number; label: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null }>;
   recentStock: Array<{ item_id?: number | null; item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null; items?: { image_url: string | null } | { image_url: string | null }[] | null }>;
 };
@@ -38,25 +38,19 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-    void fetch('/api/dashboard/summary', { cache: 'no-store' })
+    const controller = new AbortController();
+    void fetch('/api/dashboard/summary', { cache: 'no-store', signal: controller.signal })
       .then((response) => response.ok ? response.json() : null)
-      .then((data) => { if (mounted && data) setSummary(data as SummaryPayload); });
-    return () => { mounted = false; };
+      .then((data) => { if (data) setSummary(data as SummaryPayload); })
+      .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   const cards = useMemo<Card[]>(() => [
     flags.canMoneyPreview ? { id: 'money', href: '/dashboard/argent', enabled: flags.canMoneyAccess, icon: '💰', title: 'Argent', value: summary ? formatUsd(summary.values.cashBalance) : '…', subtitle: 'Caisse actuelle' } : null,
     flags.canSaleObjectsPreview ? { id: 'sale_objects', href: '/dashboard/vente-objets', enabled: flags.canSaleObjectsAccess, icon: '🧰', title: 'Vente objets', value: summary ? String(summary.values.saleObjectsToday) : '…', subtitle: 'Vendre les objets du groupe' } : null,
-    flags.canItemsPreview ? { id: 'items', href: '/dashboard/items', enabled: flags.canItemsAccess, icon: '📦', title: 'Items', value: summary ? String(summary.values.itemsCount) : '…', subtitle: 'Catalogue', hoverDetails: summary ? [
-      `Objets: ${summary.values.itemCategoryTotals.objects}`,
-      `Armes: ${summary.values.itemCategoryTotals.weapons}`,
-      `Équipement: ${summary.values.itemCategoryTotals.equipment}`,
-      `Drogues: ${summary.values.itemCategoryTotals.drugs}`,
-      `Autres: ${summary.values.itemCategoryTotals.other}`,
-      `Total stock: ${summary.values.itemCategoryTotals.total}`
-    ] : [] } : null,
-    flags.canTransactionsPreview ? { id: 'transactions', href: '/dashboard/transactions', enabled: flags.canTransactionsAccess, icon: '🔄', title: 'Transactions', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Créer et gérer' } : null,
+    flags.canItemsPreview ? { id: 'items', href: '/dashboard/items', enabled: flags.canItemsAccess, icon: '📦', title: 'Items', value: summary ? String(summary.values.itemsCount) : '…', subtitle: 'Total catalogué' } : null,
+    flags.canTransactionsPreview ? { id: 'transactions', href: '/dashboard/transactions', enabled: flags.canTransactionsAccess, icon: '🔄', title: 'Transactions', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Créer, gérer, vente objets' } : null,
     flags.canTransactionsRecentPreview ? { id: 'transactions_recent', href: '/dashboard/transactions-recentes', enabled: flags.canTransactionsRecentAccess, icon: '🕒', title: 'Transactions récentes', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Historique' } : null,
     flags.canMembersPreview ? { id: 'members', href: '/dashboard/membres', enabled: flags.canMembersAccess, icon: '👥', title: 'Membres', value: summary ? String(summary.values.membersCount) : '…', subtitle: 'Gestion équipe' } : null,
     flags.canLogsPreview ? { id: 'logs', href: '/dashboard/logs', enabled: flags.canLogsAccess, icon: '🧾', title: 'Logs', value: summary ? String(summary.values.logsCount) : '…', subtitle: 'Traçabilité' } : null,
