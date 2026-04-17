@@ -24,10 +24,23 @@ type DashboardFlags = {
 type SummaryPayload = {
   canShowMoneyMovements: boolean;
   canShowStockMovements: boolean;
+  moneyItemImageUrl: string | null;
   values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; fourOpen: boolean };
   recentCash: Array<{ type: string; amount: number; label: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null }>;
   recentStock: Array<{ item_id?: number | null; item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null; items?: { image_url: string | null } | { image_url: string | null }[] | null }>;
 };
+
+function moneyMovementIcon(type: string) {
+  if (type === 'entry') return '💵';
+  if (type === 'exit') return '💸';
+  if (type === 'adjust') return '🧮';
+  if (type === 'sale') return '🛒';
+  if (type === 'purchase') return '🧾';
+  if (type === 'tablet_passage' || type === 'tablet_morning_deposit') return '📱';
+  if (type === 'four_close') return '🔥';
+  if (type.startsWith('drugs_')) return '🧪';
+  return '💰';
+}
 
 export function DashboardShellClient({ name, role, canUpdatePassword, initialOrder, flags }: { name: string; role: string; canUpdatePassword: boolean; initialOrder: string[]; flags: DashboardFlags }) {
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
@@ -85,7 +98,7 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
             {summary.recentCash.slice(0, 4).map((row, idx) => (
               <div key={idx} className="group relative rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-[#ffe8c9]">{(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'} — {humanMoneyMovementLabel(row.type)} — {row.label}</p>
+                  <p className="text-sm font-medium text-[#ffe8c9]">{moneyMovementIcon(row.type)} {(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'} — {humanMoneyMovementLabel(row.type)} — {row.label}</p>
                   <p className={`text-sm font-semibold ${Number(row.amount) >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{formatUsd(Number(row.amount))}</p>
                 </div>
                 <p className="mt-1 text-xs text-[#f2d2ae]">{new Date(row.created_at).toLocaleString('fr-FR')}</p>
@@ -95,6 +108,7 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
                   <p>Montant: {formatUsd(Number(row.amount))}</p>
                   <p>Libellé: {row.label}</p>
                   <p>Utilisateur: {(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'}</p>
+                  {summary?.moneyItemImageUrl ? <Image src={summary.moneyItemImageUrl} alt="Argent" width={48} height={48} className="mt-2 h-12 w-12 rounded-md border border-white/10 object-cover" unoptimized /> : null}
                 </div>
               </div>
             ))}

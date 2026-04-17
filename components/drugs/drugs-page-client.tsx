@@ -182,6 +182,7 @@ export function DrugsPageClient({
   const [methMachines, setMethMachines] = useState(3);
   const [methHarvest, setMethHarvest] = useState(30);
   const [prodNote, setProdNote] = useState('');
+  const [productionMode, setProductionMode] = useState<'coke' | 'meth'>('coke');
 
   const selectedTransfoDef = useMemo(() => TRANSFO_DEFS.find((entry) => entry.key === transfoType) ?? TRANSFO_DEFS[0], [transfoType]);
   const sourceItem = itemByKeyword(selectedTransfoDef.sourceKeyword);
@@ -211,7 +212,6 @@ export function DrugsPageClient({
   const safeCokeHarvest = Number.isFinite(cokeHarvest) ? Math.max(0, cokeHarvest) : 0;
   const safeMethMachines = Number.isFinite(methMachines) ? Math.max(0, methMachines) : 0;
   const safeMethHarvest = Number.isFinite(methHarvest) ? Math.max(0, methHarvest) : 0;
-  const seedsPerZone = safeCokeZones > 0 ? Math.floor((safeCokeSeeds / safeCokeZones) * 100) / 100 : 0;
 
   const cokeNeed = useMemo(() => ({ pots: safeCokeSeeds, fert: safeCokeSeeds, water: safeCokeSeeds * 3, uv: safeCokeZones * 2, leavesTheo: safeCokeSeeds }), [safeCokeSeeds, safeCokeZones]);
   const methNeed = useMemo(() => ({ tables: safeMethMachines, machines: safeMethMachines, batteries: safeMethMachines * 2, ammoniaque: safeMethMachines * 6, methylamine: safeMethMachines * 5, theoMin: safeMethMachines * 10, theoMax: safeMethMachines * 20 }), [safeMethMachines]);
@@ -448,12 +448,12 @@ export function DrugsPageClient({
               </div>
 
               <section className="space-y-3 rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
-                <Field label="1. Type de transfo" hint="Item envoyé et item attendu">
+                <Field label="1. Type de transfo" hint="Item envoyé + stock actuel">
                   <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
                     <ItemThumb item={sourceItem} fallback="📤" />
                     <div>
                       <p className="text-sm font-semibold text-[#ffe9cd]">{selectedTransfoDef.sourceLabel}</p>
-                      <p className="text-xs text-[#efcdab]">→ {selectedTransfoDef.targetLabel}</p>
+                      <p className="text-xs text-[#efcdab]">Stock actuel: {sourceStock}</p>
                     </div>
                   </div>
                 </Field>
@@ -462,7 +462,7 @@ export function DrugsPageClient({
                   <input className="saas-input w-full" placeholder="Ex: Crew Paleto" value={targetGroup} onChange={(event) => setTargetGroup(event.target.value)} />
                 </Field>
 
-                <Field label="3. Quantité envoyée" hint="Avec repère stock actuel">
+                <Field label="3. Quantité envoyée" hint="Rappel stock réel actuel">
                   <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
                     <ItemThumb item={sourceItem} fallback="📤" />
                     <div className="min-w-[120px] flex-1">
@@ -478,15 +478,7 @@ export function DrugsPageClient({
                   </div>
                 </Field>
 
-                <Field label="4. Stock actuel disponible" hint="Contrôle avant envoi">
-                  <Metric label="Stock actuel" value={String(sourceStock)} icon="📦" />
-                </Field>
-
-                <Field label="5. Quantité attendue automatique" hint="Coke x9.5 | Meth x2">
-                  <Metric label={selectedTransfoDef.targetLabel} value={String(transfoExpected)} icon="🎯" />
-                </Field>
-
-                <Field label="6. Argent payé au groupe" hint="Laisser 0 si non payé">
+                <Field label="4. Argent payé au groupe" hint="Laisser 0 si non payé">
                   <input
                     className="saas-input w-full"
                     inputMode="decimal"
@@ -496,7 +488,7 @@ export function DrugsPageClient({
                   />
                 </Field>
 
-                <Field label="7. Note facultative" hint="Information complémentaire">
+                <Field label="5. Note facultative" hint="Information complémentaire">
                   <textarea className="saas-input w-full" rows={2} placeholder="Note (facultatif)" value={note} onChange={(event) => setNote(event.target.value)} />
                 </Field>
               </section>
@@ -685,16 +677,17 @@ export function DrugsPageClient({
                   return (
                     <article key={sale.id} className="rounded-2xl border border-white/10 bg-[#3f281b]/55 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm font-semibold text-[#ffe8ca]">#{sale.id} · {sale.item_name || (DRUG_DEFS.find((entry) => entry.key === sale.drug_type)?.label ?? sale.drug_type)}</p>
+                        <p className="text-sm font-semibold text-[#ffe8ca]">💊 #{sale.id} · {sale.item_name || (DRUG_DEFS.find((entry) => entry.key === sale.drug_type)?.label ?? sale.drug_type)}</p>
                         <p className="text-xs text-[#efcdab]">{new Date(sale.created_at).toLocaleString('fr-FR')}</p>
                       </div>
 
                       <div className="mt-2 flex items-center gap-3">
                         <ItemThumb item={{ id: -1, name: sale.item_name ?? '', image_url: sale.item_image_url ?? saleItemRef?.image_url ?? null, quantity: 0 }} fallback="💊" />
                         <div className="text-xs text-[#efcdab]">
-                          <p>Vendeur(s): <span className="text-[#ffe9cd]">{sale.is_group_sale ? 'Groupe' : (sale.member_labels ?? []).join(' + ')}</span></p>
-                          <p>Quantité vendue: <span className="text-[#ffe9cd]">{sale.quantity_sold}</span></p>
-                          <p>Réel récupéré: <span className="text-[#ffe9cd]">{formatUsd(sale.actual_amount)}</span></p>
+                          <p>👤 Vendeur(s): <span className="text-[#ffe9cd]">{sale.is_group_sale ? 'Groupe' : (sale.member_labels ?? []).join(' + ')}</span></p>
+                          <p>📦 Quantité vendue: <span className="text-[#ffe9cd]">{sale.quantity_sold}</span></p>
+                          <p>💰 Réel récupéré: <span className="text-[#ffe9cd]">{formatUsd(sale.actual_amount)}</span></p>
+                          <p>🏦 Argent groupe: <span className="text-[#ffe9cd]">{typeof sale.cash_after === 'number' ? formatUsd(sale.cash_after) : '-'}</span></p>
                         </div>
                       </div>
                       {(sale.sale_lines ?? []).length > 0 ? <button className="saas-ghost-btn mt-3 !py-2 !px-3" onClick={() => setDetailSale(sale)}>Voir détail</button> : null}
@@ -715,49 +708,63 @@ export function DrugsPageClient({
             {!canProductionAccess ? <p className="text-sm text-[#f1d2ad]">Permission manquante: accès production.</p> : null}
             {canProductionAccess ? (
               <div className="space-y-4">
-                <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
-                  <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Coke</h4>
-                  <p className="text-xs text-[#efcdab]">1 zone = 9 graines + 2 lampes UV · 1 graine = 1 feuille théorique.</p>
-                  <p className="mt-2 text-xs font-semibold text-[#ffe9cd]">1) Input (quantités)</p>
-                  <div className="mt-3 grid gap-3 md:grid-cols-3">
-                    <NumberField label="Nombre de zones" item={productionItems.cokeUv} fallback="🗺️" value={safeCokeZones} onMinus={() => setCokeZones((current) => Math.max(0, current - 1))} onPlus={() => setCokeZones((current) => current + 1)} onChange={(value) => setCokeZones(value)} />
-                    <NumberField label="Nombre de graines" item={productionItems.cokeSeeds} fallback="🌱" value={safeCokeSeeds} onMinus={() => setCokeSeeds((current) => Math.max(0, current - 9))} onPlus={() => setCokeSeeds((current) => current + 9)} onChange={(value) => setCokeSeeds(value)} />
-                    <NumberField label="Récolte réelle" item={productionItems.cokeLeaves} fallback="🌿" value={safeCokeHarvest} onMinus={() => setCokeHarvest((current) => Math.max(0, current - 1))} onPlus={() => setCokeHarvest((current) => current + 1)} onChange={(value) => setCokeHarvest(value)} />
-                  </div>
-                  <p className="mt-3 text-xs font-semibold text-[#ffe9cd]">2) Calcul besoins + stock actuel + résultat</p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    <RequirementCard label="Graines par zone" value={String(seedsPerZone)} item={productionItems.cokeSeeds} fallback="🌱" />
-                    <RequirementCard label="Pots nécessaires" value={String(cokeNeed.pots)} item={productionItems.cokePots} fallback="🪴" />
-                    <RequirementCard label="Fertilisants nécessaires" value={String(cokeNeed.fert)} item={productionItems.cokeFert} fallback="🧪" />
-                    <RequirementCard label="Bouteilles d’eau nécessaires" value={String(cokeNeed.water)} item={productionItems.cokeWater} fallback="💧" />
-                    <RequirementCard label="Lampes UV nécessaires" value={String(cokeNeed.uv)} item={productionItems.cokeUv} fallback="💡" />
-                    <RequirementCard label="Récolte théorique" value={String(cokeNeed.leavesTheo)} item={productionItems.cokeLeaves} fallback="🌿" />
-                    <RequirementCard label="Récolte réelle" value={String(safeCokeHarvest)} item={productionItems.cokeLeaves} fallback="📦" />
-                  </div>
-                  {(canProductionCreate || canProductionCokeCreate) ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('coke')}>Valider production Coke</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Coke.</p>}
-                </section>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button className={`rounded-2xl border p-3 text-left ${productionMode === 'coke' ? 'border-[#f7d6ad] bg-[#6e472b]/55' : 'border-white/10 bg-[#2f1d14]/45'}`} onClick={() => setProductionMode('coke')}>
+                    <div className="flex items-center gap-2">
+                      <ItemThumb item={productionItems.cokeLeaves} fallback="🌿" />
+                      <div><p className="text-sm font-semibold text-[#ffe9cd]">Mode Coke</p><p className="text-xs text-[#efcdab]">Production feuille de coke</p></div>
+                    </div>
+                  </button>
+                  <button className={`rounded-2xl border p-3 text-left ${productionMode === 'meth' ? 'border-[#f7d6ad] bg-[#6e472b]/55' : 'border-white/10 bg-[#2f1d14]/45'}`} onClick={() => setProductionMode('meth')}>
+                    <div className="flex items-center gap-2">
+                      <ItemThumb item={productionItems.methRaw} fallback="⚗️" />
+                      <div><p className="text-sm font-semibold text-[#ffe9cd]">Mode Meth</p><p className="text-xs text-[#efcdab]">Production meth brut</p></div>
+                    </div>
+                  </button>
+                </div>
 
-                <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
-                  <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Meth</h4>
-                  <p className="text-xs text-[#efcdab]">1 cycle = 1 table + 1 machine + 2 batteries + 6 ammoniaques + 5 methylamines.</p>
-                  <p className="text-xs text-[#efcdab]">1 table donne environ 10 à 20 meth brut.</p>
-                  <p className="mt-2 text-xs font-semibold text-[#ffe9cd]">1) Input (quantités)</p>
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <NumberField label="Nombre de cycles / machines" item={productionItems.methMachine} fallback="⚙️" value={safeMethMachines} onMinus={() => setMethMachines((current) => Math.max(0, current - 1))} onPlus={() => setMethMachines((current) => current + 1)} onChange={(value) => setMethMachines(value)} />
-                    <NumberField label="Récolte réelle" item={productionItems.methRaw} fallback="📦" value={safeMethHarvest} onMinus={() => setMethHarvest((current) => Math.max(0, current - 1))} onPlus={() => setMethHarvest((current) => current + 1)} onChange={(value) => setMethHarvest(value)} />
-                  </div>
-                  <p className="mt-3 text-xs font-semibold text-[#ffe9cd]">2) Calcul besoins + stock actuel + résultat</p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    <RequirementCard label="Tables nécessaires" value={String(methNeed.tables)} item={productionItems.methTable} fallback="🧱" />
-                    <RequirementCard label="Machines nécessaires" value={String(methNeed.machines)} item={productionItems.methMachine} fallback="⚙️" />
-                    <RequirementCard label="Batteries nécessaires" value={String(methNeed.batteries)} item={productionItems.methBattery} fallback="🔋" />
-                    <RequirementCard label="Ammoniaque nécessaire" value={String(methNeed.ammoniaque)} item={productionItems.methAmmonia} fallback="🧴" />
-                    <RequirementCard label="Methylamine nécessaire" value={String(methNeed.methylamine)} item={productionItems.methMethylamine} fallback="🧪" />
-                    <RequirementCard label="Récolte théorique" value={`${methNeed.theoMin}-${methNeed.theoMax}`} item={productionItems.methRaw} fallback="📈" />
-                    <RequirementCard label="Récolte réelle" value={String(safeMethHarvest)} item={productionItems.methRaw} fallback="📦" />
-                  </div>
-                  {(canProductionCreate || canProductionMethCreate) ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('meth')}>Valider production Meth</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Meth.</p>}
-                </section>
+                {productionMode === 'coke' ? (
+                  <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
+                    <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Coke</h4>
+                    <p className="text-xs text-[#efcdab]">1 zone = 9 graines + 2 lampes UV · 1 graine = 1 feuille théorique.</p>
+                    <p className="mt-2 text-xs font-semibold text-[#ffe9cd]">1) Input (quantités)</p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      <NumberField label="Nombre de zones" item={productionItems.cokeUv} fallback="🗺️" value={safeCokeZones} onMinus={() => setCokeZones((current) => Math.max(0, current - 1))} onPlus={() => setCokeZones((current) => current + 1)} onChange={(value) => setCokeZones(value)} />
+                      <NumberField label="Nombre de graines" item={productionItems.cokeSeeds} fallback="🌱" value={safeCokeSeeds} onMinus={() => setCokeSeeds((current) => Math.max(0, current - 9))} onPlus={() => setCokeSeeds((current) => current + 9)} onChange={(value) => setCokeSeeds(value)} />
+                      <NumberField label="Récolte réelle" item={productionItems.cokeLeaves} fallback="🌿" value={safeCokeHarvest} onMinus={() => setCokeHarvest((current) => Math.max(0, current - 1))} onPlus={() => setCokeHarvest((current) => current + 1)} onChange={(value) => setCokeHarvest(value)} />
+                    </div>
+                    <p className="mt-3 text-xs font-semibold text-[#ffe9cd]">2) Calcul auto + stock actuel</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      <RequirementCard label="Pots nécessaires" value={String(cokeNeed.pots)} item={productionItems.cokePots} fallback="🪴" />
+                      <RequirementCard label="Fertilisants nécessaires" value={String(cokeNeed.fert)} item={productionItems.cokeFert} fallback="🧪" />
+                      <RequirementCard label="Bouteilles d’eau nécessaires" value={String(cokeNeed.water)} item={productionItems.cokeWater} fallback="💧" />
+                      <RequirementCard label="Lampes UV nécessaires" value={String(cokeNeed.uv)} item={productionItems.cokeUv} fallback="💡" />
+                      <RequirementCard label="Récolte théorique" value={String(cokeNeed.leavesTheo)} item={productionItems.cokeLeaves} fallback="🌿" />
+                    </div>
+                    {(canProductionCreate || canProductionCokeCreate) ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('coke')}>Valider production Coke</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Coke.</p>}
+                  </section>
+                ) : (
+                  <section className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-4">
+                    <h4 className="text-sm font-semibold text-[#ffe9cd]">Production Meth</h4>
+                    <p className="text-xs text-[#efcdab]">1 cycle = 1 table + 1 machine + 2 batteries + 6 ammoniaques + 5 methylamines.</p>
+                    <p className="text-xs text-[#efcdab]">1 table donne environ 10 à 20 meth brut.</p>
+                    <p className="mt-2 text-xs font-semibold text-[#ffe9cd]">1) Input (quantités)</p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <NumberField label="Nombre de cycles / machines" item={productionItems.methMachine} fallback="⚙️" value={safeMethMachines} onMinus={() => setMethMachines((current) => Math.max(0, current - 1))} onPlus={() => setMethMachines((current) => current + 1)} onChange={(value) => setMethMachines(value)} />
+                      <NumberField label="Récolte réelle" item={productionItems.methRaw} fallback="📦" value={safeMethHarvest} onMinus={() => setMethHarvest((current) => Math.max(0, current - 1))} onPlus={() => setMethHarvest((current) => current + 1)} onChange={(value) => setMethHarvest(value)} />
+                    </div>
+                    <p className="mt-3 text-xs font-semibold text-[#ffe9cd]">2) Calcul auto + stock actuel</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      <RequirementCard label="Tables nécessaires" value={String(methNeed.tables)} item={productionItems.methTable} fallback="🧱" />
+                      <RequirementCard label="Machines nécessaires" value={String(methNeed.machines)} item={productionItems.methMachine} fallback="⚙️" />
+                      <RequirementCard label="Batteries nécessaires" value={String(methNeed.batteries)} item={productionItems.methBattery} fallback="🔋" />
+                      <RequirementCard label="Ammoniaque nécessaire" value={String(methNeed.ammoniaque)} item={productionItems.methAmmonia} fallback="🧴" />
+                      <RequirementCard label="Methylamine nécessaire" value={String(methNeed.methylamine)} item={productionItems.methMethylamine} fallback="🧪" />
+                      <RequirementCard label="Récolte théorique" value={`${methNeed.theoMin}-${methNeed.theoMax}`} item={productionItems.methRaw} fallback="📈" />
+                    </div>
+                    {(canProductionCreate || canProductionMethCreate) ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void validateProduction('meth')}>Valider production Meth</button> : <p className="mt-3 text-sm text-[#f2d2ad]">Permission manquante: valider production Meth.</p>}
+                  </section>
+                )}
 
                 <Field label="Note production (facultative)" hint="Ajoutée à la validation Coke ou Meth">
                   <textarea className="saas-input w-full" rows={2} placeholder="Note production" value={prodNote} onChange={(event) => setProdNote(event.target.value)} />

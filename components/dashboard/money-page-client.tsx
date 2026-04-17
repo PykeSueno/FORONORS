@@ -14,6 +14,18 @@ type Movement = {
   users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null;
 };
 
+function moneyMovementIcon(type: string) {
+  if (type === 'entry') return '💵';
+  if (type === 'exit') return '💸';
+  if (type === 'adjust') return '🧮';
+  if (type === 'sale') return '🛒';
+  if (type === 'purchase') return '🧾';
+  if (type === 'tablet_passage' || type === 'tablet_morning_deposit') return '📱';
+  if (type === 'four_close') return '🔥';
+  if (type.startsWith('drugs_')) return '🧪';
+  return '💰';
+}
+
 export function MoneyPageClient({
   canEdit,
   initialBalance,
@@ -104,7 +116,7 @@ export function MoneyPageClient({
         <div className="mt-3 space-y-2">
           {movements.map((movement) => (
             <div key={movement.id} className="rounded-xl border border-white/10 bg-[#5a3924]/55 px-3 py-2 text-sm text-[#ffe4c6]">
-              {Array.isArray(movement.users) ? (movement.users[0]?.name || movement.users[0]?.username) : (movement.users?.name || movement.users?.username) || 'Groupe'} — {humanMoneyMovementLabel(movement.type)} — {movement.label} — {formatUsd(Number(movement.amount))} · {new Date(movement.created_at).toLocaleString('fr-FR')}
+              {moneyMovementIcon(movement.type)} {Array.isArray(movement.users) ? (movement.users[0]?.name || movement.users[0]?.username) : (movement.users?.name || movement.users?.username) || 'Groupe'} — {humanMoneyMovementLabel(movement.type)} — {movement.label} — {formatUsd(Number(movement.amount))} · {new Date(movement.created_at).toLocaleString('fr-FR')}
             </div>
           ))}
         </div>

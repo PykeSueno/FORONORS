@@ -32,7 +32,7 @@ export async function GET() {
   const canShowStockMovements = has('dashboard.stock.movements.access') || has('dashboard.stock.movements.preview') || canItemsPreview;
 
   const supabase = getSupabaseAdmin();
-  const [{ data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: fourActive }] = await Promise.all([
+  const [{ data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: fourActive }, { data: moneyItem }] = await Promise.all([
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItemsPreview ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
@@ -40,7 +40,8 @@ export async function GET() {
     canLogsPreview ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canShowMoneyMovements ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
     canShowStockMovements ? supabase.from('item_stock_movements').select('item_id, item_name, quantity_delta, transaction_type, created_at, users(name, username), items(image_url)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
-    canFourPreview ? supabase.from('four_sessions').select('id, status').eq('status', 'open').order('opened_at', { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null })
+    canFourPreview ? supabase.from('four_sessions').select('id, status').eq('status', 'open').order('opened_at', { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null }),
+    canShowMoneyMovements ? supabase.from('items').select('image_url').eq('is_money_item', true).order('id').limit(1).maybeSingle() : Promise.resolve({ data: null })
   ]);
 
   return NextResponse.json({
@@ -54,6 +55,7 @@ export async function GET() {
       logsCount: logsCount ?? 0,
       fourOpen: Boolean(fourActive)
     },
+    moneyItemImageUrl: moneyItem?.image_url ?? null,
     recentCash: recentCash ?? [],
     recentStock: recentStock ?? []
   });
