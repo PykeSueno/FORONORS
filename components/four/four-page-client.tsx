@@ -10,7 +10,7 @@ type Item = { id: number; name: string; image_url: string | null; quantity: numb
 type LineKind = 'buy' | 'sell';
 
 type FourLine = { id?: number; item_id: number; item_name: string; movement_kind: LineKind; quantity: number; unit_price: number; total_amount: number };
-type FourTx = { id: number; counterparty: string | null; total_purchases: number; total_sales: number; profit_loss: number; created_at: string; four_transaction_lines: FourLine[] };
+type FourTx = { id: number; counterparty: string | null; status?: 'validated' | 'canceled'; cancel_reason?: string | null; created_by?: string | null; total_purchases: number; total_sales: number; profit_loss: number; created_at: string; updated_at?: string; four_transaction_lines: FourLine[] };
 type FourSession = {
   id: number;
   status: 'open' | 'closed';
@@ -30,7 +30,7 @@ type FourStats = {
   sessions: FourSession[];
 };
 
-export function FourPageClient({ members, items, activeSession, canOpen, canCashAdd, canManageTransaction, canValidateTransaction, canClose, canViewStats, canViewMessages, canManageMessages, currentUserId }: {
+export function FourPageClient({ members, items, activeSession, canOpen, canCashAdd, canManageTransaction, canValidateTransaction, canManageOwnTransaction, canManageAnyTransaction, canClose, canViewStats, canViewMessages, canManageMessages, currentUserId }: {
   members: Member[];
   items: Item[];
   activeSession: FourSession | null;
@@ -39,6 +39,8 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
   canCashAdd: boolean;
   canManageTransaction: boolean;
   canValidateTransaction: boolean;
+  canManageOwnTransaction: boolean;
+  canManageAnyTransaction: boolean;
   canClose: boolean;
   canViewHistory: boolean;
   canViewStats: boolean;
@@ -62,6 +64,7 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
   const [expandedTxId, setExpandedTxId] = useState<number | null>(null);
   const [messages, setMessages] = useState<FourMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState({ id: 0, title: '', content: '', display_order: 100 });
+  const [editingTxId, setEditingTxId] = useState<number | null>(null);
 
   const filteredItems = useMemo(() => items.filter((item) => {
     const qOk = !query || item.name.toLowerCase().includes(query.toLowerCase());
@@ -70,7 +73,7 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
   }), [items, query, categoryFilter]);
 
   const validatedTotals = useMemo(() => {
-    const txs = session?.four_transactions ?? [];
+    const txs = (session?.four_transactions ?? []).filter((tx) => (tx.status ?? 'validated') === 'validated');
     const purchases = txs.reduce((sum, tx) => sum + Number(tx.total_purchases ?? 0), 0);
     const sales = txs.reduce((sum, tx) => sum + Number(tx.total_sales ?? 0), 0);
     return { purchases, sales, profit: sales - purchases };
@@ -147,9 +150,11 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
     const latest = await fetchActiveSession();
     if (!latest?.id || draftLines.length === 0) return;
     const response = await fetch('/api/four/transactions', {
-      method: 'POST',
+      method: editingTxId ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: latest.id, counterparty, lines: draftLines.map((line) => ({ item_id: line.item_id, movement_kind: line.movement_kind, quantity: line.quantity, unit_price: line.unit_price })) })
+      body: JSON.stringify(editingTxId
+        ? { transaction_id: editingTxId, counterparty, lines: draftLines.map((line) => ({ item_id: line.item_id, movement_kind: line.movement_kind, quantity: line.quantity, unit_price: line.unit_price })) }
+        : { session_id: latest.id, counterparty, lines: draftLines.map((line) => ({ item_id: line.item_id, movement_kind: line.movement_kind, quantity: line.quantity, unit_price: line.unit_price })) })
     });
     if (!response.ok) {
       const payload = await response.json();
@@ -158,6 +163,38 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
     }
     setDraftLines([]);
     setCounterparty('');
+    setEditingTxId(null);
+    await fetchActiveSession();
+  }
+
+  function canManageExistingTx(tx: FourTx) {
+    if (canManageAnyTransaction) return true;
+    if (canManageOwnTransaction && tx.created_by && tx.created_by === currentUserId) return true;
+    return false;
+  }
+
+  function loadTxForEdit(tx: FourTx) {
+    if ((tx.status ?? 'validated') !== 'validated') return;
+    setEditingTxId(tx.id);
+    setCounterparty(tx.counterparty || '');
+    setDraftLines((tx.four_transaction_lines ?? []).map((line) => ({
+      id: line.id,
+      item_id: line.item_id,
+      item_name: line.item_name,
+      movement_kind: line.movement_kind,
+      quantity: Number(line.quantity),
+      unit_price: Number(line.unit_price),
+      total_amount: Number(line.total_amount)
+    })));
+  }
+
+  async function cancelTx(txId: number) {
+    const response = await fetch('/api/four/transactions', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transaction_id: txId, reason: 'Annulation depuis interface FOUR' })
+    });
+    if (!response.ok) return setError((await response.json()).message ?? 'Annulation impossible.');
     await fetchActiveSession();
   }
 
@@ -252,7 +289,7 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
             </article>
 
             <article className="glass-card p-5 space-y-3">
-              <h3 className="text-base font-semibold text-[#fff1dd]">Transaction en cours</h3>
+              <h3 className="text-base font-semibold text-[#fff1dd]">{editingTxId ? `Édition transaction #${editingTxId}` : 'Transaction en cours'}</h3>
               <input className="saas-input w-full" placeholder="Interlocuteur / client / groupe" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} />
 
               <div className="grid gap-2 sm:grid-cols-2">
@@ -299,22 +336,30 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
                 <SummaryLine label="Résultat transaction" value={formatUsd(draftTotals.profit)} positive={draftTotals.profit >= 0} danger={draftTotals.profit < 0} />
               </div>
 
-              {canValidateTransaction ? <button className="saas-primary-btn w-full" onClick={() => void validateTransaction()}>Valider la transaction</button> : null}
+              {canValidateTransaction ? <button className="saas-primary-btn w-full" onClick={() => void validateTransaction()}>{editingTxId ? 'Enregistrer la modification' : 'Valider la transaction'}</button> : null}
+              {editingTxId ? <button className="saas-ghost-btn w-full" onClick={() => { setEditingTxId(null); setDraftLines([]); setCounterparty(''); }}>Annuler l’édition</button> : null}
 
               <div className="rounded-xl border border-white/10 bg-[#2e1d14]/45 p-3">
-                <p className="text-sm font-semibold text-[#fff1dd]">Transactions validées ({session?.four_transactions?.length ?? 0})</p>
+                <p className="text-sm font-semibold text-[#fff1dd]">Transactions session ({session?.four_transactions?.length ?? 0})</p>
                 <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
                   {(session?.four_transactions ?? []).map((tx) => {
                     const expanded = expandedTxId === tx.id;
                     return (
                       <div key={tx.id} className="rounded-lg border border-white/10 bg-[#3f281b]/50">
                         <button className="w-full px-3 py-2 text-left" onClick={() => setExpandedTxId(expanded ? null : tx.id)}>
-                          <p className="text-sm font-semibold text-[#ffe8ca]">Transaction #{tx.id}</p>
+                          <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-[#ffe8ca]">Transaction #{tx.id}</p><span className={`rounded-full px-2 py-0.5 text-[10px] ${ (tx.status ?? 'validated') === 'validated' ? 'bg-emerald-500/20 text-emerald-200' : 'bg-rose-500/20 text-rose-200'}`}>{(tx.status ?? 'validated') === 'validated' ? 'VALIDÉE' : 'ANNULÉE'}</span></div>
                           <p className="text-xs text-[#efcdab]">🧑 Interlocuteur : {tx.counterparty || 'Inconnu'} · 🕒 {new Date(tx.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
                           <p className="text-xs text-[#efcdab]">Ventes {formatUsd(Number(tx.total_sales))} · Achats {formatUsd(Number(tx.total_purchases))} · Résultat {formatUsd(Number(tx.profit_loss))}</p>
+                          {(tx.status ?? 'validated') !== 'validated' && tx.cancel_reason ? <p className="text-xs text-[#f0b9b9]">Annulation: {tx.cancel_reason}</p> : null}
                         </button>
                         {expanded ? (
                           <div className="space-y-2 border-t border-white/10 px-3 py-2">
+                            {canManageExistingTx(tx) && (tx.status ?? 'validated') === 'validated' ? (
+                              <div className="flex gap-2">
+                                <button className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => loadTxForEdit(tx)}>Modifier</button>
+                                <button className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => void cancelTx(tx.id)}>Annuler</button>
+                              </div>
+                            ) : null}
                             <p className="text-xs font-semibold text-[#fff1dd]">📦 Détail</p>
                             <div className="space-y-1">
                               {(tx.four_transaction_lines ?? []).map((line, idx) => (

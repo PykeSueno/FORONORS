@@ -1,9 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { formatUsd } from '@/lib/currency';
-import { humanMoneyMovementLabel, humanStockMovementLabel } from '@/lib/labels';
+import { humanMoneyMovementLabel, humanStockMovementLabel, moneyMovementIcon, stockMovementIcon } from '@/lib/labels';
 import { WelcomeCardActions } from '@/components/dashboard/welcome-card-actions';
 import { DashboardHubGrid } from '@/components/dashboard/dashboard-hub-grid';
 
@@ -19,6 +20,7 @@ type DashboardFlags = {
   canActivityAccess: boolean; canActivityPreview: boolean;
   canFourAccess: boolean; canFourPreview: boolean;
   canDrugsAccess: boolean; canDrugsPreview: boolean;
+  canMoneyMovementsView: boolean; canStockMovementsView: boolean;
 };
 
 type SummaryPayload = {
@@ -30,17 +32,6 @@ type SummaryPayload = {
   recentStock: Array<{ item_id?: number | null; item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null; items?: { image_url: string | null } | { image_url: string | null }[] | null }>;
 };
 
-function moneyMovementIcon(type: string) {
-  if (type === 'entry') return '💵';
-  if (type === 'exit') return '💸';
-  if (type === 'adjust') return '🧮';
-  if (type === 'sale') return '🛒';
-  if (type === 'purchase') return '🧾';
-  if (type === 'tablet_passage' || type === 'tablet_morning_deposit') return '📱';
-  if (type === 'four_close') return '🔥';
-  if (type.startsWith('drugs_')) return '🧪';
-  return '💰';
-}
 
 export function DashboardShellClient({ name, role, canUpdatePassword, initialOrder, flags }: { name: string; role: string; canUpdatePassword: boolean; initialOrder: string[]; flags: DashboardFlags }) {
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
@@ -93,14 +84,14 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
 
       <section className="grid gap-4 lg:grid-cols-2">
         {summary?.canShowMoneyMovements ? <article className="glass-card p-6">
-          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2><span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">💰 Cash</span></div>
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements d’argent</h2>{flags.canMoneyMovementsView ? <Link href="/dashboard/mouvements/argent" className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3] hover:bg-[#5a3926]">💰 Cash</Link> : <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">💰 Cash</span>}</div>
           <div className="space-y-2">
             {summary.recentCash.slice(0, 4).map((row, idx) => (
               <div key={idx} className="group relative rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${Number(row.amount) >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-200'}`}>{Number(row.amount) >= 0 ? '+' : '-'}</span>
-                    <p className="text-sm font-medium text-[#ffe8c9]">{moneyMovementIcon(row.type)} {(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'} — {humanMoneyMovementLabel(row.type)} — {row.label}</p>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4a2f20]/70 text-sm">{moneyMovementIcon(row.type)}</span>
+                    <p className="text-sm font-medium text-[#ffe8c9]"> {(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'} — {humanMoneyMovementLabel(row.type)} — {row.label}</p>
                   </div>
                   <p className={`text-sm font-semibold ${Number(row.amount) >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{formatUsd(Number(row.amount))}</p>
                 </div>
@@ -114,7 +105,7 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
                   {summary?.moneyItemImageUrl ? (
                     <div className="relative mt-2 h-12 w-12">
                       <Image src={summary.moneyItemImageUrl} alt="Argent" width={48} height={48} className="h-12 w-12 rounded-md border border-white/10 object-cover" unoptimized />
-                      <span className={`absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${Number(row.amount) >= 0 ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-white'}`}>{Number(row.amount) >= 0 ? '+' : '-'}</span>
+                      
                     </div>
                   ) : null}
                 </div>
@@ -124,13 +115,13 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
         </article> : null}
 
         {summary?.canShowStockMovements ? <article className="glass-card p-6">
-          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2><span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">📦 Stock</span></div>
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#f6e5cd]">Derniers mouvements de stock</h2>{flags.canStockMovementsView ? <Link href="/dashboard/mouvements/stock" className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3] hover:bg-[#5a3926]">📦 Stock</Link> : <span className="rounded-full bg-[#3b2418]/70 px-2 py-1 text-xs text-[#f6d6b3]">📦 Stock</span>}</div>
           <div className="space-y-2">
             {stockRows.map((row, idx) => (
               <div key={idx} className="group relative rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${row.quantity >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-200'}`}>{row.quantity >= 0 ? '+' : '-'}</span>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4a2f20]/70 text-sm">{stockMovementIcon(row.type, row.quantity)}</span>
                     <p className="text-sm font-medium text-[#ffe8c9]">{row.member} — {row.description}</p>
                   </div>
                   <p className={`text-sm font-semibold ${row.value.startsWith('+') ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{row.value}</p>
@@ -145,7 +136,7 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
                   {row.image ? (
                     <div className="relative mt-2 h-12 w-12">
                       <Image src={row.image} alt={row.item} width={48} height={48} className="h-12 w-12 rounded-md border border-white/10 object-cover" unoptimized />
-                      <span className={`absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${row.quantity >= 0 ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-white'}`}>{row.quantity >= 0 ? '+' : '-'}</span>
+                      
                     </div>
                   ) : null}
                 </div>

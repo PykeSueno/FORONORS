@@ -16,6 +16,7 @@ type SessionLine = {
 type SessionTransaction = {
   id: number;
   counterparty: string | null;
+  status?: string | null;
   total_purchases: number | null;
   total_sales: number | null;
   profit_loss: number | null;
@@ -42,7 +43,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data: sessions } = await supabase
     .from('four_sessions')
-    .select('id, status, opened_at, closed_at, managed_by, users:managed_by(name, username), summary, four_transactions(id, counterparty, total_purchases, total_sales, profit_loss, created_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount))')
+    .select('id, status, opened_at, closed_at, managed_by, users:managed_by(name, username), summary, four_transactions(id, counterparty, status, cancel_reason, created_by, canceled_by, canceled_at, total_purchases, total_sales, profit_loss, created_at, updated_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount))')
     .order('opened_at', { ascending: false })
     .limit(100);
 
@@ -60,6 +61,7 @@ export async function GET() {
     byMember[memberName].sessions += 1;
 
     for (const tx of fourSession.four_transactions ?? []) {
+      if (tx.status && tx.status !== 'validated') continue;
       const p = Number(tx.total_purchases ?? 0);
       const s = Number(tx.total_sales ?? 0);
       totalPurchases += p;

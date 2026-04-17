@@ -98,7 +98,9 @@ values
   ('money.quick_sale.access'),
   ('money.quick_sale.create'),
   ('money.quick_sale.details.view'),
-  ('money.quick_sale.logs.view')
+  ('money.quick_sale.logs.view'),
+  ('money.movements.view'),
+  ('items.movements.view')
 on conflict (name) do nothing;
 
 
@@ -506,10 +508,15 @@ create table if not exists public.four_transactions (
   id bigint generated always as identity primary key,
   session_id bigint not null references public.four_sessions(id) on delete cascade,
   counterparty text,
+  status text not null default 'validated',
+  cancel_reason text,
   total_purchases numeric(12,2) not null default 0,
   total_sales numeric(12,2) not null default 0,
   profit_loss numeric(12,2) not null default 0,
   created_by uuid references public.users(id) on delete set null,
+  canceled_by uuid references public.users(id) on delete set null,
+  canceled_at timestamptz,
+  updated_at timestamptz not null default timezone('utc', now()),
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -571,12 +578,19 @@ values
   ('four.cash.add'),
   ('four.transaction.manage'),
   ('four.transaction.validate'),
+  ('four.transaction.manage.own'),
+  ('four.transaction.manage.any'),
   ('four.close'),
   ('four.logs.view'),
   ('four.history.view')
 on conflict (name) do nothing;
 
 alter table public.four_movements add column if not exists counterparty text;
+alter table public.four_transactions add column if not exists status text not null default 'validated';
+alter table public.four_transactions add column if not exists cancel_reason text;
+alter table public.four_transactions add column if not exists canceled_by uuid references public.users(id) on delete set null;
+alter table public.four_transactions add column if not exists canceled_at timestamptz;
+alter table public.four_transactions add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.four_messages (
   id bigint generated always as identity primary key,

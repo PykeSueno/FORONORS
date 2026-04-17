@@ -31,6 +31,8 @@ export default async function DashboardPage() {
   const canDrugsAccess = has('drugs.access');
   const canDrugsPreview = canDrugsAccess || has('drugs.preview');
   const canUpdatePassword = has('account.password.update');
+  const canMoneyMovementsView = has('money.movements.view');
+  const canStockMovementsView = has('items.movements.view');
 
   const supabase = getSupabaseAdmin();
   const { data: user } = session
@@ -55,7 +57,8 @@ export default async function DashboardPage() {
         canTabletAccess, canTabletPreview,
         canActivityAccess, canActivityPreview,
         canFourAccess, canFourPreview,
-        canDrugsAccess, canDrugsPreview
+        canDrugsAccess, canDrugsPreview,
+        canMoneyMovementsView, canStockMovementsView
       }}
     />
   );

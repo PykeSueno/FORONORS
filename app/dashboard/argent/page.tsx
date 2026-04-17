@@ -23,7 +23,7 @@ export default async function MoneyPage() {
       ? supabase.from('money_item_sales').select('*').order('created_at', { ascending: false }).limit(30)
       : Promise.resolve({ data: [] }),
     canQuickSaleAccess
-      ? supabase.from('items').select('id, name, image_url, quantity, sell_price, category_label').gt('quantity', 0).order('name', { ascending: true }).limit(300)
+      ? supabase.from('items').select('id, name, image_url, quantity, sell_price, category_label, category_key').eq('category_key', 'objects').gt('quantity', 0).order('name', { ascending: true }).limit(300)
       : Promise.resolve({ data: [] })
   ]);
 

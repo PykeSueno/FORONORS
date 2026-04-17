@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { describePermission, MODULE_ORDER, permissionOrder } from '@/lib/permission-catalog';
+import { describePermission, MODULE_ORDER, SECTION_ORDER } from '@/lib/permission-catalog';
 
 type Permission = { id: number; name: string };
 type Role = { id: number; name: string; display_order: number; permission_ids: number[] };
@@ -419,11 +419,12 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
   const [isSaving, setIsSaving] = useState(false);
 
   const modules = useMemo(() => {
-    const grouped: Record<string, Permission[]> = {};
+    const grouped: Record<string, Record<string, Permission[]>> = {};
     for (const permission of permissions) {
       const info = describePermission(permission.name);
-      if (!grouped[info.module]) grouped[info.module] = [];
-      grouped[info.module].push(permission);
+      if (!grouped[info.module]) grouped[info.module] = {};
+      if (!grouped[info.module][info.section]) grouped[info.module][info.section] = [];
+      grouped[info.module][info.section].push(permission);
     }
 
     return Object.entries(grouped)
@@ -434,9 +435,20 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
         const b = orderB === -1 ? MODULE_ORDER.length : orderB;
         return a - b || moduleA.localeCompare(moduleB, 'fr');
       })
-      .map(([moduleName, modulePermissions]) => ({
+      .map(([moduleName, sectionMap]) => ({
         moduleName,
-        permissions: [...modulePermissions].sort((a, b) => permissionOrder(a.name) - permissionOrder(b.name) || describePermission(a.name).label.localeCompare(describePermission(b.name).label, 'fr'))
+        sections: Object.entries(sectionMap)
+          .sort(([sectionA], [sectionB]) => {
+            const a = SECTION_ORDER.indexOf(sectionA as (typeof SECTION_ORDER)[number]);
+            const b = SECTION_ORDER.indexOf(sectionB as (typeof SECTION_ORDER)[number]);
+            const ai = a === -1 ? SECTION_ORDER.length : a;
+            const bi = b === -1 ? SECTION_ORDER.length : b;
+            return ai - bi || sectionA.localeCompare(sectionB, 'fr');
+          })
+          .map(([sectionName, sectionPermissions]) => ({
+            sectionName,
+            permissions: [...sectionPermissions].sort((a, b) => describePermission(a.name).label.localeCompare(describePermission(b.name).label, 'fr'))
+          }))
       }));
   }, [permissions]);
 
@@ -496,25 +508,32 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
             {modules.map((module) => (
               <section key={module.moduleName} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
                 <h4 className="text-sm font-semibold text-[#ffe9ce]">{module.moduleName}</h4>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  {module.permissions.map((permission) => {
-                    const info = describePermission(permission.name);
-                    return (
-                      <label key={permission.id} title={info.hint} className="rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
-                        <div className="flex items-start gap-2">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(checked[permission.id])}
-                            onChange={(e) => setChecked((current) => ({ ...current, [permission.id]: e.target.checked }))}
-                          />
-                          <div>
-                            <p className="font-medium">{info.label}</p>
-                            <p className="text-[11px] text-[#efcba8]">{permission.name}</p>
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
+                <div className="mt-3 space-y-3">
+                  {module.sections.map((section) => (
+                    <div key={`${module.moduleName}-${section.sectionName}`} className="rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#f7d6ad]">{section.sectionName}</p>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {section.permissions.map((permission) => {
+                          const info = describePermission(permission.name);
+                          return (
+                            <label key={permission.id} title={info.hint} className="rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
+                              <div className="flex items-start gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(checked[permission.id])}
+                                  onChange={(e) => setChecked((current) => ({ ...current, [permission.id]: e.target.checked }))}
+                                />
+                                <div>
+                                  <p className="font-medium">{info.label}</p>
+                                  <p className="text-[11px] text-[#efcba8]">{info.hint}</p>
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </section>
             ))}

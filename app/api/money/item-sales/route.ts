@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
   const supabase = getSupabaseAdmin();
   const itemIds = Array.from(new Set(lines.map((line) => Number(line.item_id))));
-  const { data: items } = await supabase.from('items').select('id, name, quantity, sell_price, image_url, category_label').in('id', itemIds);
+  const { data: items } = await supabase.from('items').select('id, name, quantity, sell_price, image_url, category_label, category_key').in('id', itemIds).eq('category_key', 'objects');
   if (!items || items.length === 0) return NextResponse.json({ message: 'Items introuvables.' }, { status: 404 });
   const itemMap = new Map(items.map((item) => [item.id, item]));
 

@@ -21,7 +21,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data: active } = await supabase
     .from('four_sessions')
-    .select('id, status, managed_by, opened_at, closed_at, summary, users:managed_by(name, username), four_transactions(id, counterparty, total_purchases, total_sales, profit_loss, created_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount))')
+    .select('id, status, managed_by, opened_at, closed_at, summary, users:managed_by(name, username), four_transactions(id, counterparty, status, cancel_reason, created_by, canceled_by, canceled_at, total_purchases, total_sales, profit_loss, created_at, updated_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount))')
     .eq('status', 'open')
     .order('opened_at', { ascending: false })
     .limit(1)
@@ -82,7 +82,7 @@ export async function PATCH(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: session } = await supabase
     .from('four_sessions')
-    .select('id, status, summary, four_transactions(id, total_purchases, total_sales, four_transaction_lines(item_id, movement_kind, quantity))')
+    .select('id, status, summary, four_transactions(id, status, total_purchases, total_sales, four_transaction_lines(item_id, movement_kind, quantity))')
     .eq('id', sessionId)
     .maybeSingle();
 
@@ -93,6 +93,7 @@ export async function PATCH(request: Request) {
   let totalSales = 0;
 
   for (const tx of session.four_transactions ?? []) {
+    if (tx.status && tx.status !== 'validated') continue;
     totalPurchases += Number(tx.total_purchases ?? 0);
     totalSales += Number(tx.total_sales ?? 0);
     for (const line of tx.four_transaction_lines ?? []) {

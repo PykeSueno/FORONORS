@@ -18,7 +18,7 @@ export default async function FourPage() {
     supabase.from('items').select('id, name, image_url, quantity, buy_price, sell_price, category_key').order('name', { ascending: true }),
     supabase
       .from('four_sessions')
-      .select('id, status, managed_by, opened_at, closed_at, summary, four_transactions(id, counterparty, total_purchases, total_sales, profit_loss, created_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount))')
+      .select('id, status, managed_by, opened_at, closed_at, summary, four_transactions(id, counterparty, status, cancel_reason, created_by, canceled_by, canceled_at, total_purchases, total_sales, profit_loss, created_at, updated_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount))')
       .eq('status', 'open')
       .order('opened_at', { ascending: false })
       .limit(1)
@@ -38,8 +38,10 @@ export default async function FourPage() {
         history={history ?? []}
         canOpen={permissions.includes('four.open')}
         canCashAdd={permissions.includes('four.cash.add')}
-        canManageTransaction={permissions.includes('four.transaction.manage') || permissions.includes('four.add_movement')}
+        canManageTransaction={permissions.includes('four.add_movement')}
         canValidateTransaction={permissions.includes('four.transaction.validate')}
+        canManageOwnTransaction={permissions.includes('four.transaction.manage.own') || permissions.includes('four.transaction.manage')}
+        canManageAnyTransaction={permissions.includes('four.transaction.manage.any')}
         canClose={permissions.includes('four.close')}
         canViewHistory={permissions.includes('four.history.view')}
         canViewStats={permissions.includes('four.stats.view')}

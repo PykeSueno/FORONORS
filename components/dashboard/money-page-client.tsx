@@ -24,7 +24,7 @@ type QuickSale = {
   created_at: string;
 };
 
-type SellableItem = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null };
+type SellableItem = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
 
 function moneyMovementIcon(type: string) {
   if (type === 'entry') return '💵';
@@ -57,7 +57,7 @@ export function MoneyPageClient({
   canQuickSaleCreate: boolean;
   canQuickSaleDetailsView: boolean;
 }) {
-  const [tab, setTab] = useState<'history' | 'quick_sale'>(canQuickSaleAccess ? 'quick_sale' : 'history');
+  const [tab, setTab] = useState<'history' | 'quick_sale'>('history');
   const [balance, setBalance] = useState(String(initialBalance));
   const [movements] = useState<Movement[]>(initialMovements);
   const [type, setType] = useState('entry');
@@ -195,6 +195,7 @@ export function MoneyPageClient({
                       <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setLineQty((current) => ({ ...current, [row.id]: Math.max(0, (current[row.id] ?? 0) - 1) }))}>-</button>
                       <input className="saas-input w-20 text-center" value={row.qty} onChange={(event) => setLineQty((current) => ({ ...current, [row.id]: Math.max(0, Math.min(row.quantity, Number(event.target.value || 0))) }))} />
                       <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setLineQty((current) => ({ ...current, [row.id]: Math.min(row.quantity, (current[row.id] ?? 0) + 1) }))}>+</button>
+                      <button className="saas-primary-btn !px-2 !py-1 text-xs" onClick={() => setLineQty((current) => ({ ...current, [row.id]: row.quantity }))}>MAX</button>
                     </div>
                     <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(row.lineTotal)}</p>
                   </div>
