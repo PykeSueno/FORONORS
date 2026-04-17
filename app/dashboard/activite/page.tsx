@@ -85,7 +85,6 @@ export default async function ActivityPage() {
     }))
   }));
 
-  const currentMember = members?.find((entry) => entry.id === session.userId);
 
   return (
     <div className="space-y-5">
@@ -96,7 +95,6 @@ export default async function ActivityPage() {
         members={members ?? []}
         activities={canView ? enrichedActivities : []}
         defaultMemberId={session.userId}
-        defaultMemberLabel={currentMember?.name || currentMember?.username || 'Groupe'}
         canCreate={canCreate}
         canViewRecent={canView}
         canManageOwn={canManageOwn}
