@@ -13,6 +13,10 @@ export const PERMISSION_LABELS: Record<string, { module: string; label: string; 
   'money.access': { module: 'Argent', label: 'Accéder à Argent', hint: 'Entrer dans le module Argent.' },
   'money.edit': { module: 'Argent', label: 'Créer / modifier des mouvements cash', hint: 'Créer des mouvements d’argent.' },
   'money.history.view': { module: 'Argent', label: 'Voir l’historique cash', hint: 'Afficher l’historique des mouvements.' },
+  'money.quick_sale.access': { module: 'Argent', label: 'Accéder à la page Vente objets', hint: 'Afficher la vue de vente rapide d’objets.' },
+  'money.quick_sale.create': { module: 'Argent', label: 'Valider une vente d’objets', hint: 'Retirer le stock et ajouter l’argent groupe lors d’une vente objets.' },
+  'money.quick_sale.details.view': { module: 'Argent', label: 'Voir les détails des ventes d’objets', hint: 'Consulter les ventes objets enregistrées.' },
+  'money.quick_sale.logs.view': { module: 'Argent', label: 'Voir les logs argent', hint: 'Voir les logs liés aux ventes objets et mouvements argent.' },
 
   'items.preview': { module: 'Items', label: 'Voir la bulle Items', hint: 'Afficher la bulle Items.' },
   'items.access': { module: 'Items', label: 'Accéder à Items', hint: 'Entrer dans le module Items.' },

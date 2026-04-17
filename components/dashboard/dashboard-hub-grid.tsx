@@ -16,16 +16,18 @@ type HubCardItem = {
 export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]; initialOrder: string[] }) {
   const [order, setOrder] = useState<string[]>(initialOrder);
   const [dragging, setDragging] = useState<string | null>(null);
+  const [draftOrder, setDraftOrder] = useState<string[]>(initialOrder);
 
   const orderedCards = useMemo(() => {
     const map = new Map(cards.map((card) => [card.id, card]));
-    const listed = order.map((id) => map.get(id)).filter(Boolean) as HubCardItem[];
-    const missing = cards.filter((card) => !order.includes(card.id));
+    const listed = draftOrder.map((id) => map.get(id)).filter(Boolean) as HubCardItem[];
+    const missing = cards.filter((card) => !draftOrder.includes(card.id));
     return [...listed, ...missing];
-  }, [cards, order]);
+  }, [cards, draftOrder]);
 
   async function persist(nextOrder: string[]) {
     setOrder(nextOrder);
+    setDraftOrder(nextOrder);
     await fetch('/api/dashboard/layout', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -35,13 +37,19 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
 
   function moveCard(targetId: string) {
     if (!dragging || dragging === targetId) return;
-    const next = [...order];
+    const next = [...draftOrder];
     const from = next.indexOf(dragging);
     const to = next.indexOf(targetId);
     if (from === -1 || to === -1) return;
     next.splice(from, 1);
     next.splice(to, 0, dragging);
-    void persist(next);
+    setDraftOrder(next);
+  }
+
+  function endDrag() {
+    if (!dragging) return;
+    setDragging(null);
+    if (draftOrder.join('|') !== order.join('|')) void persist(draftOrder);
   }
 
   return (
@@ -49,11 +57,11 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
       {orderedCards.map((card) => (
         <div
           key={card.id}
-          draggable
-          onDragStart={() => setDragging(card.id)}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={() => moveCard(card.id)}
-          onDragEnd={() => setDragging(null)}
+          onPointerDown={() => setDragging(card.id)}
+          onPointerEnter={() => moveCard(card.id)}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onClickCapture={(event) => { if (dragging) event.preventDefault(); }}
           className={dragging === card.id ? 'opacity-70' : ''}
         >
           <HubCard {...card} />

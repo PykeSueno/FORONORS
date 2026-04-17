@@ -903,18 +903,21 @@ export function DrugsPageClient({
               <button className="saas-ghost-btn" onClick={() => setDetailSale(null)}>Fermer</button>
             </div>
             <div className="mt-3 space-y-2 text-xs text-[#efcdab]">
-              <p>Vendeur(s): <span className="text-[#ffe9cd]">{detailSale.is_group_sale ? 'Groupe' : (detailSale.member_labels ?? []).join(' + ')}</span></p>
-              <p>Montant réel: <span className="text-[#ffe9cd]">{formatUsd(detailSale.actual_amount)}</span></p>
-              <p>Argent groupe: <span className="text-[#ffe9cd]">{typeof detailSale.cash_before === 'number' ? formatUsd(detailSale.cash_before) : '-'} → {typeof detailSale.cash_after === 'number' ? formatUsd(detailSale.cash_after) : '-'}</span></p>
+              <p>👤 Vendeur(s): <span className="text-[#ffe9cd]">{detailSale.is_group_sale ? 'Groupe' : (detailSale.member_labels ?? []).join(' + ')}</span></p>
+              <p>💰 Montant réel: <span className="text-[#ffe9cd]">{formatUsd(detailSale.actual_amount)}</span></p>
+              <p>🏦 Argent groupe: <span className="text-[#ffe9cd]">{typeof detailSale.cash_before === 'number' ? formatUsd(detailSale.cash_before) : '-'} → {typeof detailSale.cash_after === 'number' ? formatUsd(detailSale.cash_after) : '-'}</span></p>
             </div>
             {(detailSale.sale_lines ?? []).length > 0 ? (
               <div className="mt-3 space-y-2">
                 {(detailSale.sale_lines ?? []).map((line, idx) => (
                   <article key={`${detailSale.id}-${idx}`} className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-3 text-xs text-[#efcdab]">
-                    <p className="text-[#ffe9cd]">{line.itemName}</p>
-                    <p>Qté {line.quantity} · Réel {formatUsd(line.actualAmount)}</p>
-                    <p>Estimation {formatUsd(line.estimatedMin)} - {formatUsd(line.estimatedMax)} · Moyenne {formatUsd(line.estimatedAvg)}</p>
-                    <p>Stock {line.stockBefore} → {line.stockAfter}</p>
+                    <div className="flex items-center gap-2">
+                      <ItemThumb item={{ id: -1, name: line.itemName, image_url: line.itemImageUrl ?? null, quantity: 0 }} fallback="💊" />
+                      <p className="text-[#ffe9cd]">💊 {line.itemName}</p>
+                    </div>
+                    <p>📦 Quantité {line.quantity} · 💰 Réel {formatUsd(line.actualAmount)}</p>
+                    <p>📉 Min {formatUsd(line.estimatedMin)} · 📈 Max {formatUsd(line.estimatedMax)} · 🧮 Moyenne {formatUsd(line.estimatedAvg)}</p>
+                    <p>📦 Stock {line.stockBefore} → {line.stockAfter}</p>
                   </article>
                 ))}
               </div>

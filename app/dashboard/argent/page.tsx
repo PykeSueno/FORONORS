@@ -10,22 +10,36 @@ export default async function MoneyPage() {
   if (!session) redirect('/login');
 
   const permissions = await getUserPermissions(session.userId);
-  if (!permissions.includes('money.access') || !permissions.includes('money.history.view')) redirect('/dashboard');
+  if (!permissions.includes('money.access')) redirect('/dashboard');
+  const canHistoryView = permissions.includes('money.history.view');
+  const canQuickSaleAccess = permissions.includes('money.quick_sale.access');
+  if (!canHistoryView && !canQuickSaleAccess && !permissions.includes('money.edit')) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: cash }, { data: movements }] = await Promise.all([
+  const [{ data: cash }, { data: movements }, { data: quickSales }, { data: sellableItems }] = await Promise.all([
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
-    supabase.from('cash_movements').select('id, type, amount, label, created_at, user_id, users(name, username)').order('created_at', { ascending: false }).limit(30)
+    canHistoryView ? supabase.from('cash_movements').select('id, type, amount, label, created_at, user_id, users(name, username)').order('created_at', { ascending: false }).limit(30) : Promise.resolve({ data: [] }),
+    permissions.includes('money.quick_sale.details.view') || canQuickSaleAccess
+      ? supabase.from('money_item_sales').select('*').order('created_at', { ascending: false }).limit(30)
+      : Promise.resolve({ data: [] }),
+    canQuickSaleAccess
+      ? supabase.from('items').select('id, name, image_url, quantity, sell_price, category_label').gt('quantity', 0).order('name', { ascending: true }).limit(300)
+      : Promise.resolve({ data: [] })
   ]);
 
   return (
     <>
       <InternalPageHeader title="Argent" subtitle="Suivi de la caisse du groupe" />
       <MoneyPageClient
-      canEdit={permissions.includes('money.edit')}
-      initialBalance={Number(cash?.balance ?? 0)}
-      initialMovements={movements ?? []}
-    />
+        canEdit={permissions.includes('money.edit')}
+        initialBalance={Number(cash?.balance ?? 0)}
+        initialMovements={movements ?? []}
+        quickSales={quickSales ?? []}
+        sellableItems={sellableItems ?? []}
+        canQuickSaleAccess={canQuickSaleAccess}
+        canQuickSaleCreate={permissions.includes('money.quick_sale.create')}
+        canQuickSaleDetailsView={permissions.includes('money.quick_sale.details.view')}
+      />
     </>
   );
 }

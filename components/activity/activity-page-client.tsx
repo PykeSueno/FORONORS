@@ -202,7 +202,6 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                 );
               })}
             </div>
-            <p className="mt-2 text-xs text-[#efcdab]">Sélection: {memberLabel || 'Groupe'}</p>
           </div>
 
           {activityType !== 'mailbox' ? (

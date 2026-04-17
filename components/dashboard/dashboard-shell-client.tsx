@@ -99,12 +99,7 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
               <div key={idx} className="group relative rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    {summary?.moneyItemImageUrl ? (
-                      <div className="relative h-10 w-10">
-                        <Image src={summary.moneyItemImageUrl} alt="Argent" width={40} height={40} className="h-10 w-10 rounded-md border border-white/10 object-cover" unoptimized />
-                        <span className={`absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${Number(row.amount) >= 0 ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-white'}`}>{Number(row.amount) >= 0 ? '+' : '-'}</span>
-                      </div>
-                    ) : null}
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${Number(row.amount) >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-200'}`}>{Number(row.amount) >= 0 ? '+' : '-'}</span>
                     <p className="text-sm font-medium text-[#ffe8c9]">{moneyMovementIcon(row.type)} {(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'} — {humanMoneyMovementLabel(row.type)} — {row.label}</p>
                   </div>
                   <p className={`text-sm font-semibold ${Number(row.amount) >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{formatUsd(Number(row.amount))}</p>
@@ -135,12 +130,7 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
               <div key={idx} className="group relative rounded-xl border border-white/10 bg-[#342116]/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    {row.image ? (
-                      <div className="relative h-10 w-10">
-                        <Image src={row.image} alt={row.item} width={40} height={40} className="h-10 w-10 rounded-md border border-white/10 object-cover" unoptimized />
-                        <span className={`absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${row.quantity >= 0 ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-white'}`}>{row.quantity >= 0 ? '+' : '-'}</span>
-                      </div>
-                    ) : null}
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${row.quantity >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-200'}`}>{row.quantity >= 0 ? '+' : '-'}</span>
                     <p className="text-sm font-medium text-[#ffe8c9]">{row.member} — {row.description}</p>
                   </div>
                   <p className={`text-sm font-semibold ${row.value.startsWith('+') ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{row.value}</p>

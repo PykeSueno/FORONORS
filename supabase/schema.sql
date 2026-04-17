@@ -94,7 +94,11 @@ values
   ('money.access'),
   ('money.preview'),
   ('money.edit'),
-  ('money.history.view')
+  ('money.history.view'),
+  ('money.quick_sale.access'),
+  ('money.quick_sale.create'),
+  ('money.quick_sale.details.view'),
+  ('money.quick_sale.logs.view')
 on conflict (name) do nothing;
 
 
@@ -121,8 +125,19 @@ create table if not exists public.cash_movements (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.money_item_sales (
+  id bigint generated always as identity primary key,
+  total_amount numeric(12,2) not null default 0,
+  cash_before numeric(12,2) not null default 0,
+  cash_after numeric(12,2) not null default 0,
+  sale_lines jsonb not null default '[]'::jsonb,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
 alter table public.group_cash enable row level security;
 alter table public.cash_movements enable row level security;
+alter table public.money_item_sales enable row level security;
 
 drop policy if exists "allow_service_role_all_group_cash" on public.group_cash;
 create policy "allow_service_role_all_group_cash"
@@ -138,9 +153,18 @@ for all
 using (true)
 with check (true);
 
+drop policy if exists "allow_service_role_all_money_item_sales" on public.money_item_sales;
+create policy "allow_service_role_all_money_item_sales"
+on public.money_item_sales
+for all
+using (true)
+with check (true);
+
 insert into public.group_cash (balance)
 select 0
 where not exists (select 1 from public.group_cash);
+
+create index if not exists idx_money_item_sales_created_at on public.money_item_sales(created_at desc);
 
 create table if not exists public.items (
   id bigint generated always as identity primary key,

@@ -29,6 +29,7 @@ export function humanStockMovementLabel(type: string) {
   if (type === 'drugs_production_coke_output') return 'Production Coke (récolte)';
   if (type === 'drugs_production_meth_use') return 'Production Meth (consommation)';
   if (type === 'drugs_production_meth_output') return 'Production Meth (récolte)';
+  if (type === 'money_item_sale_out') return 'Vente objets (sortie stock)';
   if (type === 'four_close') return 'FOUR (clôture session)';
   return type;
 }
