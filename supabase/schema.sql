@@ -100,7 +100,16 @@ values
   ('money.quick_sale.details.view'),
   ('money.quick_sale.logs.view'),
   ('money.movements.view'),
-  ('items.movements.view')
+  ('items.movements.view'),
+  ('sale.objects.preview'),
+  ('sale.objects.access'),
+  ('sale.objects.create'),
+  ('sale.objects.receive'),
+  ('sale.objects.edit.own'),
+  ('sale.objects.edit.any'),
+  ('sale.objects.cancel.own'),
+  ('sale.objects.cancel.any'),
+  ('sale.objects.history.view')
 on conflict (name) do nothing;
 
 
@@ -137,9 +146,28 @@ create table if not exists public.money_item_sales (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.sale_object_orders (
+  id bigint generated always as identity primary key,
+  buyer_name text not null,
+  buyer_type text not null,
+  status text not null default 'pending_receipt',
+  total_amount numeric(12,2) not null default 0,
+  sale_lines jsonb not null default '[]'::jsonb,
+  cash_before numeric(12,2),
+  cash_after numeric(12,2),
+  created_by uuid references public.users(id) on delete set null,
+  received_by uuid references public.users(id) on delete set null,
+  canceled_by uuid references public.users(id) on delete set null,
+  received_at timestamptz,
+  canceled_at timestamptz,
+  updated_at timestamptz not null default timezone('utc', now()),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
 alter table public.group_cash enable row level security;
 alter table public.cash_movements enable row level security;
 alter table public.money_item_sales enable row level security;
+alter table public.sale_object_orders enable row level security;
 
 drop policy if exists "allow_service_role_all_group_cash" on public.group_cash;
 create policy "allow_service_role_all_group_cash"
@@ -162,11 +190,20 @@ for all
 using (true)
 with check (true);
 
+drop policy if exists "allow_service_role_all_sale_object_orders" on public.sale_object_orders;
+create policy "allow_service_role_all_sale_object_orders"
+on public.sale_object_orders
+for all
+using (true)
+with check (true);
+
 insert into public.group_cash (balance)
 select 0
 where not exists (select 1 from public.group_cash);
 
 create index if not exists idx_money_item_sales_created_at on public.money_item_sales(created_at desc);
+create index if not exists idx_sale_object_orders_created_at on public.sale_object_orders(created_at desc);
+create index if not exists idx_sale_object_orders_status on public.sale_object_orders(status, buyer_type);
 
 create table if not exists public.items (
   id bigint generated always as identity primary key,

@@ -12,6 +12,10 @@ export function humanMoneyMovementLabel(type: string) {
   if (type === 'item_money_sync') return 'Sync Item Argent';
   if (type === 'four_close') return 'Clôture FOUR';
   if (type === 'activity_edit') return 'Activité (correction)';
+  if (type === 'sale_objects_immediate') return 'Vente objets (paiement immédiat)';
+  if (type === 'sale_objects_receive') return 'Vente objets (réception pawnshop)';
+  if (type === 'sale_objects_edit') return 'Vente objets (modification)';
+  if (type === 'sale_objects_cancel') return 'Vente objets (annulation)';
   return type;
 }
 
@@ -33,6 +37,9 @@ export function humanStockMovementLabel(type: string) {
   if (type === 'drugs_production_meth_use') return 'Production Meth (consommation)';
   if (type === 'drugs_production_meth_output') return 'Production Meth (récolte)';
   if (type === 'money_item_sale_out') return 'Vente objets (sortie stock)';
+  if (type === 'sale_objects_out') return 'Vente objets (sortie stock)';
+  if (type === 'sale_objects_edit_delta') return 'Vente objets (ajustement stock)';
+  if (type === 'sale_objects_cancel_restore') return 'Vente objets (restitution stock)';
   if (type === 'four_close') return 'FOUR (clôture session)';
   return type;
 }
@@ -43,6 +50,7 @@ export function moneyMovementSource(type: string) {
   if (type.startsWith('activity')) return 'Activité';
   if (type.startsWith('four')) return 'FOUR';
   if (type.startsWith('drugs_')) return 'Drogues';
+  if (type.startsWith('sale_objects_')) return 'Vente objets';
   if (type === 'adjust' || type === 'entry' || type === 'exit' || type === 'purchase' || type === 'sale') return 'Argent';
   return 'Système';
 }
@@ -53,6 +61,7 @@ export function stockMovementSource(type: string) {
   if (type.startsWith('activity')) return 'Activité';
   if (type.startsWith('four')) return 'FOUR';
   if (type.startsWith('drugs_')) return 'Drogues';
+  if (type.startsWith('sale_objects_')) return 'Vente objets';
   if (type.startsWith('money_item_')) return 'Argent';
   return 'Stock';
 }
@@ -68,6 +77,7 @@ export function moneyMovementIcon(type: string) {
   if (type.startsWith('drugs_')) return '🧪';
   if (type.startsWith('activity')) return '🎯';
   if (type.startsWith('transaction')) return '🔄';
+  if (type.startsWith('sale_objects_')) return '🧰';
   return '💰';
 }
 
@@ -77,5 +87,6 @@ export function stockMovementIcon(type: string, qty: number) {
   if (type.startsWith('drugs_')) return '🧪';
   if (type.startsWith('activity')) return '🎯';
   if (type.startsWith('transaction')) return '🔄';
+  if (type.startsWith('sale_objects_')) return '🧰';
   return qty >= 0 ? '📥' : '📤';
 }

@@ -11,6 +11,7 @@ type HubCardItem = {
   title: string;
   value: string;
   subtitle: string;
+  hoverDetails?: string[];
 };
 
 export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]; initialOrder: string[] }) {
@@ -71,15 +72,20 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   );
 }
 
-function HubCard({ href, enabled, icon, title, value, subtitle }: Omit<HubCardItem, 'id'>) {
+function HubCard({ href, enabled, icon, title, value, subtitle, hoverDetails }: Omit<HubCardItem, 'id'>) {
   const content = (
     <>
       <div className="flex items-center justify-between"><p className="text-3xl">{icon}</p><p className="text-2xl font-semibold text-[#ffe9cd]">{value}</p></div>
       <p className="mt-3 text-lg font-semibold text-[#fff2de]">{title}</p>
       <p className="text-sm text-[#f1d1ac]">{subtitle}</p>
+      {hoverDetails && hoverDetails.length > 0 ? (
+        <div className="pointer-events-none mt-2 hidden rounded-xl border border-white/10 bg-[#2a180f]/90 p-2 text-xs text-[#f4d7b6] group-hover:block">
+          {hoverDetails.map((line) => <p key={line}>{line}</p>)}
+        </div>
+      ) : null}
     </>
   );
 
-  if (!enabled) return <div className="glass-card block cursor-not-allowed opacity-90 p-6">{content}</div>;
-  return <Link href={href} className="glass-card smooth-hover block p-6">{content}</Link>;
+  if (!enabled) return <div className="glass-card group block cursor-not-allowed opacity-90 p-6">{content}</div>;
+  return <Link href={href} className="glass-card smooth-hover group block p-6">{content}</Link>;
 }

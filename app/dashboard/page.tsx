@@ -3,7 +3,7 @@ import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { DashboardShellClient } from '@/components/dashboard/dashboard-shell-client';
 
-const DEFAULT_ORDER = ['money', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'activity', 'four', 'drugs'];
+const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'activity', 'four', 'drugs'];
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -30,6 +30,8 @@ export default async function DashboardPage() {
   const canFourPreview = canFourAccess || has('four.preview');
   const canDrugsAccess = has('drugs.access');
   const canDrugsPreview = canDrugsAccess || has('drugs.preview');
+  const canSaleObjectsAccess = has('sale.objects.access');
+  const canSaleObjectsPreview = canSaleObjectsAccess || has('sale.objects.preview');
   const canUpdatePassword = has('account.password.update');
   const canMoneyMovementsView = has('money.movements.view');
   const canStockMovementsView = has('items.movements.view');
@@ -58,6 +60,7 @@ export default async function DashboardPage() {
         canActivityAccess, canActivityPreview,
         canFourAccess, canFourPreview,
         canDrugsAccess, canDrugsPreview,
+        canSaleObjectsAccess, canSaleObjectsPreview,
         canMoneyMovementsView, canStockMovementsView
       }}
     />

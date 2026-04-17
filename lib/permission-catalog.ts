@@ -1,4 +1,4 @@
-export const MODULE_ORDER = ['Dashboard', 'Argent', 'Items', 'Transactions', 'Transactions récentes', 'Activité', 'FOUR', 'Drogues', 'Tablette', 'Membres', 'Logs', 'Compte', 'Autres'] as const;
+export const MODULE_ORDER = ['Dashboard', 'Argent', 'Vente objets', 'Items', 'Transactions', 'Transactions récentes', 'Activité', 'FOUR', 'Drogues', 'Tablette', 'Membres', 'Logs', 'Compte', 'Autres'] as const;
 
 export const SECTION_ORDER = ['Vue', 'Historique', 'Mouvements', 'Vente objets', 'Création', 'Gestion', 'Sessions', 'Transactions', 'Messages', 'Stats', 'Logs', 'Sécurité', 'Technique'] as const;
 
@@ -29,6 +29,17 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
   'items.create': { module: 'Items', section: 'Gestion', label: 'Créer un item', hint: 'Permet d’ajouter un item.' },
   'items.edit': { module: 'Items', section: 'Gestion', label: 'Modifier un item', hint: 'Permet de modifier un item.' },
   'items.delete': { module: 'Items', section: 'Gestion', label: 'Supprimer un item', hint: 'Permet de supprimer un item.' },
+
+
+  'sale.objects.preview': { module: 'Vente objets', section: 'Vue', label: 'Voir la bulle Vente objets', hint: 'Permet d’afficher la bulle Vente objets sur le dashboard.' },
+  'sale.objects.access': { module: 'Vente objets', section: 'Vue', label: 'Accéder à la page Vente objets', hint: 'Permet d’ouvrir le module Vente objets.' },
+  'sale.objects.create': { module: 'Vente objets', section: 'Création', label: 'Créer / valider une vente objets', hint: 'Permet de créer une nouvelle vente objets.' },
+  'sale.objects.receive': { module: 'Vente objets', section: 'Gestion', label: 'Marquer une vente pawnshop comme reçue', hint: 'Permet de confirmer la réception d’argent des ventes pawnshop.' },
+  'sale.objects.edit.own': { module: 'Vente objets', section: 'Gestion', label: 'Modifier ses propres ventes objets', hint: 'Permet de modifier uniquement ses ventes objets.' },
+  'sale.objects.edit.any': { module: 'Vente objets', section: 'Gestion', label: 'Modifier toutes les ventes objets', hint: 'Permet de modifier toutes les ventes objets.' },
+  'sale.objects.cancel.own': { module: 'Vente objets', section: 'Gestion', label: 'Annuler ses propres ventes objets', hint: 'Permet d’annuler uniquement ses ventes objets.' },
+  'sale.objects.cancel.any': { module: 'Vente objets', section: 'Gestion', label: 'Annuler toutes les ventes objets', hint: 'Permet d’annuler toutes les ventes objets.' },
+  'sale.objects.history.view': { module: 'Vente objets', section: 'Historique', label: 'Voir l’historique Vente objets', hint: 'Permet de consulter l’historique des ventes objets.' },
 
   'transactions.preview': { module: 'Transactions', section: 'Vue', label: 'Voir la bulle Transactions', hint: 'Permet d’afficher la bulle Transactions.' },
   'transactions.access': { module: 'Transactions', section: 'Vue', label: 'Accéder à Transactions', hint: 'Permet d’ouvrir la page Transactions.' },

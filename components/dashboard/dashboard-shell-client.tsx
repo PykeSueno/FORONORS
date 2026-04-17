@@ -8,7 +8,7 @@ import { humanMoneyMovementLabel, humanStockMovementLabel, moneyMovementIcon, st
 import { WelcomeCardActions } from '@/components/dashboard/welcome-card-actions';
 import { DashboardHubGrid } from '@/components/dashboard/dashboard-hub-grid';
 
-type Card = { id: string; href: string; enabled: boolean; icon: string; title: string; value: string; subtitle: string };
+type Card = { id: string; href: string; enabled: boolean; icon: string; title: string; value: string; subtitle: string; hoverDetails?: string[] };
 type DashboardFlags = {
   canMoneyAccess: boolean; canMoneyPreview: boolean;
   canItemsAccess: boolean; canItemsPreview: boolean;
@@ -20,6 +20,7 @@ type DashboardFlags = {
   canActivityAccess: boolean; canActivityPreview: boolean;
   canFourAccess: boolean; canFourPreview: boolean;
   canDrugsAccess: boolean; canDrugsPreview: boolean;
+  canSaleObjectsAccess: boolean; canSaleObjectsPreview: boolean;
   canMoneyMovementsView: boolean; canStockMovementsView: boolean;
 };
 
@@ -27,7 +28,7 @@ type SummaryPayload = {
   canShowMoneyMovements: boolean;
   canShowStockMovements: boolean;
   moneyItemImageUrl: string | null;
-  values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; fourOpen: boolean };
+  values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; fourOpen: boolean; saleObjectsToday: number; itemCategoryTotals: { objects: number; weapons: number; equipment: number; drugs: number; other: number; total: number } };
   recentCash: Array<{ type: string; amount: number; label: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null }>;
   recentStock: Array<{ item_id?: number | null; item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null; items?: { image_url: string | null } | { image_url: string | null }[] | null }>;
 };
@@ -46,7 +47,15 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
 
   const cards = useMemo<Card[]>(() => [
     flags.canMoneyPreview ? { id: 'money', href: '/dashboard/argent', enabled: flags.canMoneyAccess, icon: '💰', title: 'Argent', value: summary ? formatUsd(summary.values.cashBalance) : '…', subtitle: 'Caisse actuelle' } : null,
-    flags.canItemsPreview ? { id: 'items', href: '/dashboard/items', enabled: flags.canItemsAccess, icon: '📦', title: 'Items', value: summary ? String(summary.values.itemsCount) : '…', subtitle: 'Catalogue' } : null,
+    flags.canSaleObjectsPreview ? { id: 'sale_objects', href: '/dashboard/vente-objets', enabled: flags.canSaleObjectsAccess, icon: '🧰', title: 'Vente objets', value: summary ? String(summary.values.saleObjectsToday) : '…', subtitle: 'Vendre les objets du groupe' } : null,
+    flags.canItemsPreview ? { id: 'items', href: '/dashboard/items', enabled: flags.canItemsAccess, icon: '📦', title: 'Items', value: summary ? String(summary.values.itemsCount) : '…', subtitle: 'Catalogue', hoverDetails: summary ? [
+      `Objets: ${summary.values.itemCategoryTotals.objects}`,
+      `Armes: ${summary.values.itemCategoryTotals.weapons}`,
+      `Équipement: ${summary.values.itemCategoryTotals.equipment}`,
+      `Drogues: ${summary.values.itemCategoryTotals.drugs}`,
+      `Autres: ${summary.values.itemCategoryTotals.other}`,
+      `Total stock: ${summary.values.itemCategoryTotals.total}`
+    ] : [] } : null,
     flags.canTransactionsPreview ? { id: 'transactions', href: '/dashboard/transactions', enabled: flags.canTransactionsAccess, icon: '🔄', title: 'Transactions', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Créer et gérer' } : null,
     flags.canTransactionsRecentPreview ? { id: 'transactions_recent', href: '/dashboard/transactions-recentes', enabled: flags.canTransactionsRecentAccess, icon: '🕒', title: 'Transactions récentes', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Historique' } : null,
     flags.canMembersPreview ? { id: 'members', href: '/dashboard/membres', enabled: flags.canMembersAccess, icon: '👥', title: 'Membres', value: summary ? String(summary.values.membersCount) : '…', subtitle: 'Gestion équipe' } : null,
