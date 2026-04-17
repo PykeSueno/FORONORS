@@ -6,6 +6,16 @@ import { InternalPageHeader } from '@/components/dashboard/internal-page-header'
 import { StockMovementsPageClient } from '@/components/dashboard/stock-movements-page-client';
 import { stockMovementSource } from '@/lib/labels';
 
+type StockMovementRow = {
+  id: number;
+  item_name: string;
+  quantity_delta: number;
+  transaction_type: string;
+  created_at: string;
+  users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null;
+  items: { image_url: string | null; category_label: string | null } | { image_url: string | null; category_label: string | null }[] | null;
+};
+
 export default async function StockMovementsGlobalPage() {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -20,7 +30,7 @@ export default async function StockMovementsGlobalPage() {
     .order('created_at', { ascending: false })
     .limit(700);
 
-  const prepared = (rows ?? []).map((row) => ({
+  const prepared = ((rows ?? []) as StockMovementRow[]).map((row) => ({
     id: row.id,
     item: row.item_name,
     quantity: Number(row.quantity_delta ?? 0),
