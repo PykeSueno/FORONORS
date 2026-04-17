@@ -179,8 +179,8 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
             <h3 className="text-base font-semibold text-[#fff1dd]">A. Session activité</h3>
           <label className="mt-3 block text-xs text-[#efccaa]">Membre</label>
           <div className="mt-1 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">
-            <button className={`filter-pill ${selectedMemberIds.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => { setSelectedMemberIds([]); setMemberLabel('Groupe'); }}>Groupe</button>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button className={`filter-pill ${selectedMemberIds.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => { setSelectedMemberIds([]); setMemberLabel('Groupe'); }}>Groupe</button>
               {members.map((member) => {
                 const selected = selectedMemberIds.includes(member.id);
                 return (

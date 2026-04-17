@@ -451,9 +451,18 @@ export function DrugsPageClient({
                 <Field label="1. Type de transfo" hint="Item envoyé + stock actuel">
                   <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
                     <ItemThumb item={sourceItem} fallback="📤" />
-                    <div>
+                    <div className="min-w-[160px] flex-1">
                       <p className="text-sm font-semibold text-[#ffe9cd]">{selectedTransfoDef.sourceLabel}</p>
                       <p className="text-xs text-[#efcdab]">Stock actuel: {sourceStock}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-[#efcdab]">Quantité envoyée</p>
+                      <input
+                        className="saas-input w-28 text-center"
+                        inputMode="numeric"
+                        value={quantitySent}
+                        onChange={(event) => setQuantitySent(Math.max(1, Number(event.target.value || 1)))}
+                      />
                     </div>
                   </div>
                 </Field>
@@ -462,23 +471,7 @@ export function DrugsPageClient({
                   <input className="saas-input w-full" placeholder="Ex: Crew Paleto" value={targetGroup} onChange={(event) => setTargetGroup(event.target.value)} />
                 </Field>
 
-                <Field label="3. Quantité envoyée" hint="Rappel stock réel actuel">
-                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
-                    <ItemThumb item={sourceItem} fallback="📤" />
-                    <div className="min-w-[120px] flex-1">
-                      <p className="text-sm text-[#ffe9cd]">{selectedTransfoDef.sourceLabel}</p>
-                      <p className="text-xs text-[#efcdab]">Stock actuel: {sourceStock}</p>
-                    </div>
-                    <input
-                      className="saas-input w-28"
-                      inputMode="numeric"
-                      value={quantitySent}
-                      onChange={(event) => setQuantitySent(Math.max(1, Number(event.target.value || 1)))}
-                    />
-                  </div>
-                </Field>
-
-                <Field label="4. Argent payé au groupe" hint="Laisser 0 si non payé">
+                <Field label="3. Argent payé au groupe" hint="Laisser 0 si non payé">
                   <input
                     className="saas-input w-full"
                     inputMode="decimal"
@@ -488,7 +481,7 @@ export function DrugsPageClient({
                   />
                 </Field>
 
-                <Field label="5. Note facultative" hint="Information complémentaire">
+                <Field label="4. Note facultative" hint="Information complémentaire">
                   <textarea className="saas-input w-full" rows={2} placeholder="Note (facultatif)" value={note} onChange={(event) => setNote(event.target.value)} />
                 </Field>
               </section>
@@ -628,8 +621,8 @@ export function DrugsPageClient({
 
             <Field label="3. Membre(s) vendeur(s) ou Groupe" hint="Optionnel · Groupe par défaut">
               <div className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
-                <button className={`filter-pill ${selectedMembers.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => setSelectedMembers([])}>Groupe</button>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <button className={`filter-pill ${selectedMembers.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => setSelectedMembers([])}>Groupe</button>
                   {members.map((member) => {
                     const selected = selectedMembers.includes(member.id);
                     return (
