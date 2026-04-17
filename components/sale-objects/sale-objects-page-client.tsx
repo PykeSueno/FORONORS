@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
@@ -50,6 +51,7 @@ export function SaleObjectsPageClient({
   canHistoryView: boolean;
   currentUserId: string;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [buyerType, setBuyerType] = useState<'pawnshop_sud' | 'pawnshop_nord' | 'group'>('group');
@@ -61,6 +63,7 @@ export function SaleObjectsPageClient({
 
   const filteredItems = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(query.toLowerCase())), [items, query]);
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.line_total, 0), [cart]);
+  const visibleSales = useMemo(() => sales.filter((sale) => sale.status !== 'canceled'), [sales]);
 
   function upsertLine(item: Item) {
     setCart((current) => {
@@ -114,7 +117,8 @@ export function SaleObjectsPageClient({
     setCustomBuyer('');
     setBuyerType('group');
     setEditingSaleId(null);
-    window.location.reload();
+    await reloadHistory();
+    router.refresh();
   }
 
   async function markReceived(saleId: number) {
@@ -151,11 +155,11 @@ export function SaleObjectsPageClient({
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+    <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
       <section className="glass-card p-5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-lg font-semibold text-[#fff1dd]">Objets vendables</h3>
-          <input className="saas-input w-56" placeholder="Recherche objet" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="saas-input w-full max-w-60" placeholder="Recherche objet" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <div className="mt-3 max-h-[640px] space-y-2 overflow-y-auto">
           {filteredItems.map((item) => (
@@ -209,7 +213,10 @@ export function SaleObjectsPageClient({
             ))}
           </div>
 
-          <p className="text-xl font-semibold text-[#ffe8ca]">Total: {formatUsd(total)}</p>
+          <div className="rounded-xl border border-white/10 bg-[#2f1d14]/45 px-3 py-2">
+            <p className="text-xs text-[#efcdab]">Bulle récapitulatif</p>
+            <p className="text-xl font-semibold text-[#ffe8ca]">Total: {formatUsd(total)}</p>
+          </div>
           {canCreate ? <button className="saas-primary-btn w-full" onClick={() => void submitSale()}>{editingSaleId ? 'Enregistrer la modification' : 'Valider la vente'}</button> : <p className="text-sm text-[#f2d2ad]">Permission manquante pour créer une vente.</p>}
           {editingSaleId ? <button className="saas-ghost-btn w-full" onClick={() => { setEditingSaleId(null); setCart([]); setBuyerType('group'); setCustomBuyer(''); }}>Annuler édition</button> : null}
         </article>
@@ -218,7 +225,7 @@ export function SaleObjectsPageClient({
           <article className="glass-card p-5">
             <h4 className="text-base font-semibold text-[#fff1dd]">Historique récent</h4>
             <div className="mt-3 max-h-[480px] space-y-2 overflow-y-auto">
-              {sales.map((sale) => {
+              {visibleSales.map((sale) => {
                 const canEdit = canEditAny || (canEditOwn && canManageOwn(sale));
                 const canCancel = canCancelAny || (canCancelOwn && canManageOwn(sale));
                 return (

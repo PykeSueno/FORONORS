@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { ITEM_CATEGORIES } from '@/lib/items';
@@ -41,6 +42,7 @@ export function TransactionsPageClient({
   defaultMemberLabel: string;
   defaultMemberId: string;
 }) {
+  const router = useRouter();
   const [lines, setLines] = useState<Line[]>([]);
   const [reason, setReason] = useState('');
   const [memberId, setMemberId] = useState(defaultMemberId);
@@ -109,6 +111,7 @@ export function TransactionsPageClient({
   }
 
   async function submit() {
+    setError('');
     const response = await fetch('/api/transactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -121,7 +124,9 @@ export function TransactionsPageClient({
       return;
     }
 
-    window.location.reload();
+    setLines([]);
+    setReason('');
+    router.refresh();
   }
 
   return (

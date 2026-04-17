@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { DragEvent, useMemo, useState } from 'react';
 
 type HubCardItem = {
   id: string;
@@ -53,11 +53,36 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
     if (draftOrder.join('|') !== order.join('|')) void persist(draftOrder);
   }
 
+  function onDragStart(event: DragEvent<HTMLDivElement>, cardId: string) {
+    setDragging(cardId);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', cardId);
+  }
+
+  function onDragOver(event: DragEvent<HTMLDivElement>, cardId: string) {
+    event.preventDefault();
+    if (!dragging) {
+      const sourceId = event.dataTransfer.getData('text/plain');
+      if (sourceId) setDragging(sourceId);
+    }
+    moveCard(cardId);
+  }
+
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    endDrag();
+  }
+
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {orderedCards.map((card) => (
         <div
           key={card.id}
+          draggable
+          onDragStart={(event) => onDragStart(event, card.id)}
+          onDragOver={(event) => onDragOver(event, card.id)}
+          onDrop={onDrop}
+          onDragEnd={endDrag}
           onPointerDown={() => setDragging(card.id)}
           onPointerEnter={() => moveCard(card.id)}
           onPointerUp={endDrag}
@@ -74,16 +99,16 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
 
 function HubCard({ href, enabled, icon, title, value, subtitle, hoverDetails }: Omit<HubCardItem, 'id'>) {
   const content = (
-    <>
+    <div className="relative">
       <div className="flex items-center justify-between"><p className="text-3xl">{icon}</p><p className="text-2xl font-semibold text-[#ffe9cd]">{value}</p></div>
       <p className="mt-3 text-lg font-semibold text-[#fff2de]">{title}</p>
       <p className="text-sm text-[#f1d1ac]">{subtitle}</p>
       {hoverDetails && hoverDetails.length > 0 ? (
-        <div className="pointer-events-none mt-2 hidden rounded-xl border border-white/10 bg-[#2a180f]/90 p-2 text-xs text-[#f4d7b6] group-hover:block">
+        <div className="pointer-events-none absolute inset-x-0 top-full z-40 mt-2 hidden rounded-xl border border-white/10 bg-[#2a180f]/95 p-2 text-xs text-[#f4d7b6] shadow-xl group-hover:block">
           {hoverDetails.map((line) => <p key={line}>{line}</p>)}
         </div>
       ) : null}
-    </>
+    </div>
   );
 
   if (!enabled) return <div className="glass-card group block cursor-not-allowed opacity-90 p-6">{content}</div>;

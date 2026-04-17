@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
+import { TransactionsTabs } from '@/components/dashboard/transactions-tabs';
 import { SaleObjectsPageClient } from '@/components/sale-objects/sale-objects-page-client';
 
 type SaleObjectPageItem = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
@@ -43,6 +44,11 @@ export default async function SaleObjectsPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Vente objets" subtitle="Vendre les objets du groupe avec suivi de réception pawnshop" />
+      <TransactionsTabs
+        active="sale_objects"
+        canSeeRecent={permissions.includes('transactions.recent.access')}
+        canSeeSaleObjects
+      />
       <SaleObjectsPageClient
         items={(sellableItems ?? []) as SaleObjectPageItem[]}
         initialSales={(sales ?? []) as SaleObjectHistoryRow[]}

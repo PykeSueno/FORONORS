@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-const DEFAULT_ORDER = ['money', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'activity', 'four', 'drugs'];
+const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'activity', 'four', 'drugs'];
 
 export async function GET() {
   const session = await getSession();

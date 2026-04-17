@@ -45,7 +45,7 @@ export default async function RecentTransactionsPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Transactions récentes" subtitle="Historique complet des dernières transactions" />
-      <TransactionsTabs active="recent" canSeeRecent />
+      <TransactionsTabs active="recent" canSeeRecent canSeeSaleObjects={permissions.includes('sale.objects.access')} />
       <RecentTransactionsClient
         transactions={transactions}
         canManageOwn={permissions.includes('transactions.recent.manage.own')}
