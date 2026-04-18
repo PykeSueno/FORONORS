@@ -147,18 +147,15 @@ function HubCard({ href, enabled, icon, title, value, subtitle }: Omit<HubCardIt
   const content = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-3xl">{icon}</p>
+        <p
+          data-drag-handle={enabled ? 'true' : undefined}
+          className={`text-3xl ${enabled ? 'inline-flex select-none rounded-md p-1 cursor-grab active:cursor-grabbing' : ''}`}
+          title={enabled ? 'Maintenir cette icône pour réorganiser le dashboard' : undefined}
+        >
+          {icon}
+        </p>
         <div className="flex items-center gap-2">
           <p className="text-2xl font-semibold text-[#ffe9cd]">{value}</p>
-          {enabled ? (
-            <span
-              data-drag-handle
-              className="cursor-grab active:cursor-grabbing rounded-full border border-white/20 bg-[#2f1d14]/70 px-2 py-0.5 text-[11px] text-[#f1d1ac] hover:bg-[#4a2f20]/80"
-              title="Attraper ici puis déplacer pour réorganiser"
-            >
-              ↕
-            </span>
-          ) : null}
         </div>
       </div>
       <p className="mt-3 text-lg font-semibold text-[#fff2de]">{title}</p>

@@ -173,20 +173,23 @@ export async function POST(request: Request) {
       after_quantity: row.after
     }))
   );
-  if (uniqueMemberIds.length > 0 || uniqueLabels.length > 0) {
-    const labelsById = new Map<string, string>();
-    for (const id of uniqueMemberIds) {
-      const member = (body.member_labels ?? []).find((_, idx) => body.member_user_ids?.[idx] === id);
-      if (member) labelsById.set(id, member);
-    }
-    await supabase.from('activity_members').insert(
-      (uniqueMemberIds.length > 0 ? uniqueMemberIds : [memberId]).map((id) => ({
-        activity_id: activity.id,
-        member_user_id: id || null,
-        member_label: labelsById.get(id) || uniqueLabels[0] || memberLabel
-      }))
-    );
-  }
+  const labelsById = new Map<string, string>();
+  uniqueMemberIds.forEach((id, index) => {
+    const label = body.member_labels?.[index];
+    if (label) labelsById.set(id, label);
+  });
+  const memberRows = uniqueMemberIds.length > 0
+    ? uniqueMemberIds.map((id) => ({
+      activity_id: activity.id,
+      member_user_id: id || null,
+      member_label: labelsById.get(id) || uniqueLabels[0] || memberLabel
+    }))
+    : [{
+      activity_id: activity.id,
+      member_user_id: null,
+      member_label: 'Groupe'
+    }];
+  await supabase.from('activity_members').insert(memberRows);
 
   const lootStockRows = resolvedItems.filter((row) => !row.isMoneyItem).map((row) => ({
     item_id: row.item_id,

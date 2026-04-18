@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type ActivityType = 'mailbox' | 'burglary' | 'container';
 type ActivityDisplayType = ActivityType | 'drug_sale';
@@ -53,6 +53,8 @@ const CREATE_ACTIVITY_TYPES: ActivityType[] = ['mailbox', 'burglary', 'container
 export function ActivityPageClient({ items, members, activities, defaultMemberId, canCreate, canViewRecent, canManageOwn, canManageAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; canCreate: boolean; canViewRecent: boolean; canManageOwn: boolean; canManageAny: boolean; currentUserId: string }) {
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(defaultMemberId ? [defaultMemberId] : []);
+  const [groupMode, setGroupMode] = useState(defaultMemberId ? false : true);
+  const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   const [equipmentUsed, setEquipmentUsed] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
   const [proofImageUrl, setProofImageUrl] = useState('');
@@ -62,6 +64,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const [categoryFilter, setCategoryFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [editingActivity, setEditingActivity] = useState<RecentActivity | null>(null);
+  const memberPickerRef = useRef<HTMLDivElement | null>(null);
 
   const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const availableTypes = useMemo(() => Array.from(new Set(items.filter((item) => !categoryFilter || item.category_key === categoryFilter).map((item) => item.type_key).filter(Boolean))) as string[], [items, categoryFilter]);
@@ -73,6 +76,24 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   }), [items, query, categoryFilter, typeFilter]);
   const kitItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('kit')), [items]);
   const cutterItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('disqueuse')), [items]);
+  const selectedMembers = useMemo(() => members.filter((entry) => selectedMemberIds.includes(entry.id)), [members, selectedMemberIds]);
+
+  useEffect(() => {
+    if (!defaultMemberId) return;
+    setSelectedMemberIds((current) => current.length > 0 ? current : [defaultMemberId]);
+  }, [defaultMemberId]);
+
+  useEffect(() => {
+    function onWindowPointerDown(event: PointerEvent) {
+      if (!memberPickerRef.current) return;
+      const target = event.target as Node | null;
+      if (target && memberPickerRef.current.contains(target)) return;
+      setMemberPickerOpen(false);
+    }
+
+    window.addEventListener('pointerdown', onWindowPointerDown);
+    return () => window.removeEventListener('pointerdown', onWindowPointerDown);
+  }, []);
 
   function setType(type: ActivityType) {
     setActivityType(type);
@@ -127,13 +148,18 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   }
 
   async function submit() {
+    if (!groupMode && selectedMemberIds.length === 0) {
+      setError('Sélectionne au moins un membre ou active Groupe.');
+      return;
+    }
+
     if (activityType !== 'mailbox' && equipmentUsed <= 0) {
       setError(activityType === 'burglary' ? 'Pour un cambriolage, indique le nombre de Kits pris.' : 'Pour un conteneur, indique le nombre de Disqueuses prises.');
       return;
     }
 
-    const selectedMembers = members.filter((entry) => selectedMemberIds.includes(entry.id));
-    const memberLabels = selectedMembers.map((entry) => entry.name || entry.username);
+    const memberIds = groupMode ? [] : selectedMemberIds;
+    const memberLabels = groupMode ? [] : selectedMembers.map((entry) => entry.name || entry.username);
     const mergedLabel = memberLabels.length > 0 ? memberLabels.join(' + ') : 'Groupe';
 
     const response = await fetch('/api/activity', {
@@ -141,8 +167,8 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         activity_type: activityType,
-        member_user_id: selectedMemberIds[0] || null,
-        member_user_ids: selectedMemberIds,
+        member_user_id: memberIds[0] || null,
+        member_user_ids: memberIds,
         member_labels: memberLabels,
         member_label: mergedLabel,
         equipment_used: activityType === 'mailbox' ? 0 : equipmentUsed,
@@ -176,30 +202,68 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
         <section className="grid gap-4 lg:grid-rows-[auto_1fr]">
           <section className="glass-card p-5" onPaste={(e) => void onPaste(e)}>
             <h3 className="text-base font-semibold text-[#fff1dd]">A. Session activité</h3>
-          <label className="mt-3 block text-xs text-[#efccaa]">Membre</label>
-          <div className="mt-1 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">
-            <div className="flex flex-wrap gap-2">
-              <button className={`filter-pill ${selectedMemberIds.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => { setSelectedMemberIds([]); }}>Groupe</button>
-              {members.map((member) => {
-                const selected = selectedMemberIds.includes(member.id);
-                return (
+            <label className="mt-3 block text-xs text-[#efccaa]">Session</label>
+            <div className="mt-1 space-y-2 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={`filter-pill ${groupMode ? 'filter-pill-active' : ''}`}
+                  onClick={() => setGroupMode(true)}
+                >
+                  👥 Groupe
+                </button>
+                <div className="relative" ref={memberPickerRef}>
                   <button
-                    key={member.id}
-                    className={`filter-pill ${selected ? 'filter-pill-active' : ''}`}
+                    type="button"
+                    className={`filter-pill ${!groupMode ? 'filter-pill-active' : ''} ${groupMode ? 'opacity-60' : ''}`}
                     onClick={() => {
-                      setSelectedMemberIds((current) => {
-                        const exists = current.includes(member.id);
-                        const next = exists ? current.filter((id) => id !== member.id) : [...current, member.id];
-                        return next;
-                      });
+                      setGroupMode(false);
+                      setMemberPickerOpen((current) => !current);
                     }}
                   >
-                    {member.name || member.username}
+                    👤 Membres ({selectedMemberIds.length})
                   </button>
-                );
-              })}
+                  {!groupMode && memberPickerOpen ? (
+                    <div className="absolute left-0 top-[110%] z-20 w-72 max-w-[80vw] rounded-xl border border-white/15 bg-[#2f1c14]/95 p-2 shadow-2xl backdrop-blur">
+                      <div className="max-h-56 space-y-1 overflow-auto pr-1">
+                        {members.map((member) => {
+                          const label = member.name || member.username;
+                          const selected = selectedMemberIds.includes(member.id);
+                          return (
+                            <label key={member.id} className="flex cursor-pointer items-center justify-between rounded-lg border border-white/10 bg-[#4f3220]/55 px-2 py-1.5 text-sm text-[#f8e2c6]">
+                              <span className="truncate pr-2">{label}</span>
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-[#ffcf9a]"
+                                checked={selected}
+                                onChange={(event) => {
+                                  const shouldSelect = event.target.checked;
+                                  setSelectedMemberIds((current) => (
+                                    shouldSelect
+                                      ? (current.includes(member.id) ? current : [...current, member.id])
+                                      : current.filter((id) => id !== member.id)
+                                  ));
+                                }}
+                              />
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-2 text-xs text-[#efcdab]">
+                {groupMode ? (
+                  <p>Mode Groupe actif : les membres individuels sont ignorés pour cette session.</p>
+                ) : selectedMembers.length > 0 ? (
+                  <p>Membres sélectionnés : {selectedMembers.map((member) => member.name || member.username).join(', ')}</p>
+                ) : (
+                  <p>Aucun membre sélectionné.</p>
+                )}
+                {!groupMode ? <p className="mt-1 text-[11px] text-[#e7c39d]">Astuce : le membre connecté est pré-sélectionné par défaut.</p> : null}
+              </div>
             </div>
-          </div>
 
           {activityType !== 'mailbox' ? (
             <>

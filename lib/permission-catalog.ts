@@ -1,6 +1,6 @@
 export const MODULE_ORDER = ['Dashboard', 'Argent', 'Vente objets', 'Items', 'Transactions', 'Transactions récentes', 'Activité', 'FOUR', 'Drogues', 'Tablette', 'Membres', 'Logs', 'Compte', 'Autres'] as const;
 
-export const SECTION_ORDER = ['Vue', 'Historique', 'Mouvements', 'Vente objets', 'Création', 'Modification / Annulation', 'Sessions', 'Transactions', 'Messages', 'Stats', 'Logs', 'Sécurité', 'Technique'] as const;
+export const SECTION_ORDER = ['Vue', 'Historique', 'Mouvements', 'Vente objets', 'Création', 'Modification / Annulation', 'Sessions', 'Transactions', 'Messages', 'Stats', 'Logs', 'Sécurité', 'Gestion', 'Technique'] as const;
 
 type PermissionInfo = { module: string; section: string; label: string; hint: string };
 
@@ -22,10 +22,10 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
   'money.pay.create': { module: 'Argent', section: 'Création', label: 'Créer / valider une paye', hint: 'Permet de payer un membre depuis la caisse groupe.' },
   'money.pay.history.view': { module: 'Argent', section: 'Historique', label: 'Voir l’historique des payes', hint: 'Permet de consulter l’historique des payes membres.' },
   'money.pay.logs.view': { module: 'Argent', section: 'Logs', label: 'Voir les logs paye', hint: 'Permet de consulter les logs des payes.' },
-  'money.quick_sale.access': { module: 'Vente objets', section: 'Technique', label: 'Accéder à Vente objets (compatibilité)', hint: 'Permission historique conservée pour compatibilité API.' },
-  'money.quick_sale.create': { module: 'Vente objets', section: 'Technique', label: 'Valider une vente objets (compatibilité)', hint: 'Permission historique conservée pour compatibilité API.' },
-  'money.quick_sale.details.view': { module: 'Vente objets', section: 'Technique', label: 'Voir les détails ventes objets (compatibilité)', hint: 'Permission historique conservée pour compatibilité API.' },
-  'money.quick_sale.logs.view': { module: 'Vente objets', section: 'Technique', label: 'Voir les logs vente objets (compatibilité)', hint: 'Permission historique conservée pour compatibilité API.' },
+  'money.quick_sale.access': { module: 'Vente objets', section: 'Vue', label: 'Accéder à Vente objets (compatibilité)', hint: 'Alias historique: ouvre le module Vente objets.' },
+  'money.quick_sale.create': { module: 'Vente objets', section: 'Création', label: 'Valider une vente objets (compatibilité)', hint: 'Alias historique: autorise la création/validation de vente objets.' },
+  'money.quick_sale.details.view': { module: 'Vente objets', section: 'Historique', label: 'Voir les détails ventes objets (compatibilité)', hint: 'Alias historique: autorise la lecture du détail et historique des ventes objets.' },
+  'money.quick_sale.logs.view': { module: 'Vente objets', section: 'Logs', label: 'Voir les logs vente objets (compatibilité)', hint: 'Alias historique: autorise la lecture des logs Vente objets.' },
 
   'items.preview': { module: 'Items', section: 'Vue', label: 'Voir la bulle Items', hint: 'Permet d’afficher la bulle Items.' },
   'items.access': { module: 'Items', section: 'Vue', label: 'Accéder au module Items', hint: 'Permet d’ouvrir le module Items.' },
@@ -52,8 +52,8 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
   'transactions.cancel.own': { module: 'Transactions', section: 'Modification / Annulation', label: 'Annuler ses transactions', hint: 'Permet d’annuler uniquement ses transactions.' },
   'transactions.edit.any': { module: 'Transactions', section: 'Modification / Annulation', label: 'Modifier toutes les transactions', hint: 'Permet de modifier toutes les transactions.' },
   'transactions.cancel.any': { module: 'Transactions', section: 'Modification / Annulation', label: 'Annuler toutes les transactions', hint: 'Permet d’annuler toutes les transactions.' },
-  'transactions.manage.own': { module: 'Transactions', section: 'Technique', label: 'Modifier ses transactions', hint: 'Compatibilité interne: équivaut à modifier/annuler ses transactions.' },
-  'transactions.manage.any': { module: 'Transactions', section: 'Technique', label: 'Modifier toutes les transactions', hint: 'Compatibilité interne: équivaut à modifier/annuler toutes les transactions.' },
+  'transactions.manage.own': { module: 'Transactions', section: 'Modification / Annulation', label: 'Modifier ses transactions (compatibilité)', hint: 'Alias historique: équivaut à modifier/annuler ses transactions.' },
+  'transactions.manage.any': { module: 'Transactions', section: 'Modification / Annulation', label: 'Modifier toutes les transactions (compatibilité)', hint: 'Alias historique: équivaut à modifier/annuler toutes les transactions.' },
 
   'transactions.recent.preview': { module: 'Transactions récentes', section: 'Vue', label: 'Voir la bulle Transactions récentes', hint: 'Permet d’afficher la bulle Transactions récentes.' },
   'transactions.recent.access': { module: 'Transactions récentes', section: 'Historique', label: 'Accéder à Transactions récentes', hint: 'Permet d’ouvrir la page Transactions récentes.' },
@@ -61,8 +61,8 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
   'transactions.recent.cancel.own': { module: 'Transactions récentes', section: 'Modification / Annulation', label: 'Annuler ses transactions récentes', hint: 'Permet d’annuler uniquement ses transactions récentes.' },
   'transactions.recent.edit.any': { module: 'Transactions récentes', section: 'Modification / Annulation', label: 'Modifier toutes les transactions récentes', hint: 'Permet de modifier toutes les transactions récentes.' },
   'transactions.recent.cancel.any': { module: 'Transactions récentes', section: 'Modification / Annulation', label: 'Annuler toutes les transactions récentes', hint: 'Permet d’annuler toutes les transactions récentes.' },
-  'transactions.recent.manage.own': { module: 'Transactions récentes', section: 'Technique', label: 'Modifier ses transactions récentes', hint: 'Compatibilité interne: équivaut à modifier/annuler ses transactions récentes.' },
-  'transactions.recent.manage.any': { module: 'Transactions récentes', section: 'Technique', label: 'Modifier toutes les transactions récentes', hint: 'Compatibilité interne: équivaut à modifier/annuler toutes les transactions récentes.' },
+  'transactions.recent.manage.own': { module: 'Transactions récentes', section: 'Modification / Annulation', label: 'Modifier ses transactions récentes (compatibilité)', hint: 'Alias historique: équivaut à modifier/annuler ses transactions récentes.' },
+  'transactions.recent.manage.any': { module: 'Transactions récentes', section: 'Modification / Annulation', label: 'Modifier toutes les transactions récentes (compatibilité)', hint: 'Alias historique: équivaut à modifier/annuler toutes les transactions récentes.' },
 
   'activity.preview': { module: 'Activité', section: 'Vue', label: 'Voir la bulle Activité', hint: 'Permet d’afficher la bulle Activité.' },
   'activity.access': { module: 'Activité', section: 'Vue', label: 'Accéder au module Activité', hint: 'Permet d’ouvrir le module Activité.' },
@@ -72,8 +72,8 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
   'activity.cancel.own': { module: 'Activité', section: 'Modification / Annulation', label: 'Annuler ses activités', hint: 'Permet d’annuler uniquement ses activités.' },
   'activity.edit.any': { module: 'Activité', section: 'Modification / Annulation', label: 'Modifier toutes les activités', hint: 'Permet de modifier toutes les activités.' },
   'activity.cancel.any': { module: 'Activité', section: 'Modification / Annulation', label: 'Annuler toutes les activités', hint: 'Permet d’annuler toutes les activités.' },
-  'activity.manage.own': { module: 'Activité', section: 'Technique', label: 'Modifier ses activités', hint: 'Compatibilité interne: équivaut à modifier/annuler ses activités.' },
-  'activity.manage.any': { module: 'Activité', section: 'Technique', label: 'Modifier toutes les activités', hint: 'Compatibilité interne: équivaut à modifier/annuler toutes les activités.' },
+  'activity.manage.own': { module: 'Activité', section: 'Modification / Annulation', label: 'Modifier ses activités (compatibilité)', hint: 'Alias historique: équivaut à modifier/annuler ses activités.' },
+  'activity.manage.any': { module: 'Activité', section: 'Modification / Annulation', label: 'Modifier toutes les activités (compatibilité)', hint: 'Alias historique: équivaut à modifier/annuler toutes les activités.' },
   'activity.stats.view': { module: 'Activité', section: 'Stats', label: 'Voir les stats Activité', hint: 'Permet de consulter les statistiques Activité.' },
   'activity.logs.view': { module: 'Activité', section: 'Logs', label: 'Voir les logs Activité', hint: 'Permet de consulter les logs Activité.' },
 
@@ -88,9 +88,9 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
   'four.transaction.cancel.own': { module: 'FOUR', section: 'Transactions', label: 'Annuler ses transactions FOUR', hint: 'Permet d’annuler uniquement ses transactions FOUR.' },
   'four.transaction.edit.any': { module: 'FOUR', section: 'Transactions', label: 'Modifier toutes les transactions FOUR', hint: 'Permet de modifier toutes les transactions FOUR.' },
   'four.transaction.cancel.any': { module: 'FOUR', section: 'Transactions', label: 'Annuler toutes les transactions FOUR', hint: 'Permet d’annuler toutes les transactions FOUR.' },
-  'four.transaction.manage': { module: 'FOUR', section: 'Technique', label: 'Modifier ses transactions FOUR', hint: 'Compatibilité interne: équivaut à modifier/annuler ses transactions FOUR.' },
-  'four.transaction.manage.own': { module: 'FOUR', section: 'Technique', label: 'Modifier ses transactions FOUR', hint: 'Compatibilité interne: équivaut à modifier/annuler ses transactions FOUR.' },
-  'four.transaction.manage.any': { module: 'FOUR', section: 'Technique', label: 'Modifier toutes les transactions FOUR', hint: 'Compatibilité interne: équivaut à modifier/annuler toutes les transactions FOUR.' },
+  'four.transaction.manage': { module: 'FOUR', section: 'Transactions', label: 'Modifier ses transactions FOUR (compatibilité)', hint: 'Alias historique: équivaut à modifier/annuler ses transactions FOUR.' },
+  'four.transaction.manage.own': { module: 'FOUR', section: 'Transactions', label: 'Modifier ses transactions FOUR (compatibilité)', hint: 'Alias historique: équivaut à modifier/annuler ses transactions FOUR.' },
+  'four.transaction.manage.any': { module: 'FOUR', section: 'Transactions', label: 'Modifier toutes les transactions FOUR (compatibilité)', hint: 'Alias historique: équivaut à modifier/annuler toutes les transactions FOUR.' },
   'four.history.view': { module: 'FOUR', section: 'Historique', label: 'Voir l’historique FOUR', hint: 'Permet de consulter l’historique des sessions FOUR.' },
   'four.stats.view': { module: 'FOUR', section: 'Stats', label: 'Voir les stats FOUR', hint: 'Permet de consulter les statistiques FOUR.' },
   'four.messages.view': { module: 'FOUR', section: 'Messages', label: 'Voir les messages FOUR', hint: 'Permet d’afficher les messages FOUR.' },
