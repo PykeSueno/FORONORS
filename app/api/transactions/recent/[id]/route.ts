@@ -39,12 +39,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canManageOwn, canManageAny] = await Promise.all([
+  const [canAccess, canEditOwn, canEditAny, canLegacyOwn, canLegacyAny] = await Promise.all([
     hasUserPermission(session.userId, 'transactions.recent.access'),
+    hasUserPermission(session.userId, 'transactions.recent.edit.own'),
+    hasUserPermission(session.userId, 'transactions.recent.edit.any'),
     hasUserPermission(session.userId, 'transactions.recent.manage.own'),
     hasUserPermission(session.userId, 'transactions.recent.manage.any')
   ]);
-  if (!canAccess || (!canManageOwn && !canManageAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const canOwn = canEditOwn || canLegacyOwn;
+  const canAny = canEditAny || canLegacyAny;
+  if (!canAccess || (!canOwn && !canAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const txId = Number(id);
@@ -59,7 +63,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .maybeSingle();
 
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
-  if (!canManageAny && tx.actor_user_id !== session.userId) return NextResponse.json({ message: 'Vous pouvez gérer uniquement vos propres transactions.' }, { status: 403 });
+  if (!canAny && tx.actor_user_id !== session.userId) return NextResponse.json({ message: 'Vous pouvez modifier uniquement vos propres transactions.' }, { status: 403 });
 
   const oldLines = (tx.transaction_lines ?? []) as TxLine[];
 
@@ -167,7 +171,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   await createAuditLog({
     actorUserId: session.userId,
-    action: 'transactions.recent.manage',
+    action: 'transactions.recent.edit',
     entityType: 'transaction',
     entityId: txId,
     summary: `Correction transaction #${txId}`,
@@ -182,12 +186,16 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canAccess, canManageOwn, canManageAny] = await Promise.all([
+  const [canAccess, canCancelOwn, canCancelAny, canLegacyOwn, canLegacyAny] = await Promise.all([
     hasUserPermission(session.userId, 'transactions.recent.access'),
+    hasUserPermission(session.userId, 'transactions.recent.cancel.own'),
+    hasUserPermission(session.userId, 'transactions.recent.cancel.any'),
     hasUserPermission(session.userId, 'transactions.recent.manage.own'),
     hasUserPermission(session.userId, 'transactions.recent.manage.any')
   ]);
-  if (!canAccess || (!canManageOwn && !canManageAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const canOwn = canCancelOwn || canLegacyOwn;
+  const canAny = canCancelAny || canLegacyAny;
+  if (!canAccess || (!canOwn && !canAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const txId = Number(id);
@@ -200,7 +208,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     .maybeSingle();
 
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
-  if (!canManageAny && tx.actor_user_id !== session.userId) return NextResponse.json({ message: 'Vous pouvez gérer uniquement vos propres transactions.' }, { status: 403 });
+  if (!canAny && tx.actor_user_id !== session.userId) return NextResponse.json({ message: 'Vous pouvez annuler uniquement vos propres transactions.' }, { status: 403 });
 
   const lines = (tx.transaction_lines ?? []) as TxLine[];
   const rollback = await applyDeltaToItems(lines, -1);
@@ -227,7 +235,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
   await createAuditLog({
     actorUserId: session.userId,
-    action: 'transactions.recent.manage',
+    action: 'transactions.recent.cancel',
     entityType: 'transaction',
     entityId: txId,
     summary: `Annulation transaction #${txId}`,

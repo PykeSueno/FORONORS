@@ -113,13 +113,16 @@ export async function PATCH(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canOwn, canAny, canLegacyManage] = await Promise.all([
+  const [canOwn, canAny, canLegacyOwn, canLegacyAny, canLegacyManage] = await Promise.all([
+    hasUserPermission(session.userId, 'four.transaction.edit.own'),
+    hasUserPermission(session.userId, 'four.transaction.edit.any'),
     hasUserPermission(session.userId, 'four.transaction.manage.own'),
     hasUserPermission(session.userId, 'four.transaction.manage.any'),
     hasUserPermission(session.userId, 'four.transaction.manage')
   ]);
-  const ownAccess = canOwn || canLegacyManage;
-  if (!ownAccess && !canAny) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const ownAccess = canOwn || canLegacyOwn || canLegacyManage;
+  const anyAccess = canAny || canLegacyAny;
+  if (!ownAccess && !anyAccess) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as { transaction_id?: number; counterparty?: string; lines?: TxLine[] };
   const txId = Number(body.transaction_id);
@@ -128,7 +131,7 @@ export async function PATCH(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: tx } = await supabase.from('four_transactions').select('id, status, created_by, session_id').eq('id', txId).maybeSingle();
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
-  if (!canManageTx(session.userId, tx.created_by ?? null, ownAccess, canAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canManageTx(session.userId, tx.created_by ?? null, ownAccess, anyAccess)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
   if (tx.status !== 'validated') return NextResponse.json({ message: 'Seules les transactions validées peuvent être modifiées.' }, { status: 400 });
 
   const sessionId = await ensureSessionOpen(supabase, tx.session_id);
@@ -161,7 +164,7 @@ export async function PATCH(request: Request) {
 
     await createAuditLog({
       actorUserId: session.userId,
-      action: 'four.transaction.update',
+      action: 'four.transaction.edit',
       entityType: 'four_transaction',
       entityId: txId,
       summary: `Modification transaction FOUR #${txId}`,
@@ -178,13 +181,16 @@ export async function DELETE(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canOwn, canAny, canLegacyManage] = await Promise.all([
+  const [canOwn, canAny, canLegacyOwn, canLegacyAny, canLegacyManage] = await Promise.all([
+    hasUserPermission(session.userId, 'four.transaction.cancel.own'),
+    hasUserPermission(session.userId, 'four.transaction.cancel.any'),
     hasUserPermission(session.userId, 'four.transaction.manage.own'),
     hasUserPermission(session.userId, 'four.transaction.manage.any'),
     hasUserPermission(session.userId, 'four.transaction.manage')
   ]);
-  const ownAccess = canOwn || canLegacyManage;
-  if (!ownAccess && !canAny) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const ownAccess = canOwn || canLegacyOwn || canLegacyManage;
+  const anyAccess = canAny || canLegacyAny;
+  if (!ownAccess && !anyAccess) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as { transaction_id?: number; reason?: string };
   const txId = Number(body.transaction_id);
@@ -193,7 +199,7 @@ export async function DELETE(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: tx } = await supabase.from('four_transactions').select('id, session_id, status, created_by').eq('id', txId).maybeSingle();
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
-  if (!canManageTx(session.userId, tx.created_by ?? null, ownAccess, canAny)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canManageTx(session.userId, tx.created_by ?? null, ownAccess, anyAccess)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const sessionId = await ensureSessionOpen(supabase, tx.session_id);
   if (!sessionId) return NextResponse.json({ message: 'Session FOUR non active.' }, { status: 400 });

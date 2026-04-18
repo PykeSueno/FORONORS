@@ -621,23 +621,49 @@ export function DrugsPageClient({
 
             <Field label="3. Membre(s) vendeur(s) ou Groupe" hint="Optionnel · Groupe par défaut">
               <div className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
-                <div className="grid gap-2 md:grid-cols-[auto_1fr]">
-                  <button className={`filter-pill w-fit ${selectedMembers.length === 0 ? 'filter-pill-active' : ''}`} onClick={() => setSelectedMembers([])}>Groupe</button>
-                  <select
-                    multiple
-                    className="saas-input min-h-28 w-full"
-                    value={selectedMembers}
-                    onChange={(event) => {
-                      const values = Array.from(event.target.selectedOptions).map((option) => option.value);
-                      setSelectedMembers(values);
-                    }}
-                  >
-                    {members.map((member) => (
-                      <option key={member.id} value={member.id}>{member.name || member.username}</option>
-                    ))}
-                  </select>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      className={`filter-pill ${selectedMembers.length === 0 ? 'filter-pill-active' : ''}`}
+                      onClick={() => setSelectedMembers([])}
+                    >
+                      👥 Groupe
+                    </button>
+                    <p className="text-xs text-[#efcdab]">Active “Groupe” ou sélectionne des membres individuellement.</p>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-2">
+                    <p className="mb-2 px-1 text-xs font-semibold text-[#f6d6ad]">Membres vendeurs</p>
+                    <div className="flex flex-wrap gap-2">
+                      {members.map((member) => {
+                        const label = member.name || member.username;
+                        const isSelected = selectedMembers.includes(member.id);
+                        return (
+                          <button
+                            key={member.id}
+                            type="button"
+                            className={`filter-pill ${isSelected ? 'filter-pill-active' : ''}`}
+                            onClick={() => {
+                              setSelectedMembers((current) => (
+                                current.includes(member.id)
+                                  ? current.filter((entry) => entry !== member.id)
+                                  : [...current, member.id]
+                              ));
+                            }}
+                          >
+                            {isSelected ? '✅ ' : ''}{label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-2 text-xs text-[#efcdab]">{selectedMembers.length === 0 ? 'Mode Groupe actif.' : `Membres sélectionnés: ${selectedMembers.length}`}</p>
+                <p className="mt-2 text-xs text-[#efcdab]">
+                  {selectedMembers.length === 0
+                    ? 'Mode Groupe actif.'
+                    : `Membres sélectionnés: ${selectedMembers.map((id) => members.find((member) => member.id === id)?.name || members.find((member) => member.id === id)?.username || id).join(', ')}`}
+                </p>
               </div>
             </Field>
 

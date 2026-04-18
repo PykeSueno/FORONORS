@@ -48,8 +48,10 @@ export default async function RecentTransactionsPage() {
       <TransactionsTabs active="recent" canSeeRecent canSeeSaleObjects={permissions.includes('sale.objects.access')} />
       <RecentTransactionsClient
         transactions={transactions}
-        canManageOwn={permissions.includes('transactions.recent.manage.own')}
-        canManageAny={permissions.includes('transactions.recent.manage.any')}
+        canEditOwn={permissions.includes('transactions.recent.edit.own') || permissions.includes('transactions.recent.manage.own')}
+        canEditAny={permissions.includes('transactions.recent.edit.any') || permissions.includes('transactions.recent.manage.any')}
+        canCancelOwn={permissions.includes('transactions.recent.cancel.own') || permissions.includes('transactions.recent.manage.own')}
+        canCancelAny={permissions.includes('transactions.recent.cancel.any') || permissions.includes('transactions.recent.manage.any')}
         currentUserId={session.userId}
       />
     </div>

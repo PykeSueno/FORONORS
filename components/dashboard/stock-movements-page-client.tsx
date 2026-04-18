@@ -6,6 +6,8 @@ import { humanStockMovementLabel, stockMovementIcon } from '@/lib/labels';
 
 type Row = {
   id: number;
+  item_id?: number | null;
+  transaction_id?: number | null;
   item: string;
   quantity: number;
   type: string;
@@ -21,17 +23,20 @@ type Row = {
 export function StockMovementsPageClient({ rows }: { rows: Row[] }) {
   const [period, setPeriod] = useState('');
   const [member, setMember] = useState('');
+  const [item, setItem] = useState('');
   const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
   const [type, setType] = useState('');
   const [query, setQuery] = useState('');
 
   const members = useMemo(() => Array.from(new Set(rows.map((row) => row.user_name))).sort((a, b) => a.localeCompare(b, 'fr')), [rows]);
+  const items = useMemo(() => Array.from(new Set(rows.map((row) => row.item))).sort((a, b) => a.localeCompare(b, 'fr')), [rows]);
   const categories = useMemo(() => Array.from(new Set(rows.map((row) => row.category || 'Sans catégorie'))).sort((a, b) => a.localeCompare(b, 'fr')), [rows]);
   const sources = useMemo(() => Array.from(new Set(rows.map((row) => row.source))).sort((a, b) => a.localeCompare(b, 'fr')), [rows]);
 
   const filtered = useMemo(() => rows.filter((row) => {
     if (member && row.user_name !== member) return false;
+    if (item && row.item !== item) return false;
     if (category && (row.category || 'Sans catégorie') !== category) return false;
     if (source && row.source !== source) return false;
     if (type === 'in' && row.quantity <= 0) return false;
@@ -48,11 +53,11 @@ export function StockMovementsPageClient({ rows }: { rows: Row[] }) {
       if (Number.isFinite(days) && dt < min) return false;
     }
     return true;
-  }), [rows, member, category, source, type, query, period]);
+  }), [rows, member, item, category, source, type, query, period]);
 
   return (
     <section className="glass-card p-5">
-      <div className="grid gap-2 md:grid-cols-6">
+      <div className="grid gap-2 md:grid-cols-7">
         <select className="saas-input" value={period} onChange={(e) => setPeriod(e.target.value)}>
           <option value="">Période: tout</option>
           <option value="1">24h</option>
@@ -62,6 +67,10 @@ export function StockMovementsPageClient({ rows }: { rows: Row[] }) {
         <select className="saas-input" value={member} onChange={(e) => setMember(e.target.value)}>
           <option value="">Membre: tous</option>
           {members.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+        </select>
+        <select className="saas-input" value={item} onChange={(e) => setItem(e.target.value)}>
+          <option value="">Item: tous</option>
+          {items.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
         </select>
         <select className="saas-input" value={category} onChange={(e) => setCategory(e.target.value)}>
           <option value="">Catégorie: toutes</option>
@@ -90,9 +99,18 @@ export function StockMovementsPageClient({ rows }: { rows: Row[] }) {
                   <p className="truncate text-sm font-medium text-[#ffe8ca]">{row.user_name} — {row.item}</p>
                   <p className="text-xs text-[#efcdab]">{row.source} · {humanStockMovementLabel(row.type)} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
                   <p className="text-[11px] text-[#efcdab]">Avant {row.before != null ? row.before : '—'} → Après {row.after != null ? row.after : '—'}</p>
+                  <p className="text-[11px] text-[#efcdab]">👤 Utilisateur · 📦 Item · 🔁 Variation · 🧭 Module source</p>
                 </div>
               </div>
               <p className={`text-sm font-semibold ${row.quantity >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{row.quantity > 0 ? '+' : ''}{row.quantity}</p>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[#efcdab]">
+              <span className="rounded-full border border-white/10 bg-[#2f1d14]/60 px-2 py-1">🧍 {row.user_name}</span>
+              <span className="rounded-full border border-white/10 bg-[#2f1d14]/60 px-2 py-1">🧩 {row.source}</span>
+              <span className="rounded-full border border-white/10 bg-[#2f1d14]/60 px-2 py-1">📉📈 {row.before != null ? `${row.before} → ${row.after}` : '—'}</span>
+              {row.transaction_id ? (
+                <span className="rounded-full border border-white/10 bg-[#2f1d14]/60 px-2 py-1">🔗 Action #{row.transaction_id}</span>
+              ) : null}
             </div>
           </article>
         ))}

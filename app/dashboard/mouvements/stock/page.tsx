@@ -9,6 +9,7 @@ import { stockMovementSource } from '@/lib/labels';
 type StockMovementRow = {
   id: number;
   item_id: number | null;
+  transaction_id: number | null;
   item_name: string;
   quantity_delta: number;
   transaction_type: string;
@@ -27,7 +28,7 @@ export default async function StockMovementsGlobalPage() {
   const supabase = getSupabaseAdmin();
   const { data: rows } = await supabase
     .from('item_stock_movements')
-    .select('id, item_id, item_name, quantity_delta, transaction_type, created_at, users(name, username), items(image_url, category_label, quantity)')
+    .select('id, item_id, transaction_id, item_name, quantity_delta, transaction_type, created_at, users(name, username), items(image_url, category_label, quantity)')
     .order('created_at', { ascending: false })
     .limit(700);
 
@@ -48,6 +49,8 @@ export default async function StockMovementsGlobalPage() {
 
     return {
       id: row.id,
+      item_id: row.item_id,
+      transaction_id: row.transaction_id,
       item: row.item_name,
       quantity: Number(row.quantity_delta ?? 0),
       type: row.transaction_type,

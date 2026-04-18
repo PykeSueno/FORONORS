@@ -40,8 +40,8 @@ export default async function FourPage() {
         canCashAdd={permissions.includes('four.cash.add')}
         canManageTransaction={permissions.includes('four.add_movement')}
         canValidateTransaction={permissions.includes('four.transaction.validate')}
-        canManageOwnTransaction={permissions.includes('four.transaction.manage.own') || permissions.includes('four.transaction.manage')}
-        canManageAnyTransaction={permissions.includes('four.transaction.manage.any')}
+        canManageOwnTransaction={permissions.includes('four.transaction.edit.own') || permissions.includes('four.transaction.cancel.own') || permissions.includes('four.transaction.manage.own') || permissions.includes('four.transaction.manage')}
+        canManageAnyTransaction={permissions.includes('four.transaction.edit.any') || permissions.includes('four.transaction.cancel.any') || permissions.includes('four.transaction.manage.any')}
         canClose={permissions.includes('four.close')}
         canViewHistory={permissions.includes('four.history.view')}
         canViewStats={permissions.includes('four.stats.view')}

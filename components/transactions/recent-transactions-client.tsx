@@ -25,7 +25,21 @@ type RecentTransaction = {
   }>;
 };
 
-export function RecentTransactionsClient({ transactions, canManageOwn, canManageAny, currentUserId }: { transactions: RecentTransaction[]; canManageOwn: boolean; canManageAny: boolean; currentUserId: string }) {
+export function RecentTransactionsClient({
+  transactions,
+  canEditOwn,
+  canEditAny,
+  canCancelOwn,
+  canCancelAny,
+  currentUserId
+}: {
+  transactions: RecentTransaction[];
+  canEditOwn: boolean;
+  canEditAny: boolean;
+  canCancelOwn: boolean;
+  canCancelAny: boolean;
+  currentUserId: string;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [member, setMember] = useState('');
@@ -176,13 +190,15 @@ export function RecentTransactionsClient({ transactions, canManageOwn, canManage
             </div>
 
             {(() => {
-              const canManageThis = canManageAny || (canManageOwn && transaction.actor_user_id === currentUserId);
-              return canManageThis ? (
+              const canEditThis = canEditAny || (canEditOwn && transaction.actor_user_id === currentUserId);
+              const canCancelThis = canCancelAny || (canCancelOwn && transaction.actor_user_id === currentUserId);
+              if (!canEditThis && !canCancelThis) return null;
+              return (
               <div className="mt-3 flex flex-wrap justify-end gap-2">
-                <button className="saas-ghost-btn" onClick={() => setEditing(transaction)}>Modifier</button>
-                <button className="saas-ghost-btn" onClick={() => void cancelTransaction(transaction.id)}>Annuler</button>
+                {canEditThis ? <button className="saas-ghost-btn" onClick={() => setEditing(transaction)}>Modifier</button> : null}
+                {canCancelThis ? <button className="saas-ghost-btn" onClick={() => void cancelTransaction(transaction.id)}>Annuler</button> : null}
               </div>
-            ) : null;
+            );
             })()}
           </article>
         ))}
