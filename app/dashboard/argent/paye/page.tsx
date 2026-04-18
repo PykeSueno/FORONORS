@@ -31,7 +31,7 @@ export default async function MoneyPayPage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Paye" subtitle="Payer un membre depuis la caisse groupe" />
+      <InternalPageHeader title="Paye 💸" subtitle="Payer un membre depuis la caisse groupe" />
       <MoneyPayPageClient
         canCreate={canCreate}
         canHistory={canHistory}

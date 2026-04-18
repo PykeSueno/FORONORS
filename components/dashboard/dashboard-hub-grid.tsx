@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { DragEvent, PointerEvent, useEffect, useMemo, useState } from 'react';
+import { PointerEvent, useEffect, useMemo, useState } from 'react';
 
 type HubCardItem = {
   id: string;
@@ -25,7 +25,7 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   const [dragging, setDragging] = useState<string | null>(null);
   const [draftOrder, setDraftOrder] = useState<string[]>(initialNormalizedOrder);
   const [hasDragged, setHasDragged] = useState(false);
-  const [pointerDrag, setPointerDrag] = useState<{ pointerId: number; cardId: string; startX: number; startY: number; draggingStarted: boolean } | null>(null);
+  const [pointerDrag, setPointerDrag] = useState<{ pointerId: number; cardId: string; startX: number; startY: number; startAt: number; draggingStarted: boolean } | null>(null);
 
   useEffect(() => {
     setOrder(initialNormalizedOrder);
@@ -69,26 +69,6 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
     if (draftOrder.join('|') !== order.join('|')) void persist(draftOrder);
   }
 
-  function onDragStart(event: DragEvent<HTMLDivElement>, cardId: string) {
-    setDragging(cardId);
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', cardId);
-  }
-
-  function onDragOver(event: DragEvent<HTMLDivElement>, cardId: string) {
-    event.preventDefault();
-    if (!dragging) {
-      const sourceId = event.dataTransfer.getData('text/plain');
-      if (sourceId) setDragging(sourceId);
-    }
-    moveCard(cardId);
-  }
-
-  function onDrop(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    endDrag();
-  }
-
   function onPointerDown(event: PointerEvent<HTMLDivElement>, cardId: string) {
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
@@ -97,6 +77,7 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
       cardId,
       startX: event.clientX,
       startY: event.clientY,
+      startAt: Date.now(),
       draggingStarted: false
     });
     setHasDragged(false);
@@ -107,8 +88,10 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
     const dx = event.clientX - pointerDrag.startX;
     const dy = event.clientY - pointerDrag.startY;
     const distance = Math.hypot(dx, dy);
-    const DRAG_DISTANCE_THRESHOLD = 14;
-    if (!pointerDrag.draggingStarted && distance < DRAG_DISTANCE_THRESHOLD) return;
+    const elapsed = Date.now() - pointerDrag.startAt;
+    const DRAG_DISTANCE_THRESHOLD = 24;
+    const DRAG_HOLD_THRESHOLD_MS = 180;
+    if (!pointerDrag.draggingStarted && (distance < DRAG_DISTANCE_THRESHOLD || elapsed < DRAG_HOLD_THRESHOLD_MS)) return;
     if (!pointerDrag.draggingStarted) {
       setPointerDrag((current) => (current ? { ...current, draggingStarted: true } : current));
       setDragging(pointerDrag.cardId);
@@ -143,11 +126,6 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
         <div
           key={card.id}
           data-hub-card-id={card.id}
-          draggable
-          onDragStart={(event) => onDragStart(event, card.id)}
-          onDragOver={(event) => onDragOver(event, card.id)}
-          onDrop={onDrop}
-          onDragEnd={endDrag}
           onPointerDown={(event) => onPointerDown(event, card.id)}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
