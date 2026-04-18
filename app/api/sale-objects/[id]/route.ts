@@ -74,8 +74,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const previousLines = (existing.sale_lines ?? []) as Array<{ itemId: number; itemName: string; quantity: number }>;
   const previousQtyByItem = new Map<number, number>();
   for (const line of previousLines) previousQtyByItem.set(Number(line.itemId), (previousQtyByItem.get(Number(line.itemId)) ?? 0) + Number(line.quantity ?? 0));
+  const nextQtyByItem = new Map<number, number>();
+  for (const line of lines) nextQtyByItem.set(Number(line.item_id), (nextQtyByItem.get(Number(line.item_id)) ?? 0) + Math.max(1, Number(line.quantity)));
 
-  const itemIds = Array.from(new Set(lines.map((line) => Number(line.item_id))));
+  const itemIds = Array.from(new Set([...Array.from(previousQtyByItem.keys()), ...Array.from(nextQtyByItem.keys())]));
   const { data: items } = await supabase.from('items').select('id, name, quantity, sell_price, image_url, category_label, category_key').in('id', itemIds).eq('category_key', 'objects');
   const itemMap = new Map((items ?? []).map((item) => [item.id, item]));
   const resolved: Array<{ itemId: number; itemName: string; categoryLabel: string | null; itemImageUrl: string | null; quantity: number; unitPrice: number; lineTotal: number; stockBefore: number; stockAfter: number }> = [];
@@ -91,8 +93,28 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const lineTotal = qty * unitPrice;
     resolved.push({ itemId: item.id, itemName: item.name, categoryLabel: item.category_label ?? null, itemImageUrl: item.image_url ?? null, quantity: qty, unitPrice, lineTotal, stockBefore, stockAfter: stockBefore - qty });
   }
-  for (const line of resolved) {
-    await supabase.from('items').update({ quantity: line.stockAfter, updated_at: new Date().toISOString() }).eq('id', line.itemId);
+
+  const stockMovements: Array<{ item_id: number; item_name: string; transaction_type: string; quantity_delta: number; user_id: string }> = [];
+  for (const itemId of itemIds) {
+    const item = itemMap.get(itemId);
+    if (!item) continue;
+    const currentQuantity = Number(item.quantity ?? 0);
+    const previousQty = Number(previousQtyByItem.get(itemId) ?? 0);
+    const nextQty = Number(nextQtyByItem.get(itemId) ?? 0);
+    const theoreticalBefore = currentQuantity + previousQty;
+    if (nextQty > theoreticalBefore) return NextResponse.json({ message: `Stock insuffisant pour ${item.name}.` }, { status: 400 });
+    const desiredQuantity = theoreticalBefore - nextQty;
+    const delta = desiredQuantity - currentQuantity;
+    if (delta === 0) continue;
+
+    await supabase.from('items').update({ quantity: desiredQuantity, updated_at: new Date().toISOString() }).eq('id', itemId);
+    stockMovements.push({
+      item_id: itemId,
+      item_name: item.name,
+      transaction_type: 'sale_objects_edit_delta',
+      quantity_delta: delta,
+      user_id: session.userId
+    });
   }
 
   const oldTotal = Number(existing.total_amount ?? 0);
@@ -143,13 +165,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     updated_at: new Date().toISOString()
   }).eq('id', saleId);
 
-  await supabase.from('item_stock_movements').insert(resolved.map((line) => ({
-    item_id: line.itemId,
-    item_name: line.itemName,
-    transaction_type: 'sale_objects_edit_delta',
-    quantity_delta: -line.quantity,
-    user_id: session.userId
-  })));
+  if (stockMovements.length > 0) {
+    await supabase.from('item_stock_movements').insert(stockMovements);
+  }
 
   await createAuditLog({
     actorUserId: session.userId,

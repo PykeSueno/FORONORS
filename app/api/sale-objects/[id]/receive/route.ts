@@ -51,7 +51,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     entityId: saleId,
     summary: `Réception vente objets #${saleId}`,
     oldValues: { status: sale.status, cashBefore },
-    newValues: { status: 'paid', cashAfter, amount: total }
+    newValues: { status: 'paid', cashAfter, amount: total, stockApplied: true, cashReceived: true }
   });
 
   return NextResponse.json({ ok: true });

@@ -42,6 +42,12 @@ function normalizeItemName(value: string) {
     .trim();
 }
 
+function saleStatusMeta(status: SaleRow['status']) {
+  if (status === 'paid') return { label: 'Reçu', badge: 'bg-emerald-500/20 text-emerald-200', detail: 'Argent reçu', stockHint: 'Stock sorti' };
+  if (status === 'pending_receipt') return { label: 'En attente de réception', badge: 'bg-amber-500/20 text-amber-100', detail: 'Argent en attente', stockHint: 'Stock déjà sorti' };
+  return { label: 'Annulé', badge: 'bg-rose-500/20 text-rose-200', detail: 'Vente annulée', stockHint: 'Stock restauré' };
+}
+
 export function SaleObjectsPageClient({
   items,
   initialSales,
@@ -352,13 +358,15 @@ export function SaleObjectsPageClient({
               {visibleSales.map((sale) => {
                 const canEdit = canEditAny || (canEditOwn && canManageOwn(sale));
                 const canCancel = canCancelAny || (canCancelOwn && canManageOwn(sale));
+                const statusMeta = saleStatusMeta(sale.status);
                 return (
                   <div key={sale.id} className="rounded-xl border border-white/10 bg-[#3b2418]/50 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-[#ffe8ca]">#{sale.id} · {sale.buyer_name}</p>
-                      <span className={`rounded-full px-2 py-1 text-xs ${sale.status === 'paid' ? 'bg-emerald-500/20 text-emerald-200' : sale.status === 'pending_receipt' ? 'bg-amber-500/20 text-amber-100' : 'bg-rose-500/20 text-rose-200'}`}>{sale.status === 'paid' ? 'Payé' : sale.status === 'pending_receipt' ? 'En attente' : 'Annulé'}</span>
+                      <span className={`rounded-full px-2 py-1 text-xs ${statusMeta.badge}`}>{statusMeta.label}</span>
                     </div>
                     <p className="text-xs text-[#efcdab]">{new Date(sale.created_at).toLocaleString('fr-FR')} · Total {formatUsd(Number(sale.total_amount ?? 0))}</p>
+                    <p className="mt-1 text-[11px] text-[#efcdab]">📦 {statusMeta.stockHint} · 💵 {statusMeta.detail}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => setDetail(sale)}>Voir détail</button>
                       {sale.status === 'pending_receipt' && canReceive ? <button className="saas-primary-btn !px-2 !py-1 text-xs" onClick={() => void markReceived(sale.id)}>Reçu</button> : null}
@@ -380,8 +388,9 @@ export function SaleObjectsPageClient({
               <h3 className="text-lg font-semibold text-[#fff1dd]">Détail vente #{detail.id}</h3>
               <button className="saas-ghost-btn" onClick={() => setDetail(null)}>Fermer</button>
             </div>
-            <p className="mt-2 text-xs text-[#efcdab]">Acheteur: {detail.buyer_name} · Statut: {detail.status}</p>
+            <p className="mt-2 text-xs text-[#efcdab]">Acheteur: {detail.buyer_name} · Statut: {saleStatusMeta(detail.status).label}</p>
             <p className="text-xs text-[#efcdab]">Argent groupe: {detail.cash_before != null ? formatUsd(Number(detail.cash_before)) : '-'} → {detail.cash_after != null ? formatUsd(Number(detail.cash_after)) : '-'}</p>
+            {detail.status === 'pending_receipt' ? <p className="mt-1 text-xs text-[#f3d4b0]">📦 Les objets sont déjà sortis du stock. 💵 L’argent sera ajouté lors du clic sur “Reçu”.</p> : null}
             <div className="mt-3 space-y-2">
               {(detail.sale_lines ?? []).map((line, idx) => (
                 <article key={`${detail.id}-${idx}`} className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-3 text-xs text-[#efcdab]">

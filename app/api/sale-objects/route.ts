@@ -171,7 +171,7 @@ export async function POST(request: Request) {
     entityId: sale?.id ?? null,
     summary: `Vente objets ${pawnshop ? 'pawnshop' : 'groupe'} #${sale?.id ?? 'N/A'} · ${total}$ · vendeur ${sellerLabel}`,
     oldValues: { cashBefore },
-    newValues: { cashAfter, buyerName, buyerType, status, total, lines: resolved, sellerUserId, sellerLabel }
+    newValues: { cashAfter, buyerName, buyerType, status, total, lines: resolved, sellerUserId, sellerLabel, stockApplied: true, cashReceived: !pawnshop }
   });
 
   return NextResponse.json({ ok: true, sale });

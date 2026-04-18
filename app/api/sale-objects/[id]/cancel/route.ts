@@ -71,7 +71,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     entityId: saleId,
     summary: `Annulation vente objets #${saleId}`,
     oldValues: { status: sale.status, total: sale.total_amount },
-    newValues: { status: 'canceled', cashBefore, cashAfter, restoredLines: lines }
+    newValues: { status: 'canceled', cashBefore, cashAfter, restoredLines: lines, stockApplied: false, cashReceived: false }
   });
 
   return NextResponse.json({ ok: true });
