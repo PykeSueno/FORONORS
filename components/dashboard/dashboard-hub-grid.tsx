@@ -134,7 +134,7 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
           onPointerUp={onPointerUp}
           onPointerCancel={endDrag}
           onClickCapture={(event) => { if (hasDragged || dragging) event.preventDefault(); }}
-          className={`cursor-grab active:cursor-grabbing ${dragging === card.id ? 'opacity-70' : ''}`}
+          className={`${dragging === card.id ? 'opacity-70' : ''}`}
         >
           <HubCard {...card} />
         </div>
@@ -153,7 +153,7 @@ function HubCard({ href, enabled, icon, title, value, subtitle }: Omit<HubCardIt
           {enabled ? (
             <span
               data-drag-handle
-              className="rounded-full border border-white/20 bg-[#2f1d14]/70 px-2 py-0.5 text-[11px] text-[#f1d1ac] hover:bg-[#4a2f20]/80"
+              className="cursor-grab active:cursor-grabbing rounded-full border border-white/20 bg-[#2f1d14]/70 px-2 py-0.5 text-[11px] text-[#f1d1ac] hover:bg-[#4a2f20]/80"
               title="Attraper ici puis déplacer pour réorganiser"
             >
               ↕
