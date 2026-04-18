@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { formatUsd } from '@/lib/currency';
+import { SessionMemberSelector } from '@/components/shared/session-member-selector';
 
 type Member = { id: string; name: string; username: string };
 type Item = { id: number; name: string; image_url: string | null; quantity: number };
@@ -174,7 +175,9 @@ export function DrugsPageClient({
   const [manageNote, setManageNote] = useState('');
 
   const [saleLines, setSaleLines] = useState<Array<{ id: number; drug_type: 'coke' | 'meth' | 'fentanyl'; quantity_sold: number; actual_amount: number }>>([{ id: 1, drug_type: 'coke', quantity_sold: 10, actual_amount: 0 }]);
-  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const defaultSaleMemberIds = useMemo(() => members.some((member) => member.id === currentUserId) ? [currentUserId] : [], [members, currentUserId]);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>(defaultSaleMemberIds);
+  const [groupSaleMode, setGroupSaleMode] = useState(defaultSaleMemberIds.length === 0);
   const [detailSale, setDetailSale] = useState<Sale | null>(null);
   const [cokeSeeds, setCokeSeeds] = useState(9);
   const [cokeZones, setCokeZones] = useState(1);
@@ -370,7 +373,12 @@ export function DrugsPageClient({
       setError('Au moins une drogue sélectionnée est introuvable dans le stock.');
       return;
     }
-    const selected = members.filter((member) => selectedMembers.includes(member.id));
+    if (!groupSaleMode && selectedMembers.length === 0) {
+      setError('Sélectionne au moins un membre vendeur ou active Groupe.');
+      return;
+    }
+    const activeMemberIds = groupSaleMode ? [] : selectedMembers;
+    const selected = members.filter((member) => activeMemberIds.includes(member.id));
     const labels = selected.map((member) => member.name || member.username);
 
     const response = await fetch('/api/drugs/sales', {
@@ -378,8 +386,8 @@ export function DrugsPageClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         lines: saleRows.map((row) => ({ drug_type: row.drug_type, quantity_sold: row.quantity_sold, actual_amount: row.actual_amount })),
-        is_group_sale: labels.length === 0,
-        member_user_ids: selectedMembers,
+        is_group_sale: groupSaleMode || labels.length === 0,
+        member_user_ids: activeMemberIds,
         member_labels: labels,
         actual_amount: saleTotals.actual
       })
@@ -620,51 +628,16 @@ export function DrugsPageClient({
             </Field>
 
             <Field label="3. Membre(s) vendeur(s) ou Groupe" hint="Optionnel · Groupe par défaut">
-              <div className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      className={`filter-pill ${selectedMembers.length === 0 ? 'filter-pill-active' : ''}`}
-                      onClick={() => setSelectedMembers([])}
-                    >
-                      👥 Groupe
-                    </button>
-                    <p className="text-xs text-[#efcdab]">Active “Groupe” ou sélectionne des membres individuellement.</p>
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-2">
-                    <p className="mb-2 px-1 text-xs font-semibold text-[#f6d6ad]">Membres vendeurs</p>
-                    <div className="flex flex-wrap gap-2">
-                      {members.map((member) => {
-                        const label = member.name || member.username;
-                        const isSelected = selectedMembers.includes(member.id);
-                        return (
-                          <button
-                            key={member.id}
-                            type="button"
-                            className={`filter-pill ${isSelected ? 'filter-pill-active' : ''}`}
-                            onClick={() => {
-                              setSelectedMembers((current) => (
-                                current.includes(member.id)
-                                  ? current.filter((entry) => entry !== member.id)
-                                  : [...current, member.id]
-                              ));
-                            }}
-                          >
-                            {isSelected ? '✅ ' : ''}{label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-[#efcdab]">
-                  {selectedMembers.length === 0
-                    ? 'Mode Groupe actif.'
-                    : `Membres sélectionnés: ${selectedMembers.map((id) => members.find((member) => member.id === id)?.name || members.find((member) => member.id === id)?.username || id).join(', ')}`}
-                </p>
-              </div>
+              <SessionMemberSelector
+                members={members.map((member) => ({ id: member.id, label: member.name || member.username }))}
+                selectedMemberIds={selectedMembers}
+                onSelectedMemberIdsChange={setSelectedMembers}
+                groupMode={groupSaleMode}
+                onGroupModeChange={setGroupSaleMode}
+                selectedHint="Vendeurs sélectionnés"
+                groupHint="Mode Groupe actif : la vente est enregistrée comme vente collective."
+                defaultHint="Astuce : le membre connecté est pré-sélectionné par défaut."
+              />
             </Field>
 
             <Field label="4. Estimation auto globale" hint="Mini / Maxi / Moyenne">
@@ -681,7 +654,7 @@ export function DrugsPageClient({
                 <Metric label="Qté vendue" value={String(saleRows.reduce((sum, row) => sum + row.quantity_sold, 0))} icon="📦" />
                 <Metric label="Estimation moyenne" value={formatUsd(saleTotals.avg)} icon="🧮" />
                 <Metric label="Réel récupéré" value={formatUsd(saleTotals.actual)} icon="💰" />
-                <Metric label="Vendeurs" value={selectedMembers.length ? String(selectedMembers.length) : 'Groupe'} icon="👥" />
+                <Metric label="Vendeurs" value={!groupSaleMode && selectedMembers.length ? String(selectedMembers.length) : 'Groupe'} icon="👥" />
               </div>
             </Field>
 

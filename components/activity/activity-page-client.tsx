@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { SessionMemberSelector } from '@/components/shared/session-member-selector';
 
 type ActivityType = 'mailbox' | 'burglary' | 'container';
 type ActivityDisplayType = ActivityType | 'drug_sale';
@@ -54,7 +55,6 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(defaultMemberId ? [defaultMemberId] : []);
   const [groupMode, setGroupMode] = useState(defaultMemberId ? false : true);
-  const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   const [equipmentUsed, setEquipmentUsed] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
   const [proofImageUrl, setProofImageUrl] = useState('');
@@ -64,7 +64,6 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const [categoryFilter, setCategoryFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [editingActivity, setEditingActivity] = useState<RecentActivity | null>(null);
-  const memberPickerRef = useRef<HTMLDivElement | null>(null);
 
   const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const availableTypes = useMemo(() => Array.from(new Set(items.filter((item) => !categoryFilter || item.category_key === categoryFilter).map((item) => item.type_key).filter(Boolean))) as string[], [items, categoryFilter]);
@@ -82,18 +81,6 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
     if (!defaultMemberId) return;
     setSelectedMemberIds((current) => current.length > 0 ? current : [defaultMemberId]);
   }, [defaultMemberId]);
-
-  useEffect(() => {
-    function onWindowPointerDown(event: PointerEvent) {
-      if (!memberPickerRef.current) return;
-      const target = event.target as Node | null;
-      if (target && memberPickerRef.current.contains(target)) return;
-      setMemberPickerOpen(false);
-    }
-
-    window.addEventListener('pointerdown', onWindowPointerDown);
-    return () => window.removeEventListener('pointerdown', onWindowPointerDown);
-  }, []);
 
   function setType(type: ActivityType) {
     setActivityType(type);
@@ -203,67 +190,14 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
           <section className="glass-card p-5" onPaste={(e) => void onPaste(e)}>
             <h3 className="text-base font-semibold text-[#fff1dd]">A. Session activité</h3>
             <label className="mt-3 block text-xs text-[#efccaa]">Session</label>
-            <div className="mt-1 space-y-2 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className={`filter-pill ${groupMode ? 'filter-pill-active' : ''}`}
-                  onClick={() => setGroupMode(true)}
-                >
-                  👥 Groupe
-                </button>
-                <div className="relative" ref={memberPickerRef}>
-                  <button
-                    type="button"
-                    className={`filter-pill ${!groupMode ? 'filter-pill-active' : ''} ${groupMode ? 'opacity-60' : ''}`}
-                    onClick={() => {
-                      setGroupMode(false);
-                      setMemberPickerOpen((current) => !current);
-                    }}
-                  >
-                    👤 Membres ({selectedMemberIds.length})
-                  </button>
-                  {!groupMode && memberPickerOpen ? (
-                    <div className="absolute left-0 top-[110%] z-20 w-72 max-w-[80vw] rounded-xl border border-white/15 bg-[#2f1c14]/95 p-2 shadow-2xl backdrop-blur">
-                      <div className="max-h-56 space-y-1 overflow-auto pr-1">
-                        {members.map((member) => {
-                          const label = member.name || member.username;
-                          const selected = selectedMemberIds.includes(member.id);
-                          return (
-                            <label key={member.id} className="flex cursor-pointer items-center justify-between rounded-lg border border-white/10 bg-[#4f3220]/55 px-2 py-1.5 text-sm text-[#f8e2c6]">
-                              <span className="truncate pr-2">{label}</span>
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 accent-[#ffcf9a]"
-                                checked={selected}
-                                onChange={(event) => {
-                                  const shouldSelect = event.target.checked;
-                                  setSelectedMemberIds((current) => (
-                                    shouldSelect
-                                      ? (current.includes(member.id) ? current : [...current, member.id])
-                                      : current.filter((id) => id !== member.id)
-                                  ));
-                                }}
-                              />
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-2 text-xs text-[#efcdab]">
-                {groupMode ? (
-                  <p>Mode Groupe actif : les membres individuels sont ignorés pour cette session.</p>
-                ) : selectedMembers.length > 0 ? (
-                  <p>Membres sélectionnés : {selectedMembers.map((member) => member.name || member.username).join(', ')}</p>
-                ) : (
-                  <p>Aucun membre sélectionné.</p>
-                )}
-                {!groupMode ? <p className="mt-1 text-[11px] text-[#e7c39d]">Astuce : le membre connecté est pré-sélectionné par défaut.</p> : null}
-              </div>
-            </div>
+            <SessionMemberSelector
+              members={members.map((member) => ({ id: member.id, label: member.name || member.username }))}
+              selectedMemberIds={selectedMemberIds}
+              onSelectedMemberIdsChange={setSelectedMemberIds}
+              groupMode={groupMode}
+              onGroupModeChange={setGroupMode}
+              defaultHint="Astuce : le membre connecté est pré-sélectionné par défaut."
+            />
 
           {activityType !== 'mailbox' ? (
             <>
