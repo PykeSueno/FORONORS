@@ -417,6 +417,8 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
   const [checked, setChecked] = useState<Record<number, boolean>>(() => Object.fromEntries(role.permission_ids.map((id) => [id, true])));
   const [newPermission, setNewPermission] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const modules = useMemo(() => {
     const grouped: Record<string, Record<string, Permission[]>> = {};
@@ -451,6 +453,14 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
           }))
       }));
   }, [permissions]);
+
+  useEffect(() => {
+    if (modules.length === 0) return;
+    setOpenModules((current) => {
+      if (Object.keys(current).length > 0) return current;
+      return { [modules[0].moduleName]: true };
+    });
+  }, [modules]);
 
   async function saveRole() {
     if (isSaving) return;
@@ -507,12 +517,29 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
           <div className="space-y-3">
             {modules.map((module) => (
               <section key={module.moduleName} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
-                <h4 className="text-sm font-semibold text-[#ffe9ce]">{module.moduleName}</h4>
-                <div className="mt-3 space-y-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between text-left"
+                  onClick={() => setOpenModules((current) => ({ ...current, [module.moduleName]: !current[module.moduleName] }))}
+                >
+                  <h4 className="text-sm font-semibold text-[#ffe9ce]">{module.moduleName}</h4>
+                  <span className="text-xs text-[#efcba8]">{openModules[module.moduleName] ? '−' : '+'}</span>
+                </button>
+                {openModules[module.moduleName] ? <div className="mt-3 space-y-3">
                   {module.sections.map((section) => (
                     <div key={`${module.moduleName}-${section.sectionName}`} className="rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[#f7d6ad]">{section.sectionName}</p>
-                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between text-left"
+                        onClick={() => {
+                          const key = `${module.moduleName}-${section.sectionName}`;
+                          setOpenSections((current) => ({ ...current, [key]: !current[key] }));
+                        }}
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#f7d6ad]">{section.sectionName}</p>
+                        <span className="text-[11px] text-[#efcba8]">{openSections[`${module.moduleName}-${section.sectionName}`] ? '−' : '+'}</span>
+                      </button>
+                      {openSections[`${module.moduleName}-${section.sectionName}`] ? <div className="mt-2 grid gap-2 sm:grid-cols-2">
                         {section.permissions.map((permission) => {
                           const info = describePermission(permission.name);
                           return (
@@ -531,10 +558,10 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
                             </label>
                           );
                         })}
-                      </div>
+                      </div> : null}
                     </div>
                   ))}
-                </div>
+                </div> : null}
               </section>
             ))}
           </div>

@@ -25,7 +25,7 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   const [dragging, setDragging] = useState<string | null>(null);
   const [draftOrder, setDraftOrder] = useState<string[]>(initialNormalizedOrder);
   const [hasDragged, setHasDragged] = useState(false);
-  const [pointerDrag, setPointerDrag] = useState<{ pointerId: number; cardId: string } | null>(null);
+  const [pointerDrag, setPointerDrag] = useState<{ pointerId: number; cardId: string; startX: number; startY: number; draggingStarted: boolean } | null>(null);
 
   useEffect(() => {
     setOrder(initialNormalizedOrder);
@@ -92,13 +92,29 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   function onPointerDown(event: PointerEvent<HTMLDivElement>, cardId: string) {
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
-    setPointerDrag({ pointerId: event.pointerId, cardId });
-    setDragging(cardId);
+    setPointerDrag({
+      pointerId: event.pointerId,
+      cardId,
+      startX: event.clientX,
+      startY: event.clientY,
+      draggingStarted: false
+    });
     setHasDragged(false);
   }
 
   function onPointerMove(event: PointerEvent<HTMLDivElement>) {
     if (!pointerDrag) return;
+    const dx = event.clientX - pointerDrag.startX;
+    const dy = event.clientY - pointerDrag.startY;
+    const distance = Math.hypot(dx, dy);
+    const DRAG_DISTANCE_THRESHOLD = 14;
+    if (!pointerDrag.draggingStarted && distance < DRAG_DISTANCE_THRESHOLD) return;
+    if (!pointerDrag.draggingStarted) {
+      setPointerDrag((current) => (current ? { ...current, draggingStarted: true } : current));
+      setDragging(pointerDrag.cardId);
+      setHasDragged(true);
+    }
+    if (!dragging) return;
     const hovered = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
     const card = hovered?.closest('[data-hub-card-id]') as HTMLElement | null;
     const targetCardId = card?.dataset.hubCardId;
@@ -111,6 +127,12 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
     if (!pointerDrag) return;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (!pointerDrag.draggingStarted) {
+      setPointerDrag(null);
+      setDragging(null);
+      setHasDragged(false);
+      return;
     }
     endDrag();
   }

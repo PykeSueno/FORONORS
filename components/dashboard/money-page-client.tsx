@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { humanMoneyMovementLabel } from '@/lib/labels';
@@ -20,6 +21,7 @@ function moneyMovementIcon(type: string) {
   if (type === 'adjust') return '🧮';
   if (type === 'sale') return '🛒';
   if (type === 'purchase') return '🧾';
+  if (type === 'payment') return '🧑‍💼';
   if (type === 'tablet_passage' || type === 'tablet_morning_deposit') return '📱';
   if (type === 'four_close') return '🔥';
   if (type.startsWith('drugs_')) return '🧪';
@@ -28,10 +30,12 @@ function moneyMovementIcon(type: string) {
 
 export function MoneyPageClient({
   canEdit,
+  canPayAccess,
   initialBalance,
   initialMovements
 }: {
   canEdit: boolean;
+  canPayAccess: boolean;
   initialBalance: number;
   initialMovements: Movement[];
 }) {
@@ -86,6 +90,7 @@ export function MoneyPageClient({
             <p className="mt-2 text-3xl font-bold text-[#ffe5c0]">{formattedBalance}</p>
             {latest ? <p className="mt-2 text-sm text-[#ffe3c3]">Dernière activité: {humanMoneyMovementLabel(latest.type)} · {formatUsd(Number(latest.amount))} · {latest.label}</p> : null}
           </div>
+          {canPayAccess ? <Link href="/dashboard/argent/paye" className="saas-primary-btn">Paye</Link> : null}
         </div>
       </section>
 

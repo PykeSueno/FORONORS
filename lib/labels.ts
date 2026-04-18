@@ -7,6 +7,7 @@ export function humanMoneyMovementLabel(type: string) {
   if (type === 'exit') return 'Sortie argent';
   if (type === 'sale') return 'Vente';
   if (type === 'purchase') return 'Achat';
+  if (type === 'payment') return 'Paye membre';
   if (type === 'tablet_passage') return 'Passage Tablette';
   if (type === 'tablet_morning_deposit') return 'Dépôt matin Tablette';
   if (type === 'item_money_sync') return 'Sync Item Argent';
@@ -51,7 +52,7 @@ export function moneyMovementSource(type: string) {
   if (type.startsWith('four')) return 'FOUR';
   if (type.startsWith('drugs_')) return 'Drogues';
   if (type.startsWith('sale_objects_')) return 'Vente objets';
-  if (type === 'adjust' || type === 'entry' || type === 'exit' || type === 'purchase' || type === 'sale') return 'Argent';
+  if (type === 'adjust' || type === 'entry' || type === 'exit' || type === 'purchase' || type === 'sale' || type === 'payment') return 'Argent';
   return 'Système';
 }
 
@@ -72,6 +73,7 @@ export function moneyMovementIcon(type: string) {
   if (type === 'adjust') return '🧮';
   if (type === 'sale') return '🛒';
   if (type === 'purchase') return '🧾';
+  if (type === 'payment') return '🧑‍💼';
   if (type.startsWith('tablet_')) return '📱';
   if (type.startsWith('four')) return '🔥';
   if (type.startsWith('drugs_')) return '🧪';
