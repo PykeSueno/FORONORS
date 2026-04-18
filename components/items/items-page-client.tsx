@@ -56,6 +56,7 @@ export function ItemsPageClient({
   const [typeFilter, setTypeFilter] = useState('');
   const [editing, setEditing] = useState<Item | null>(null);
   const [creating, setCreating] = useState(false);
+  const [deleteFlow, setDeleteFlow] = useState<{ item: Item; step: 1 | 2 } | null>(null);
   const [error, setError] = useState('');
 
   const availableTypes = categories.find((category) => category.key === categoryFilter)?.types ?? [];
@@ -86,11 +87,17 @@ export function ItemsPageClient({
   }
 
   async function removeItem(itemId: number) {
-    const response = await fetch(`/api/items/${itemId}`, { method: 'DELETE' });
+    const response = await fetch(`/api/items/${itemId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm_delete: true })
+    });
     if (!response.ok) {
-      setError('Suppression impossible.');
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
+      setError(data.message ?? 'Suppression impossible.');
       return;
     }
+    setDeleteFlow(null);
     await refresh();
   }
 
@@ -181,7 +188,14 @@ export function ItemsPageClient({
               {(canEdit || canDelete) ? (
                 <div className="flex gap-2">
                   {canEdit ? <button className="saas-ghost-btn" onClick={() => setEditing(item)}>Modifier</button> : null}
-                  {canDelete ? <button className="saas-ghost-btn" onClick={() => void removeItem(item.id)}>Supprimer</button> : null}
+                  {canDelete ? (
+                    <button
+                      className="rounded-full border border-red-300/40 bg-red-500/20 px-3 py-1.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/30"
+                      onClick={() => setDeleteFlow({ item, step: 1 })}
+                    >
+                      Supprimer
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -235,6 +249,53 @@ export function ItemsPageClient({
           }}
         />
       ) : null}
+
+      {deleteFlow ? (
+        <DeleteItemConfirmModal
+          item={deleteFlow.item}
+          step={deleteFlow.step}
+          onClose={() => setDeleteFlow(null)}
+          onNext={() => setDeleteFlow((current) => (current ? { ...current, step: 2 } : current))}
+          onConfirm={() => void removeItem(deleteFlow.item.id)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function DeleteItemConfirmModal({
+  item,
+  step,
+  onClose,
+  onNext,
+  onConfirm
+}: {
+  item: Item;
+  step: 1 | 2;
+  onClose: () => void;
+  onNext: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="glass-card w-full max-w-md space-y-4 p-5" onClick={(event) => event.stopPropagation()}>
+        <h3 className="text-lg font-semibold text-[#fff1dd]">Suppression item</h3>
+        {step === 1 ? (
+          <p className="text-sm text-[#f1d2ad]">Tu es sûr de vouloir supprimer cet item : <span className="font-semibold text-[#ffe8ca]">{item.name}</span> ?</p>
+        ) : (
+          <p className="text-sm text-[#f1d2ad]">Confirmation finale : cette suppression retirera l’item du catalogue. Continuer ?</p>
+        )}
+        <div className="flex justify-end gap-2">
+          <button className="saas-ghost-btn" onClick={onClose}>Annuler</button>
+          {step === 1 ? (
+            <button className="saas-primary-btn" onClick={onNext} autoFocus>Continuer</button>
+          ) : (
+            <button className="rounded-full border border-red-300/40 bg-red-600/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600" onClick={onConfirm} autoFocus>
+              Confirmer la suppression
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

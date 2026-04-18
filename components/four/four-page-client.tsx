@@ -65,6 +65,8 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
   const [expandedTxId, setExpandedTxId] = useState<number | null>(null);
   const [messages, setMessages] = useState<FourMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState({ id: 0, title: '', content: '', display_order: 100 });
+  const [messageEditing, setMessageEditing] = useState<FourMessage | null>(null);
+  const [messageDeleteId, setMessageDeleteId] = useState<number | null>(null);
   const [editingTxId, setEditingTxId] = useState<number | null>(null);
 
   const filteredItems = useMemo(() => items.filter((item) => {
@@ -226,11 +228,53 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
   }
 
   async function saveMessage() {
-    const res = await fetch('/api/four/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: messageDraft.id || undefined, title: messageDraft.title, content: messageDraft.content, display_order: messageDraft.display_order }) });
+    if (!canManageMessages) return;
+    const res = await fetch('/api/four/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: messageDraft.title, content: messageDraft.content, display_order: messageDraft.display_order }) });
     if (res.ok) {
       setMessageDraft({ id: 0, title: '', content: '', display_order: 100 });
       await loadMessages();
+    } else {
+      setError((await res.json().catch(() => ({}))).message ?? 'Enregistrement message impossible.');
     }
+  }
+
+  function editMessage(message: FourMessage) {
+    setMessageEditing(message);
+  }
+
+  async function saveEditedMessage() {
+    if (!messageEditing || !canManageMessages) return;
+    const res = await fetch('/api/four/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: messageEditing.id,
+        title: messageEditing.title,
+        content: messageEditing.content,
+        display_order: messageEditing.display_order
+      })
+    });
+    if (!res.ok) {
+      setError((await res.json().catch(() => ({}))).message ?? 'Modification message impossible.');
+      return;
+    }
+    setMessageEditing(null);
+    await loadMessages();
+  }
+
+  async function deleteMessage(messageId: number) {
+    if (!canManageMessages) return;
+    const res = await fetch('/api/four/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id: messageId })
+    });
+    if (!res.ok) {
+      setError((await res.json().catch(() => ({}))).message ?? 'Suppression message impossible.');
+      return;
+    }
+    setMessageDeleteId(null);
+    await loadMessages();
   }
 
   return (
@@ -513,7 +557,64 @@ export function FourPageClient({ members, items, activeSession, canOpen, canCash
         </section>
       ) : null}
 
-      {activeTab === 'messages' && canViewMessages ? <section className="glass-card p-5 space-y-3"><h3 className="text-base font-semibold text-[#fff1dd]">Messages prédéfinis</h3>{canManageMessages ? <div className="grid gap-2 md:grid-cols-4"><input className="saas-input" placeholder="Titre" value={messageDraft.title} onChange={(e) => setMessageDraft((c) => ({ ...c, title: e.target.value }))} /><input className="saas-input md:col-span-2" placeholder="Message" value={messageDraft.content} onChange={(e) => setMessageDraft((c) => ({ ...c, content: e.target.value }))} /><button className="saas-primary-btn" onClick={() => void saveMessage()}>{messageDraft.id ? 'Modifier' : 'Ajouter'}</button></div> : null}<div className="space-y-2">{messages.map((m) => <div key={m.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3"><div className="flex items-center justify-between"><p className="font-medium text-[#ffe8ca]">{m.title}</p><button className="saas-ghost-btn !px-2" onClick={() => void navigator.clipboard.writeText(m.content)}>Copier</button></div><p className="mt-1 text-sm text-[#efcdab]">{m.content}</p></div>)}</div></section> : null}
+      {activeTab === 'messages' && canViewMessages ? (
+        <section className="glass-card space-y-3 p-5">
+          <h3 className="text-base font-semibold text-[#fff1dd]">Messages prédéfinis</h3>
+          {canManageMessages ? (
+            <div className="grid gap-2 md:grid-cols-[1fr_2fr_auto]">
+              <input className="saas-input" placeholder="Titre" value={messageDraft.title} onChange={(e) => setMessageDraft((c) => ({ ...c, title: e.target.value }))} />
+              <input className="saas-input" placeholder="Message" value={messageDraft.content} onChange={(e) => setMessageDraft((c) => ({ ...c, content: e.target.value }))} />
+              <button className="saas-primary-btn" onClick={() => void saveMessage()}>Ajouter</button>
+            </div>
+          ) : null}
+          <div className="space-y-2">
+            {messages.map((m) => (
+              <div key={m.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium text-[#ffe8ca]">{m.title}</p>
+                  <div className="flex gap-2">
+                    <button className="saas-ghost-btn !px-2" onClick={() => void navigator.clipboard.writeText(m.content)}>📋 Copier</button>
+                    {canManageMessages ? (
+                      <>
+                        <button className="saas-ghost-btn !px-2" onClick={() => editMessage(m)}>✏️ Modifier</button>
+                        <button className="rounded-full border border-red-300/40 bg-red-500/20 px-2 py-1 text-xs font-semibold text-red-100 hover:bg-red-500/30" onClick={() => setMessageDeleteId(m.id)}>🗑️ Supprimer</button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+                <p className="mt-1 text-sm text-[#efcdab]">{m.content}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {messageDeleteId ? (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setMessageDeleteId(null)}>
+          <div className="glass-card w-full max-w-md space-y-3 p-5" onClick={(event) => event.stopPropagation()}>
+            <h4 className="text-lg font-semibold text-[#fff1dd]">Supprimer le message FOUR ?</h4>
+            <p className="text-sm text-[#f1d2ad]">Cette action supprimera définitivement ce message prédéfini.</p>
+            <div className="flex justify-end gap-2">
+              <button className="saas-ghost-btn" onClick={() => setMessageDeleteId(null)}>Annuler</button>
+              <button className="rounded-full border border-red-300/40 bg-red-600/80 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600" onClick={() => void deleteMessage(messageDeleteId)}>Confirmer suppression</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {messageEditing ? (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setMessageEditing(null)}>
+          <div className="glass-card w-full max-w-xl space-y-3 p-5" onClick={(event) => event.stopPropagation()}>
+            <h4 className="text-lg font-semibold text-[#fff1dd]">Modifier le message FOUR</h4>
+            <input className="saas-input" value={messageEditing.title} onChange={(event) => setMessageEditing((current) => current ? { ...current, title: event.target.value } : current)} placeholder="Titre" />
+            <textarea className="saas-input min-h-28" value={messageEditing.content} onChange={(event) => setMessageEditing((current) => current ? { ...current, content: event.target.value } : current)} placeholder="Contenu" />
+            <div className="flex justify-end gap-2">
+              <button className="saas-ghost-btn" onClick={() => setMessageEditing(null)}>Annuler</button>
+              <button className="saas-primary-btn" onClick={() => void saveEditedMessage()}>Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {error ? <p className="rounded-xl border border-red-300/45 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
     </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { createAuditLog } from '@/lib/audit-log';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'activity', 'four', 'drugs'];
@@ -23,6 +24,16 @@ export async function PATCH(request: Request) {
   if (order.length === 0) return NextResponse.json({ message: 'Ordre invalide.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
+  const { data: before } = await supabase.from('users').select('dashboard_layout').eq('id', session.userId).maybeSingle();
   await supabase.from('users').update({ dashboard_layout: order }).eq('id', session.userId);
+  await createAuditLog({
+    actorUserId: session.userId,
+    action: 'dashboard.layout.update',
+    entityType: 'user_dashboard',
+    entityId: session.userId,
+    summary: 'Mise à jour de l’ordre des bulles dashboard.',
+    oldValues: { order: before?.dashboard_layout ?? [] },
+    newValues: { order }
+  });
   return NextResponse.json({ ok: true });
 }

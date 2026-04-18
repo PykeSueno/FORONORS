@@ -87,7 +87,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
@@ -96,6 +96,19 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params;
   const supabase = getSupabaseAdmin();
+  const body = (await request.json().catch(() => ({}))) as { confirm_delete?: boolean };
+
+  if (!body.confirm_delete) {
+    await createAuditLog({
+      actorUserId: session.userId,
+      action: 'items.delete.attempt_blocked',
+      entityType: 'item',
+      entityId: id,
+      summary: `Tentative de suppression item #${id} bloquée (confirmation finale absente).`,
+      newValues: { confirm_delete: false }
+    });
+    return NextResponse.json({ message: 'Confirmation finale requise pour supprimer cet item.' }, { status: 400 });
+  }
 
   const { data: before } = await supabase.from('items').select('*').eq('id', Number(id)).maybeSingle();
 

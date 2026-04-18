@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { DragEvent, useEffect, useMemo, useState } from 'react';
+import { DragEvent, PointerEvent, useEffect, useMemo, useState } from 'react';
 
 type HubCardItem = {
   id: string;
@@ -25,6 +25,7 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   const [dragging, setDragging] = useState<string | null>(null);
   const [draftOrder, setDraftOrder] = useState<string[]>(initialNormalizedOrder);
   const [hasDragged, setHasDragged] = useState(false);
+  const [pointerDrag, setPointerDrag] = useState<{ pointerId: number; cardId: string } | null>(null);
 
   useEffect(() => {
     setOrder(initialNormalizedOrder);
@@ -63,6 +64,7 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   function endDrag() {
     if (!dragging) return;
     setDragging(null);
+    setPointerDrag(null);
     setHasDragged(false);
     if (draftOrder.join('|') !== order.join('|')) void persist(draftOrder);
   }
@@ -87,19 +89,46 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
     endDrag();
   }
 
+  function onPointerDown(event: PointerEvent<HTMLDivElement>, cardId: string) {
+    const target = event.currentTarget;
+    target.setPointerCapture(event.pointerId);
+    setPointerDrag({ pointerId: event.pointerId, cardId });
+    setDragging(cardId);
+    setHasDragged(false);
+  }
+
+  function onPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!pointerDrag) return;
+    const hovered = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+    const card = hovered?.closest('[data-hub-card-id]') as HTMLElement | null;
+    const targetCardId = card?.dataset.hubCardId;
+    if (!targetCardId) return;
+    if (targetCardId !== dragging) setHasDragged(true);
+    moveCard(targetCardId);
+  }
+
+  function onPointerUp(event: PointerEvent<HTMLDivElement>) {
+    if (!pointerDrag) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    endDrag();
+  }
+
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {orderedCards.map((card) => (
         <div
           key={card.id}
+          data-hub-card-id={card.id}
           draggable
           onDragStart={(event) => onDragStart(event, card.id)}
           onDragOver={(event) => onDragOver(event, card.id)}
           onDrop={onDrop}
           onDragEnd={endDrag}
-          onPointerDown={() => setDragging(card.id)}
-          onPointerEnter={() => moveCard(card.id)}
-          onPointerUp={endDrag}
+          onPointerDown={(event) => onPointerDown(event, card.id)}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
           onPointerCancel={endDrag}
           onClickCapture={(event) => { if (hasDragged || dragging) event.preventDefault(); }}
           className={`cursor-grab active:cursor-grabbing ${dragging === card.id ? 'opacity-70' : ''}`}
