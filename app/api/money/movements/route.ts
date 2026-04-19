@@ -33,7 +33,9 @@ export async function POST(request: Request) {
       type: normalizedType,
       amount: sign * amount,
       label: body.label.trim(),
-      user_id: session.userId
+      user_id: session.userId,
+      before_amount: Number(cash.balance),
+      after_amount: nextBalance
     })
   ]);
   await syncMoneyItemToGroupCash(supabase);

@@ -124,7 +124,9 @@ export async function POST(request: Request) {
     type: 'tablet_passage',
     amount: -400,
     label: 'Passage Tablette',
-    user_id: memberId
+    user_id: memberId,
+    before_amount: beforeGroupBalance,
+    after_amount: afterGroupBalance
   });
 
   if (kit) await supabase.from('items').update({ quantity: afterKits, updated_at: new Date().toISOString() }).eq('id', kit.id);

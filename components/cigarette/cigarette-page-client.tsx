@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { CIGARETTE_REVENUE, CIGARETTE_SALE_QTY } from '@/lib/cigarette';
@@ -12,6 +13,8 @@ type CigaretteDay = {
   passages_count: number;
   total_revenue: number;
   packs_sold: number;
+  packs_deposit_initial?: number;
+  packs_deposit_remaining?: number;
 } | null;
 
 type CigarettePassage = {
@@ -21,6 +24,8 @@ type CigarettePassage = {
   revenue_amount: number;
   before_packs: number;
   after_packs: number;
+  before_deposit_packs?: number;
+  after_deposit_packs?: number;
   before_chest: number;
   after_chest: number;
   before_group_cash: number;
@@ -101,12 +106,16 @@ export function CigarettePageClient({
     <div className="space-y-5">
       <section className="glass-card p-5">
         <h2 className="text-lg font-semibold text-[#fff1dd]">A. État journée Cigarette ({businessDay})</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href="/dashboard/tablette" className="saas-ghost-btn">📱 Aller à Tablette</Link>
+        </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat icon="🚬" tone="from-[#825128]/45 to-[#5a3119]/20" label="Paquets vendus" value={String(day?.packs_sold ?? 0)} />
           <Stat icon="🧾" tone="from-violet-700/40 to-violet-500/10" label="Passages" value={String(day?.passages_count ?? 0)} />
           <Stat icon="🏦" tone="from-amber-700/40 to-amber-500/10" label="Dépôt Cigarette" value={formatUsd(Number(day?.chest_amount ?? 0))} />
           <Stat icon="💵" tone="from-emerald-700/40 to-emerald-500/10" label="Total gagné" value={formatUsd(Number(day?.total_revenue ?? 0))} />
           <Stat icon="📦" tone="from-cyan-700/40 to-cyan-500/10" label="Paquets restants" value={String(packsInStock)} />
+          <Stat icon="🧮" tone="from-orange-700/40 to-orange-500/10" label="Dépôt paquets restant" value={String(day?.packs_deposit_remaining ?? 0)} />
           <Stat icon="💰" tone="from-green-700/40 to-green-500/10" label="Argent groupe réel" value={formatUsd(groupCash)} />
           <Stat icon="🕓" tone="from-[#70401f]/45 to-[#5a3119]/20" label="Fenêtre passage" value="04h → 20h" />
           <Stat icon={isAllowedHour ? '✅' : '⛔'} tone="from-[#6f4424]/45 to-[#3a2418]/20" label="Statut horaire" value={isAllowedHour ? 'Ouverte' : 'Fermée'} />
@@ -160,6 +169,7 @@ export function CigarettePageClient({
               </div>
               <div className="mt-1 grid gap-2 md:grid-cols-2">
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">🚬 Paquets {passage.before_packs} → {passage.after_packs}</p>
+                <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">📚 Dépôt paquets {passage.before_deposit_packs ?? '—'} → {passage.after_deposit_packs ?? '—'}</p>
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">🏦 Dépôt {formatUsd(passage.before_chest)} → {formatUsd(passage.after_chest)}</p>
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">💵 Groupe {formatUsd(passage.before_group_cash)} → {formatUsd(passage.after_group_cash)}</p>
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">🧾 Qté {passage.quantity_sold} · Recette {formatUsd(passage.revenue_amount)} · État {passage.status}</p>

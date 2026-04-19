@@ -41,7 +41,11 @@ export async function PATCH() {
   ]);
 
   if (!item) return NextResponse.json({ message: `Item introuvable: ${CIGARETTE_ITEM_NAME}.` }, { status: 404 });
-  const depositPacks = Math.max(0, Math.min(Number(item.quantity ?? 0), CIGARETTE_DAILY_PACKS));
+  const stockPacks = Number(item.quantity ?? 0);
+  if (stockPacks < CIGARETTE_DAILY_PACKS) {
+    return NextResponse.json({ message: `Stock insuffisant pour déposer ${CIGARETTE_DAILY_PACKS} paquets (${stockPacks} disponibles).` }, { status: 400 });
+  }
+  const depositPacks = CIGARETTE_DAILY_PACKS;
 
   if (!existingDay) {
     const { data: createdDay } = await supabase

@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getCigaretteBusinessDate } from '@/lib/cigarette';
+import { getTabletBusinessDate } from '@/lib/tablet';
 
 export async function GET() {
   const session = await getSession();
@@ -33,15 +34,24 @@ export async function GET() {
   const canSaleObjectsPreview = canSaleObjectsAccess || has('sale.objects.preview');
   const canCigaretteAccess = has('cigarette.access');
   const canCigarettePreview = canCigaretteAccess || has('cigarette.preview');
+  const canTabletAccess = has('tablet.access');
+  const canTabletPreview = canTabletAccess || has('tablet.preview');
+  const canActivityAccess = has('activity.access');
+  const canActivityPreview = canActivityAccess || has('activity.preview');
 
   const canShowMoneyMovements = has('dashboard.money.movements.access') || has('dashboard.money.movements.preview') || canMoneyPreview;
   const canShowStockMovements = has('dashboard.stock.movements.access') || has('dashboard.stock.movements.preview') || canItemsPreview;
   const cigaretteBusinessDay = getCigaretteBusinessDate();
+  const tabletBusinessDay = getTabletBusinessDate();
+  const activityDayStart = new Date();
+  activityDayStart.setHours(0, 0, 0, 0);
+  const activityDayEnd = new Date(activityDayStart);
+  activityDayEnd.setDate(activityDayEnd.getDate() + 1);
 
   const supabase = getSupabaseAdmin();
-  const [{ data: cash }, { count: itemsCount }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: fourActive }, { data: moneyItem }, { count: saleObjectsToday }, { data: cigaretteToday }] = await Promise.all([
+  const [{ data: cash }, { data: itemQuantities }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: fourActive }, { data: moneyItem }, { count: saleObjectsToday }, { data: cigaretteToday }, { data: tabletToday }, { count: activitiesToday }] = await Promise.all([
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
-    canItemsPreview ? supabase.from('items').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
+    canItemsPreview ? supabase.from('items').select('quantity') : Promise.resolve({ data: [] }),
     canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canMembersPreview ? supabase.from('users').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canLogsPreview ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
@@ -54,21 +64,30 @@ export async function GET() {
       : Promise.resolve({ count: 0 }),
     canCigarettePreview
       ? supabase.from('cigarette_days').select('passages_count, total_revenue').eq('business_day', cigaretteBusinessDay).maybeSingle()
-      : Promise.resolve({ data: null })
+      : Promise.resolve({ data: null }),
+    canTabletPreview
+      ? supabase.from('tablet_days').select('passages_count').eq('business_day', tabletBusinessDay).maybeSingle()
+      : Promise.resolve({ data: null }),
+    canActivityPreview
+      ? supabase.from('activities').select('id', { count: 'exact', head: true }).gte('created_at', activityDayStart.toISOString()).lt('created_at', activityDayEnd.toISOString())
+      : Promise.resolve({ count: 0 })
 
   ]);
+  const itemsStockTotal = Number(((itemQuantities ?? []) as Array<{ quantity: number | null }>).reduce((acc, item) => acc + Number(item.quantity ?? 0), 0));
 
   return NextResponse.json({
     canShowMoneyMovements,
     canShowStockMovements,
     values: {
       cashBalance: Number(cash?.balance ?? 0),
-      itemsCount: itemsCount ?? 0,
+      itemsCount: itemsStockTotal,
       txCount: txCount ?? 0,
       membersCount: membersCount ?? 0,
       logsCount: logsCount ?? 0,
       fourOpen: Boolean(fourActive),
       saleObjectsToday: Number(saleObjectsToday ?? 0),
+      tabletPassagesToday: Number(tabletToday?.passages_count ?? 0),
+      activitiesToday: Number(activitiesToday ?? 0),
       cigarettePassagesToday: Number(cigaretteToday?.passages_count ?? 0),
       cigaretteRevenueToday: Number(cigaretteToday?.total_revenue ?? 0)
     },

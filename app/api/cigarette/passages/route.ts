@@ -52,7 +52,10 @@ export async function POST(request: Request) {
   const beforePacks = Number(item.quantity ?? 0);
   let { data: day } = await supabase.from('cigarette_days').select('*').eq('business_day', businessDay).maybeSingle();
   if (!day) {
-    const initialReserve = Math.max(0, Math.min(beforePacks, CIGARETTE_DAILY_PACKS));
+    if (beforePacks < CIGARETTE_DAILY_PACKS) {
+      return NextResponse.json({ message: `Stock insuffisant pour initialiser le dépôt (${CIGARETTE_DAILY_PACKS} requis).` }, { status: 400 });
+    }
+    const initialReserve = CIGARETTE_DAILY_PACKS;
     const { data: createdDay } = await supabase
       .from('cigarette_days')
       .insert({
@@ -164,7 +167,10 @@ export async function POST(request: Request) {
     type: 'cigarette_passage',
     amount: CIGARETTE_REVENUE,
     label: `Passage Cigarette (${memberLabel})`,
-    user_id: requestedMemberId
+    user_id: requestedMemberId,
+    before_amount: beforeGroupCash,
+    after_amount: afterGroupCash,
+    related_item_name: CIGARETTE_ITEM_NAME
   });
   await syncMoneyItemToGroupCash(supabase);
 

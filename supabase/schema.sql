@@ -136,9 +136,16 @@ create table if not exists public.cash_movements (
   type text not null,
   amount numeric(12,2) not null,
   label text not null,
+  before_amount numeric(12,2),
+  after_amount numeric(12,2),
+  related_item_name text,
   user_id uuid references public.users(id) on delete set null,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.cash_movements add column if not exists before_amount numeric(12,2);
+alter table public.cash_movements add column if not exists after_amount numeric(12,2);
+alter table public.cash_movements add column if not exists related_item_name text;
 
 create table if not exists public.money_item_sales (
   id bigint generated always as identity primary key,

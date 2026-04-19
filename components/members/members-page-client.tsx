@@ -58,7 +58,8 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const [roles, setRoles] = useState<Role[]>(initialRoles);
   const [permissions, setPermissions] = useState<Permission[]>(initialPermissions);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [error, setError] = useState('');
   const [copyFeedback, setCopyFeedback] = useState('');
@@ -75,7 +76,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const canEditMemberPassword = userPermissions.includes('members.password.edit');
 
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
-  const selectedRole = useMemo(() => sortedRoles.find((role) => role.id === selectedRoleId) ?? null, [selectedRoleId, sortedRoles]);
+  const selectedRoles = useMemo(() => sortedRoles.filter((role) => selectedRoleIds.includes(role.id)), [selectedRoleIds, sortedRoles]);
 
   async function refreshAll() {
     const [membersRes, rolesRes, permissionsRes] = await Promise.all([
@@ -210,9 +211,31 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
             {sortedRoles.map((role) => (
               <div key={role.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
                 <p className="font-medium text-[#fff2df]">{role.name}</p>
-                <button className="saas-ghost-btn" onClick={() => { if (selectedRoleId === null) setSelectedRoleId(role.id); }}>Gérer</button>
+                <button
+                  className={`saas-ghost-btn ${selectedRoleIds.includes(role.id) ? '!bg-[#6a452c]/70' : ''}`}
+                  onClick={() => {
+                    setSelectedRoleIds((current) => current.includes(role.id) ? current.filter((id) => id !== role.id) : [...current, role.id]);
+                    setIsRoleModalOpen(false);
+                  }}
+                >
+                  {selectedRoleIds.includes(role.id) ? 'Retirer' : 'Sélectionner'}
+                </button>
               </div>
             ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#3b2418]/55 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#f5d8b5]">Rôles sélectionnés</p>
+              {selectedRoles.length === 0 ? <span className="text-xs text-[#efcdab]">Aucun</span> : selectedRoles.map((role) => (
+                <span key={role.id} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#5e3b25]/70 px-2 py-1 text-xs text-[#ffe8ca]">
+                  {role.name}
+                  <button className="text-[#ffd6ac] hover:text-white" onClick={() => setSelectedRoleIds((current) => current.filter((id) => id !== role.id))}>✕</button>
+                </span>
+              ))}
+            </div>
+            <button className="saas-primary-btn" disabled={selectedRoles.length === 0} onClick={() => setIsRoleModalOpen(true)}>
+              Gérer la sélection
+            </button>
           </div>
         </section>
       ) : null}
@@ -236,14 +259,15 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
         />
       ) : null}
 
-      {selectedRole ? (
+      {isRoleModalOpen && selectedRoles.length > 0 ? (
         <RoleManageModal
-          role={selectedRole}
+          selectedRoles={selectedRoles}
           permissions={permissions}
-          onClose={() => setSelectedRoleId(null)}
-          onSaved={async (updatedRoleId) => {
+          onClose={() => setIsRoleModalOpen(false)}
+          onSaved={async () => {
             await refreshAll();
-            setSelectedRoleId(updatedRoleId);
+            setIsRoleModalOpen(false);
+            setSelectedRoleIds([]);
           }}
           onError={setError}
         />
@@ -412,9 +436,18 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
   );
 }
 
-function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { role: Role; permissions: Permission[]; onClose: () => void; onSaved: (roleId: number) => Promise<void>; onError: (message: string) => void; }) {
-  const [name, setName] = useState(role.name);
-  const [checked, setChecked] = useState<Record<number, boolean>>(() => Object.fromEntries(role.permission_ids.map((id) => [id, true])));
+function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError }: { selectedRoles: Role[]; permissions: Permission[]; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
+  const [checked, setChecked] = useState<Record<number, boolean>>(() => {
+    const allPermissionIds = permissions.map((permission) => permission.id);
+    return Object.fromEntries(allPermissionIds.map((permissionId) => [permissionId, selectedRoles.every((role) => role.permission_ids.includes(permissionId))]));
+  });
+  const [mixedPermissionIds] = useState<Set<number>>(() => {
+    const allPermissionIds = permissions.map((permission) => permission.id);
+    return new Set(allPermissionIds.filter((permissionId) => {
+      const withPermission = selectedRoles.filter((role) => role.permission_ids.includes(permissionId)).length;
+      return withPermission > 0 && withPermission < selectedRoles.length;
+    }));
+  });
   const [newPermission, setNewPermission] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
@@ -466,11 +499,10 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
     if (isSaving) return;
     setIsSaving(true);
     const permissionIds = permissions.filter((permission) => checked[permission.id]).map((permission) => permission.id);
-
-    const response = await fetch(`/api/roles/${role.id}`, {
+    const response = await fetch('/api/roles', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), permission_ids: permissionIds })
+      body: JSON.stringify({ role_ids: selectedRoles.map((role) => role.id), permission_ids: permissionIds })
     });
 
     setIsSaving(false);
@@ -478,14 +510,15 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
       const data = (await response.json().catch(() => ({}))) as { message?: string };
       return onError(data.message ?? 'Enregistrement rôle impossible.');
     }
-    await onSaved(role.id);
+    await onSaved();
   }
 
   async function removeRole() {
-    const response = await fetch(`/api/roles/${role.id}`, { method: 'DELETE' });
+    if (selectedRoles.length !== 1) return onError('Suppression disponible uniquement avec un seul rôle sélectionné.');
+    const response = await fetch(`/api/roles/${selectedRoles[0].id}`, { method: 'DELETE' });
     if (!response.ok) return onError('Suppression rôle impossible.');
     onClose();
-    await onSaved(-1);
+    await onSaved();
   }
 
   async function addPermission() {
@@ -500,19 +533,26 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
 
     if (!response.ok) return onError('Création permission impossible.');
     setNewPermission('');
-    await onSaved(role.id);
+    await onSaved();
   }
 
   return (
     <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
       <div className="glass-card flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-[#fff0db]">Gérer rôle</h3>
+          <h3 className="text-xl font-semibold text-[#fff0db]">Gérer rôle{selectedRoles.length > 1 ? 's' : ''}</h3>
           <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
         </div>
 
         <div className="space-y-4 overflow-y-auto pr-1">
-          <input className="saas-input w-full" value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#f5d8b5]">Rôles sélectionnés</p>
+            <div className="flex flex-wrap gap-2">
+              {selectedRoles.map((role) => (
+                <span key={role.id} className="rounded-full border border-white/10 bg-[#5e3b25]/70 px-2 py-1 text-xs text-[#ffe8ca]">{role.name}</span>
+              ))}
+            </div>
+          </div>
 
           <div className="space-y-3">
             {modules.map((module) => (
@@ -548,6 +588,10 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
                                 <input
                                   type="checkbox"
                                   checked={Boolean(checked[permission.id])}
+                                  ref={(el) => {
+                                    if (!el) return;
+                                    el.indeterminate = mixedPermissionIds.has(permission.id) && !checked[permission.id];
+                                  }}
                                   onChange={(e) => setChecked((current) => ({ ...current, [permission.id]: e.target.checked }))}
                                 />
                                 <div>
@@ -572,7 +616,7 @@ function RoleManageModal({ role, permissions, onClose, onSaved, onError }: { rol
           </div>
 
           <div className="flex justify-end gap-2">
-            <button className="saas-ghost-btn" onClick={() => void removeRole()}>Supprimer rôle</button>
+            {selectedRoles.length === 1 ? <button className="saas-ghost-btn" onClick={() => void removeRole()}>Supprimer rôle</button> : null}
             <button className="saas-primary-btn" disabled={isSaving} onClick={() => void saveRole()}>{isSaving ? 'Enregistrement…' : 'Enregistrer'}</button>
           </div>
         </div>

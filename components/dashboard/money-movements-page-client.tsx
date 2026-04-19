@@ -10,6 +10,9 @@ type Row = {
   type: string;
   amount: number;
   label: string;
+  before_amount: number | null;
+  after_amount: number | null;
+  related_item_name: string | null;
   created_at: string;
   user_name: string;
   source: string;
@@ -85,10 +88,14 @@ export function MoneyMovementsPageClient({ rows, moneyItemImageUrl }: { rows: Ro
             <div className="pointer-events-none absolute left-3 top-full z-20 mt-1 hidden min-w-72 rounded-xl border border-white/10 bg-[#2a180f]/95 p-3 text-xs text-[#f2d2ae] shadow-xl group-hover:block">
               <p className="font-semibold text-[#ffe8c9]">Détail mouvement</p>
               <p>🧭 Source: {row.source}</p>
-              <p>👤 Membre: {row.user_name}</p>
               <p>🧾 Type: {humanMoneyMovementLabel(row.type)}</p>
-              <p>💰 Montant: {formatUsd(Number(row.amount))}</p>
-              <p>🕒 Date: {new Date(row.created_at).toLocaleString('fr-FR')}</p>
+              <p>👤 Membre: {row.user_name}</p>
+              <p>📉 Avant: {row.before_amount != null ? formatUsd(Number(row.before_amount)) : 'Indisponible'}</p>
+              <p>📈 Après: {row.after_amount != null ? formatUsd(Number(row.after_amount)) : 'Indisponible'}</p>
+              <p>↕️ Variation: {formatUsd(Number(row.amount))}</p>
+              <p>🏷️ Motif: {row.label || '—'}</p>
+              {row.related_item_name ? <p>📦 Item concerné: {row.related_item_name}</p> : null}
+              <p>🕒 Date / heure: {new Date(row.created_at).toLocaleString('fr-FR')}</p>
               {moneyItemImageUrl ? <Image src={moneyItemImageUrl} alt="Argent" width={42} height={42} className="mt-2 h-10 w-10 rounded-lg border border-white/10" unoptimized /> : null}
             </div>
           </article>

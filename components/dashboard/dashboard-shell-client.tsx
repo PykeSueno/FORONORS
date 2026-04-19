@@ -29,7 +29,7 @@ type SummaryPayload = {
   canShowMoneyMovements: boolean;
   canShowStockMovements: boolean;
   moneyItemImageUrl: string | null;
-  values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; fourOpen: boolean; saleObjectsToday: number; cigarettePassagesToday: number; cigaretteRevenueToday: number };
+  values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; fourOpen: boolean; saleObjectsToday: number; tabletPassagesToday: number; activitiesToday: number; cigarettePassagesToday: number; cigaretteRevenueToday: number };
   recentCash: Array<{ type: string; amount: number; label: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null }>;
   recentStock: Array<{ item_id?: number | null; item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null; items?: { image_url: string | null; quantity?: number | null } | { image_url: string | null; quantity?: number | null }[] | null }>;
 };
@@ -50,14 +50,14 @@ export function DashboardShellClient({ name, role, canUpdatePassword, initialOrd
   const cards = useMemo<Card[]>(() => [
     flags.canMoneyPreview ? { id: 'money', href: '/dashboard/argent', enabled: flags.canMoneyAccess, icon: '💰', title: 'Argent', value: summary ? formatUsd(summary.values.cashBalance) : '…', subtitle: 'Caisse actuelle' } : null,
     flags.canSaleObjectsPreview ? { id: 'sale_objects', href: '/dashboard/vente-objets', enabled: flags.canSaleObjectsAccess, icon: '🧰', title: 'Vente objets', value: summary ? String(summary.values.saleObjectsToday) : '…', subtitle: 'Vendre les objets du groupe' } : null,
-    flags.canItemsPreview ? { id: 'items', href: '/dashboard/items', enabled: flags.canItemsAccess, icon: '📦', title: 'Items', value: summary ? String(summary.values.itemsCount) : '…', subtitle: 'Total catalogué' } : null,
+    flags.canItemsPreview ? { id: 'items', href: '/dashboard/items', enabled: flags.canItemsAccess, icon: '📦', title: 'Items', value: summary ? String(summary.values.itemsCount) : '…', subtitle: 'Stock total' } : null,
     flags.canTransactionsPreview ? { id: 'transactions', href: '/dashboard/transactions', enabled: flags.canTransactionsAccess, icon: '🔄', title: 'Transactions', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Créer, gérer, vente objets' } : null,
     flags.canTransactionsRecentPreview ? { id: 'transactions_recent', href: '/dashboard/transactions-recentes', enabled: flags.canTransactionsRecentAccess, icon: '🕒', title: 'Transactions récentes', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Historique' } : null,
     flags.canMembersPreview ? { id: 'members', href: '/dashboard/membres', enabled: flags.canMembersAccess, icon: '👥', title: 'Membres', value: summary ? String(summary.values.membersCount) : '…', subtitle: 'Gestion équipe' } : null,
     flags.canLogsPreview ? { id: 'logs', href: '/dashboard/logs', enabled: flags.canLogsAccess, icon: '🧾', title: 'Logs', value: summary ? String(summary.values.logsCount) : '…', subtitle: 'Traçabilité' } : null,
-    flags.canTabletPreview ? { id: 'tablet', href: '/dashboard/tablette', enabled: flags.canTabletAccess, icon: '📱', title: 'Tablette', value: 'Module', subtitle: 'Passages 8h → 8h' } : null,
+    flags.canTabletPreview ? { id: 'tablet', href: '/dashboard/tablette', enabled: flags.canTabletAccess, icon: '📱', title: 'Tablette', value: summary ? String(summary.values.tabletPassagesToday) : '0', subtitle: 'Passages 8h → 8h' } : null,
     flags.canCigarettePreview ? { id: 'cigarette', href: '/dashboard/cigarette', enabled: flags.canCigaretteAccess, icon: '🚬', title: 'Cigarette', value: summary ? String(summary.values.cigarettePassagesToday) : '…', subtitle: summary ? `Aujourd’hui ${formatUsd(summary.values.cigaretteRevenueToday)}` : 'Passages 4h → 20h' } : null,
-    flags.canActivityPreview ? { id: 'activity', href: '/dashboard/activite', enabled: flags.canActivityAccess, icon: '🎯', title: 'Activité', value: 'Module', subtitle: 'Boîte / Cambriolage / Conteneur' } : null,
+    flags.canActivityPreview ? { id: 'activity', href: '/dashboard/activite', enabled: flags.canActivityAccess, icon: '🎯', title: 'Activité', value: summary ? String(summary.values.activitiesToday) : '0', subtitle: 'Boîte / Cambriolage / Conteneur' } : null,
     flags.canFourPreview ? { id: 'four', href: '/dashboard/four', enabled: flags.canFourAccess, icon: '🔥', title: 'FOUR', value: summary ? (summary.values.fourOpen ? 'Ouvert' : 'Fermé') : '…', subtitle: 'Session vente / achat' } : null,
     flags.canDrugsPreview ? { id: 'drugs', href: '/dashboard/drogues', enabled: flags.canDrugsAccess, icon: '🧪', title: 'Drogues', value: 'Module', subtitle: 'Transfo + vente + production' } : null
   ].filter(Boolean) as Card[], [flags, summary]);
