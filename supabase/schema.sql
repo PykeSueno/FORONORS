@@ -1,18 +1,964 @@
 create extension if not exists "pgcrypto";
 
+create table if not exists public.roles (
+  id bigint generated always as identity primary key,
+  name text not null unique,
+  display_order integer not null default 100
+);
+
+create table if not exists public.permissions (
+  id bigint generated always as identity primary key,
+  name text not null unique
+);
+
+create table if not exists public.role_permissions (
+  role_id bigint not null references public.roles(id) on delete cascade,
+  permission_id bigint not null references public.permissions(id) on delete cascade,
+  primary key (role_id, permission_id)
+);
+
 create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   username text not null unique,
+  name text not null default '',
   password_hash text not null,
+  password_plain text,
   role text,
+  role_id bigint references public.roles(id) on delete set null,
   is_active boolean not null default true,
   created_at timestamptz not null default timezone('utc', now())
 );
 
+alter table public.roles add column if not exists display_order integer not null default 100;
+alter table public.users add column if not exists role_id bigint references public.roles(id) on delete set null;
+alter table public.users add column if not exists name text not null default '';
+alter table public.users add column if not exists password_plain text;
+alter table public.users add column if not exists dashboard_layout jsonb;
+
+alter table public.roles enable row level security;
+alter table public.permissions enable row level security;
+alter table public.role_permissions enable row level security;
 alter table public.users enable row level security;
 
-create policy "allow_service_role_all"
+drop policy if exists "allow_service_role_all_roles" on public.roles;
+create policy "allow_service_role_all_roles"
+on public.roles
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_permissions" on public.permissions;
+create policy "allow_service_role_all_permissions"
+on public.permissions
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_role_permissions" on public.role_permissions;
+create policy "allow_service_role_all_role_permissions"
+on public.role_permissions
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_users" on public.users;
+create policy "allow_service_role_all_users"
 on public.users
 for all
 using (true)
 with check (true);
+
+
+insert into public.permissions (name)
+values
+  ('members.access'),
+  ('members.create'),
+  ('members.edit'),
+  ('members.delete'),
+  ('members.activities.view'),
+  ('members.preview'),
+  ('members.view'),
+  ('members.password.view'),
+  ('members.password.copy'),
+  ('members.credentials.copy'),
+  ('members.password.edit'),
+  ('account.password.update'),
+  ('roles.manage'),
+  ('dashboard.preview'),
+  ('dashboard.access'),
+  ('dashboard.view'),
+  ('dashboard.money.movements.preview'),
+  ('dashboard.money.movements.access'),
+  ('dashboard.stock.movements.preview'),
+  ('dashboard.stock.movements.access'),
+  ('money.access'),
+  ('money.preview'),
+  ('money.edit'),
+  ('money.pay.access'),
+  ('money.pay.create'),
+  ('money.pay.history.view'),
+  ('money.pay.logs.view'),
+  ('money.history.view'),
+  ('money.quick_sale.access'),
+  ('money.quick_sale.create'),
+  ('money.quick_sale.details.view'),
+  ('money.quick_sale.logs.view'),
+  ('money.movements.view'),
+  ('items.movements.view'),
+  ('sale.objects.preview'),
+  ('sale.objects.access'),
+  ('sale.objects.create'),
+  ('sale.objects.receive'),
+  ('sale.objects.edit.own'),
+  ('sale.objects.edit.any'),
+  ('sale.objects.cancel.own'),
+  ('sale.objects.cancel.any'),
+  ('sale.objects.history.view')
+on conflict (name) do nothing;
+
+
+insert into public.role_permissions (role_id, permission_id)
+select r.id, p.id
+from public.roles r
+join public.permissions p on p.name = 'members.access'
+where lower(r.name) = 'patron'
+on conflict (role_id, permission_id) do nothing;
+
+
+create table if not exists public.group_cash (
+  id bigint generated always as identity primary key,
+  balance numeric(12,2) not null default 0,
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.cash_movements (
+  id bigint generated always as identity primary key,
+  type text not null,
+  amount numeric(12,2) not null,
+  label text not null,
+  user_id uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.money_item_sales (
+  id bigint generated always as identity primary key,
+  total_amount numeric(12,2) not null default 0,
+  cash_before numeric(12,2) not null default 0,
+  cash_after numeric(12,2) not null default 0,
+  sale_lines jsonb not null default '[]'::jsonb,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.sale_object_orders (
+  id bigint generated always as identity primary key,
+  buyer_name text not null,
+  buyer_type text not null,
+  status text not null default 'pending_receipt',
+  total_amount numeric(12,2) not null default 0,
+  sale_lines jsonb not null default '[]'::jsonb,
+  cash_before numeric(12,2),
+  cash_after numeric(12,2),
+  created_by uuid references public.users(id) on delete set null,
+  received_by uuid references public.users(id) on delete set null,
+  canceled_by uuid references public.users(id) on delete set null,
+  received_at timestamptz,
+  canceled_at timestamptz,
+  updated_at timestamptz not null default timezone('utc', now()),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.group_cash enable row level security;
+alter table public.cash_movements enable row level security;
+alter table public.money_item_sales enable row level security;
+alter table public.sale_object_orders enable row level security;
+
+drop policy if exists "allow_service_role_all_group_cash" on public.group_cash;
+create policy "allow_service_role_all_group_cash"
+on public.group_cash
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_cash_movements" on public.cash_movements;
+create policy "allow_service_role_all_cash_movements"
+on public.cash_movements
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_money_item_sales" on public.money_item_sales;
+create policy "allow_service_role_all_money_item_sales"
+on public.money_item_sales
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_sale_object_orders" on public.sale_object_orders;
+create policy "allow_service_role_all_sale_object_orders"
+on public.sale_object_orders
+for all
+using (true)
+with check (true);
+
+insert into public.group_cash (balance)
+select 0
+where not exists (select 1 from public.group_cash);
+
+create index if not exists idx_money_item_sales_created_at on public.money_item_sales(created_at desc);
+create index if not exists idx_sale_object_orders_created_at on public.sale_object_orders(created_at desc);
+create index if not exists idx_sale_object_orders_status on public.sale_object_orders(status, buyer_type);
+
+create table if not exists public.items (
+  id bigint generated always as identity primary key,
+  name text not null,
+  image_url text,
+  buy_price numeric(12,2) not null default 0,
+  sell_price numeric(12,2) not null default 0,
+  quantity integer not null default 0,
+  weapon_identifier text,
+  category_key text not null,
+  category_label text not null,
+  type_key text,
+  type_label text,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.audit_logs (
+  id bigint generated always as identity primary key,
+  actor_user_id uuid references public.users(id) on delete set null,
+  actor_name text not null,
+  actor_username text not null,
+  actor_role text,
+  action text not null,
+  entity_type text not null,
+  entity_id text,
+  summary text not null,
+  old_values jsonb,
+  new_values jsonb,
+  metadata jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_items_category_type on public.items(category_key, type_key);
+create index if not exists idx_items_name on public.items(name);
+create index if not exists idx_audit_logs_action_created_at on public.audit_logs(action, created_at desc);
+create index if not exists idx_audit_logs_entity on public.audit_logs(entity_type, entity_id);
+
+alter table public.items enable row level security;
+alter table public.audit_logs enable row level security;
+
+drop policy if exists "allow_service_role_all_items" on public.items;
+create policy "allow_service_role_all_items"
+on public.items
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_audit_logs" on public.audit_logs;
+create policy "allow_service_role_all_audit_logs"
+on public.audit_logs
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('items.access'),
+  ('items.create'),
+  ('items.edit'),
+  ('items.delete'),
+  ('items.preview'),
+  ('logs.access'),
+  ('logs.view'),
+  ('logs.preview'),
+  ('logs.webhook.manage')
+on conflict (name) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('item-images', 'item-images', true)
+on conflict (id) do update set public = excluded.public;
+
+drop policy if exists "allow_service_role_item_images_all" on storage.objects;
+create policy "allow_service_role_item_images_all"
+on storage.objects
+for all
+using (bucket_id = 'item-images')
+with check (bucket_id = 'item-images');
+
+
+create table if not exists public.app_settings (
+  key text primary key,
+  value text not null default '',
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.app_settings enable row level security;
+
+drop policy if exists "allow_service_role_all_app_settings" on public.app_settings;
+create policy "allow_service_role_all_app_settings"
+on public.app_settings
+for all
+using (true)
+with check (true);
+
+alter table public.items add column if not exists is_money_item boolean not null default false;
+
+create table if not exists public.transactions (
+  id bigint generated always as identity primary key,
+  actor_user_id uuid references public.users(id) on delete set null,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null default 'Groupe',
+  reason text not null,
+  total_money_in numeric(12,2) not null default 0,
+  total_money_out numeric(12,2) not null default 0,
+  stock_in_count integer not null default 0,
+  stock_out_count integer not null default 0,
+  profit_loss numeric(12,2) not null default 0,
+  summary text not null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.transaction_lines (
+  id bigint generated always as identity primary key,
+  transaction_id bigint not null references public.transactions(id) on delete cascade,
+  item_id bigint references public.items(id) on delete set null,
+  item_name_snapshot text not null,
+  movement_type text not null,
+  quantity integer not null,
+  unit_price numeric(12,2) not null default 0,
+  total_amount numeric(12,2) not null default 0,
+  money_effect numeric(12,2) not null default 0,
+  stock_effect integer not null default 0,
+  metadata jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.item_stock_movements (
+  id bigint generated always as identity primary key,
+  item_id bigint references public.items(id) on delete set null,
+  transaction_id bigint references public.transactions(id) on delete set null,
+  item_name text not null,
+  transaction_type text not null,
+  quantity_delta integer not null,
+  user_id uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_transactions_created_at on public.transactions(created_at desc);
+create index if not exists idx_transaction_lines_transaction on public.transaction_lines(transaction_id);
+create index if not exists idx_item_stock_movements_created_at on public.item_stock_movements(created_at desc);
+
+alter table public.transactions enable row level security;
+alter table public.transaction_lines enable row level security;
+alter table public.item_stock_movements enable row level security;
+
+drop policy if exists "allow_service_role_all_transactions" on public.transactions;
+create policy "allow_service_role_all_transactions"
+on public.transactions
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_transaction_lines" on public.transaction_lines;
+create policy "allow_service_role_all_transaction_lines"
+on public.transaction_lines
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_item_stock_movements" on public.item_stock_movements;
+create policy "allow_service_role_all_item_stock_movements"
+on public.item_stock_movements
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('transactions.access'),
+  ('transactions.create'),
+  ('transactions.edit.own'),
+  ('transactions.cancel.own'),
+  ('transactions.edit.any'),
+  ('transactions.cancel.any'),
+  ('transactions.manage.own'),
+  ('transactions.manage.any'),
+  ('transactions.recent.access'),
+  ('transactions.recent.edit.own'),
+  ('transactions.recent.cancel.own'),
+  ('transactions.recent.edit.any'),
+  ('transactions.recent.cancel.any'),
+  ('transactions.recent.manage.own'),
+  ('transactions.recent.manage.any'),
+  ('transactions.preview'),
+  ('transactions.recent.preview')
+on conflict (name) do nothing;
+
+create table if not exists public.tablet_days (
+  id bigint generated always as identity primary key,
+  business_day date not null unique,
+  deposited_amount numeric(12,2) not null default 0,
+  chest_amount numeric(12,2) not null default 0,
+  passages_count integer not null default 0,
+  kits_added integer not null default 0,
+  cutters_added integer not null default 0,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.tablet_passages (
+  id bigint generated always as identity primary key,
+  tablet_day_id bigint not null references public.tablet_days(id) on delete cascade,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null,
+  before_cash numeric(12,2) not null,
+  after_cash numeric(12,2) not null,
+  before_kits integer not null,
+  after_kits integer not null,
+  before_cutters integer not null,
+  after_cutters integer not null,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  unique(tablet_day_id, member_user_id)
+);
+
+create index if not exists idx_tablet_passages_created_at on public.tablet_passages(created_at desc);
+
+alter table public.tablet_days enable row level security;
+alter table public.tablet_passages enable row level security;
+
+drop policy if exists "allow_service_role_all_tablet_days" on public.tablet_days;
+create policy "allow_service_role_all_tablet_days"
+on public.tablet_days
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_tablet_passages" on public.tablet_passages;
+create policy "allow_service_role_all_tablet_passages"
+on public.tablet_passages
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('tablet.access'),
+  ('tablet.passage.create'),
+  ('tablet.daily.manage'),
+  ('tablet.stats.view'),
+  ('tablet.logs.view'),
+  ('tablet.preview')
+on conflict (name) do nothing;
+
+create table if not exists public.cigarette_days (
+  id bigint generated always as identity primary key,
+  business_day date not null unique,
+  chest_amount numeric(12,2) not null default 0,
+  passages_count integer not null default 0,
+  total_revenue numeric(12,2) not null default 0,
+  packs_sold integer not null default 0,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.cigarette_passages (
+  id bigint generated always as identity primary key,
+  cigarette_day_id bigint not null references public.cigarette_days(id) on delete cascade,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null,
+  quantity_sold integer not null,
+  revenue_amount numeric(12,2) not null,
+  before_packs integer not null,
+  after_packs integer not null,
+  before_chest numeric(12,2) not null,
+  after_chest numeric(12,2) not null,
+  before_group_cash numeric(12,2) not null,
+  after_group_cash numeric(12,2) not null,
+  status text not null default 'validated',
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  unique(cigarette_day_id, member_user_id)
+);
+
+create index if not exists idx_cigarette_passages_created_at on public.cigarette_passages(created_at desc);
+
+alter table public.cigarette_days enable row level security;
+alter table public.cigarette_passages enable row level security;
+
+drop policy if exists "allow_service_role_all_cigarette_days" on public.cigarette_days;
+create policy "allow_service_role_all_cigarette_days"
+on public.cigarette_days
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_cigarette_passages" on public.cigarette_passages;
+create policy "allow_service_role_all_cigarette_passages"
+on public.cigarette_passages
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('cigarette.access'),
+  ('cigarette.preview'),
+  ('cigarette.passage.create'),
+  ('cigarette.passage.create.any'),
+  ('cigarette.history.view'),
+  ('cigarette.stats.view'),
+  ('cigarette.logs.view'),
+  ('cigarette.daily.manage'),
+  ('cigarette.edit.own'),
+  ('cigarette.edit.any')
+on conflict (name) do nothing;
+
+create table if not exists public.activities (
+  id bigint generated always as identity primary key,
+  activity_type text not null,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null,
+  proof_image_url text,
+  equipment_item_id bigint references public.items(id) on delete set null,
+  equipment_item_name text,
+  equipment_used integer not null default 0,
+  equipment_before integer not null default 0,
+  equipment_after integer not null default 0,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.activity_items (
+  id bigint generated always as identity primary key,
+  activity_id bigint not null references public.activities(id) on delete cascade,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text not null,
+  quantity_added integer not null,
+  before_quantity integer not null,
+  after_quantity integer not null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.activity_members (
+  id bigint generated always as identity primary key,
+  activity_id bigint not null references public.activities(id) on delete cascade,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null
+);
+
+create index if not exists idx_activities_created_at on public.activities(created_at desc);
+create index if not exists idx_activity_items_activity on public.activity_items(activity_id);
+create index if not exists idx_activity_members_activity on public.activity_members(activity_id);
+
+alter table public.activities enable row level security;
+alter table public.activity_items enable row level security;
+alter table public.activity_members enable row level security;
+
+drop policy if exists "allow_service_role_all_activities" on public.activities;
+create policy "allow_service_role_all_activities"
+on public.activities
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_activity_items" on public.activity_items;
+create policy "allow_service_role_all_activity_items"
+on public.activity_items
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_activity_members" on public.activity_members;
+create policy "allow_service_role_all_activity_members"
+on public.activity_members
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('activity.access'),
+  ('activity.view'),
+  ('activity.create'),
+  ('activity.stats.view'),
+  ('activity.logs.view'),
+  ('activity.edit.own'),
+  ('activity.cancel.own'),
+  ('activity.edit.any'),
+  ('activity.cancel.any'),
+  ('activity.manage.own'),
+  ('activity.manage.any'),
+  ('activity.preview')
+on conflict (name) do nothing;
+
+create table if not exists public.four_sessions (
+  id bigint generated always as identity primary key,
+  status text not null default 'open',
+  opened_by uuid references public.users(id) on delete set null,
+  managed_by uuid references public.users(id) on delete set null,
+  opened_at timestamptz not null default timezone('utc', now()),
+  closed_at timestamptz,
+  summary jsonb
+);
+
+create table if not exists public.four_movements (
+  id bigint generated always as identity primary key,
+  session_id bigint not null references public.four_sessions(id) on delete cascade,
+  movement_kind text not null,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text,
+  quantity numeric(12,2) not null default 0,
+  unit_price numeric(12,2) not null default 0,
+  total_amount numeric(12,2) not null default 0,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.four_transactions (
+  id bigint generated always as identity primary key,
+  session_id bigint not null references public.four_sessions(id) on delete cascade,
+  counterparty text,
+  status text not null default 'validated',
+  cancel_reason text,
+  total_purchases numeric(12,2) not null default 0,
+  total_sales numeric(12,2) not null default 0,
+  profit_loss numeric(12,2) not null default 0,
+  created_by uuid references public.users(id) on delete set null,
+  canceled_by uuid references public.users(id) on delete set null,
+  canceled_at timestamptz,
+  updated_at timestamptz not null default timezone('utc', now()),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.four_transaction_lines (
+  id bigint generated always as identity primary key,
+  transaction_id bigint not null references public.four_transactions(id) on delete cascade,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text not null,
+  movement_kind text not null,
+  quantity numeric(12,2) not null default 0,
+  unit_price numeric(12,2) not null default 0,
+  total_amount numeric(12,2) not null default 0
+);
+
+create index if not exists idx_four_sessions_status_opened_at on public.four_sessions(status, opened_at desc);
+create index if not exists idx_four_movements_session_id on public.four_movements(session_id, created_at desc);
+create index if not exists idx_four_transactions_session_id on public.four_transactions(session_id, created_at desc);
+create index if not exists idx_four_transaction_lines_tx_id on public.four_transaction_lines(transaction_id);
+
+alter table public.four_sessions enable row level security;
+alter table public.four_movements enable row level security;
+alter table public.four_transactions enable row level security;
+alter table public.four_transaction_lines enable row level security;
+
+drop policy if exists "allow_service_role_all_four_sessions" on public.four_sessions;
+create policy "allow_service_role_all_four_sessions"
+on public.four_sessions
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_four_movements" on public.four_movements;
+create policy "allow_service_role_all_four_movements"
+on public.four_movements
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_four_transactions" on public.four_transactions;
+create policy "allow_service_role_all_four_transactions"
+on public.four_transactions
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_four_transaction_lines" on public.four_transaction_lines;
+create policy "allow_service_role_all_four_transaction_lines"
+on public.four_transaction_lines
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('four.preview'),
+  ('four.access'),
+  ('four.open'),
+  ('four.add_movement'),
+  ('four.cash.add'),
+  ('four.transaction.manage'),
+  ('four.transaction.edit.own'),
+  ('four.transaction.cancel.own'),
+  ('four.transaction.edit.any'),
+  ('four.transaction.cancel.any'),
+  ('four.transaction.validate'),
+  ('four.transaction.manage.own'),
+  ('four.transaction.manage.any'),
+  ('four.close'),
+  ('four.logs.view'),
+  ('four.history.view')
+on conflict (name) do nothing;
+
+alter table public.four_movements add column if not exists counterparty text;
+alter table public.four_transactions add column if not exists status text not null default 'validated';
+alter table public.four_transactions add column if not exists cancel_reason text;
+alter table public.four_transactions add column if not exists canceled_by uuid references public.users(id) on delete set null;
+alter table public.four_transactions add column if not exists canceled_at timestamptz;
+alter table public.four_transactions add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
+create table if not exists public.four_messages (
+  id bigint generated always as identity primary key,
+  title text not null,
+  content text not null,
+  display_order integer not null default 100,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_four_messages_order on public.four_messages(display_order, id);
+alter table public.four_messages enable row level security;
+
+drop policy if exists "allow_service_role_all_four_messages" on public.four_messages;
+create policy "allow_service_role_all_four_messages"
+on public.four_messages
+for all
+using (true)
+with check (true);
+
+create table if not exists public.drug_transfos (
+  id bigint generated always as identity primary key,
+  transfo_type text not null,
+  target_group text,
+  source_item_id bigint references public.items(id) on delete set null,
+  source_item_name text,
+  target_item_id bigint references public.items(id) on delete set null,
+  target_item_name text,
+  quantity_sent numeric(12,2) not null default 0,
+  quantity_expected numeric(12,2) not null default 0,
+  quantity_received numeric(12,2),
+  source_stock_before numeric(12,2),
+  source_stock_after_send numeric(12,2),
+  source_stock_after_cancel numeric(12,2),
+  target_stock_before numeric(12,2),
+  target_stock_after_receive numeric(12,2),
+  status text not null default 'pending',
+  paid_amount numeric(12,2) not null default 0,
+  compensation_amount numeric(12,2) not null default 0,
+  cash_before_compensation numeric(12,2),
+  cash_after_compensation numeric(12,2),
+  note text,
+  sent_at timestamptz not null default timezone('utc', now()),
+  received_at timestamptz,
+  created_by uuid references public.users(id) on delete set null,
+  received_by uuid references public.users(id) on delete set null,
+  canceled_by uuid references public.users(id) on delete set null,
+  updated_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.drug_sales (
+  id bigint generated always as identity primary key,
+  drug_type text not null,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text,
+  item_image_url text,
+  quantity_sold numeric(12,2) not null default 0,
+  is_group_sale boolean not null default false,
+  member_user_ids jsonb not null default '[]'::jsonb,
+  member_labels jsonb not null default '[]'::jsonb,
+  estimated_min numeric(12,2) not null default 0,
+  estimated_max numeric(12,2) not null default 0,
+  estimated_avg numeric(12,2) not null default 0,
+  actual_amount numeric(12,2) not null default 0,
+  stock_before numeric(12,2),
+  stock_after numeric(12,2),
+  cash_before numeric(12,2),
+  cash_after numeric(12,2),
+  sale_lines jsonb not null default '[]'::jsonb,
+  status text not null default 'validated',
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.drug_sale_lines (
+  id bigint generated always as identity primary key,
+  sale_id bigint not null references public.drug_sales(id) on delete cascade,
+  drug_type text not null,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text,
+  item_image_url text,
+  quantity_sold numeric(12,2) not null default 0,
+  estimated_min numeric(12,2) not null default 0,
+  estimated_max numeric(12,2) not null default 0,
+  estimated_avg numeric(12,2) not null default 0,
+  actual_amount numeric(12,2) not null default 0,
+  stock_before numeric(12,2),
+  stock_after numeric(12,2),
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.drug_productions (
+  id bigint generated always as identity primary key,
+  production_type text not null,
+  input_snapshot jsonb not null default '{}'::jsonb,
+  output_snapshot jsonb not null default '{}'::jsonb,
+  note text,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.drug_transfos add column if not exists source_item_id bigint references public.items(id) on delete set null;
+alter table public.drug_transfos add column if not exists source_item_name text;
+alter table public.drug_transfos add column if not exists target_item_id bigint references public.items(id) on delete set null;
+alter table public.drug_transfos add column if not exists target_item_name text;
+alter table public.drug_transfos add column if not exists source_stock_before numeric(12,2);
+alter table public.drug_transfos add column if not exists source_stock_after_send numeric(12,2);
+alter table public.drug_transfos add column if not exists source_stock_after_cancel numeric(12,2);
+alter table public.drug_transfos add column if not exists target_stock_before numeric(12,2);
+alter table public.drug_transfos add column if not exists target_stock_after_receive numeric(12,2);
+alter table public.drug_transfos add column if not exists paid_amount numeric(12,2) not null default 0;
+alter table public.drug_transfos add column if not exists compensation_amount numeric(12,2) not null default 0;
+alter table public.drug_transfos add column if not exists cash_before_compensation numeric(12,2);
+alter table public.drug_transfos add column if not exists cash_after_compensation numeric(12,2);
+alter table public.drug_transfos add column if not exists received_by uuid references public.users(id) on delete set null;
+alter table public.drug_transfos add column if not exists updated_by uuid references public.users(id) on delete set null;
+
+alter table public.drug_sales add column if not exists item_id bigint references public.items(id) on delete set null;
+alter table public.drug_sales add column if not exists item_name text;
+alter table public.drug_sales add column if not exists item_image_url text;
+alter table public.drug_sales add column if not exists stock_before numeric(12,2);
+alter table public.drug_sales add column if not exists stock_after numeric(12,2);
+alter table public.drug_sales add column if not exists cash_before numeric(12,2);
+alter table public.drug_sales add column if not exists cash_after numeric(12,2);
+alter table public.drug_sales add column if not exists sale_lines jsonb not null default '[]'::jsonb;
+alter table public.drug_sale_lines add column if not exists item_image_url text;
+alter table public.drug_sale_lines add column if not exists stock_before numeric(12,2);
+alter table public.drug_sale_lines add column if not exists stock_after numeric(12,2);
+alter table public.drug_productions add column if not exists input_snapshot jsonb not null default '{}'::jsonb;
+alter table public.drug_productions add column if not exists output_snapshot jsonb not null default '{}'::jsonb;
+alter table public.drug_productions add column if not exists note text;
+
+insert into public.items (name, image_url, buy_price, sell_price, quantity, category_key, category_label, type_key, type_label)
+select 'Pack Meth', null, 0, 0, 0, 'drugs', 'Drogues', 'seeds', 'Graines'
+where not exists (select 1 from public.items where lower(name) = 'pack meth');
+
+create index if not exists idx_drug_transfos_status_sent_at on public.drug_transfos(status, sent_at desc);
+create index if not exists idx_drug_sales_type_created_at on public.drug_sales(drug_type, created_at desc);
+create index if not exists idx_drug_sale_lines_sale_id on public.drug_sale_lines(sale_id, created_at desc);
+create index if not exists idx_drug_productions_type_created_at on public.drug_productions(production_type, created_at desc);
+
+alter table public.drug_transfos enable row level security;
+alter table public.drug_sales enable row level security;
+alter table public.drug_sale_lines enable row level security;
+alter table public.drug_productions enable row level security;
+
+drop policy if exists "allow_service_role_all_drug_transfos" on public.drug_transfos;
+create policy "allow_service_role_all_drug_transfos"
+on public.drug_transfos
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_drug_sales" on public.drug_sales;
+create policy "allow_service_role_all_drug_sales"
+on public.drug_sales
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_drug_sale_lines" on public.drug_sale_lines;
+create policy "allow_service_role_all_drug_sale_lines"
+on public.drug_sale_lines
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_drug_productions" on public.drug_productions;
+create policy "allow_service_role_all_drug_productions"
+on public.drug_productions
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('drugs.preview'),
+  ('drugs.access'),
+  ('drugs.transfo.view'),
+  ('drugs.transfo.create'),
+  ('drugs.transfo.receive.validate'),
+  ('drugs.transfo.cancel.own'),
+  ('drugs.transfo.cancel.any'),
+  ('drugs.transfo.edit.own'),
+  ('drugs.transfo.edit.any'),
+  ('drugs.transfo.logs.view'),
+  ('drugs.transfo.stats.view'),
+  ('drugs.sales.preview'),
+  ('drugs.sales.view'),
+  ('drugs.sales.create'),
+  ('drugs.sales.edit.own'),
+  ('drugs.sales.edit.any'),
+  ('drugs.sales.cancel.own'),
+  ('drugs.sales.cancel.any'),
+  ('drugs.sales.logs.view'),
+  ('drugs.sales.stats.view'),
+  ('drugs.production.access'),
+  ('drugs.production.create'),
+  ('drugs.production.coke.create'),
+  ('drugs.production.meth.create'),
+  ('drugs.production.edit.own'),
+  ('drugs.production.edit.any'),
+  ('drugs.production.cancel.own'),
+  ('drugs.production.cancel.any'),
+  ('drugs.production.history.view'),
+  ('drugs.logs.view'),
+  ('drugs.stats.view')
+on conflict (name) do nothing;
+
+delete from public.permissions where name = 'drugs.transfo.validate';
+
+
+delete from public.role_permissions
+where permission_id in (
+  select id from public.permissions
+  where name in (
+    'transactions.view',
+    'transactions.edit',
+    'transactions.manage',
+    'transactions.recent.edit',
+    'transactions.recent.cancel',
+    'four.create',
+    'four.manage.own',
+    'four.manage.any',
+    'four.manage'
+  )
+);
+
+delete from public.permissions
+where name in (
+  'transactions.view',
+  'transactions.edit',
+  'transactions.manage',
+  'transactions.recent.edit',
+  'transactions.recent.cancel',
+  'four.create',
+  'four.manage.own',
+  'four.manage.any',
+  'four.manage'
+);
+
+insert into public.permissions (name)
+values
+  ('four.stats.view'),
+  ('four.messages.view'),
+  ('four.messages.manage')
+on conflict (name) do nothing;
