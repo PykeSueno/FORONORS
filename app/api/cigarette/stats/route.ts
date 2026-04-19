@@ -3,6 +3,15 @@ import { getSession } from '@/lib/auth';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+type StatsPassageRow = {
+  member_label: string | null;
+  quantity_sold: number | null;
+  revenue_amount: number | null;
+  created_at: string;
+  status: string | null;
+  cigarette_days: { business_day: string } | { business_day: string }[] | null;
+};
+
 function weekKey(dateIso: string) {
   const date = new Date(dateIso);
   const day = date.getDay();
@@ -32,7 +41,7 @@ export async function GET() {
   const byWeek = new Map<string, { week_start: string; passages: number; packs: number; revenue: number }>();
   const byDay = new Map<string, { day: string; passages: number; packs: number; revenue: number }>();
 
-  for (const row of passages ?? []) {
+  for (const row of (passages ?? []) as StatsPassageRow[]) {
     const businessDay = Array.isArray(row.cigarette_days) ? row.cigarette_days[0]?.business_day : row.cigarette_days?.business_day;
     if (!businessDay) continue;
     const member = row.member_label || 'Inconnu';
