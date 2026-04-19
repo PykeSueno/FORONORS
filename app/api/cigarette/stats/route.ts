@@ -23,7 +23,8 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data: passages } = await supabase
     .from('cigarette_passages')
-    .select('member_label, quantity_sold, revenue_amount, created_at')
+    .select('member_label, quantity_sold, revenue_amount, created_at, status, cigarette_days!inner(business_day)')
+    .eq('status', 'validated')
     .order('created_at', { ascending: false })
     .limit(5000);
 
@@ -32,6 +33,8 @@ export async function GET() {
   const byDay = new Map<string, { day: string; passages: number; packs: number; revenue: number }>();
 
   for (const row of passages ?? []) {
+    const businessDay = Array.isArray(row.cigarette_days) ? row.cigarette_days[0]?.business_day : row.cigarette_days?.business_day;
+    if (!businessDay) continue;
     const member = row.member_label || 'Inconnu';
     if (!byMember[member]) byMember[member] = { passages: 0, packs: 0, revenue: 0 };
     byMember[member].passages += 1;
@@ -45,7 +48,7 @@ export async function GET() {
     weekCurrent.revenue += Number(row.revenue_amount ?? 0);
     byWeek.set(week, weekCurrent);
 
-    const day = row.created_at.slice(0, 10);
+    const day = businessDay;
     const dayCurrent = byDay.get(day) ?? { day, passages: 0, packs: 0, revenue: 0 };
     dayCurrent.passages += 1;
     dayCurrent.packs += Number(row.quantity_sold ?? 0);

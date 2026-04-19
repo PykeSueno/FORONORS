@@ -123,7 +123,7 @@ export async function POST(request: Request) {
   const afterChest = beforeChest + CIGARETTE_REVENUE;
   const afterGroupCash = beforeGroupCash + CIGARETTE_REVENUE;
 
-  const { data: createdPassage } = await supabase
+  const { data: createdPassage, error: createPassageError } = await supabase
     .from('cigarette_passages')
     .insert({
       cigarette_day_id: day.id,
@@ -144,10 +144,13 @@ export async function POST(request: Request) {
     })
     .select('id, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at')
     .maybeSingle();
+  if (createPassageError || !createdPassage) {
+    return NextResponse.json({ message: 'Enregistrement du passage cigarette impossible.' }, { status: 500 });
+  }
 
-  await supabase.from('items').update({ quantity: afterPacks, updated_at: new Date().toISOString() }).eq('id', item.id);
-  await supabase.from('group_cash').update({ balance: afterGroupCash, updated_at: new Date().toISOString() }).eq('id', cash.id);
-  await supabase.from('cigarette_days').update({
+  const { error: updateItemError } = await supabase.from('items').update({ quantity: afterPacks, updated_at: new Date().toISOString() }).eq('id', item.id);
+  const { error: updateCashError } = await supabase.from('group_cash').update({ balance: afterGroupCash, updated_at: new Date().toISOString() }).eq('id', cash.id);
+  const { error: updateDayError } = await supabase.from('cigarette_days').update({
     chest_amount: afterChest,
     passages_count: Number(day.passages_count ?? 0) + 1,
     total_revenue: Number(day.total_revenue ?? 0) + CIGARETTE_REVENUE,
@@ -155,15 +158,18 @@ export async function POST(request: Request) {
     packs_deposit_remaining: afterDepositPacks,
     updated_at: new Date().toISOString()
   }).eq('id', day.id);
+  if (updateItemError || updateCashError || updateDayError) {
+    return NextResponse.json({ message: 'Mise à jour du stock/caisse cigarette impossible.' }, { status: 500 });
+  }
 
-  await supabase.from('item_stock_movements').insert({
+  const { error: stockMovementError } = await supabase.from('item_stock_movements').insert({
     item_id: item.id,
     item_name: item.name,
     transaction_type: 'cigarette_passage',
     quantity_delta: -CIGARETTE_SALE_QTY,
     user_id: requestedMemberId
   });
-  await supabase.from('cash_movements').insert({
+  const { error: cashMovementError } = await supabase.from('cash_movements').insert({
     type: 'cigarette_passage',
     amount: CIGARETTE_REVENUE,
     label: `Passage Cigarette (${memberLabel})`,
@@ -172,6 +178,9 @@ export async function POST(request: Request) {
     after_amount: afterGroupCash,
     related_item_name: CIGARETTE_ITEM_NAME
   });
+  if (stockMovementError || cashMovementError) {
+    return NextResponse.json({ message: 'Traçabilité du passage cigarette incomplète.' }, { status: 500 });
+  }
   await syncMoneyItemToGroupCash(supabase);
 
   await createAuditLog({

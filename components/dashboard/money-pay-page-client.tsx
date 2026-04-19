@@ -10,12 +10,14 @@ export function MoneyPayPageClient({
   canCreate,
   canHistory,
   balance,
+  payEstimates,
   members,
   payments
 }: {
   canCreate: boolean;
   canHistory: boolean;
   balance: number;
+  payEstimates: Record<string, { recommended: number; minimum: number; maximum: number; activityIndex: number; economyIndex: number }>;
   members: Member[];
   payments: PaymentRow[];
 }) {
@@ -26,6 +28,7 @@ export function MoneyPayPageClient({
   const [submitting, setSubmitting] = useState(false);
   const selectedMember = members.find((member) => member.id === memberId) ?? null;
   const safeAmount = Math.max(0, Number(amount || 0));
+  const estimate = selectedMember ? payEstimates[selectedMember.id] : null;
 
   async function submitPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -94,6 +97,37 @@ export function MoneyPayPageClient({
               <p className="mt-1 text-xs text-[#efcdab]">Raison: {reason || '—'}</p>
             </div>
           </div>
+
+          {estimate ? (
+            <div className="grid gap-2 rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 md:grid-cols-5">
+              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
+                <p className="text-[11px] text-[#efcdab]">Estimation recommandée</p>
+                <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(estimate.recommended)}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
+                <p className="text-[11px] text-[#efcdab]">Minimum conseillé</p>
+                <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(estimate.minimum)}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
+                <p className="text-[11px] text-[#efcdab]">Maximum conseillé</p>
+                <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(estimate.maximum)}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
+                <p className="text-[11px] text-[#efcdab]">Indice activité</p>
+                <p className="text-sm font-semibold text-[#ffe8ca]">{estimate.activityIndex.toFixed(2)}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
+                <p className="text-[11px] text-[#efcdab]">Indice économie groupe</p>
+                <p className="text-sm font-semibold text-[#ffe8ca]">{estimate.economyIndex.toFixed(2)}</p>
+              </div>
+              <div className="md:col-span-5 flex flex-wrap gap-2">
+                <button type="button" className="saas-ghost-btn" onClick={() => setAmount(String(estimate.minimum))}>Appliquer minimum</button>
+                <button type="button" className="saas-ghost-btn" onClick={() => setAmount(String(estimate.recommended))}>Appliquer recommandé</button>
+                <button type="button" className="saas-ghost-btn" onClick={() => setAmount(String(estimate.maximum))}>Appliquer maximum</button>
+                <p className="text-[11px] text-[#efcdab] self-center">Estimation basée sur 30 jours (activité + économie groupe), avec fallback automatique si historique partiel.</p>
+              </div>
+            </div>
+          ) : null}
 
           {error ? <p className="rounded-xl border border-red-300/45 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
           <button className="saas-primary-btn w-full" disabled={submitting}>{submitting ? 'Validation…' : 'Valider la paye'}</button>
