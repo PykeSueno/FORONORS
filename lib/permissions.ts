@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from './supabase';
+import { expandPermissionAliases, normalizePermissionNames } from './permission-normalization';
 
 type PermissionRelation = { permissions: { name: string } | { name: string }[] | null };
 
@@ -14,18 +15,21 @@ export async function getUserPermissions(userId: string) {
 
   if (roleName === 'patron') {
     const { data: allPermissions } = await supabase.from('permissions').select('name');
-    return Array.from(new Set((allPermissions ?? []).map((item) => item.name)));
+    const canonical = normalizePermissionNames((allPermissions ?? []).map((item) => item.name));
+    return Array.from(new Set(canonical.flatMap((permission) => expandPermissionAliases(permission))));
   }
 
   if (!user?.role_id) return [] as string[];
 
   const { data } = await supabase.from('role_permissions').select('permissions(name)').eq('role_id', user.role_id);
 
-  const permissions = ((data ?? []) as PermissionRelation[])
+  const rawPermissions = ((data ?? []) as PermissionRelation[])
     .map((item) => (Array.isArray(item.permissions) ? item.permissions[0]?.name : item.permissions?.name))
     .filter((value): value is string => Boolean(value));
 
-  return Array.from(new Set(permissions));
+  const canonical = normalizePermissionNames(rawPermissions);
+  const expanded = canonical.flatMap((permission) => expandPermissionAliases(permission));
+  return Array.from(new Set(expanded));
 }
 
 export async function hasUserPermission(userId: string, permission: string) {

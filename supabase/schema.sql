@@ -17,6 +17,25 @@ create table if not exists public.role_permissions (
   primary key (role_id, permission_id)
 );
 
+create or replace function public.set_roles_permissions_bulk(
+  p_role_ids bigint[],
+  p_permission_ids bigint[]
+) returns void
+language plpgsql
+as $$
+begin
+  delete from public.role_permissions
+  where role_id = any(p_role_ids);
+
+  if coalesce(array_length(p_permission_ids, 1), 0) > 0 then
+    insert into public.role_permissions(role_id, permission_id)
+    select role_id, permission_id
+    from unnest(p_role_ids) as role_id
+    cross join unnest(p_permission_ids) as permission_id;
+  end if;
+end;
+$$;
+
 create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   username text not null unique,

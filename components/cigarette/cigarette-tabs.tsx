@@ -5,6 +5,7 @@ export function CigaretteTabs({ active, canSeeStats }: { active: 'cigarette' | '
     <div className="mb-4 flex flex-wrap gap-2">
       <Link href="/dashboard/cigarette" className={`filter-pill ${active === 'cigarette' ? 'filter-pill-active' : ''}`}>Cigarette</Link>
       {canSeeStats ? <Link href="/dashboard/cigarette/stats" className={`filter-pill ${active === 'stats' ? 'filter-pill-active' : ''}`}>Stats</Link> : null}
+      <Link href="/dashboard/tablette" className="filter-pill">Aller Tablette</Link>
     </div>
   );
 }

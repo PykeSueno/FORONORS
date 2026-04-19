@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CIGARETTE_REVENUE, CIGARETTE_SALE_QTY } from '@/lib/cigarette';
 import { formatUsd } from '@/lib/currency';
 
@@ -62,10 +61,21 @@ export function CigarettePageClient({
   defaultMemberLabel: string;
 }) {
   const router = useRouter();
+  const [dayState, setDayState] = useState(day);
+  const [passagesState, setPassagesState] = useState(passages);
+  const [packsInStockState, setPacksInStockState] = useState(packsInStock);
+  const [groupCashState, setGroupCashState] = useState(groupCash);
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
   const [error, setError] = useState('');
   const [statusFeedback, setStatusFeedback] = useState('');
+
+  useEffect(() => {
+    setDayState(day);
+    setPassagesState(passages);
+    setPacksInStockState(packsInStock);
+    setGroupCashState(groupCash);
+  }, [day, passages, packsInStock, groupCash]);
 
   const isAllowedHour = useMemo(() => {
     const hour = new Date().getHours();
@@ -84,9 +94,18 @@ export function CigarettePageClient({
       setError(data.message ?? 'Passage cigarette impossible.');
       return;
     }
+    const data = (await response.json()) as {
+      passage?: CigarettePassage | null;
+      day?: (NonNullable<CigaretteDay> & { packs_deposit_remaining?: number }) | null;
+      packsInStock?: number;
+      groupCash?: number;
+    };
+    if (data.passage) setPassagesState((current) => [data.passage as CigarettePassage, ...current]);
+    if (data.day) setDayState((current) => ({ ...(current ?? {}), ...data.day } as NonNullable<CigaretteDay>));
+    if (typeof data.packsInStock === 'number') setPacksInStockState(data.packsInStock);
+    if (typeof data.groupCash === 'number') setGroupCashState(data.groupCash);
     setStatusFeedback('Passage cigarette validé.');
     setTimeout(() => setStatusFeedback(''), 1400);
-    router.refresh();
   }
 
   async function resetDay() {
@@ -106,17 +125,14 @@ export function CigarettePageClient({
     <div className="space-y-5">
       <section className="glass-card p-5">
         <h2 className="text-lg font-semibold text-[#fff1dd]">A. État journée Cigarette ({businessDay})</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link href="/dashboard/tablette" className="saas-ghost-btn">📱 Aller à Tablette</Link>
-        </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat icon="🚬" tone="from-[#825128]/45 to-[#5a3119]/20" label="Paquets vendus" value={String(day?.packs_sold ?? 0)} />
-          <Stat icon="🧾" tone="from-violet-700/40 to-violet-500/10" label="Passages" value={String(day?.passages_count ?? 0)} />
-          <Stat icon="🏦" tone="from-amber-700/40 to-amber-500/10" label="Dépôt Cigarette" value={formatUsd(Number(day?.chest_amount ?? 0))} />
-          <Stat icon="💵" tone="from-emerald-700/40 to-emerald-500/10" label="Total gagné" value={formatUsd(Number(day?.total_revenue ?? 0))} />
-          <Stat icon="📦" tone="from-cyan-700/40 to-cyan-500/10" label="Paquets restants" value={String(packsInStock)} />
-          <Stat icon="🧮" tone="from-orange-700/40 to-orange-500/10" label="Dépôt paquets restant" value={String(day?.packs_deposit_remaining ?? 0)} />
-          <Stat icon="💰" tone="from-green-700/40 to-green-500/10" label="Argent groupe réel" value={formatUsd(groupCash)} />
+          <Stat icon="🚬" tone="from-[#825128]/45 to-[#5a3119]/20" label="Paquets vendus" value={String(dayState?.packs_sold ?? 0)} />
+          <Stat icon="🧾" tone="from-violet-700/40 to-violet-500/10" label="Passages" value={String(dayState?.passages_count ?? 0)} />
+          <Stat icon="🏦" tone="from-amber-700/40 to-amber-500/10" label="Dépôt Cigarette" value={formatUsd(Number(dayState?.chest_amount ?? 0))} />
+          <Stat icon="💵" tone="from-emerald-700/40 to-emerald-500/10" label="Total gagné" value={formatUsd(Number(dayState?.total_revenue ?? 0))} />
+          <Stat icon="📦" tone="from-cyan-700/40 to-cyan-500/10" label="Paquets restants" value={String(packsInStockState)} />
+          <Stat icon="🧮" tone="from-orange-700/40 to-orange-500/10" label="Dépôt paquets restant" value={String(dayState?.packs_deposit_remaining ?? 0)} />
+          <Stat icon="💰" tone="from-green-700/40 to-green-500/10" label="Argent groupe réel" value={formatUsd(groupCashState)} />
           <Stat icon="🕓" tone="from-[#70401f]/45 to-[#5a3119]/20" label="Fenêtre passage" value="04h → 20h" />
           <Stat icon={isAllowedHour ? '✅' : '⛔'} tone="from-[#6f4424]/45 to-[#3a2418]/20" label="Statut horaire" value={isAllowedHour ? 'Ouverte' : 'Fermée'} />
         </div>
@@ -161,7 +177,7 @@ export function CigarettePageClient({
       {canHistoryView ? <section className="glass-card p-5">
         <h3 className="text-base font-semibold text-[#fff1dd]">C. Historique passages Cigarette</h3>
         <div className="mt-2 space-y-2">
-          {passages.map((passage) => (
+          {passagesState.map((passage) => (
             <article key={passage.id} className="rounded-xl border border-white/10 bg-[#4f3220]/55 p-3 text-sm text-[#f3d4b0]">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">👤 {passage.member_label}</p>
@@ -176,7 +192,7 @@ export function CigarettePageClient({
               </div>
             </article>
           ))}
-          {passages.length === 0 ? <p className="text-sm text-[#f1d0ab]">Aucun passage cigarette pour la journée.</p> : null}
+          {passagesState.length === 0 ? <p className="text-sm text-[#f1d0ab]">Aucun passage cigarette pour la journée.</p> : null}
         </div>
       </section> : null}
     </div>

@@ -24,11 +24,11 @@ export default async function CigarettePage() {
     supabase.from('items').select('id, quantity').eq('name', CIGARETTE_ITEM_NAME).maybeSingle()
   ]);
 
-  const { data: passages } = day?.id && canHistoryView
+  const { data: passages } = canHistoryView
     ? await supabase
         .from('cigarette_passages')
-        .select('id, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at')
-        .eq('cigarette_day_id', day.id)
+        .select('id, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at, cigarette_days!inner(business_day)')
+        .eq('cigarette_days.business_day', businessDay)
         .order('created_at', { ascending: false })
     : { data: [] };
 

@@ -142,7 +142,7 @@ export async function POST(request: Request) {
       status: 'validated',
       created_by: session.userId
     })
-    .select('id')
+    .select('id, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at')
     .maybeSingle();
 
   await supabase.from('items').update({ quantity: afterPacks, updated_at: new Date().toISOString() }).eq('id', item.id);
@@ -184,5 +184,18 @@ export async function POST(request: Request) {
     newValues: { businessDay, memberUserId: requestedMemberId, memberLabel, afterPacks, afterDepositPacks, afterChest, afterGroupCash, quantitySold: CIGARETTE_SALE_QTY, revenueAmount: CIGARETTE_REVENUE, dayId: day.id }
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    passage: createdPassage ?? null,
+    day: {
+      id: day.id,
+      chest_amount: afterChest,
+      passages_count: Number(day.passages_count ?? 0) + 1,
+      total_revenue: Number(day.total_revenue ?? 0) + CIGARETTE_REVENUE,
+      packs_sold: Number(day.packs_sold ?? 0) + CIGARETTE_SALE_QTY,
+      packs_deposit_remaining: afterDepositPacks
+    },
+    packsInStock: afterPacks,
+    groupCash: afterGroupCash
+  });
 }

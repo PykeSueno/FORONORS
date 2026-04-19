@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { toCanonicalPermission } from '@/lib/permission-normalization';
 
 export async function GET() {
   const session = await getSession();
@@ -18,7 +19,14 @@ export async function GET() {
     return NextResponse.json({ message: 'Erreur de lecture des permissions.' }, { status: 500 });
   }
 
-  return NextResponse.json({ permissions: data ?? [] });
+  const canonicalByName = new Map<string, { id: number; name: string }>();
+  for (const permission of (data ?? []) as Array<{ id: number; name: string }>) {
+    const canonical = toCanonicalPermission(permission.name);
+    const current = canonicalByName.get(canonical);
+    if (!current || current.name !== canonical) canonicalByName.set(canonical, { id: permission.id, name: canonical });
+  }
+
+  return NextResponse.json({ permissions: Array.from(canonicalByName.values()).sort((a, b) => a.name.localeCompare(b.name, 'fr')) });
 }
 
 export async function POST(request: Request) {
@@ -36,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = getSupabaseAdmin();
-  const permissionName = normalizedName.toLowerCase();
+  const permissionName = toCanonicalPermission(normalizedName.toLowerCase());
   const { data, error } = await supabase.from('permissions').insert({ name: permissionName }).select('id, name').maybeSingle();
 
   if (error) {

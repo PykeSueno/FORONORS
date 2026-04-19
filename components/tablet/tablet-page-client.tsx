@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -56,9 +55,6 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
     <div className="space-y-5">
       <section className="glass-card p-5">
         <h2 className="text-lg font-semibold text-[#fff1dd]">Journée tablette ({businessDay})</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link href="/dashboard/cigarette" className="saas-ghost-btn">🚬 Aller à Cigarette</Link>
-        </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat icon="💰" tone="from-emerald-700/40 to-emerald-500/10" label="Dépôt restant" value={`${day?.chest_amount ?? 0}$`} />
           <Stat icon="🏦" tone="from-amber-700/40 to-amber-500/10" label="Dépôt matin" value={`${day?.deposited_amount ?? 0}$`} />

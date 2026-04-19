@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { normalizePermissionNames, toCanonicalPermission } from '@/lib/permission-normalization';
 
 type PermissionRow = { id: number; name: string };
 type RolePermissionRow = { permission_id: number; permissions: PermissionRow | PermissionRow[] | null };
@@ -17,25 +18,42 @@ export async function GET() {
   if (!canManageRoles && !canAccessMembers) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from('roles')
-    .select('id, name, display_order, role_permissions(permission_id, permissions(id, name))')
-    .order('display_order', { ascending: true })
-    .order('name', { ascending: true });
+  const [{ data, error }, { data: allPermissions }] = await Promise.all([
+    supabase
+      .from('roles')
+      .select('id, name, display_order, role_permissions(permission_id, permissions(id, name))')
+      .order('display_order', { ascending: true })
+      .order('name', { ascending: true }),
+    supabase.from('permissions').select('id, name')
+  ]);
 
   if (error) {
     return NextResponse.json({ message: 'Erreur de lecture des rôles.' }, { status: 500 });
   }
 
-  const roles = ((data ?? []) as RoleRow[]).map((role) => ({
+  const canonicalPermissionIdByName = new Map<string, number>();
+  for (const permission of (allPermissions ?? []) as PermissionRow[]) {
+    const canonical = toCanonicalPermission(permission.name);
+    if (!canonicalPermissionIdByName.has(canonical) || permission.name === canonical) canonicalPermissionIdByName.set(canonical, permission.id);
+  }
+
+  const roles = ((data ?? []) as RoleRow[]).map((role) => {
+    const rawNames = role.role_permissions
+      .map((rp) => (Array.isArray(rp.permissions) ? rp.permissions[0] : rp.permissions))
+      .filter((permission): permission is PermissionRow => Boolean(permission))
+      .map((permission) => permission.name);
+    const canonicalNames = normalizePermissionNames(rawNames);
+    return {
     id: role.id,
     name: role.name,
     display_order: role.display_order,
-    permission_ids: role.role_permissions.map((rp) => rp.permission_id),
-    permissions: role.role_permissions
-      .map((rp) => (Array.isArray(rp.permissions) ? rp.permissions[0] : rp.permissions))
-      .filter((permission): permission is PermissionRow => Boolean(permission))
-  }));
+    permission_ids: canonicalNames.map((name) => canonicalPermissionIdByName.get(name)).filter((id): id is number => Number.isInteger(id)),
+    permissions: canonicalNames.map((name) => {
+      const id = canonicalPermissionIdByName.get(name);
+      return { id: Number(id ?? 0), name };
+    }).filter((permission) => permission.id > 0)
+  };
+  });
 
   return NextResponse.json({ roles });
 }
@@ -85,24 +103,42 @@ export async function PATCH(request: Request) {
 
   const body = (await request.json()) as { role_ids?: number[]; permission_ids?: number[] };
   const roleIds = Array.from(new Set((body.role_ids ?? []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)));
-  const permissionIds = Array.from(new Set((body.permission_ids ?? []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)));
   if (roleIds.length === 0) return NextResponse.json({ message: 'Sélectionnez au moins un rôle.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
-  const { data: roles } = await supabase.from('roles').select('id, name').in('id', roleIds);
+  const [{ data: roles }, { data: selectedPermissions }, { data: allPermissions }, { data: previousRolePermissions }] = await Promise.all([
+    supabase.from('roles').select('id, name').in('id', roleIds),
+    supabase.from('permissions').select('id, name').in('id', body.permission_ids ?? []),
+    supabase.from('permissions').select('id, name'),
+    supabase.from('role_permissions').select('role_id, permissions(name)').in('role_id', roleIds)
+  ]);
   if (!roles || roles.length === 0) return NextResponse.json({ message: 'Rôles introuvables.' }, { status: 404 });
 
-  for (const role of roles) {
-    const { error: deleteError } = await supabase.from('role_permissions').delete().eq('role_id', role.id);
-    if (deleteError) return NextResponse.json({ message: 'Mise à jour des rôles impossible.' }, { status: 400 });
-
-    if (permissionIds.length > 0) {
-      const { error: insertError } = await supabase.from('role_permissions').insert(
-        permissionIds.map((permissionId) => ({ role_id: role.id, permission_id: permissionId }))
-      );
-      if (insertError) return NextResponse.json({ message: 'Attribution des permissions impossible.' }, { status: 400 });
-    }
+  const canonicalByName = new Map<string, number>();
+  for (const permission of (allPermissions ?? []) as PermissionRow[]) {
+    const canonical = toCanonicalPermission(permission.name);
+    if (!canonicalByName.has(canonical) || permission.name === canonical) canonicalByName.set(canonical, permission.id);
   }
+  const selectedCanonical = normalizePermissionNames(((selectedPermissions ?? []) as PermissionRow[]).map((permission) => permission.name));
+  const permissionIds = selectedCanonical.map((name) => canonicalByName.get(name)).filter((id): id is number => Number.isInteger(id));
+  const previousByRole = new Map<number, string[]>();
+  for (const row of (previousRolePermissions ?? []) as Array<{ role_id: number; permissions: { name: string } | { name: string }[] | null }>) {
+    const permissionName = Array.isArray(row.permissions) ? row.permissions[0]?.name : row.permissions?.name;
+    if (!permissionName) continue;
+    const current = previousByRole.get(row.role_id) ?? [];
+    current.push(permissionName);
+    previousByRole.set(row.role_id, current);
+  }
+  const { error: rpcError } = await supabase.rpc('set_roles_permissions_bulk', { p_role_ids: roleIds, p_permission_ids: permissionIds });
+
+  if (rpcError) return NextResponse.json({ message: 'Mise à jour des rôles impossible.' }, { status: 400 });
+
+  const roleChanges = (roles ?? []).map((role) => {
+    const before = normalizePermissionNames(previousByRole.get(role.id) ?? []);
+    const added = selectedCanonical.filter((permission) => !before.includes(permission));
+    const removed = before.filter((permission) => !selectedCanonical.includes(permission));
+    return { roleId: role.id, roleName: role.name, before, after: selectedCanonical, added, removed };
+  });
 
   await createAuditLog({
     actorUserId: session.userId,
@@ -113,7 +149,9 @@ export async function PATCH(request: Request) {
     newValues: {
       roleIds: roles.map((role) => role.id),
       roleNames: roles.map((role) => role.name),
-      permissionIds
+      permissionIds,
+      permissionNames: selectedCanonical,
+      roleChanges
     }
   });
 

@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { normalizePermissionNames, toCanonicalPermission } from '@/lib/permission-normalization';
 
 async function ensureRolesManagePermission() {
   const session = await getSession();
@@ -44,7 +45,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (body.permission_ids !== undefined) {
-    const permissionIds = Array.from(new Set(body.permission_ids));
+    const [{ data: selectedPermissions }, { data: allPermissions }] = await Promise.all([
+      supabase.from('permissions').select('id, name').in('id', body.permission_ids),
+      supabase.from('permissions').select('id, name')
+    ]);
+    const canonicalByName = new Map<string, number>();
+    for (const permission of (allPermissions ?? []) as Array<{ id: number; name: string }>) {
+      const canonical = toCanonicalPermission(permission.name);
+      if (!canonicalByName.has(canonical) || permission.name === canonical) canonicalByName.set(canonical, permission.id);
+    }
+    const canonicalNames = normalizePermissionNames(((selectedPermissions ?? []) as Array<{ id: number; name: string }>).map((permission) => permission.name));
+    const permissionIds = canonicalNames.map((name) => canonicalByName.get(name)).filter((id): id is number => Number.isInteger(id));
 
     const { error: deleteError } = await supabase.from('role_permissions').delete().eq('role_id', roleId);
     if (deleteError) return NextResponse.json({ message: 'Mise à jour impossible.' }, { status: 400 });
