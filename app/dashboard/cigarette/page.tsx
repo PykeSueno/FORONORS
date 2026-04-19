@@ -24,13 +24,20 @@ export default async function CigarettePage() {
     supabase.from('items').select('id, quantity').eq('name', CIGARETTE_ITEM_NAME).maybeSingle()
   ]);
 
-  const { data: passages } = canHistoryView
-    ? await supabase
-        .from('cigarette_passages')
-        .select('id, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at, cigarette_days!inner(business_day)')
-        .eq('cigarette_days.business_day', businessDay)
-        .order('created_at', { ascending: false })
-    : { data: [] };
+  const passages = canHistoryView
+    ? await (async () => {
+        let query = supabase
+          .from('cigarette_passages')
+          .select('id, cigarette_day_id, business_day, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at')
+          .order('created_at', { ascending: false });
+
+        if (day?.id) query = query.or(`business_day.eq.${businessDay},and(business_day.is.null,cigarette_day_id.eq.${day.id})`);
+        else query = query.eq('business_day', businessDay);
+
+        const { data } = await query;
+        return data ?? [];
+      })()
+    : [];
 
   const currentMember = members?.find((member) => member.id === session.userId);
   const defaultMemberId = currentMember?.id ?? session.userId;
@@ -44,7 +51,7 @@ export default async function CigarettePage() {
         day={day ?? null}
         businessDay={businessDay}
         members={members ?? []}
-        passages={passages ?? []}
+        passages={passages}
         groupCash={Number(cash?.balance ?? 0)}
         packsInStock={Number(cigaretteItem?.quantity ?? 0)}
         canCreatePassage={permissions.includes('cigarette.passage.create')}

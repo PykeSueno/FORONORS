@@ -496,6 +496,7 @@ create table if not exists public.cigarette_days (
 create table if not exists public.cigarette_passages (
   id bigint generated always as identity primary key,
   cigarette_day_id bigint not null references public.cigarette_days(id) on delete cascade,
+  business_day text,
   member_user_id uuid references public.users(id) on delete set null,
   member_label text not null,
   quantity_sold integer not null,
@@ -511,6 +512,8 @@ create table if not exists public.cigarette_passages (
   created_at timestamptz not null default timezone('utc', now()),
   unique(cigarette_day_id, member_user_id)
 );
+
+alter table public.cigarette_passages add column if not exists business_day text;
 
 create index if not exists idx_cigarette_passages_created_at on public.cigarette_passages(created_at desc);
 
