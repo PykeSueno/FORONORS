@@ -174,7 +174,7 @@ export function DrugsPageClient({
   const [managePaidAmount, setManagePaidAmount] = useState(0);
   const [manageNote, setManageNote] = useState('');
 
-  const [saleLines, setSaleLines] = useState<Array<{ id: number; drug_type: 'coke' | 'meth' | 'fentanyl'; quantity_sold: number; actual_amount: number }>>([{ id: 1, drug_type: 'coke', quantity_sold: 10, actual_amount: 0 }]);
+  const [saleLines, setSaleLines] = useState<Array<{ id: number; drug_type: 'coke' | 'meth' | 'fentanyl'; quantity_sold: number; actual_amount: number }>>([]);
   const defaultSaleMemberIds = useMemo(() => members.some((member) => member.id === currentUserId) ? [currentUserId] : [], [members, currentUserId]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>(defaultSaleMemberIds);
   const [groupSaleMode, setGroupSaleMode] = useState(defaultSaleMemberIds.length === 0);
@@ -248,6 +248,16 @@ export function DrugsPageClient({
     }
     return labels;
   }, [visibleTransfos]);
+
+  function addOrIncrementSaleLine(drugType: 'coke' | 'meth' | 'fentanyl') {
+    setSaleLines((current) => {
+      const existing = current.find((line) => line.drug_type === drugType);
+      if (existing) {
+        return current.map((line) => line.drug_type === drugType ? { ...line, quantity_sold: line.quantity_sold + 1 } : line);
+      }
+      return [...current, { id: Date.now() + current.length, drug_type: drugType, quantity_sold: 1, actual_amount: 0 }];
+    });
+  }
 
   function openManage(entry: Transfo) {
     setManageTransfo(entry);
@@ -369,6 +379,10 @@ export function DrugsPageClient({
   }
 
   async function createSale() {
+    if (saleRows.length === 0) {
+      setError('Ajoute au moins une drogue vendue avant validation.');
+      return;
+    }
     if (saleRows.some((row) => !row.item)) {
       setError('Au moins une drogue sélectionnée est introuvable dans le stock.');
       return;
@@ -569,30 +583,38 @@ export function DrugsPageClient({
 
             <Field label="1. Sélection drogue (multi-lignes)" hint="Ajoute plusieurs drogues dans la même vente">
               <div className="space-y-3">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {DRUG_DEFS.map((drug) => {
+                    const item = itemByKeyword(drug.itemKeyword);
+                    return (
+                      <button
+                        key={`quick-add-${drug.key}`}
+                        className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-2 text-left transition hover:border-[#f7d6ad]/70 hover:bg-[#6e472b]/40"
+                        onClick={() => addOrIncrementSaleLine(drug.key)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <ItemThumb item={item} fallback="💊" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-[#ffe9cd]">{drug.label}</p>
+                            <p className="text-[11px] text-[#efcdab]">Stock {item?.quantity ?? 0}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
                 {saleRows.map((row) => (
                   <div key={row.id} className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-3">
                     <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
                       <div className="space-y-3">
-                        <div className="grid gap-2 sm:grid-cols-3">
-                          {DRUG_DEFS.map((drug) => {
-                            const item = itemByKeyword(drug.itemKeyword);
-                            const active = row.drug_type === drug.key;
-                            return (
-                              <button
-                                key={`${row.id}-${drug.key}`}
-                                className={`rounded-xl border p-2 text-left ${active ? 'border-[#f7d6ad] bg-[#6e472b]/55' : 'border-white/10 bg-[#2b1a12]/50'}`}
-                                onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, drug_type: drug.key } : line))}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <ItemThumb item={item} fallback="💊" />
-                                  <div>
-                                    <p className="text-xs font-semibold text-[#ffe9cd]">{drug.label}</p>
-                                    <p className="text-[11px] text-[#efcdab]">Stock {item?.quantity ?? 0}</p>
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
+                        <div className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-2">
+                          <div className="flex items-center gap-2">
+                            <ItemThumb item={row.item} fallback="💊" />
+                            <div>
+                              <p className="text-xs font-semibold text-[#ffe9cd]">{row.def.label}</p>
+                              <p className="text-[11px] text-[#efcdab]">Stock {row.stock}</p>
+                            </div>
+                          </div>
                         </div>
                         <div className="space-y-1">
                           <p className="text-center text-xs text-[#efcdab]">Quantité vendue</p>
@@ -602,7 +624,7 @@ export function DrugsPageClient({
                           <input className="saas-input w-24 text-center" value={row.quantity_sold} onChange={(event) => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: Math.max(1, Number(event.target.value || 1)) } : line))} />
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 10 } : line))}>+10</button>
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 1 } : line))}>+1</button>
-                          {saleLines.length > 1 ? <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.filter((line) => line.id !== row.id))}>Supprimer</button> : null}
+                          <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.filter((line) => line.id !== row.id))}>Supprimer</button>
                           </div>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-3">
@@ -614,7 +636,7 @@ export function DrugsPageClient({
                           <p className="text-center text-xs text-[#efcdab]">Argent réel récupéré</p>
                           <div className="flex flex-wrap items-center justify-center gap-2">
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: Math.max(0, line.actual_amount - 100) } : line))}>-100</button>
-                          <input className="saas-input w-28 text-center" value={row.actual_amount} onChange={(event) => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: Math.max(0, Number(event.target.value || 0)) } : line))} />
+                          <input className="saas-input money-chip w-28 text-center" value={row.actual_amount} onChange={(event) => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: Math.max(0, Number(event.target.value || 0)) } : line))} />
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, actual_amount: line.actual_amount + 100 } : line))}>+100</button>
                           </div>
                         </div>
@@ -623,7 +645,7 @@ export function DrugsPageClient({
                     </div>
                   </div>
                 ))}
-                <button className="saas-ghost-btn w-full" onClick={() => setSaleLines((current) => [...current, { id: Date.now() + current.length, drug_type: 'coke', quantity_sold: 1, actual_amount: 0 }])}>+ Ajouter une drogue</button>
+                {saleRows.length === 0 ? <p className="text-xs text-[#efcdab]">Clique sur une carte drogue ci-dessus pour ajouter automatiquement une ligne de vente.</p> : null}
               </div>
             </Field>
 

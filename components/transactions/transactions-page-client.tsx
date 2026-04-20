@@ -242,12 +242,12 @@ export function TransactionsPageClient({
 
                       <div>
                         <p className="mb-1 text-xs text-[#efcdab]">Prix unitaire</p>
-                        <input className="saas-input w-full" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
+                        <input className="saas-input money-chip w-full" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
                       </div>
 
                       <div>
                         <p className="mb-1 text-xs text-[#efcdab]">Total ligne</p>
-                        <p className="saas-input flex items-center">{formatUsd(lineTotal)}</p>
+                        <p className="saas-input money-chip flex items-center">{formatUsd(lineTotal)}</p>
                       </div>
 
                       <div className="flex items-end justify-end">

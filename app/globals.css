@@ -87,6 +87,12 @@ button {
   box-shadow: 0 0 0 3px rgba(255, 223, 176, 0.24);
 }
 
+.money-chip {
+  min-width: 7.75rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .saas-primary-btn {
   @apply rounded-xl px-4 py-2.5 text-sm font-semibold transition;
   color: #4a2f1e;

@@ -243,7 +243,7 @@ export function SaleObjectsPageClient({
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <span className="rounded-full border border-white/15 bg-[#2d1b12]/80 px-2 py-1 text-[11px] font-semibold text-[#f8d9b7]">📦 {item.quantity}</span>
-                <span className="rounded-full border border-white/15 bg-[#2d1b12]/80 px-2 py-1 text-[11px] font-semibold text-[#c8f3be]">💵 {formatUsd(Number(item.sell_price ?? 0))}</span>
+                <span className="money-chip rounded-full border border-white/15 bg-[#2d1b12]/80 px-2 py-1 text-[11px] font-semibold text-[#c8f3be]">💵 {formatUsd(Number(item.sell_price ?? 0))}</span>
               </div>
             </button>
           ))}
@@ -320,7 +320,7 @@ export function SaleObjectsPageClient({
                   </div>
                   <button className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => removeLine(line.item_id)}>🗑️</button>
                 </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-[1.1fr_0.9fr_0.9fr]">
+                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1.1fr)_minmax(8.5rem,0.9fr)_minmax(9rem,0.9fr)]">
                   <div className="rounded-lg border border-white/10 bg-[#21140e]/55 p-2">
                     <p className="mb-1 text-[11px] text-[#efcdab]">Quantité</p>
                     <div className="flex items-center gap-1">
@@ -332,11 +332,11 @@ export function SaleObjectsPageClient({
                   </div>
                   <div className="rounded-lg border border-white/10 bg-[#21140e]/55 p-2">
                     <p className="mb-1 text-[11px] text-[#efcdab]">Prix unité</p>
-                    <input className="saas-input !h-7 w-full text-center text-sm" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
+                    <input className="saas-input money-chip !h-7 w-full text-center text-sm" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
                   </div>
                   <div className="rounded-lg border border-white/10 bg-[#21140e]/55 p-2">
                     <p className="mb-1 text-[11px] text-[#efcdab]">Total ligne</p>
-                    <p className="text-sm font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
+                    <p className="money-chip text-sm font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
                   </div>
                 </div>
               </div>

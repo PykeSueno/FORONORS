@@ -302,11 +302,11 @@ function EditTransactionModal({ transaction, onClose, onError }: { transaction: 
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-[#efcdab]">Prix unitaire</p>
-                  <input className="saas-input" value={line.unit_price} onChange={(e) => updateLine(index, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
+                  <input className="saas-input money-chip" value={line.unit_price} onChange={(e) => updateLine(index, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-[#efcdab]">Total ligne</p>
-                  <p className="saas-input flex items-center">{formatUsd(line.quantity * line.unit_price)}</p>
+                  <p className="saas-input money-chip flex items-center">{formatUsd(line.quantity * line.unit_price)}</p>
                 </div>
               </div>
             </div>
