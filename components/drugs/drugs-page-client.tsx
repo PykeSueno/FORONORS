@@ -7,7 +7,7 @@ import { formatUsd } from '@/lib/currency';
 import { SessionMemberSelector } from '@/components/shared/session-member-selector';
 
 type Member = { id: string; name: string; username: string };
-type Item = { id: number; name: string; image_url: string | null; quantity: number };
+type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price?: number | null; category_key?: string | null; type_key?: string | null };
 
 type Transfo = {
   id: number;
@@ -35,7 +35,7 @@ type Transfo = {
 
 type Sale = {
   id: number;
-  drug_type: 'coke' | 'meth' | 'fentanyl';
+  drug_type: string;
   quantity_sold: number;
   member_labels: string[];
   is_group_sale: boolean;
@@ -44,6 +44,7 @@ type Sale = {
   estimated_avg: number;
   actual_amount: number;
   created_at: string;
+  item_id?: number | null;
   item_name?: string | null;
   item_image_url?: string | null;
   stock_before?: number | null;
@@ -57,18 +58,12 @@ type Production = { id: number; production_type: 'coke' | 'meth'; input_snapshot
 type Tab = 'transfo' | 'sales' | 'production';
 
 type DrugDef = {
-  key: 'coke' | 'meth' | 'fentanyl';
+  key: string;
+  itemId: number;
   label: string;
   description: string;
-  itemKeyword: string;
   unitPrice: { min: number; max: number };
 };
-
-const DRUG_DEFS: DrugDef[] = [
-  { key: 'coke', label: 'Pochon de Coke', description: 'Vente premium, marge stable', itemKeyword: 'pochon de coke', unitPrice: { min: 75, max: 85 } },
-  { key: 'meth', label: 'Pochon de Meth', description: 'Valeur élevée, prix dynamique', itemKeyword: 'pochon de meth', unitPrice: { min: 120, max: 140 } },
-  { key: 'fentanyl', label: 'Fentanyl', description: 'Flux rapide, marge moyenne', itemKeyword: 'fentanyl', unitPrice: { min: 60, max: 75 } }
-];
 
 const TRANSFO_DEFS = [
   {
@@ -174,7 +169,7 @@ export function DrugsPageClient({
   const [managePaidAmount, setManagePaidAmount] = useState(0);
   const [manageNote, setManageNote] = useState('');
 
-  const [saleLines, setSaleLines] = useState<Array<{ id: number; drug_type: 'coke' | 'meth' | 'fentanyl'; quantity_sold: number; actual_amount: number }>>([]);
+  const [saleLines, setSaleLines] = useState<Array<{ id: number; item_id: number; quantity_sold: number; actual_amount: number }>>([]);
   const defaultSaleMemberIds = useMemo(() => members.some((member) => member.id === currentUserId) ? [currentUserId] : [], [members, currentUserId]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>(defaultSaleMemberIds);
   const [groupSaleMode, setGroupSaleMode] = useState(defaultSaleMemberIds.length === 0);
@@ -194,14 +189,38 @@ export function DrugsPageClient({
   const sourceStock = Number(sourceItem?.quantity ?? 0);
   const stockAfterSend = Math.max(0, sourceStock - quantitySent);
 
+  const saleDrugDefs = useMemo<DrugDef[]>(() => {
+    const normalize = (value: string) => value.toLowerCase();
+    return items
+      .filter((entry) => (entry.category_key ?? '').toLowerCase() === 'drugs' && (entry.type_key ?? '').toLowerCase() === 'bag')
+      .map((entry) => {
+        const label = entry.name;
+        const key = normalize(entry.name).replace(/\s+/g, '_');
+        const sellPrice = Math.max(0, Number(entry.sell_price ?? 0));
+        const fromName = (() => {
+          const lower = normalize(entry.name);
+          if (lower.includes('pochon de coke')) return { min: 75, max: 85 };
+          if (lower.includes('pochon de meth')) return { min: 120, max: 140 };
+          if (lower.includes('fentanyl')) return { min: 60, max: 75 };
+          if (sellPrice > 0) return { min: sellPrice, max: sellPrice };
+          return { min: 0, max: 0 };
+        })();
+        return { key, itemId: entry.id, label, description: 'Item drogues / pochon', unitPrice: fromName };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+  }, [items]);
+
+  const saleItemById = useMemo(() => new Map(saleDrugDefs.map((entry) => [entry.itemId, entry])), [saleDrugDefs]);
+
   const saleRows = useMemo(() => saleLines.map((line) => {
-    const def = DRUG_DEFS.find((entry) => entry.key === line.drug_type) ?? DRUG_DEFS[0];
-    const item = itemByKeyword(def.itemKeyword);
-    const min = line.quantity_sold * def.unitPrice.min;
-    const max = line.quantity_sold * def.unitPrice.max;
+    const def = saleItemById.get(line.item_id);
+    const item = items.find((entry) => entry.id === line.item_id) ?? null;
+    const price = def?.unitPrice ?? { min: 0, max: 0 };
+    const min = line.quantity_sold * price.min;
+    const max = line.quantity_sold * price.max;
     const avg = Math.round((min + max) / 2);
-    return { ...line, def, item, stock: Number(item?.quantity ?? 0), estimate: { min, max, avg } };
-  }), [saleLines, itemByKeyword]);
+    return { ...line, def: def ?? { key: String(line.item_id), itemId: line.item_id, label: item?.name ?? 'Item inconnu', description: '', unitPrice: price }, item, stock: Number(item?.quantity ?? 0), estimate: { min, max, avg } };
+  }), [saleLines, saleItemById, items]);
   const saleTotals = useMemo(() => ({
     min: saleRows.reduce((sum, row) => sum + row.estimate.min, 0),
     max: saleRows.reduce((sum, row) => sum + row.estimate.max, 0),
@@ -249,13 +268,13 @@ export function DrugsPageClient({
     return labels;
   }, [visibleTransfos]);
 
-  function addOrIncrementSaleLine(drugType: 'coke' | 'meth' | 'fentanyl') {
+  function addOrIncrementSaleLine(itemId: number) {
     setSaleLines((current) => {
-      const existing = current.find((line) => line.drug_type === drugType);
+      const existing = current.find((line) => line.item_id === itemId);
       if (existing) {
-        return current.map((line) => line.drug_type === drugType ? { ...line, quantity_sold: line.quantity_sold + 1 } : line);
+        return current.map((line) => line.item_id === itemId ? { ...line, quantity_sold: line.quantity_sold + 1 } : line);
       }
-      return [...current, { id: Date.now() + current.length, drug_type: drugType, quantity_sold: 1, actual_amount: 0 }];
+      return [...current, { id: Date.now() + current.length, item_id: itemId, quantity_sold: 1, actual_amount: 0 }];
     });
   }
 
@@ -399,7 +418,7 @@ export function DrugsPageClient({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        lines: saleRows.map((row) => ({ drug_type: row.drug_type, quantity_sold: row.quantity_sold, actual_amount: row.actual_amount })),
+        lines: saleRows.map((row) => ({ item_id: row.item_id, quantity_sold: row.quantity_sold, actual_amount: row.actual_amount })),
         is_group_sale: groupSaleMode || labels.length === 0,
         member_user_ids: activeMemberIds,
         member_labels: labels,
@@ -584,13 +603,13 @@ export function DrugsPageClient({
             <Field label="1. Sélection drogue (multi-lignes)" hint="Ajoute plusieurs drogues dans la même vente">
               <div className="space-y-3">
                 <div className="grid gap-2 sm:grid-cols-3">
-                  {DRUG_DEFS.map((drug) => {
-                    const item = itemByKeyword(drug.itemKeyword);
+                  {saleDrugDefs.map((drug) => {
+                    const item = items.find((entry) => entry.id === drug.itemId) ?? null;
                     return (
                       <button
                         key={`quick-add-${drug.key}`}
                         className="rounded-xl border border-white/10 bg-[#2b1a12]/50 p-2 text-left transition hover:border-[#f7d6ad]/70 hover:bg-[#6e472b]/40"
-                        onClick={() => addOrIncrementSaleLine(drug.key)}
+                        onClick={() => addOrIncrementSaleLine(drug.itemId)}
                       >
                         <div className="flex items-center gap-2">
                           <ItemThumb item={item} fallback="💊" />
@@ -603,6 +622,7 @@ export function DrugsPageClient({
                     );
                   })}
                 </div>
+                {saleDrugDefs.length === 0 ? <p className="text-xs text-[#efcdab]">Aucun item Drogues + Pochon détecté dans le stock.</p> : null}
                 {saleRows.map((row) => (
                   <div key={row.id} className="rounded-2xl border border-white/10 bg-[#2f1d14]/45 p-3">
                     <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
@@ -645,7 +665,7 @@ export function DrugsPageClient({
                     </div>
                   </div>
                 ))}
-                {saleRows.length === 0 ? <p className="text-xs text-[#efcdab]">Clique sur une carte drogue ci-dessus pour ajouter automatiquement une ligne de vente.</p> : null}
+                {saleRows.length === 0 ? <p className="text-xs text-[#efcdab]">Clique sur un item Drogues + Pochon ci-dessus pour ajouter automatiquement une ligne de vente.</p> : null}
               </div>
             </Field>
 
@@ -689,11 +709,11 @@ export function DrugsPageClient({
             {canSalesView ? (
               <div className="max-h-[980px] space-y-3 overflow-y-auto pr-1">
                 {sales.map((sale) => {
-                  const saleItemRef = itemByKeyword((DRUG_DEFS.find((entry) => entry.key === sale.drug_type)?.itemKeyword ?? ''));
+                  const saleItemRef = items.find((entry) => entry.id === sale.item_id) ?? null;
                   return (
                     <article key={sale.id} className="rounded-2xl border border-white/10 bg-[#3f281b]/55 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm font-semibold text-[#ffe8ca]">💊 #{sale.id} · {sale.item_name || (DRUG_DEFS.find((entry) => entry.key === sale.drug_type)?.label ?? sale.drug_type)}</p>
+                        <p className="text-sm font-semibold text-[#ffe8ca]">💊 #{sale.id} · {sale.item_name || sale.drug_type}</p>
                         <p className="text-xs text-[#efcdab]">{new Date(sale.created_at).toLocaleString('fr-FR')}</p>
                       </div>
 

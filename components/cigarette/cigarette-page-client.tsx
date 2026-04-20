@@ -1,8 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { CIGARETTE_REVENUE, CIGARETTE_SALE_QTY } from '@/lib/cigarette';
+import { CIGARETTE_REVENUE, CIGARETTE_SALE_QTY, getCigaretteWindowLabel, isCigarettePassageHourAllowed } from '@/lib/cigarette';
 import { formatUsd } from '@/lib/currency';
 
 type CigaretteDay = {
@@ -42,7 +41,6 @@ export function CigarettePageClient({
   packsInStock,
   canCreatePassage,
   canCreateForAny,
-  canManageDaily,
   canHistoryView,
   defaultMemberId,
   defaultMemberLabel
@@ -55,12 +53,10 @@ export function CigarettePageClient({
   packsInStock: number;
   canCreatePassage: boolean;
   canCreateForAny: boolean;
-  canManageDaily: boolean;
   canHistoryView: boolean;
   defaultMemberId: string;
   defaultMemberLabel: string;
 }) {
-  const router = useRouter();
   const [dayState, setDayState] = useState(day);
   const [passagesState, setPassagesState] = useState(passages);
   const [packsInStockState, setPacksInStockState] = useState(packsInStock);
@@ -77,10 +73,7 @@ export function CigarettePageClient({
     setGroupCashState(groupCash);
   }, [day, passages, packsInStock, groupCash]);
 
-  const isAllowedHour = useMemo(() => {
-    const hour = new Date().getHours();
-    return hour >= 4 && hour < 20;
-  }, []);
+  const isAllowedHour = useMemo(() => isCigarettePassageHourAllowed(), []);
 
   async function createPassage() {
     setError('');
@@ -108,19 +101,6 @@ export function CigarettePageClient({
     setTimeout(() => setStatusFeedback(''), 1400);
   }
 
-  async function resetDay() {
-    setError('');
-    const response = await fetch('/api/cigarette/day', { method: 'PATCH' });
-    if (!response.ok) {
-      const data = (await response.json()) as { message?: string };
-      setError(data.message ?? 'Réinitialisation impossible.');
-      return;
-    }
-    setStatusFeedback('Journée cigarette réinitialisée.');
-    setTimeout(() => setStatusFeedback(''), 1600);
-    router.refresh();
-  }
-
   return (
     <div className="space-y-5">
       <section className="glass-card p-5">
@@ -133,7 +113,7 @@ export function CigarettePageClient({
           <Stat icon="📦" tone="from-cyan-700/40 to-cyan-500/10" label="Paquets restants" value={String(packsInStockState)} />
           <Stat icon="🧮" tone="from-orange-700/40 to-orange-500/10" label="Dépôt paquets restant" value={String(dayState?.packs_deposit_remaining ?? 0)} />
           <Stat icon="💰" tone="from-green-700/40 to-green-500/10" label="Argent groupe réel" value={formatUsd(groupCashState)} />
-          <Stat icon="🕓" tone="from-[#70401f]/45 to-[#5a3119]/20" label="Fenêtre passage" value="04h → 20h" />
+          <Stat icon="🕓" tone="from-[#70401f]/45 to-[#5a3119]/20" label="Fenêtre passage" value={getCigaretteWindowLabel()} />
           <Stat icon={isAllowedHour ? '✅' : '⛔'} tone="from-[#6f4424]/45 to-[#3a2418]/20" label="Statut horaire" value={isAllowedHour ? 'Ouverte' : 'Fermée'} />
         </div>
       </section>
@@ -162,12 +142,7 @@ export function CigarettePageClient({
           <p className="mt-1 text-[11px] text-[#efcdab]">Membre sélectionné: <span className="font-semibold text-[#ffe8ca]">{memberLabel}</span></p>
           {!canCreateForAny ? <p className="mt-1 text-[11px] text-[#efcdab]">Permission manquante pour sélectionner un autre membre.</p> : null}
 
-          {canManageDaily ? (
-            <div className="mt-3 rounded-xl border border-white/10 bg-[#2f1d14]/40 p-3">
-              <p className="text-xs text-[#efcdab]">Gestion journée</p>
-              <button className="saas-ghost-btn mt-2" onClick={() => void resetDay()}>Réinitialiser journée Cigarette</button>
-            </div>
-          ) : null}
+          <p className="mt-2 text-[11px] text-[#efcdab]">Reset automatique à 04h00. Aucun reset manuel requis.</p>
         </section>
       ) : null}
 

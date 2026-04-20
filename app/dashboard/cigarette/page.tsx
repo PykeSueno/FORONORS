@@ -26,14 +26,12 @@ export default async function CigarettePage() {
 
   const passages = canHistoryView
     ? await (async () => {
-        let query = supabase
+        const query = supabase
           .from('cigarette_passages')
           .select('id, cigarette_day_id, business_day, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at')
+          .eq('business_day', businessDay)
+          .eq('status', 'validated')
           .order('created_at', { ascending: false });
-
-        if (day?.id) query = query.or(`business_day.eq.${businessDay},and(business_day.is.null,cigarette_day_id.eq.${day.id})`);
-        else query = query.eq('business_day', businessDay);
-
         const { data } = await query;
         return data ?? [];
       })()
@@ -56,7 +54,6 @@ export default async function CigarettePage() {
         packsInStock={Number(cigaretteItem?.quantity ?? 0)}
         canCreatePassage={permissions.includes('cigarette.passage.create')}
         canCreateForAny={permissions.includes('cigarette.passage.create.any')}
-        canManageDaily={permissions.includes('cigarette.daily.manage')}
         canHistoryView={canHistoryView}
         defaultMemberId={defaultMemberId}
         defaultMemberLabel={defaultMemberLabel}

@@ -9,18 +9,22 @@ export function CigaretteStatsClient({
   totals,
   byMember,
   byWeek,
-  byDay
+  byDay,
+  currentBusinessDay
 }: {
   totals: { passages: number; packs: number; revenue: number };
   byMember: MemberStat[];
   byWeek: PeriodStat[];
   byDay: PeriodStat[];
+  currentBusinessDay: string;
 }) {
+  const today = byDay.find((row) => row.day === currentBusinessDay);
   return (
     <div className="space-y-4">
       <section className="glass-card p-5">
         <h2 className="text-xl font-semibold text-[#fff1dd]">Stats Cigarette</h2>
         <p className="mt-1 text-sm text-[#efcdab]">Passages: {totals.passages} · Paquets vendus: {totals.packs} · Total gagné: {formatUsd(totals.revenue)}</p>
+        <p className="mt-1 text-xs text-[#efcdab]">Journée métier en cours ({currentBusinessDay}) : {today ? `${today.passages} passages · ${today.packs} paquets · ${formatUsd(today.revenue)}` : 'aucun passage validé'}</p>
       </section>
 
       <section className="glass-card p-5">

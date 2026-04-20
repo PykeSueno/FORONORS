@@ -493,6 +493,9 @@ create table if not exists public.cigarette_days (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table public.cigarette_days add column if not exists packs_deposit_initial integer not null default 0;
+alter table public.cigarette_days add column if not exists packs_deposit_remaining integer not null default 0;
+
 create table if not exists public.cigarette_passages (
   id bigint generated always as identity primary key,
   cigarette_day_id bigint not null references public.cigarette_days(id) on delete cascade,
@@ -514,6 +517,8 @@ create table if not exists public.cigarette_passages (
 );
 
 alter table public.cigarette_passages add column if not exists business_day text;
+alter table public.cigarette_passages add column if not exists before_deposit_packs integer;
+alter table public.cigarette_passages add column if not exists after_deposit_packs integer;
 
 create index if not exists idx_cigarette_passages_created_at on public.cigarette_passages(created_at desc);
 

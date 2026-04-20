@@ -5,6 +5,7 @@ import { CigaretteStatsClient } from '@/components/cigarette/cigarette-stats-cli
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getCigaretteBusinessDate } from '@/lib/cigarette';
 
 export default async function CigaretteStatsPage() {
   const session = await getSession();
@@ -18,9 +19,11 @@ export default async function CigaretteStatsPage() {
   const supabase = getSupabaseAdmin();
   const { data: passages } = await supabase
     .from('cigarette_passages')
-    .select('member_label, quantity_sold, revenue_amount, created_at')
+    .select('member_label, quantity_sold, revenue_amount, created_at, business_day, status')
+    .eq('status', 'validated')
     .order('created_at', { ascending: false })
     .limit(5000);
+  const currentBusinessDay = getCigaretteBusinessDate();
 
   const byMember = new Map<string, { member: string; passages: number; packs: number; revenue: number }>();
   const byWeek = new Map<string, { week_start: string; passages: number; packs: number; revenue: number }>();
@@ -44,7 +47,7 @@ export default async function CigaretteStatsPage() {
     weekCurrent.revenue += Number(passage.revenue_amount ?? 0);
     byWeek.set(weekKey, weekCurrent);
 
-    const dayKey = passage.created_at.slice(0, 10);
+    const dayKey = passage.business_day || passage.created_at.slice(0, 10);
     const dayCurrent = byDay.get(dayKey) ?? { day: dayKey, passages: 0, packs: 0, revenue: 0 };
     dayCurrent.passages += 1;
     dayCurrent.packs += Number(passage.quantity_sold ?? 0);
@@ -67,6 +70,7 @@ export default async function CigaretteStatsPage() {
         byMember={Array.from(byMember.values()).sort((a, b) => b.revenue - a.revenue || b.passages - a.passages)}
         byWeek={Array.from(byWeek.values()).sort((a, b) => b.week_start.localeCompare(a.week_start))}
         byDay={Array.from(byDay.values()).sort((a, b) => b.day.localeCompare(a.day))}
+        currentBusinessDay={currentBusinessDay}
       />
     </div>
   );

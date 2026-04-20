@@ -5,30 +5,42 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 
-type DrugType = 'coke' | 'meth' | 'fentanyl';
-
 type SaleLineInput = {
-  drug_type: DrugType;
+  drug_type?: string;
+  item_id?: number;
   quantity_sold: number;
   actual_amount?: number;
 };
 
-const PRICE_RANGES: Record<DrugType, { min: number; max: number; itemKeyword: string; label: string }> = {
-  coke: { min: 75, max: 85, itemKeyword: 'pochon de coke', label: 'Pochon de Coke' },
-  meth: { min: 120, max: 140, itemKeyword: 'pochon de meth', label: 'Pochon de Meth' },
-  fentanyl: { min: 60, max: 75, itemKeyword: 'fentanyl', label: 'Fentanyl' }
-};
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[’']/g, '').trim();
+}
 
-async function findDrugItem(drugType: DrugType) {
-  const cfg = PRICE_RANGES[drugType];
+function isDrugBag(item: { category_key?: string | null; type_key?: string | null }) {
+  return normalize(item.category_key ?? '') === 'drugs' && normalize(item.type_key ?? '') === 'bag';
+}
+
+function resolvePriceRange(itemName: string, sellPrice: number) {
+  const lower = normalize(itemName);
+  if (lower.includes('pochon de coke')) return { min: 75, max: 85 };
+  if (lower.includes('pochon de meth')) return { min: 120, max: 140 };
+  if (lower.includes('fentanyl')) return { min: 60, max: 75 };
+  if (sellPrice > 0) return { min: sellPrice, max: sellPrice };
+  return { min: 0, max: 0 };
+}
+
+async function findDrugItemByType(drugType: string) {
+  const map: Record<string, string> = { coke: 'pochon de coke', meth: 'pochon de meth', fentanyl: 'fentanyl' };
+  const keyword = map[normalize(drugType)] ?? drugType;
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from('items')
-    .select('id, name, quantity, image_url')
-    .ilike('name', `%${cfg.itemKeyword}%`)
+    .select('id, name, quantity, image_url, sell_price, category_key, type_key')
+    .ilike('name', `%${keyword}%`)
     .order('name', { ascending: true })
     .limit(1)
     .maybeSingle();
+  if (!data || !isDrugBag(data)) return null;
   return data;
 }
 
@@ -56,7 +68,7 @@ export async function POST(request: Request) {
     actual_amount?: number;
   };
 
-  const lines = (body.lines ?? []).filter((line) => PRICE_RANGES[line.drug_type] && Number(line.quantity_sold) > 0);
+  const lines = (body.lines ?? []).filter((line) => Number(line.quantity_sold) > 0 && (Number(line.item_id) > 0 || Boolean(line.drug_type)));
   if (lines.length === 0) return NextResponse.json({ message: 'Ajoute au moins une drogue à vendre.' }, { status: 400 });
 
   const memberIds = Array.from(new Set((body.member_user_ids ?? []).map((entry) => entry.trim()).filter(Boolean)));
@@ -67,7 +79,7 @@ export async function POST(request: Request) {
   const supabase = getSupabaseAdmin();
 
   const resolved = [] as Array<{
-    drugType: DrugType;
+    drugType: string;
     quantity: number;
     itemId: number;
     itemName: string;
@@ -83,18 +95,20 @@ export async function POST(request: Request) {
   let estimatedTotalAvg = 0;
   for (const line of lines) {
     const qty = Math.max(1, Number(line.quantity_sold));
-    const item = await findDrugItem(line.drug_type);
-    if (!item) return NextResponse.json({ message: `Item introuvable pour ${line.drug_type}.` }, { status: 404 });
+    const item = Number(line.item_id) > 0
+      ? await supabase.from('items').select('id, name, quantity, image_url, sell_price, category_key, type_key').eq('id', Number(line.item_id)).maybeSingle().then((res) => res.data)
+      : await findDrugItemByType(String(line.drug_type ?? ''));
+    if (!item || !isDrugBag(item)) return NextResponse.json({ message: 'Item drogues / pochon introuvable.' }, { status: 404 });
     if (Number(item.quantity) < qty) return NextResponse.json({ message: `Stock insuffisant pour ${item.name}.` }, { status: 400 });
 
-    const range = PRICE_RANGES[line.drug_type];
+    const range = resolvePriceRange(item.name, Math.max(0, Number(item.sell_price ?? 0)));
     const estimatedMin = qty * range.min;
     const estimatedMax = qty * range.max;
     const estimatedAvg = Math.round((estimatedMin + estimatedMax) / 2);
     estimatedTotalAvg += estimatedAvg;
 
     resolved.push({
-      drugType: line.drug_type,
+      drugType: normalize(item.name).replace(/\s+/g, '_'),
       quantity: qty,
       itemId: item.id,
       itemName: item.name,

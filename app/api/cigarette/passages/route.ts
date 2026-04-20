@@ -52,10 +52,7 @@ export async function POST(request: Request) {
   const beforePacks = Number(item.quantity ?? 0);
   let { data: day } = await supabase.from('cigarette_days').select('*').eq('business_day', businessDay).maybeSingle();
   if (!day) {
-    if (beforePacks < CIGARETTE_DAILY_PACKS) {
-      return NextResponse.json({ message: `Stock insuffisant pour initialiser le dépôt (${CIGARETTE_DAILY_PACKS} requis).` }, { status: 400 });
-    }
-    const initialReserve = CIGARETTE_DAILY_PACKS;
+    const initialReserve = Math.min(beforePacks, CIGARETTE_DAILY_PACKS);
     const { data: createdDay } = await supabase
       .from('cigarette_days')
       .insert({
@@ -71,6 +68,19 @@ export async function POST(request: Request) {
       .select('*')
       .maybeSingle();
     day = createdDay;
+  } else if (Number(day.packs_deposit_initial ?? 0) <= 0 && Number(day.passages_count ?? 0) === 0) {
+    const recalculatedReserve = Math.min(beforePacks, CIGARETTE_DAILY_PACKS);
+    const { data: patchedDay } = await supabase
+      .from('cigarette_days')
+      .update({
+        packs_deposit_initial: recalculatedReserve,
+        packs_deposit_remaining: recalculatedReserve,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', day.id)
+      .select('*')
+      .maybeSingle();
+    day = patchedDay ?? day;
   }
   if (!day) return NextResponse.json({ message: 'Impossible de préparer la journée cigarette.' }, { status: 500 });
 

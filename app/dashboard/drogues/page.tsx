@@ -18,7 +18,7 @@ export default async function DrugsPage() {
     supabase.from('drug_sales').select('*').order('created_at', { ascending: false }).limit(300),
     supabase.from('drug_productions').select('*').order('created_at', { ascending: false }).limit(200),
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
-    supabase.from('items').select('id, name, image_url, quantity').order('name', { ascending: true })
+    supabase.from('items').select('id, name, image_url, quantity, sell_price, category_key, type_key').order('name', { ascending: true })
   ]);
 
   return (

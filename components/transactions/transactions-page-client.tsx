@@ -233,21 +233,21 @@ export function TransactionsPageClient({
 
                       <div>
                         <p className="mb-1 text-xs text-[#efcdab]">Quantité</p>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#2c1a12]/45 p-1">
                           <button type="button" className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, { quantity: Math.max(1, line.quantity - 1) })}>-</button>
-                          <input className="saas-input w-full text-center" value={line.quantity} onChange={(e) => updateLine(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
+                          <input className="saas-input w-20 text-center" value={line.quantity} onChange={(e) => updateLine(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
                           <button type="button" className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, { quantity: line.quantity + 1 })}>+</button>
                         </div>
                       </div>
 
                       <div>
                         <p className="mb-1 text-xs text-[#efcdab]">Prix unitaire</p>
-                        <input className="saas-input money-chip w-full" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
+                        <input className="saas-input w-full" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
                       </div>
 
                       <div>
                         <p className="mb-1 text-xs text-[#efcdab]">Total ligne</p>
-                        <p className="saas-input money-chip flex items-center">{formatUsd(lineTotal)}</p>
+                        <p className="saas-input flex items-center">{formatUsd(lineTotal)}</p>
                       </div>
 
                       <div className="flex items-end justify-end">
