@@ -1,0 +1,59 @@
+import { redirect } from 'next/navigation';
+import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
+import { TransactionsTabs } from '@/components/dashboard/transactions-tabs';
+import { RecentTransactionsClient } from '@/components/transactions/recent-transactions-client';
+import { getSession } from '@/lib/auth';
+import { getUserPermissions } from '@/lib/permissions';
+import { getSupabaseAdmin } from '@/lib/supabase';
+
+type RecentTransaction = {
+  id: number;
+  actor_user_id: string | null;
+  reason: string;
+  member_label: string;
+  total_money_in: number;
+  total_money_out: number;
+  profit_loss: number;
+  created_at: string;
+  transaction_lines: Array<{
+    item_name_snapshot: string;
+    quantity: number;
+    movement_type: 'purchase' | 'sale' | 'stock_in' | 'stock_out';
+    item_id?: number;
+    unit_price?: number;
+    items: { image_url: string | null; category_key?: string | null; type_key?: string | null } | Array<{ image_url: string | null; category_key?: string | null; type_key?: string | null }> | null;
+  }>;
+};
+
+export default async function RecentTransactionsPage() {
+  const session = await getSession();
+  if (!session) redirect('/login');
+
+  const permissions = await getUserPermissions(session.userId);
+  const canRecent = permissions.includes('transactions.recent.access');
+
+  if (!canRecent) redirect('/dashboard');
+
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from('transactions')
+    .select('id, actor_user_id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, item_id, unit_price, items(image_url, category_key, type_key))')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  const transactions = (data ?? []) as RecentTransaction[];
+
+  return (
+    <div className="space-y-5">
+      <InternalPageHeader title="Transactions récentes" subtitle="Historique complet des dernières transactions" />
+      <TransactionsTabs active="recent" canSeeRecent canSeeSaleObjects={permissions.includes('sale.objects.access')} />
+      <RecentTransactionsClient
+        transactions={transactions}
+        canEditOwn={permissions.includes('transactions.recent.edit.own') || permissions.includes('transactions.recent.manage.own')}
+        canEditAny={permissions.includes('transactions.recent.edit.any') || permissions.includes('transactions.recent.manage.any')}
+        canCancelOwn={permissions.includes('transactions.recent.cancel.own') || permissions.includes('transactions.recent.manage.own')}
+        canCancelAny={permissions.includes('transactions.recent.cancel.any') || permissions.includes('transactions.recent.manage.any')}
+        currentUserId={session.userId}
+      />
+    </div>
+  );
+}
