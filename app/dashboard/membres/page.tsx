@@ -27,46 +27,55 @@ export default async function MembersPage() {
   if (!session) redirect('/login');
 
   const userPermissions = await getUserPermissions(session.userId);
-  if (!userPermissions.includes('members.access') || !userPermissions.includes('members.view')) redirect('/dashboard');
+  if (!userPermissions.includes('members.access') || !userPermissions.includes('members.view')) {
+    redirect('/dashboard');
+  }
 
   const supabase = getSupabaseAdmin();
 
   const [{ data: members }, { data: roles }, permsResult] = await Promise.all([
-    supabase.from('users').select('id, name, username, role_id, is_active, roles(name)').order('username', { ascending: true }),
+    supabase
+      .from('users')
+      .select('id, name, username, role_id, is_active, roles(name)')
+      .order('username', { ascending: true }),
     supabase
       .from('roles')
       .select('id, name, display_order, role_permissions(permission_id)')
       .order('display_order', { ascending: true }),
     userPermissions.includes('roles.manage')
       ? supabase.from('permissions').select('id, name').order('name', { ascending: true })
-      : Promise.resolve({ data: [] as { id: number; name: string }[] })
+      : Promise.resolve({ data: [] as { id: number; name: string }[] }),
   ]);
 
-  const initialMembers = sortMembersByGrade(((members ?? []) as MemberRow[]).map((member) => ({
-    id: member.id,
-    name: member.name,
-    username: member.username,
-    role_id: member.role_id,
-    role_name: Array.isArray(member.roles) ? member.roles[0]?.name ?? '' : member.roles?.name ?? '',
-    is_active: member.is_active
-  }));
+  const initialMembers = sortMembersByGrade(
+    ((members ?? []) as MemberRow[]).map((member) => ({
+      id: member.id,
+      name: member.name,
+      username: member.username,
+      role_id: member.role_id,
+      role_name: Array.isArray(member.roles)
+        ? member.roles[0]?.name ?? ''
+        : member.roles?.name ?? '',
+      is_active: member.is_active,
+    }))
+  );
 
   const initialRoles = ((roles ?? []) as RoleRow[]).map((role) => ({
     id: role.id,
     name: role.name,
     display_order: role.display_order,
-    permission_ids: role.role_permissions.map((item) => item.permission_id)
+    permission_ids: role.role_permissions.map((item) => item.permission_id),
   }));
 
   return (
     <>
       <InternalPageHeader title="Membres" subtitle="Gestion des membres, rôles et permissions" />
       <MembersPageClient
-      initialMembers={initialMembers}
-      initialRoles={initialRoles}
-      initialPermissions={permsResult.data ?? []}
-      userPermissions={userPermissions}
-    />
+        initialMembers={initialMembers}
+        initialRoles={initialRoles}
+        initialPermissions={permsResult.data ?? []}
+        userPermissions={userPermissions}
+      />
     </>
   );
 }
