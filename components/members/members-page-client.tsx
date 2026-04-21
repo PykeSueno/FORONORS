@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { describePermission, MODULE_ORDER, SECTION_ORDER } from '@/lib/permission-catalog';
+import { sortMembersByGrade } from '@/lib/members';
 
 type Permission = { id: number; name: string };
 type Role = { id: number; name: string; display_order: number; permission_ids: number[] };
@@ -76,6 +77,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const canEditMemberPassword = userPermissions.includes('members.password.edit');
 
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
+  const sortedMembers = useMemo(() => sortMembersByGrade(members), [members]);
   const selectedRoles = useMemo(() => sortedRoles.filter((role) => selectedRoleIds.includes(role.id)), [selectedRoleIds, sortedRoles]);
 
   async function refreshAll() {
@@ -180,7 +182,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
       <section className="glass-card p-5">
         <h2 className="text-lg font-semibold text-[#fff0d9]">Membres</h2>
         <div className="mt-3 space-y-2">
-          {members.map((member) => (
+          {sortedMembers.map((member) => (
             <div key={member.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
               <div className="grid min-w-[280px] flex-1 grid-cols-3 gap-3 text-sm">
                 <div><p className="text-[#ffe2c1]/80">Nom</p><p className="font-medium text-[#fff3df]">{member.name}</p></div>

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { sortMembersByGrade } from '@/lib/members';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { MembersPageClient } from '@/components/members/members-page-client';
 
@@ -41,7 +42,7 @@ export default async function MembersPage() {
       : Promise.resolve({ data: [] as { id: number; name: string }[] })
   ]);
 
-  const initialMembers = ((members ?? []) as MemberRow[]).map((member) => ({
+  const initialMembers = sortMembersByGrade(((members ?? []) as MemberRow[]).map((member) => ({
     id: member.id,
     name: member.name,
     username: member.username,

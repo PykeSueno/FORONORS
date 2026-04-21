@@ -17,7 +17,7 @@ export function MoneyPayPageClient({
   canCreate: boolean;
   canHistory: boolean;
   balance: number;
-  payEstimates: Record<string, { recommended: number; minimum: number; maximum: number; activityIndex: number; economyIndex: number }>;
+  payEstimates: Record<string, { recommended: number; previousRecommended: number; minimum: number; maximum: number; activityIndex: number; economyIndex: number }>;
   members: Member[];
   payments: PaymentRow[];
 }) {
@@ -103,6 +103,10 @@ export function MoneyPayPageClient({
               <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
                 <p className="text-[11px] text-[#efcdab]">Estimation recommandée</p>
                 <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(estimate.recommended)}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
+                <p className="text-[11px] text-[#efcdab]">Semaine passée</p>
+                <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(estimate.previousRecommended)}</p>
               </div>
               <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
                 <p className="text-[11px] text-[#efcdab]">Minimum conseillé</p>

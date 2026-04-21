@@ -79,11 +79,7 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
 
   'four.preview': { module: 'FOUR', section: 'Vue', label: 'Voir la bulle FOUR', hint: 'Permet d’afficher la bulle FOUR sur le dashboard.' },
   'four.access': { module: 'FOUR', section: 'Vue', label: 'Accéder à la page FOUR', hint: 'Permet d’ouvrir le module FOUR.' },
-  'four.open': { module: 'FOUR', section: 'Sessions', label: 'Ouvrir une session FOUR', hint: 'Permet d’ouvrir une session FOUR.' },
-  'four.close': { module: 'FOUR', section: 'Sessions', label: 'Fermer une session FOUR', hint: 'Permet de clôturer une session FOUR.' },
-  'four.cash.add': { module: 'FOUR', section: 'Sessions', label: 'Ajouter du cash à la session FOUR', hint: 'Permet d’ajouter du cash dans la session FOUR ouverte.' },
-  'four.add_movement': { module: 'FOUR', section: 'Transactions', label: 'Ajouter un mouvement FOUR', hint: 'Permet d’ajouter des lignes dans la transaction FOUR en cours.' },
-  'four.transaction.validate': { module: 'FOUR', section: 'Transactions', label: 'Valider une transaction FOUR', hint: 'Permet de valider une transaction dans une session FOUR.' },
+  'four.transaction.validate': { module: 'FOUR', section: 'Transactions', label: 'Créer une transaction FOUR', hint: 'Permet de créer une transaction FOUR appliquée immédiatement.' },
   'four.transaction.edit.own': { module: 'FOUR', section: 'Transactions', label: 'Modifier ses transactions FOUR', hint: 'Permet de modifier uniquement ses transactions FOUR.' },
   'four.transaction.cancel.own': { module: 'FOUR', section: 'Transactions', label: 'Annuler ses transactions FOUR', hint: 'Permet d’annuler uniquement ses transactions FOUR.' },
   'four.transaction.edit.any': { module: 'FOUR', section: 'Transactions', label: 'Modifier toutes les transactions FOUR', hint: 'Permet de modifier toutes les transactions FOUR.' },

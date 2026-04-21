@@ -724,9 +724,6 @@ insert into public.permissions (name)
 values
   ('four.preview'),
   ('four.access'),
-  ('four.open'),
-  ('four.add_movement'),
-  ('four.cash.add'),
   ('four.transaction.manage'),
   ('four.transaction.edit.own'),
   ('four.transaction.cancel.own'),
@@ -735,10 +732,11 @@ values
   ('four.transaction.validate'),
   ('four.transaction.manage.own'),
   ('four.transaction.manage.any'),
-  ('four.close'),
   ('four.logs.view'),
   ('four.history.view')
 on conflict (name) do nothing;
+
+delete from public.permissions where name in ('four.open', 'four.close', 'four.cash.add', 'four.add_movement');
 
 alter table public.four_movements add column if not exists counterparty text;
 alter table public.four_transactions add column if not exists status text not null default 'validated';
