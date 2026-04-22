@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { describePermission, MODULE_ORDER, SECTION_ORDER } from '@/lib/permission-catalog';
+import { toCanonicalPermission } from '@/lib/permission-normalization';
 import { sortMembersByGrade } from '@/lib/members';
 
 type Permission = { id: number; name: string };
@@ -439,12 +440,22 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
 }
 
 function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError }: { selectedRoles: Role[]; permissions: Permission[]; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
+  const displayPermissions = useMemo(() => {
+    const byCanonical = new Map<string, Permission>();
+    for (const permission of permissions) {
+      const canonicalName = toCanonicalPermission(permission.name);
+      const current = byCanonical.get(canonicalName);
+      if (!current || permission.name === canonicalName) byCanonical.set(canonicalName, permission);
+    }
+    return Array.from(byCanonical.values());
+  }, [permissions]);
+
   const [checked, setChecked] = useState<Record<number, boolean>>(() => {
-    const allPermissionIds = permissions.map((permission) => permission.id);
+    const allPermissionIds = displayPermissions.map((permission) => permission.id);
     return Object.fromEntries(allPermissionIds.map((permissionId) => [permissionId, selectedRoles.every((role) => role.permission_ids.includes(permissionId))]));
   });
   const [mixedPermissionIds] = useState<Set<number>>(() => {
-    const allPermissionIds = permissions.map((permission) => permission.id);
+    const allPermissionIds = displayPermissions.map((permission) => permission.id);
     return new Set(allPermissionIds.filter((permissionId) => {
       const withPermission = selectedRoles.filter((role) => role.permission_ids.includes(permissionId)).length;
       return withPermission > 0 && withPermission < selectedRoles.length;
@@ -457,7 +468,7 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
 
   const modules = useMemo(() => {
     const grouped: Record<string, Record<string, Permission[]>> = {};
-    for (const permission of permissions) {
+    for (const permission of displayPermissions) {
       const info = describePermission(permission.name);
       if (!grouped[info.module]) grouped[info.module] = {};
       if (!grouped[info.module][info.section]) grouped[info.module][info.section] = [];
@@ -487,7 +498,7 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
             permissions: [...sectionPermissions].sort((a, b) => describePermission(a.name).label.localeCompare(describePermission(b.name).label, 'fr'))
           }))
       }));
-  }, [permissions]);
+  }, [displayPermissions]);
 
   useEffect(() => {
     if (modules.length === 0) return;
@@ -500,7 +511,7 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
   async function saveRole() {
     if (isSaving) return;
     setIsSaving(true);
-    const permissionIds = permissions.filter((permission) => checked[permission.id]).map((permission) => permission.id);
+    const permissionIds = displayPermissions.filter((permission) => checked[permission.id]).map((permission) => permission.id);
     const response = await fetch('/api/roles', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

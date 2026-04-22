@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
-import { LineControlsRow, LineField, QuantityStepper } from '@/components/shared/line-controls';
+import { QuantityStepper } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; buy_price?: number; sell_price?: number; category_key?: string | null; type_key?: string | null };
 type LineKind = 'buy' | 'sell';
@@ -135,55 +135,58 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
           <input className="saas-input w-full" placeholder="Interlocuteur / Client / Groupe" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} />
           <div className="space-y-2">
             {draftLines.map((line, idx) => (
-              <div key={`${line.item_id}-${idx}`} className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2.5">
+              <div key={`${line.item_id}-${idx}`} className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
                 <div className="flex items-center gap-2">
                   <div className="h-10 w-10 overflow-hidden rounded-lg border border-white/10 bg-[#1f120d]">
                     {line.item_image_url ? <Image src={line.item_image_url} alt={line.item_name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#efcdab]">📦</div>}
                   </div>
                   <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#ffe8ca]">{line.item_name}</p>
                 </div>
-
-                <LineControlsRow>
-                  <LineField label="Type" widthClass="w-[8.5rem]">
-                    <select className="saas-input !h-9 !min-h-9 text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, movement_kind: e.target.value as LineKind } : entry))}>
+                <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-[8.5rem_11rem_8.5rem_7.5rem]">
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-xs text-[#efcdab]">Type</span>
+                    <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, movement_kind: e.target.value as LineKind } : entry))}>
                       <option value="buy">Achat</option>
                       <option value="sell">Vente</option>
                     </select>
-                  </LineField>
+                  </label>
 
-                  <LineField label="Quantité" widthClass="w-[10.5rem]">
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-xs text-[#efcdab]">Quantité</span>
                     <QuantityStepper
                       value={line.quantity}
                       onDecrease={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, entry.quantity - 1) } : entry))}
                       onIncrease={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: entry.quantity + 1 } : entry))}
                       onChange={(next) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, next || 1) } : entry))}
                     />
-                  </LineField>
+                  </label>
 
-                  <LineField label="Prix" widthClass="w-[8rem]">
-                    <input className="saas-input !h-9 !min-h-9 text-sm" value={line.unit_price} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, unit_price: Math.max(0, Number(e.target.value || 0)) } : entry))} />
-                  </LineField>
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-xs text-[#efcdab]">Prix</span>
+                    <input className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.unit_price} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, unit_price: Math.max(0, Number(e.target.value || 0)) } : entry))} />
+                  </label>
 
-                  <LineField label="Action" widthClass="w-[7.25rem]">
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-xs text-[#efcdab]">Action</span>
                     <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full !px-3 text-xs" onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))}>Supprimer</button>
-                  </LineField>
-                </LineControlsRow>
+                  </label>
+                </div>
               </div>
             ))}
           </div>
 
           <div className="grid gap-2 md:grid-cols-3">
-            <div className="rounded-xl border border-orange-300/20 bg-orange-500/10 px-3 py-2">
+            <div className="rounded-xl border border-orange-300/20 bg-orange-500/10 px-3 py-2.5">
               <p className="text-xs text-[#efcdab]">🛒 Achats transaction</p>
-              <p className="text-base font-semibold text-[#ffe8ca]">{formatUsd(draftTotals.purchases)}</p>
+              <p className="mt-1 text-base font-semibold text-[#ffe8ca]">{formatUsd(draftTotals.purchases)}</p>
             </div>
-            <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2">
+            <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2.5">
               <p className="text-xs text-[#efcdab]">💸 Ventes transaction</p>
-              <p className="text-base font-semibold text-[#ffe8ca]">{formatUsd(draftTotals.sales)}</p>
+              <p className="mt-1 text-base font-semibold text-[#ffe8ca]">{formatUsd(draftTotals.sales)}</p>
             </div>
-            <div className={`rounded-xl border px-3 py-2 ${draftTotals.profit >= 0 ? 'border-sky-300/20 bg-sky-500/10' : 'border-rose-300/20 bg-rose-500/10'}`}>
+            <div className={`rounded-xl border px-3 py-2.5 ${draftTotals.profit >= 0 ? 'border-sky-300/20 bg-sky-500/10' : 'border-rose-300/20 bg-rose-500/10'}`}>
               <p className="text-xs text-[#efcdab]">📈 Résultat transaction</p>
-              <p className="text-base font-semibold text-[#ffe8ca]">{formatUsd(draftTotals.profit)}</p>
+              <p className="mt-1 text-base font-semibold text-[#ffe8ca]">{formatUsd(draftTotals.profit)}</p>
             </div>
           </div>
           {canCreate ? <button className="saas-primary-btn w-full" onClick={() => void submit()}>{editingTxId ? 'Enregistrer modification' : 'Valider transaction'}</button> : null}

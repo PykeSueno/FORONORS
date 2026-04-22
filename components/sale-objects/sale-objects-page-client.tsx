@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 import { tryCopyText } from '@/lib/copy';
-import { LineControlsRow, LineField, QuantityStepper } from '@/components/shared/line-controls';
+import { QuantityStepper } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
 type SaleRow = {
@@ -310,7 +310,7 @@ export function SaleObjectsPageClient({
 
           <div className="space-y-2">
             {cart.map((line) => (
-              <div key={line.item_id} className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">
+              <div key={line.item_id} className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
                 <div className="flex items-start gap-2">
                   <div className="h-10 w-10 overflow-hidden rounded-lg border border-white/10 bg-[#1f120d]">
                     {line.image_url ? <Image src={line.image_url} alt={line.item_name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#f2d2ad]">📦</div>}
@@ -320,8 +320,9 @@ export function SaleObjectsPageClient({
                     <p className="text-[11px] text-[#efcdab]">Stock actuel: {line.stock}</p>
                   </div>
                 </div>
-                <LineControlsRow>
-                  <LineField label="Quantité" widthClass="w-[12rem]">
+                <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-[12rem_7.5rem_8.5rem_7.5rem]">
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-xs text-[#efcdab]">Quantité</span>
                     <QuantityStepper
                       value={line.quantity}
                       onDecrease={() => patchLine(line.item_id, { quantity: line.quantity - 1 })}
@@ -329,17 +330,20 @@ export function SaleObjectsPageClient({
                       onChange={(next) => patchLine(line.item_id, { quantity: next })}
                       extraAction={{ label: 'MAX', onClick: () => patchLine(line.item_id, { quantity: Number(line.stock ?? 0) }) }}
                     />
-                  </LineField>
-                  <LineField label="Prix unité" widthClass="w-[6.5rem]">
+                  </label>
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-xs text-[#efcdab]">Prix unité</span>
                     <input className="saas-input money-chip !h-9 !min-h-9 w-full text-center text-sm" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
-                  </LineField>
-                  <LineField label="Total ligne" widthClass="w-[7.5rem]">
+                  </label>
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-xs text-[#efcdab]">Total ligne</span>
                     <p className="saas-input !h-9 !min-h-9 money-chip flex items-center justify-center text-sm font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
-                  </LineField>
-                  <LineField label="Action" widthClass="w-[7.25rem]">
+                  </label>
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-xs text-[#efcdab]">Action</span>
                     <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full text-xs" onClick={() => removeLine(line.item_id)}>Supprimer</button>
-                  </LineField>
-                </LineControlsRow>
+                  </label>
+                </div>
               </div>
             ))}
           </div>

@@ -81,18 +81,18 @@ export function FourMessagesClient({ initialMessages, canManage }: { initialMess
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
+    <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
       <section className="glass-card p-5">
         <h3 className="text-lg font-semibold text-[#fff1dd]">Messages prédéfinis FOUR</h3>
         <div className="mt-3 space-y-2">
           {messages.map((message) => (
             <article key={message.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
               <p className="text-sm font-semibold text-[#ffe8ca]">{message.title}</p>
-              <p className="mt-1 whitespace-pre-wrap text-xs text-[#efcdab]">{message.content}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" className="saas-ghost-btn !py-1.5 text-xs" onClick={() => void copy(message.content)}>Copier</button>
-                {canManage ? <button type="button" className="saas-ghost-btn !py-1.5 text-xs" onClick={() => startEdit(message)}>Modifier</button> : null}
-                {canManage ? <button type="button" className="saas-ghost-btn !py-1.5 text-xs" onClick={() => void remove(message.id)}>Supprimer</button> : null}
+              <p className="mt-1 min-h-[3.75rem] max-h-[4.75rem] overflow-hidden whitespace-pre-wrap text-xs leading-relaxed text-[#efcdab]">{message.content}</p>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full !py-0 text-xs" onClick={() => void copy(message.content)}>Copier</button>
+                {canManage ? <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full !py-0 text-xs" onClick={() => startEdit(message)}>Modifier</button> : null}
+                {canManage ? <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full !py-0 text-xs" onClick={() => void remove(message.id)}>Supprimer</button> : null}
               </div>
             </article>
           ))}
@@ -105,11 +105,11 @@ export function FourMessagesClient({ initialMessages, canManage }: { initialMess
           <div className="mt-3 space-y-3">
             <label className="block space-y-1">
               <span className="text-xs text-[#efcdab]">Titre</span>
-              <input className="saas-input !h-10 !min-h-10" placeholder="Titre du message" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <input className="saas-input !h-10 !min-h-10 w-full" placeholder="Titre du message" value={title} onChange={(e) => setTitle(e.target.value)} />
             </label>
             <label className="block space-y-1">
               <span className="text-xs text-[#efcdab]">Contenu</span>
-              <textarea className="saas-input min-h-44 resize-y" placeholder="Contenu du message" value={content} onChange={(e) => setContent(e.target.value)} />
+              <textarea className="saas-input h-52 min-h-52 w-full resize-y" placeholder="Contenu du message" value={content} onChange={(e) => setContent(e.target.value)} />
             </label>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
