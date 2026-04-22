@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { ITEM_CATEGORIES } from '@/lib/items';
-import { LineControlsRow, LineField, QuantityStepper } from '@/components/shared/line-controls';
+import { QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
 
 type Item = {
   id: number;
@@ -221,37 +221,44 @@ export function TransactionsPageClient({
                       </div>
                     </div>
 
-                    <LineControlsRow>
-                      <LineField label="Type de mouvement" widthClass="w-[11rem]">
+                    <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-[8.5rem_10rem_minmax(6.25rem,7.5rem)_minmax(6.75rem,8rem)_2.75rem]">
+                      <label className="min-w-0 space-y-1">
+                        <span className="block text-xs text-[#efcdab]">Type de mouvement</span>
                         <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_type} onChange={(e) => updateLine(idx, { movement_type: e.target.value as MovementType })}>
                           <option value="stock_in">Entrée</option>
                           <option value="stock_out">Sortie</option>
                           <option value="purchase">Achat</option>
                           <option value="sale">Vente</option>
                         </select>
-                      </LineField>
+                      </label>
 
-                      <LineField label="Quantité" widthClass="w-[10.5rem]">
+                      <label className="min-w-0 space-y-1">
+                        <span className="block text-xs text-[#efcdab]">Quantité</span>
                         <QuantityStepper
                           value={line.quantity}
                           onDecrease={() => updateLine(idx, { quantity: Math.max(1, line.quantity - 1) })}
                           onIncrease={() => updateLine(idx, { quantity: line.quantity + 1 })}
                           onChange={(next) => updateLine(idx, { quantity: Math.max(1, Number(next || 1)) })}
                         />
-                      </LineField>
+                      </label>
 
-                      <LineField label="Prix unitaire" widthClass="w-[7.5rem]">
+                      <label className="min-w-0 space-y-1">
+                        <span className="block text-xs text-[#efcdab]">Prix unitaire</span>
                         <input className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
-                      </LineField>
+                      </label>
 
-                      <LineField label="Total ligne" widthClass="w-[8.5rem]">
-                        <p className="saas-input !h-9 !min-h-9 flex items-center text-sm">{formatUsd(lineTotal)}</p>
-                      </LineField>
+                      <label className="min-w-0 space-y-1">
+                        <span className="block text-xs text-[#efcdab]">Total ligne</span>
+                        <p className="saas-input !h-9 !min-h-9 flex items-center px-2 text-sm">{formatUsd(lineTotal)}</p>
+                      </label>
 
-                      <LineField label="Action" widthClass="w-[7.25rem]">
-                        <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full text-xs" onClick={() => removeLine(idx)}>Supprimer</button>
-                      </LineField>
-                    </LineControlsRow>
+                      <label className="min-w-0 space-y-1">
+                        <span className="block text-xs text-[#efcdab]">Action</span>
+                        <div className="flex h-9 items-center justify-center">
+                          <RemoveLineButton onClick={() => removeLine(idx)} />
+                        </div>
+                      </label>
+                    </div>
                   </article>
                 );
               })}

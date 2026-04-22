@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 import { tryCopyText } from '@/lib/copy';
-import { QuantityStepper } from '@/components/shared/line-controls';
+import { QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
 type SaleRow = {
@@ -320,7 +320,7 @@ export function SaleObjectsPageClient({
                     <p className="text-[11px] text-[#efcdab]">Stock actuel: {line.stock}</p>
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-[12rem_7.5rem_8.5rem_7.5rem]">
+                <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-[10.5rem_minmax(6.5rem,8rem)_minmax(7rem,8.5rem)_2.75rem]">
                   <label className="min-w-0 space-y-1">
                     <span className="block text-xs text-[#efcdab]">Quantité</span>
                     <QuantityStepper
@@ -341,7 +341,9 @@ export function SaleObjectsPageClient({
                   </label>
                   <label className="min-w-0 space-y-1">
                     <span className="block text-xs text-[#efcdab]">Action</span>
-                    <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full text-xs" onClick={() => removeLine(line.item_id)}>Supprimer</button>
+                    <div className="flex h-9 items-center justify-center">
+                      <RemoveLineButton onClick={() => removeLine(line.item_id)} />
+                    </div>
                   </label>
                 </div>
               </div>

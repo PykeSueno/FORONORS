@@ -30,6 +30,7 @@ export function FourStatsClient({ totals, byClient, byMember, byItem, history }:
         <article className="glass-card p-5">
           <h3 className="text-base font-semibold text-[#fff1dd]">Stats client</h3>
           <div className="mt-3 space-y-2">
+            {byClient.length === 0 ? <p className="text-sm text-[#efcdab]">Aucune transaction client pour le moment.</p> : null}
             {byClient.map((row) => (
               <div key={row.key} className="rounded-xl border border-white/10 bg-[#3f281b]/50 p-3 text-xs text-[#efcdab]">
                 <p className="text-sm font-semibold text-[#ffe8ca]">👥 {row.key}</p>
@@ -44,6 +45,7 @@ export function FourStatsClient({ totals, byClient, byMember, byItem, history }:
         <article className="glass-card p-5">
           <h3 className="text-base font-semibold text-[#fff1dd]">Stats membre</h3>
           <div className="mt-3 space-y-2">
+            {byMember.length === 0 ? <p className="text-sm text-[#efcdab]">Aucune transaction membre pour le moment.</p> : null}
             {byMember.map((row) => (
               <div key={row.key} className="rounded-xl border border-white/10 bg-[#3f281b]/50 p-3 text-xs text-[#efcdab]">
                 <p className="text-sm font-semibold text-[#ffe8ca]">🧑 {row.key}</p>
@@ -59,6 +61,7 @@ export function FourStatsClient({ totals, byClient, byMember, byItem, history }:
       <section className="glass-card p-5">
         <h3 className="text-base font-semibold text-[#fff1dd]">Stats items</h3>
         <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {byItem.length === 0 ? <p className="text-sm text-[#efcdab]">Aucune ligne item disponible.</p> : null}
           {byItem.map((item) => (
             <article key={item.itemId} className="rounded-xl border border-white/10 bg-[#3f281b]/50 p-3">
               <div className="flex items-center gap-2">
@@ -80,6 +83,7 @@ export function FourStatsClient({ totals, byClient, byMember, byItem, history }:
       <section className="glass-card p-5">
         <h3 className="text-base font-semibold text-[#fff1dd]">Historique détaillé FOUR</h3>
         <div className="mt-3 space-y-3">
+          {history.length === 0 ? <p className="text-sm text-[#efcdab]">Aucune transaction FOUR enregistrée.</p> : null}
           {history.map((tx) => (
             <article key={tx.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
               <div className="grid gap-2 md:grid-cols-[auto_1fr_auto] md:items-center">

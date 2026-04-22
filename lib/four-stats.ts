@@ -39,7 +39,7 @@ export async function buildFourStats(): Promise<FourStatsPayload> {
     supabase
       .from('four_transactions')
       .select('id, session_id, counterparty, created_at, status, total_purchases, total_sales, profit_loss, users(name, username), four_transaction_lines(item_id, item_name, movement_kind, quantity, unit_price, total_amount, items(image_url))')
-      .neq('status', 'canceled')
+      .or('status.eq.validated,status.is.null')
       .order('created_at', { ascending: false })
       .limit(1200),
     supabase

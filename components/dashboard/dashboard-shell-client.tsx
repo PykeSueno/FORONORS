@@ -29,7 +29,7 @@ type SummaryPayload = {
   canShowMoneyMovements: boolean;
   canShowStockMovements: boolean;
   moneyItemImageUrl: string | null;
-  values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; saleObjectsToday: number; tabletPassagesToday: number; activitiesToday: number; cigarettePassagesToday: number; cigaretteRevenueToday: number };
+  values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; saleObjectsToday: number; tabletPassagesToday: number; activitiesToday: number; cigarettePassagesToday: number; cigaretteRevenueToday: number; fourPurchasesToday: number; fourSalesToday: number; fourProfitToday: number };
   recentCash: Array<{ type: string; amount: number; label: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null }>;
   recentStock: Array<{ item_id?: number | null; item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null; items?: { image_url: string | null; quantity?: number | null } | { image_url: string | null; quantity?: number | null }[] | null }>;
 };
@@ -58,7 +58,7 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
     flags.canTabletPreview ? { id: 'tablet', href: '/dashboard/tablette', enabled: flags.canTabletAccess, icon: '📱', title: 'Tablette', value: summary ? String(summary.values.tabletPassagesToday) : '0', subtitle: 'Passages 8h → 8h' } : null,
     flags.canCigarettePreview ? { id: 'cigarette', href: '/dashboard/cigarette', enabled: flags.canCigaretteAccess, icon: '🚬', title: 'Cigarette', value: summary ? String(summary.values.cigarettePassagesToday) : '…', subtitle: summary ? `Aujourd’hui ${formatUsd(summary.values.cigaretteRevenueToday)}` : 'Passages 4h → 20h' } : null,
     flags.canActivityPreview ? { id: 'activity', href: '/dashboard/activite', enabled: flags.canActivityAccess, icon: '🎯', title: 'Activité', value: summary ? String(summary.values.activitiesToday) : '0', subtitle: 'Boîte / Cambriolage / Conteneur' } : null,
-    flags.canFourPreview ? { id: 'four', href: '/dashboard/four', enabled: flags.canFourAccess, icon: '🔥', title: 'FOUR', value: 'Direct', subtitle: 'Transactions stock + argent' } : null,
+    flags.canFourPreview ? { id: 'four', href: '/dashboard/four', enabled: flags.canFourAccess, icon: '🔥', title: 'FOUR', value: summary ? formatUsd(summary.values.fourProfitToday) : '…', subtitle: summary ? `${formatUsd(summary.values.fourPurchasesToday)} achat / ${formatUsd(summary.values.fourSalesToday)} vente` : 'Achat / Vente' } : null,
     flags.canDrugsPreview ? { id: 'drugs', href: '/dashboard/drogues', enabled: flags.canDrugsAccess, icon: '🧪', title: 'Drogues', value: 'Module', subtitle: 'Transfo + vente + production' } : null
   ].filter(Boolean) as Card[], [flags, summary]);
 

@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
-import { QuantityStepper } from '@/components/shared/line-controls';
+import { QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; buy_price?: number; sell_price?: number; category_key?: string | null; type_key?: string | null };
 type LineKind = 'buy' | 'sell';
@@ -142,7 +142,7 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                   </div>
                   <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#ffe8ca]">{line.item_name}</p>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-[8.5rem_11rem_8.5rem_7.5rem]">
+                <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-[7.75rem_10rem_minmax(6.5rem,8.5rem)_2.75rem]">
                   <label className="min-w-0 space-y-1">
                     <span className="block text-xs text-[#efcdab]">Type</span>
                     <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, movement_kind: e.target.value as LineKind } : entry))}>
@@ -168,7 +168,9 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
 
                   <label className="min-w-0 space-y-1">
                     <span className="block text-xs text-[#efcdab]">Action</span>
-                    <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full !px-3 text-xs" onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))}>Supprimer</button>
+                    <div className="flex h-9 items-center justify-center">
+                      <RemoveLineButton onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))} />
+                    </div>
                   </label>
                 </div>
               </div>

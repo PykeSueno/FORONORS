@@ -35,6 +35,8 @@ export async function GET() {
   const canTabletPreview = canTabletAccess || has('tablet.preview');
   const canActivityAccess = has('activity.access');
   const canActivityPreview = canActivityAccess || has('activity.preview');
+  const canFourAccess = has('four.access');
+  const canFourPreview = canFourAccess || has('four.preview');
 
   const canShowMoneyMovements = has('dashboard.money.movements.access') || has('dashboard.money.movements.preview') || canMoneyPreview;
   const canShowStockMovements = has('dashboard.stock.movements.access') || has('dashboard.stock.movements.preview') || canItemsPreview;
@@ -46,7 +48,11 @@ export async function GET() {
   activityDayEnd.setDate(activityDayEnd.getDate() + 1);
 
   const supabase = getSupabaseAdmin();
-  const [{ data: cash }, { data: itemQuantities }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { count: saleObjectsToday }, { data: cigaretteToday }, { data: tabletToday }, { count: activitiesToday }] = await Promise.all([
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const dayStartIso = dayStart.toISOString();
+
+  const [{ data: cash }, { data: itemQuantities }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { count: saleObjectsToday }, { data: cigaretteToday }, { data: tabletToday }, { count: activitiesToday }, { data: fourTodayRows }] = await Promise.all([
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItemsPreview ? supabase.from('items').select('quantity') : Promise.resolve({ data: [] }),
     canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
@@ -66,10 +72,18 @@ export async function GET() {
       : Promise.resolve({ data: null }),
     canActivityPreview
       ? supabase.from('activities').select('id', { count: 'exact', head: true }).gte('created_at', activityDayStart.toISOString()).lt('created_at', activityDayEnd.toISOString())
-      : Promise.resolve({ count: 0 })
+      : Promise.resolve({ count: 0 }),
+    canFourPreview
+      ? supabase.from('four_transactions').select('total_purchases, total_sales').or('status.eq.validated,status.is.null').gte('created_at', dayStartIso)
+      : Promise.resolve({ data: [] })
 
   ]);
   const itemsStockTotal = Number(((itemQuantities ?? []) as Array<{ quantity: number | null }>).reduce((acc, item) => acc + Number(item.quantity ?? 0), 0));
+  const fourToday = ((fourTodayRows ?? []) as Array<{ total_purchases: number | null; total_sales: number | null }>).reduce((acc, row) => {
+    acc.purchases += Number(row.total_purchases ?? 0);
+    acc.sales += Number(row.total_sales ?? 0);
+    return acc;
+  }, { purchases: 0, sales: 0 });
 
   return NextResponse.json({
     canShowMoneyMovements,
@@ -84,7 +98,10 @@ export async function GET() {
       tabletPassagesToday: Number(tabletToday?.passages_count ?? 0),
       activitiesToday: Number(activitiesToday ?? 0),
       cigarettePassagesToday: Number(cigaretteToday?.passages_count ?? 0),
-      cigaretteRevenueToday: Number(cigaretteToday?.total_revenue ?? 0)
+      cigaretteRevenueToday: Number(cigaretteToday?.total_revenue ?? 0),
+      fourPurchasesToday: Number(fourToday.purchases),
+      fourSalesToday: Number(fourToday.sales),
+      fourProfitToday: Number(fourToday.sales - fourToday.purchases)
     },
     moneyItemImageUrl: moneyItem?.image_url ?? null,
     recentCash: recentCash ?? [],

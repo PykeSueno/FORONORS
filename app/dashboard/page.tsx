@@ -64,7 +64,7 @@ export default async function DashboardPage() {
         supabase.from('cigarette_passages').select('member_user_id, created_at').not('member_user_id', 'is', null).gte('created_at', windowStartIso),
         supabase.from('transactions').select('member_user_id, reason, created_at').not('member_user_id', 'is', null).gte('created_at', windowStartIso).limit(3000),
         supabase.from('drug_sales').select('created_by, created_at').not('created_by', 'is', null).eq('status', 'validated').gte('created_at', windowStartIso).limit(3000),
-        supabase.from('four_transactions').select('created_by, created_at').not('created_by', 'is', null).eq('status', 'validated').gte('created_at', windowStartIso).limit(3000),
+        supabase.from('four_transactions').select('created_by, created_at').not('created_by', 'is', null).or('status.eq.validated,status.is.null').gte('created_at', windowStartIso).limit(3000),
         supabase.from('cash_movements').select('amount').gte('created_at', windowStartIso).limit(5000)
       ])
     : [{ data: [] }, { data: null }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
