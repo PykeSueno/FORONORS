@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { describePermission, MODULE_ORDER, SECTION_ORDER } from '@/lib/permission-catalog';
 import { toCanonicalPermission } from '@/lib/permission-normalization';
 import { sortMembersByGrade } from '@/lib/members';
+import { RemoveLineButton } from '@/components/shared/line-controls';
 
 type Permission = { id: number; name: string };
 type Role = { id: number; name: string; display_order: number; permission_ids: number[] };
@@ -415,7 +416,7 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
 
           <div className="flex flex-wrap justify-end gap-2 pt-2">
             {!isCreateMode && canCopyCredentials ? <button className="saas-ghost-btn" onClick={() => void copyTabletAccessMessage()}>Copier</button> : null}
-            {!isCreateMode && canDelete ? <button className="saas-ghost-btn" onClick={() => void remove()}>Supprimer</button> : null}
+            {!isCreateMode && canDelete ? <div className="flex items-center"><RemoveLineButton onClick={() => void remove()} title="Supprimer le membre" /></div> : null}
             <button className="saas-primary-btn" onClick={() => void save()}>Enregistrer</button>
           </div>
 
@@ -629,7 +630,7 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
           </div>
 
           <div className="flex justify-end gap-2">
-            {selectedRoles.length === 1 ? <button className="saas-ghost-btn" onClick={() => void removeRole()}>Supprimer rôle</button> : null}
+            {selectedRoles.length === 1 ? <div className="flex items-center"><RemoveLineButton onClick={() => void removeRole()} title="Supprimer le rôle" /></div> : null}
             <button className="saas-primary-btn" disabled={isSaving} onClick={() => void saveRole()}>{isSaving ? 'Enregistrement…' : 'Enregistrer'}</button>
           </div>
         </div>

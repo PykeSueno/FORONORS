@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { SessionMemberSelector } from '@/components/shared/session-member-selector';
+import { RemoveLineButton } from '@/components/shared/line-controls';
 
 type Member = { id: string; name: string; username: string };
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price?: number | null; category_key?: string | null; type_key?: string | null };
@@ -644,7 +645,7 @@ export function DrugsPageClient({
                           <input className="saas-input w-24 text-center" value={row.quantity_sold} onChange={(event) => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: Math.max(1, Number(event.target.value || 1)) } : line))} />
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 10 } : line))}>+10</button>
                           <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.map((line) => line.id === row.id ? { ...line, quantity_sold: line.quantity_sold + 1 } : line))}>+1</button>
-                          <button className="saas-ghost-btn !px-2 !py-1" onClick={() => setSaleLines((current) => current.filter((line) => line.id !== row.id))}>Supprimer</button>
+                          <RemoveLineButton onClick={() => setSaleLines((current) => current.filter((line) => line.id !== row.id))} title="Supprimer la ligne de vente" />
                           </div>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-3">

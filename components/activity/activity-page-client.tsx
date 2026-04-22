@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { SessionMemberSelector } from '@/components/shared/session-member-selector';
+import { RemoveLineButton } from '@/components/shared/line-controls';
 
 type ActivityType = 'mailbox' | 'burglary' | 'container';
 type ActivityDisplayType = ActivityType | 'drug_sale';
@@ -225,7 +226,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
               <label className="saas-ghost-btn cursor-pointer">Choisir un fichier
                 <input type="file" className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadImage(file); }} />
               </label>
-              {proofImageUrl ? <button className="saas-ghost-btn" onClick={() => setProofImageUrl('')}>Supprimer image</button> : null}
+              {proofImageUrl ? <RemoveLineButton onClick={() => setProofImageUrl('')} title="Supprimer l’image" /> : null}
             </div>
           </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { tryCopyText } from '@/lib/copy';
+import { RemoveLineButton } from '@/components/shared/line-controls';
 
 type FourMessage = { id: number; title: string; content: string; display_order: number };
 
@@ -89,10 +90,10 @@ export function FourMessagesClient({ initialMessages, canManage }: { initialMess
             <article key={message.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">
               <p className="text-sm font-semibold text-[#ffe8ca]">{message.title}</p>
               <p className="mt-1 min-h-[3.75rem] max-h-[4.75rem] overflow-hidden whitespace-pre-wrap text-xs leading-relaxed text-[#efcdab]">{message.content}</p>
-              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
                 <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full !py-0 text-xs" onClick={() => void copy(message.content)}>Copier</button>
                 {canManage ? <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full !py-0 text-xs" onClick={() => startEdit(message)}>Modifier</button> : null}
-                {canManage ? <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full !py-0 text-xs" onClick={() => void remove(message.id)}>Supprimer</button> : null}
+                {canManage ? <div className="flex justify-center sm:justify-end"><RemoveLineButton onClick={() => void remove(message.id)} title="Supprimer le message" /></div> : null}
               </div>
             </article>
           ))}

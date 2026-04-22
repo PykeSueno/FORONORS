@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { FormEvent, useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { isMoneyLinkedItemName, needsWeaponId } from '@/lib/items';
+import { RemoveLineButton } from '@/components/shared/line-controls';
 
 type Category = {
   key: string;
@@ -189,12 +190,9 @@ export function ItemsPageClient({
                 <div className="flex gap-2">
                   {canEdit ? <button className="saas-ghost-btn" onClick={() => setEditing(item)}>Modifier</button> : null}
                   {canDelete ? (
-                    <button
-                      className="rounded-full border border-red-300/40 bg-red-500/20 px-3 py-1.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/30"
-                      onClick={() => setDeleteFlow({ item, step: 1 })}
-                    >
-                      Supprimer
-                    </button>
+                    <div className="flex items-center">
+                      <RemoveLineButton onClick={() => setDeleteFlow({ item, step: 1 })} title="Supprimer l’item" />
+                    </div>
                   ) : null}
                 </div>
               ) : null}
@@ -398,7 +396,7 @@ function ItemModal({
                   <label className="saas-ghost-btn cursor-pointer">Remplacer
                     <input type="file" className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadImage(file); }} />
                   </label>
-                  <button type="button" className="saas-ghost-btn" onClick={() => setForm({ ...form, image_url: '' })}>Supprimer image</button>
+                  <RemoveLineButton onClick={() => setForm({ ...form, image_url: '' })} title="Supprimer l’image" />
                 </div>
               </div>
             ) : (

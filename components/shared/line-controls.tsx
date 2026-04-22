@@ -14,12 +14,12 @@ export function RemoveLineButton({ onClick, title = 'Supprimer la ligne' }: { on
   return (
     <button
       type="button"
-      className="saas-ghost-btn !h-9 !min-h-9 !w-9 !px-0 !py-0 text-[#f3c4c4] hover:!border-red-200/40 hover:!bg-red-500/15 hover:text-[#ffd3d3]"
+      className="inline-flex h-5 w-5 items-center justify-center text-[#f0baba] transition-colors duration-150 hover:text-[#ff8f8f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#2a180f]"
       onClick={onClick}
       aria-label={title}
       title={title}
     >
-      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 6h18" />
         <path d="M8 6V4h8v2" />
         <path d="M19 6l-1 14H6L5 6" />
