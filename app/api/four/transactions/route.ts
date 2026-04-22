@@ -22,6 +22,10 @@ function isAllowedFourItem(item: { name: string; category_key: string | null; ty
   return category === 'drugs' && type === 'bag';
 }
 
+function isValidatedStatus(status: string | null | undefined) {
+  return !status || status === 'validated';
+}
+
 async function parseResolvedLines(lines: TxLine[]) {
   if (lines.length === 0) throw new Error('Aucune ligne transaction.');
   const supabase = getSupabaseAdmin();
@@ -108,10 +112,30 @@ export async function POST(request: Request) {
   try {
     const { resolved, totalPurchases, totalSales, profitLoss } = await parseResolvedLines(body.lines ?? []);
     const supabase = getSupabaseAdmin();
-    const { data: tx } = await supabase
+    const nowIso = new Date().toISOString();
+    const { data: directSession, error: sessionError } = await supabase
+      .from('four_sessions')
+      .insert({
+        status: 'closed',
+        opened_by: session.userId,
+        managed_by: session.userId,
+        opened_at: nowIso,
+        closed_at: nowIso,
+        summary: {
+          mode: 'direct',
+          counterparty: body.counterparty?.trim() || null
+        }
+      })
+      .select('id')
+      .maybeSingle();
+    if (sessionError || !directSession) {
+      return NextResponse.json({ message: 'Création session FOUR impossible.' }, { status: 400 });
+    }
+
+    const { data: tx, error: txError } = await supabase
       .from('four_transactions')
       .insert({
-        session_id: null,
+        session_id: directSession.id,
         counterparty: body.counterparty?.trim() || null,
         status: 'validated',
         created_by: session.userId,
@@ -121,8 +145,8 @@ export async function POST(request: Request) {
       })
       .select('id')
       .maybeSingle();
-    if (!tx) return NextResponse.json({ message: 'Validation impossible.' }, { status: 400 });
-    await supabase.from('four_transaction_lines').insert(resolved.map((line) => ({
+    if (txError || !tx) return NextResponse.json({ message: 'Validation impossible.' }, { status: 400 });
+    const { error: lineError } = await supabase.from('four_transaction_lines').insert(resolved.map((line) => ({
       transaction_id: tx.id,
       item_id: line.itemId,
       item_name: line.itemName,
@@ -131,6 +155,7 @@ export async function POST(request: Request) {
       unit_price: line.unitPrice,
       total_amount: line.totalAmount
     })));
+    if (lineError) return NextResponse.json({ message: 'Enregistrement des lignes FOUR impossible.' }, { status: 400 });
     await applyTransactionEffect({ transactionId: tx.id, actorUserId: session.userId, lines: resolved, multiplier: 1, label: `FOUR transaction #${tx.id}` });
     await createAuditLog({
       actorUserId: session.userId,
@@ -172,7 +197,7 @@ export async function PATCH(request: Request) {
     .maybeSingle();
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
   if (!canManageTx(session.userId, tx.created_by ?? null, ownAccess, anyAccess)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
-  if (tx.status !== 'validated') return NextResponse.json({ message: 'Transaction non modifiable.' }, { status: 400 });
+  if (!isValidatedStatus(tx.status)) return NextResponse.json({ message: 'Transaction non modifiable.' }, { status: 400 });
 
   try {
     const previousLines = (tx.four_transaction_lines ?? []).map((line) => ({
@@ -244,7 +269,7 @@ export async function DELETE(request: Request) {
     .maybeSingle();
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
   if (!canManageTx(session.userId, tx.created_by ?? null, ownAccess, anyAccess)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
-  if (tx.status !== 'validated') return NextResponse.json({ message: 'Transaction déjà annulée.' }, { status: 400 });
+  if (!isValidatedStatus(tx.status)) return NextResponse.json({ message: 'Transaction déjà annulée.' }, { status: 400 });
 
   try {
     const previousLines = (tx.four_transaction_lines ?? []).map((line) => ({
