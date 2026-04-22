@@ -320,7 +320,7 @@ export function SaleObjectsPageClient({
                     <p className="text-[11px] text-[#efcdab]">Stock actuel: {line.stock}</p>
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2 lg:inline-grid lg:w-auto lg:grid-cols-[11.5rem_6.5rem_6.75rem_1.25rem] lg:items-end">
+                <div className="mt-2 grid grid-cols-2 gap-1 sm:gap-1.5 lg:inline-grid lg:w-auto lg:grid-cols-[9.75rem_6.25rem_6.5rem_1.25rem] lg:items-end">
                   <label className="min-w-0 space-y-1">
                     <span className="block text-xs text-[#efcdab]">Quantité</span>
                     <QuantityStepper
@@ -333,11 +333,11 @@ export function SaleObjectsPageClient({
                   </label>
                   <label className="min-w-0 space-y-1">
                     <span className="block text-xs text-[#efcdab]">Prix unité</span>
-                    <input className="saas-input money-chip !h-9 !min-h-9 w-full text-center text-sm" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
+                    <input className="saas-input money-chip !h-9 !min-h-9 w-full text-center text-xs" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
                   </label>
                   <label className="min-w-0 space-y-1">
                     <span className="block text-xs text-[#efcdab]">Total ligne</span>
-                    <p className="saas-input !h-9 !min-h-9 money-chip flex items-center justify-center text-sm font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
+                    <p className="saas-input !h-9 !min-h-9 money-chip flex items-center justify-center text-xs font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
                   </label>
                   <label className="min-w-0 space-y-1">
                     <span className="sr-only">Action</span>

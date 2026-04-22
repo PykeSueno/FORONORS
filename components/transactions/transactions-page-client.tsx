@@ -221,7 +221,7 @@ export function TransactionsPageClient({
                       </div>
                     </div>
 
-                    <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2 lg:inline-grid lg:w-auto lg:grid-cols-[7.5rem_9.25rem_6.5rem_6.75rem_1.25rem] lg:items-end">
+                    <div className="mt-2 grid grid-cols-2 gap-1 sm:gap-1.5 lg:inline-grid lg:w-auto lg:grid-cols-[7.25rem_8.5rem_6.25rem_6.5rem_1.25rem] lg:items-end">
                       <label className="min-w-0 space-y-1">
                         <span className="block text-xs text-[#efcdab]">Type de mouvement</span>
                         <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_type} onChange={(e) => updateLine(idx, { movement_type: e.target.value as MovementType })}>
