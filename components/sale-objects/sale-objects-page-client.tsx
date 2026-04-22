@@ -320,20 +320,21 @@ export function SaleObjectsPageClient({
                   </div>
                   <button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0 text-xs" onClick={() => removeLine(line.item_id)}>Supprimer</button>
                 </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)]">
-                  <div className="rounded-lg border border-white/10 bg-[#21140e]/55 p-1.5">
+                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(7.5rem,0.7fr)_minmax(7.5rem,0.7fr)]">
+                  <div className="rounded-lg border border-white/10 bg-[#2c1a12]/35 p-1.5">
                     <p className="mb-1 text-[11px] text-[#efcdab]">Quantité</p>
                     <div className="flex items-center gap-1">
                       <button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0 text-xs" onClick={() => patchLine(line.item_id, { quantity: line.quantity - 1 })}>-</button>
                       <input className="saas-input !h-7 w-14 text-center text-sm" value={line.quantity} onChange={(e) => patchLine(line.item_id, { quantity: Number(e.target.value || 0) })} />
                       <button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0 text-xs" onClick={() => patchLine(line.item_id, { quantity: line.quantity + 1 })}>+</button>
+                      <button type="button" className="saas-primary-btn !h-7 !min-h-7 !px-2 !py-0 text-[10px]" onClick={() => patchLine(line.item_id, { quantity: Number(line.stock ?? 0) })}>MAX</button>
                     </div>
                   </div>
-                  <div className="rounded-lg border border-white/10 bg-[#21140e]/55 p-1.5">
+                  <div className="rounded-lg border border-white/10 bg-[#2c1a12]/35 p-1.5">
                     <p className="mb-1 text-[11px] text-[#efcdab]">Prix unité</p>
                     <input className="saas-input money-chip !h-7 w-full text-center text-sm" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
                   </div>
-                  <div className="rounded-lg border border-white/10 bg-[#21140e]/55 p-1.5">
+                  <div className="rounded-lg border border-white/10 bg-[#2c1a12]/35 p-1.5">
                     <p className="mb-1 text-[11px] text-[#efcdab]">Total ligne</p>
                     <p className="money-chip text-sm font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
                   </div>

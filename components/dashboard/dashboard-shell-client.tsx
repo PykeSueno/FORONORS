@@ -137,10 +137,11 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
                 <p className="mt-1 text-xs text-[#f2d2ae]">{new Date(row.created_at).toLocaleString('fr-FR')}</p>
                 <div className="pointer-events-none absolute left-3 top-full z-20 mt-1 hidden min-w-64 rounded-xl border border-white/10 bg-[#2a180f]/95 p-3 text-xs text-[#f2d2ae] shadow-xl group-hover:block">
                   <p className="font-semibold text-[#ffe8c9]">Détail mouvement</p>
-                  <p>Type: {humanMoneyMovementLabel(row.type)}</p>
-                  <p>Montant: {formatUsd(Number(row.amount))}</p>
-                  <p>Libellé: {row.label}</p>
-                  <p>Utilisateur: {(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'}</p>
+                  <p>🏷️ Type: {humanMoneyMovementLabel(row.type)}</p>
+                  <p>💰 Montant: {formatUsd(Number(row.amount))}</p>
+                  <p>🧾 Libellé: {row.label}</p>
+                  <p>👤 Utilisateur: {(Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe'}</p>
+                  <p>🕒 Date: {new Date(row.created_at).toLocaleString('fr-FR')}</p>
                   {summary?.moneyItemImageUrl ? (
                     <div className="relative mt-2 h-12 w-12">
                       <Image src={summary.moneyItemImageUrl} alt="Argent" width={48} height={48} className="h-12 w-12 rounded-md border border-white/10 object-cover" unoptimized />
@@ -168,11 +169,12 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
                 <p className="mt-1 text-xs text-[#f2d2ae]">{new Date(row.created_at).toLocaleString('fr-FR')}</p>
                 <div className="pointer-events-none absolute left-3 top-full z-20 mt-1 hidden min-w-64 rounded-xl border border-white/10 bg-[#2a180f]/95 p-3 text-xs text-[#f2d2ae] shadow-xl group-hover:block">
                   <p className="font-semibold text-[#ffe8c9]">Détail mouvement</p>
-                  <p>Type: {humanStockMovementLabel(row.type)}</p>
-                  <p>Item: {row.item}</p>
-                  <p>Avant: {row.before != null ? row.before : '—'} · Après: {row.after != null ? row.after : '—'}</p>
-                  <p>Quantité: {row.quantity > 0 ? '+' : ''}{row.quantity}</p>
-                  <p>Utilisateur: {row.member}</p>
+                  <p>🏷️ Type: {humanStockMovementLabel(row.type)}</p>
+                  <p>📦 Item: {row.item}</p>
+                  <p>📊 Avant / Après: {row.before != null ? row.before : '—'} → {row.after != null ? row.after : '—'}</p>
+                  <p>📈 Variation: {row.quantity > 0 ? '+' : ''}{row.quantity}</p>
+                  <p>👤 Utilisateur: {row.member}</p>
+                  <p>🕒 Date: {new Date(row.created_at).toLocaleString('fr-FR')}</p>
                   {row.image ? (
                     <div className="relative mt-2 h-12 w-12">
                       <Image src={row.image} alt={row.item} width={48} height={48} className="h-12 w-12 rounded-md border border-white/10 object-cover" unoptimized />

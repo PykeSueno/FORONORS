@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
+import { redirect } from 'next/navigation';
+import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
+import { FourTabs } from '@/components/four/four-tabs';
+import { FourStatsClient } from '@/components/four/four-stats-client';
 import { getSession } from '@/lib/auth';
-import { hasUserPermission } from '@/lib/permissions';
+import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 type TxRow = {
@@ -14,11 +17,12 @@ type TxRow = {
   four_transaction_lines: Array<{ item_id: number; item_name: string; movement_kind: 'buy' | 'sell'; quantity: number; unit_price: number; total_amount: number; items?: { image_url: string | null } | { image_url: string | null }[] | null }>;
 };
 
-export async function GET() {
+export default async function FourStatsPage() {
   const session = await getSession();
-  if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
-  const canView = await hasUserPermission(session.userId, 'four.stats.view');
-  if (!canView) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!session) redirect('/login');
+
+  const permissions = await getUserPermissions(session.userId);
+  if (!permissions.includes('four.access') || !permissions.includes('four.stats.view')) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
@@ -106,5 +110,11 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ totals, byClient, byMember, byItem, history });
+  return (
+    <div className="space-y-5">
+      <InternalPageHeader title="Stats FOUR" subtitle="Vue globale, clients, membres, items et historique détaillé" />
+      <FourTabs active="stats" canSeeStats canSeeMessages={permissions.includes('four.messages.view')} />
+      <FourStatsClient totals={totals} byClient={byClient} byMember={byMember} byItem={byItem} history={history} />
+    </div>
+  );
 }

@@ -107,11 +107,6 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
 
   return (
     <div className="space-y-4">
-      <section className="glass-card p-5">
-        <h3 className="text-lg font-semibold text-[#fff1dd]">FOUR direct</h3>
-        <p className="text-xs text-[#efcdab]">Transactions immédiates: stock + argent sont appliqués directement, sans ouverture / fermeture de session.</p>
-      </section>
-
       <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <article className="glass-card space-y-3 p-5">
           <div className="flex items-center gap-2">
@@ -147,7 +142,7 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                   <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#ffe8ca]">{line.item_name}</p>
                 </div>
 
-                <div className="mt-2 grid items-end gap-2 md:grid-cols-[8rem_9rem_minmax(0,1fr)_auto]">
+                <div className="mt-2 grid items-end gap-2 md:grid-cols-[7.5rem_8.5rem_8rem_auto]">
                   <label className="space-y-1 text-xs text-[#efcdab]">
                     <span>Type</span>
                     <select className="saas-input !h-8 !min-h-8 text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, movement_kind: e.target.value as LineKind } : entry))}>
@@ -158,19 +153,19 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
 
                   <label className="space-y-1 text-xs text-[#efcdab]">
                     <span>Quantité</span>
-                    <div className="flex h-8 items-center gap-1 rounded-lg border border-white/10 bg-[#22150f]/65 px-1">
-                      <button type="button" className="saas-ghost-btn !h-6 !min-h-6 !px-2 !py-0" onClick={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, entry.quantity - 1) } : entry))}>-</button>
-                      <input className="saas-input !h-6 w-12 border-0 bg-transparent px-1 text-center text-sm" value={line.quantity} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, Number(e.target.value || 1)) } : entry))} />
-                      <button type="button" className="saas-ghost-btn !h-6 !min-h-6 !px-2 !py-0" onClick={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: entry.quantity + 1 } : entry))}>+</button>
+                    <div className="flex h-8 items-center gap-1">
+                      <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-2 !py-0" onClick={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, entry.quantity - 1) } : entry))}>-</button>
+                      <input className="saas-input !h-8 w-12 px-1 text-center text-sm" value={line.quantity} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, Number(e.target.value || 1)) } : entry))} />
+                      <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-2 !py-0" onClick={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: entry.quantity + 1 } : entry))}>+</button>
                     </div>
                   </label>
 
                   <label className="space-y-1 text-xs text-[#efcdab]">
                     <span>Prix</span>
-                    <input className="saas-input !h-8 !min-h-8" value={line.unit_price} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, unit_price: Math.max(0, Number(e.target.value || 0)) } : entry))} />
+                    <input className="saas-input !h-8 !min-h-8 text-sm" value={line.unit_price} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, unit_price: Math.max(0, Number(e.target.value || 0)) } : entry))} />
                   </label>
 
-                  <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-3" onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))}>Supprimer</button>
+                  <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-3 text-xs" onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))}>Supprimer</button>
                 </div>
               </div>
             ))}

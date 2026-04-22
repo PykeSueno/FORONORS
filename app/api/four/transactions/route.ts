@@ -204,6 +204,15 @@ export async function PATCH(request: Request) {
       unit_price: line.unitPrice,
       total_amount: line.totalAmount
     })));
+    await createAuditLog({
+      actorUserId: session.userId,
+      action: 'four.transaction.edit',
+      entityType: 'four_transaction',
+      entityId: txId,
+      summary: `Modification transaction FOUR #${txId}`,
+      oldValues: { lines: previousLines },
+      newValues: { counterparty: body.counterparty?.trim() || null, totalPurchases, totalSales, profitLoss, lines: resolved }
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Modification impossible.' }, { status: 400 });
@@ -254,6 +263,15 @@ export async function DELETE(request: Request) {
       canceled_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }).eq('id', txId);
+    await createAuditLog({
+      actorUserId: session.userId,
+      action: 'four.transaction.cancel',
+      entityType: 'four_transaction',
+      entityId: txId,
+      summary: `Annulation transaction FOUR #${txId}`,
+      oldValues: { lines: previousLines },
+      newValues: { reason: body.reason?.trim() || null }
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Annulation impossible.' }, { status: 400 });

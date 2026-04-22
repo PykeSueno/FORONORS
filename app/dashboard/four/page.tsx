@@ -4,6 +4,7 @@ import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { FourPageClient } from '@/components/four/four-page-client';
+import { FourTabs } from '@/components/four/four-tabs';
 
 export default async function FourPage() {
   const session = await getSession();
@@ -24,7 +25,12 @@ export default async function FourPage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="FOUR" subtitle="FOUR direct: validation instantanée stock + argent" />
+      <InternalPageHeader title="FOUR" subtitle="Transactions stock + argent" />
+      <FourTabs
+        active="four"
+        canSeeStats={permissions.includes('four.stats.view')}
+        canSeeMessages={permissions.includes('four.messages.view')}
+      />
       <FourPageClient
         items={items ?? []}
         initialTransactions={transactions ?? []}
