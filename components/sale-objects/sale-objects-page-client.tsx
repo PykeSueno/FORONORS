@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 import { tryCopyText } from '@/lib/copy';
+import { LineControlsRow, LineField, QuantityStepper } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
 type SaleRow = {
@@ -318,27 +319,27 @@ export function SaleObjectsPageClient({
                     <p className="truncate text-sm font-semibold text-[#ffe8ca]">{line.item_name}</p>
                     <p className="text-[11px] text-[#efcdab]">Stock actuel: {line.stock}</p>
                   </div>
-                  <button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0 text-xs" onClick={() => removeLine(line.item_id)}>Supprimer</button>
                 </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(7.5rem,0.7fr)_minmax(7.5rem,0.7fr)]">
-                  <div className="rounded-lg border border-white/10 bg-[#2c1a12]/35 p-1.5">
-                    <p className="mb-1 text-[11px] text-[#efcdab]">Quantité</p>
-                    <div className="flex items-center gap-1">
-                      <button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0 text-xs" onClick={() => patchLine(line.item_id, { quantity: line.quantity - 1 })}>-</button>
-                      <input className="saas-input !h-7 w-14 text-center text-sm" value={line.quantity} onChange={(e) => patchLine(line.item_id, { quantity: Number(e.target.value || 0) })} />
-                      <button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0 text-xs" onClick={() => patchLine(line.item_id, { quantity: line.quantity + 1 })}>+</button>
-                      <button type="button" className="saas-primary-btn !h-7 !min-h-7 !px-2 !py-0 text-[10px]" onClick={() => patchLine(line.item_id, { quantity: Number(line.stock ?? 0) })}>MAX</button>
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-white/10 bg-[#2c1a12]/35 p-1.5">
-                    <p className="mb-1 text-[11px] text-[#efcdab]">Prix unité</p>
-                    <input className="saas-input money-chip !h-7 w-full text-center text-sm" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
-                  </div>
-                  <div className="rounded-lg border border-white/10 bg-[#2c1a12]/35 p-1.5">
-                    <p className="mb-1 text-[11px] text-[#efcdab]">Total ligne</p>
-                    <p className="money-chip text-sm font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
-                  </div>
-                </div>
+                <LineControlsRow>
+                  <LineField label="Quantité" widthClass="w-[12rem]">
+                    <QuantityStepper
+                      value={line.quantity}
+                      onDecrease={() => patchLine(line.item_id, { quantity: line.quantity - 1 })}
+                      onIncrease={() => patchLine(line.item_id, { quantity: line.quantity + 1 })}
+                      onChange={(next) => patchLine(line.item_id, { quantity: next })}
+                      extraAction={{ label: 'MAX', onClick: () => patchLine(line.item_id, { quantity: Number(line.stock ?? 0) }) }}
+                    />
+                  </LineField>
+                  <LineField label="Prix unité" widthClass="w-[6.5rem]">
+                    <input className="saas-input money-chip !h-9 !min-h-9 w-full text-center text-sm" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
+                  </LineField>
+                  <LineField label="Total ligne" widthClass="w-[7.5rem]">
+                    <p className="saas-input !h-9 !min-h-9 money-chip flex items-center justify-center text-sm font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
+                  </LineField>
+                  <LineField label="Action" widthClass="w-[7.25rem]">
+                    <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full text-xs" onClick={() => removeLine(line.item_id)}>Supprimer</button>
+                  </LineField>
+                </LineControlsRow>
               </div>
             ))}
           </div>

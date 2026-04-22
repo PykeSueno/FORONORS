@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { ITEM_CATEGORIES } from '@/lib/items';
+import { LineControlsRow, LineField, QuantityStepper } from '@/components/shared/line-controls';
 
 type Item = {
   id: number;
@@ -220,40 +221,37 @@ export function TransactionsPageClient({
                       </div>
                     </div>
 
-                    <div className="mt-3 grid items-end gap-2 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_9rem_8rem_8rem_auto]">
-                      <div className="min-w-0">
-                        <p className="mb-1 text-xs text-[#efcdab]">Type de mouvement</p>
-                        <select className="saas-input !h-8 !min-h-8 w-full text-sm" value={line.movement_type} onChange={(e) => updateLine(idx, { movement_type: e.target.value as MovementType })}>
+                    <LineControlsRow>
+                      <LineField label="Type de mouvement" widthClass="w-[11rem]">
+                        <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_type} onChange={(e) => updateLine(idx, { movement_type: e.target.value as MovementType })}>
                           <option value="stock_in">Entrée</option>
                           <option value="stock_out">Sortie</option>
                           <option value="purchase">Achat</option>
                           <option value="sale">Vente</option>
                         </select>
-                      </div>
+                      </LineField>
 
-                      <div>
-                        <p className="mb-1 text-xs text-[#efcdab]">Quantité</p>
-                        <div className="flex h-8 items-center gap-1">
-                          <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-2 !py-0" onClick={() => updateLine(idx, { quantity: Math.max(1, line.quantity - 1) })}>-</button>
-                          <input className="saas-input !h-8 w-14 text-center text-sm" value={line.quantity} onChange={(e) => updateLine(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
-                          <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-2 !py-0" onClick={() => updateLine(idx, { quantity: line.quantity + 1 })}>+</button>
-                        </div>
-                      </div>
+                      <LineField label="Quantité" widthClass="w-[10.5rem]">
+                        <QuantityStepper
+                          value={line.quantity}
+                          onDecrease={() => updateLine(idx, { quantity: Math.max(1, line.quantity - 1) })}
+                          onIncrease={() => updateLine(idx, { quantity: line.quantity + 1 })}
+                          onChange={(next) => updateLine(idx, { quantity: Math.max(1, Number(next || 1)) })}
+                        />
+                      </LineField>
 
-                      <div>
-                        <p className="mb-1 text-xs text-[#efcdab]">Prix unitaire</p>
-                        <input className="saas-input !h-8 !min-h-8 w-full text-sm" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
-                      </div>
+                      <LineField label="Prix unitaire" widthClass="w-[7.5rem]">
+                        <input className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
+                      </LineField>
 
-                      <div>
-                        <p className="mb-1 text-xs text-[#efcdab]">Total ligne</p>
-                        <p className="saas-input !h-8 !min-h-8 flex items-center text-sm">{formatUsd(lineTotal)}</p>
-                      </div>
+                      <LineField label="Total ligne" widthClass="w-[8.5rem]">
+                        <p className="saas-input !h-9 !min-h-9 flex items-center text-sm">{formatUsd(lineTotal)}</p>
+                      </LineField>
 
-                      <div className="flex items-end justify-end">
-                        <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-3 text-xs" onClick={() => removeLine(idx)}>Supprimer</button>
-                      </div>
-                    </div>
+                      <LineField label="Action" widthClass="w-[7.25rem]">
+                        <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full text-xs" onClick={() => removeLine(idx)}>Supprimer</button>
+                      </LineField>
+                    </LineControlsRow>
                   </article>
                 );
               })}

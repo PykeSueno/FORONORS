@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
+import { LineControlsRow, LineField, QuantityStepper } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; buy_price?: number; sell_price?: number; category_key?: string | null; type_key?: string | null };
 type LineKind = 'buy' | 'sell';
@@ -142,31 +143,31 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                   <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#ffe8ca]">{line.item_name}</p>
                 </div>
 
-                <div className="mt-2 grid items-end gap-2 md:grid-cols-[7.5rem_8.5rem_8rem_auto]">
-                  <label className="space-y-1 text-xs text-[#efcdab]">
-                    <span>Type</span>
-                    <select className="saas-input !h-8 !min-h-8 text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, movement_kind: e.target.value as LineKind } : entry))}>
+                <LineControlsRow>
+                  <LineField label="Type" widthClass="w-[8.5rem]">
+                    <select className="saas-input !h-9 !min-h-9 text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, movement_kind: e.target.value as LineKind } : entry))}>
                       <option value="buy">Achat</option>
                       <option value="sell">Vente</option>
                     </select>
-                  </label>
+                  </LineField>
 
-                  <label className="space-y-1 text-xs text-[#efcdab]">
-                    <span>Quantité</span>
-                    <div className="flex h-8 items-center gap-1">
-                      <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-2 !py-0" onClick={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, entry.quantity - 1) } : entry))}>-</button>
-                      <input className="saas-input !h-8 w-12 px-1 text-center text-sm" value={line.quantity} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, Number(e.target.value || 1)) } : entry))} />
-                      <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-2 !py-0" onClick={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: entry.quantity + 1 } : entry))}>+</button>
-                    </div>
-                  </label>
+                  <LineField label="Quantité" widthClass="w-[10.5rem]">
+                    <QuantityStepper
+                      value={line.quantity}
+                      onDecrease={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, entry.quantity - 1) } : entry))}
+                      onIncrease={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: entry.quantity + 1 } : entry))}
+                      onChange={(next) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, next || 1) } : entry))}
+                    />
+                  </LineField>
 
-                  <label className="space-y-1 text-xs text-[#efcdab]">
-                    <span>Prix</span>
-                    <input className="saas-input !h-8 !min-h-8 text-sm" value={line.unit_price} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, unit_price: Math.max(0, Number(e.target.value || 0)) } : entry))} />
-                  </label>
+                  <LineField label="Prix" widthClass="w-[8rem]">
+                    <input className="saas-input !h-9 !min-h-9 text-sm" value={line.unit_price} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, unit_price: Math.max(0, Number(e.target.value || 0)) } : entry))} />
+                  </LineField>
 
-                  <button type="button" className="saas-ghost-btn !h-8 !min-h-8 !px-3 text-xs" onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))}>Supprimer</button>
-                </div>
+                  <LineField label="Action" widthClass="w-[7.25rem]">
+                    <button type="button" className="saas-ghost-btn !h-9 !min-h-9 w-full !px-3 text-xs" onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))}>Supprimer</button>
+                  </LineField>
+                </LineControlsRow>
               </div>
             ))}
           </div>
