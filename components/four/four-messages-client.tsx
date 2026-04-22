@@ -100,16 +100,24 @@ export function FourMessagesClient({ initialMessages, canManage }: { initialMess
       </section>
 
       {canManage ? (
-        <section className="glass-card space-y-3 p-5">
+        <section className="glass-card p-5">
           <h3 className="text-lg font-semibold text-[#fff1dd]">{editing ? `Modifier message #${editing.id}` : 'Créer un message'}</h3>
-          <input className="saas-input" placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <textarea className="saas-input min-h-40" placeholder="Contenu" value={content} onChange={(e) => setContent(e.target.value)} />
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="saas-primary-btn" onClick={() => void submit()}>{editing ? 'Enregistrer' : 'Créer'}</button>
-            <button type="button" className="saas-ghost-btn" onClick={startCreate}>Réinitialiser</button>
+          <div className="mt-3 space-y-3">
+            <label className="block space-y-1">
+              <span className="text-xs text-[#efcdab]">Titre</span>
+              <input className="saas-input !h-10 !min-h-10" placeholder="Titre du message" value={title} onChange={(e) => setTitle(e.target.value)} />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs text-[#efcdab]">Contenu</span>
+              <textarea className="saas-input min-h-44 resize-y" placeholder="Contenu du message" value={content} onChange={(e) => setContent(e.target.value)} />
+            </label>
           </div>
-          {error ? <p className="text-sm text-red-200">{error}</p> : null}
-          {copyFeedback ? <p className="text-xs text-[#efcdab]">{copyFeedback}</p> : null}
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button type="button" className="saas-primary-btn !h-10 !min-h-10 w-full" onClick={() => void submit()}>{editing ? 'Enregistrer' : 'Créer'}</button>
+            <button type="button" className="saas-ghost-btn !h-10 !min-h-10 w-full" onClick={startCreate}>Réinitialiser</button>
+          </div>
+          {error ? <p className="mt-2 text-sm text-red-200">{error}</p> : null}
+          {copyFeedback ? <p className="mt-1 text-xs text-[#efcdab]">{copyFeedback}</p> : null}
         </section>
       ) : (
         <section className="glass-card p-5">

@@ -18,7 +18,12 @@ const LEGACY_TO_CANONICAL: Record<string, string> = {
   'four.transaction.manage.own': 'four.transaction.edit.own',
   'four.transaction.manage': 'four.transaction.edit.own',
   'four.transaction.cancel.any': 'four.transaction.edit.any',
-  'four.transaction.manage.any': 'four.transaction.edit.any'
+  'four.transaction.manage.any': 'four.transaction.edit.any',
+
+  'money.quick_sale.access': 'sale.objects.access',
+  'money.quick_sale.create': 'sale.objects.create',
+  'money.quick_sale.details.view': 'sale.objects.history.view',
+  'money.quick_sale.logs.view': 'sale.objects.history.view'
 };
 
 const CANONICAL_TO_ALIASES = Object.entries(LEGACY_TO_CANONICAL).reduce<Record<string, string[]>>((acc, [legacy, canonical]) => {
