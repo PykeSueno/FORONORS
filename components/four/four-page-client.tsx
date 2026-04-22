@@ -142,7 +142,7 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                   </div>
                   <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#ffe8ca]">{line.item_name}</p>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2 xl:inline-grid xl:w-auto xl:grid-cols-[7.5rem_8.5rem_7rem_1.25rem] xl:items-end">
+                <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2 lg:inline-grid lg:w-auto lg:grid-cols-[7rem_9rem_6.5rem_1.25rem] lg:items-end">
                   <label className="min-w-0 space-y-1">
                     <span className="block text-xs text-[#efcdab]">Type</span>
                     <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, movement_kind: e.target.value as LineKind } : entry))}>

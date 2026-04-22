@@ -320,7 +320,7 @@ export function SaleObjectsPageClient({
                     <p className="text-[11px] text-[#efcdab]">Stock actuel: {line.stock}</p>
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2 xl:inline-grid xl:w-auto xl:grid-cols-[9rem_7rem_7.25rem_1.25rem] xl:items-end">
+                <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2 lg:inline-grid lg:w-auto lg:grid-cols-[11.5rem_6.5rem_6.75rem_1.25rem] lg:items-end">
                   <label className="min-w-0 space-y-1">
                     <span className="block text-xs text-[#efcdab]">Quantité</span>
                     <QuantityStepper
