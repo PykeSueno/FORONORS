@@ -28,48 +28,41 @@ export function RemoveLineButton({ onClick, title = 'Supprimer la ligne' }: { on
   );
 }
 
-export function LineField({ label, widthClass = 'w-[9rem]', children }: { label: string; widthClass?: string; children: ReactNode }) {
-  return (
-    <label className={`${widthClass} min-w-0 space-y-1`}>
-      <span className="block text-xs text-[#efcdab]">{label}</span>
-      {children}
-    </label>
-  );
-}
-
 export function QuantityStepper({ value, onDecrease, onIncrease, onChange }: QuantityStepperProps) {
   return (
-    <div className="flex h-9 items-center gap-1">
-      <button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-1.5 !py-0" onClick={onDecrease}>−</button>
+    <div className="grid h-9 grid-cols-[1.75rem_3rem_1.75rem] items-center gap-1 overflow-hidden">
+      <button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-0 !py-0" onClick={onDecrease}>−</button>
       <input
         className="saas-input !h-9 !min-h-9 w-12 px-1 text-center text-sm"
         value={value}
         onChange={(event) => onChange(Number(event.target.value || 0))}
       />
-      <button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-1.5 !py-0" onClick={onIncrease}>+</button>
+      <button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-0 !py-0" onClick={onIncrease}>+</button>
     </div>
   );
 }
 
-export function LineControlsRow({ children }: { children: ReactNode }) {
-  return <div className="mt-2 flex flex-nowrap items-end gap-2 overflow-x-auto pb-1">{children}</div>;
-}
-
 export function CompactLineGrid({ type, children }: { type: 'transaction' | 'four' | 'sale'; children: ReactNode }) {
-  const template = type === 'transaction'
-    ? 'lg:grid-cols-[7rem_8.25rem_6.25rem_6.25rem_1.25rem]'
+  const gridClass = type === 'transaction'
+    ? 'grid-cols-[8.75rem_8.25rem_6.875rem_6.875rem_1.75rem]'
     : type === 'four'
-      ? 'lg:grid-cols-[6.75rem_8.25rem_6.25rem_1.25rem]'
-      : 'lg:grid-cols-[9rem_3rem_6.25rem_6.25rem_1.25rem]';
+      ? 'grid-cols-[7.5rem_8.25rem_7rem_1.75rem]'
+      : 'grid-cols-[8.25rem_3.25rem_6.875rem_6.875rem_1.75rem]';
 
-  return <div className={`mt-2 grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:inline-grid ${template} lg:w-fit lg:items-end`}>{children}</div>;
+  return (
+    <div className="mt-2 overflow-x-auto pb-1">
+      <div className={`inline-grid min-w-max items-end gap-x-1.5 gap-y-1 ${gridClass}`}>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export function CompactField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="min-w-0 space-y-1">
       <span className="block text-xs text-[#efcdab]">{label}</span>
-      {children}
+      <div className="min-w-0 overflow-hidden">{children}</div>
     </label>
   );
 }
