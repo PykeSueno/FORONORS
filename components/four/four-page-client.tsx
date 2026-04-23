@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
-import { CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
+import { CompactActionField, CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; buy_price?: number; sell_price?: number; category_key?: string | null; type_key?: string | null };
 type LineKind = 'buy' | 'sell';
@@ -163,12 +163,9 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                     <input className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.unit_price} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, unit_price: Math.max(0, Number(e.target.value || 0)) } : entry))} />
                   </CompactField>
 
-                  <label className="min-w-0 space-y-1">
-                    <span className="sr-only">Action</span>
-                    <div className="flex h-9 items-center justify-center">
-                      <RemoveLineButton onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))} />
-                    </div>
-                  </label>
+                  <CompactActionField>
+                    <RemoveLineButton onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))} />
+                  </CompactActionField>
                 </CompactLineGrid>
               </div>
             ))}

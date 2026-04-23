@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { ITEM_CATEGORIES } from '@/lib/items';
-import { CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
+import { CompactActionField, CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
 
 type Item = {
   id: number;
@@ -248,12 +248,9 @@ export function TransactionsPageClient({
                         <p className="saas-input !h-9 !min-h-9 flex items-center px-2 text-sm">{formatUsd(lineTotal)}</p>
                       </CompactField>
 
-                      <label className="min-w-0 space-y-1">
-                        <span className="sr-only">Action</span>
-                        <div className="flex h-9 items-center justify-center">
-                          <RemoveLineButton onClick={() => removeLine(idx)} />
-                        </div>
-                      </label>
+                      <CompactActionField>
+                        <RemoveLineButton onClick={() => removeLine(idx)} />
+                      </CompactActionField>
                     </CompactLineGrid>
                   </article>
                 );

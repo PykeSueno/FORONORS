@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 import { tryCopyText } from '@/lib/copy';
-import { CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
+import { CompactActionField, CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
 type SaleRow = {
@@ -338,12 +338,9 @@ export function SaleObjectsPageClient({
                   <CompactField label="Total ligne">
                     <p className="saas-input !h-9 !min-h-9 money-chip flex items-center justify-center text-xs font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
                   </CompactField>
-                  <label className="min-w-0 space-y-1">
-                    <span className="sr-only">Action</span>
-                    <div className="flex h-9 items-center justify-center">
-                      <RemoveLineButton onClick={() => removeLine(line.item_id)} />
-                    </div>
-                  </label>
+                  <CompactActionField>
+                    <RemoveLineButton onClick={() => removeLine(line.item_id)} />
+                  </CompactActionField>
                 </CompactLineGrid>
               </div>
             ))}

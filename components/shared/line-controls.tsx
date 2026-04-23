@@ -43,16 +43,27 @@ export function QuantityStepper({ value, onDecrease, onIncrease, onChange }: Qua
 }
 
 export function CompactLineGrid({ type, children }: { type: 'transaction' | 'four' | 'sale'; children: ReactNode }) {
-  const gridClass = type === 'transaction'
-    ? 'grid-cols-[8.75rem_8.25rem_6.875rem_6.875rem_1.75rem]'
+  const config = type === 'transaction'
+    ? {
+      cols: 'grid-cols-[8.75rem_8.25rem_6.875rem_6.875rem_1.75rem]',
+      gap: 'gap-x-1.5',
+    }
     : type === 'four'
-      ? 'grid-cols-[7.5rem_8.25rem_7rem_1.75rem]'
-      : 'grid-cols-[8.25rem_3.25rem_6.875rem_6.875rem_1.75rem]';
+      ? {
+        cols: 'grid-cols-[7.5rem_8.25rem_7rem_1.75rem]',
+        gap: 'gap-x-1.5',
+      }
+      : {
+        cols: 'grid-cols-[8.25rem_3rem_6.875rem_6.875rem_1.75rem]',
+        gap: 'gap-x-1',
+      };
 
   return (
-    <div className="mt-2 overflow-x-auto pb-1">
-      <div className={`inline-grid min-w-max items-end gap-x-1.5 gap-y-1 ${gridClass}`}>
-        {children}
+    <div className="mt-2 w-full overflow-hidden">
+      <div className="overflow-x-auto pb-1">
+        <div className={`inline-grid min-w-max items-end ${config.gap} gap-y-1 ${config.cols}`}>
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -64,5 +75,14 @@ export function CompactField({ label, children }: { label: string; children: Rea
       <span className="block text-xs text-[#efcdab]">{label}</span>
       <div className="min-w-0 overflow-hidden">{children}</div>
     </label>
+  );
+}
+
+export function CompactActionField({ children }: { children: ReactNode }) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <span className="sr-only">Action</span>
+      <div className="flex h-9 items-center justify-center">{children}</div>
+    </div>
   );
 }
