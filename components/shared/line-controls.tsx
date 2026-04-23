@@ -7,7 +7,6 @@ type QuantityStepperProps = {
   onDecrease: () => void;
   onIncrease: () => void;
   onChange: (next: number) => void;
-  extraAction?: { label: string; onClick: () => void };
 };
 
 export function RemoveLineButton({ onClick, title = 'Supprimer la ligne' }: { onClick: () => void; title?: string }) {
@@ -38,22 +37,39 @@ export function LineField({ label, widthClass = 'w-[9rem]', children }: { label:
   );
 }
 
-export function QuantityStepper({ value, onDecrease, onIncrease, onChange, extraAction }: QuantityStepperProps) {
-  const compact = Boolean(extraAction);
+export function QuantityStepper({ value, onDecrease, onIncrease, onChange }: QuantityStepperProps) {
   return (
-    <div className="flex h-9 items-center gap-0.5">
+    <div className="flex h-9 items-center gap-1">
       <button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-1.5 !py-0" onClick={onDecrease}>−</button>
       <input
-        className={`saas-input !h-9 !min-h-9 ${compact ? 'w-11' : 'w-14'} px-1 text-center text-sm`}
+        className="saas-input !h-9 !min-h-9 w-12 px-1 text-center text-sm"
         value={value}
         onChange={(event) => onChange(Number(event.target.value || 0))}
       />
       <button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-1.5 !py-0" onClick={onIncrease}>+</button>
-      {extraAction ? <button type="button" className="saas-primary-btn !h-9 !min-h-9 !px-1.5 !py-0 text-[9px] font-semibold uppercase tracking-wide" onClick={extraAction.onClick}>{extraAction.label}</button> : null}
     </div>
   );
 }
 
 export function LineControlsRow({ children }: { children: ReactNode }) {
   return <div className="mt-2 flex flex-nowrap items-end gap-2 overflow-x-auto pb-1">{children}</div>;
+}
+
+export function CompactLineGrid({ type, children }: { type: 'transaction' | 'four' | 'sale'; children: ReactNode }) {
+  const template = type === 'transaction'
+    ? 'lg:grid-cols-[7rem_8.25rem_6.25rem_6.25rem_1.25rem]'
+    : type === 'four'
+      ? 'lg:grid-cols-[6.75rem_8.25rem_6.25rem_1.25rem]'
+      : 'lg:grid-cols-[9rem_3rem_6.25rem_6.25rem_1.25rem]';
+
+  return <div className={`mt-2 grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:inline-grid ${template} lg:w-fit lg:items-end`}>{children}</div>;
+}
+
+export function CompactField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="min-w-0 space-y-1">
+      <span className="block text-xs text-[#efcdab]">{label}</span>
+      {children}
+    </label>
+  );
 }

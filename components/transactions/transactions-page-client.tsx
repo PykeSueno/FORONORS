@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { ITEM_CATEGORIES } from '@/lib/items';
-import { QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
+import { CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
 
 type Item = {
   id: number;
@@ -221,36 +221,32 @@ export function TransactionsPageClient({
                       </div>
                     </div>
 
-                    <div className="mt-2 grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:inline-grid lg:w-auto lg:grid-cols-[7rem_8.25rem_6.25rem_6.25rem_1.25rem] lg:items-end">
-                      <label className="min-w-0 space-y-1">
-                        <span className="block text-xs text-[#efcdab]">Type de mouvement</span>
+                    <CompactLineGrid type="transaction">
+                      <CompactField label="Type de mouvement">
                         <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_type} onChange={(e) => updateLine(idx, { movement_type: e.target.value as MovementType })}>
                           <option value="stock_in">Entrée</option>
                           <option value="stock_out">Sortie</option>
                           <option value="purchase">Achat</option>
                           <option value="sale">Vente</option>
                         </select>
-                      </label>
+                      </CompactField>
 
-                      <label className="min-w-0 space-y-1">
-                        <span className="block text-xs text-[#efcdab]">Quantité</span>
+                      <CompactField label="Quantité">
                         <QuantityStepper
                           value={line.quantity}
                           onDecrease={() => updateLine(idx, { quantity: Math.max(1, line.quantity - 1) })}
                           onIncrease={() => updateLine(idx, { quantity: line.quantity + 1 })}
                           onChange={(next) => updateLine(idx, { quantity: Math.max(1, Number(next || 1)) })}
                         />
-                      </label>
+                      </CompactField>
 
-                      <label className="min-w-0 space-y-1">
-                        <span className="block text-xs text-[#efcdab]">Prix unitaire</span>
+                      <CompactField label="Prix unitaire">
                         <input className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value || 0)) })} />
-                      </label>
+                      </CompactField>
 
-                      <label className="min-w-0 space-y-1">
-                        <span className="block text-xs text-[#efcdab]">Total ligne</span>
+                      <CompactField label="Total ligne">
                         <p className="saas-input !h-9 !min-h-9 flex items-center px-2 text-sm">{formatUsd(lineTotal)}</p>
-                      </label>
+                      </CompactField>
 
                       <label className="min-w-0 space-y-1">
                         <span className="sr-only">Action</span>
@@ -258,7 +254,7 @@ export function TransactionsPageClient({
                           <RemoveLineButton onClick={() => removeLine(idx)} />
                         </div>
                       </label>
-                    </div>
+                    </CompactLineGrid>
                   </article>
                 );
               })}

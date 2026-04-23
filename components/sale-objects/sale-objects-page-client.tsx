@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 import { tryCopyText } from '@/lib/copy';
-import { QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
+import { CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
 type SaleRow = {
@@ -320,32 +320,31 @@ export function SaleObjectsPageClient({
                     <p className="text-[11px] text-[#efcdab]">Stock actuel: {line.stock}</p>
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:inline-grid lg:w-auto lg:grid-cols-[9.25rem_6.25rem_6.25rem_1.25rem] lg:items-end">
-                  <label className="min-w-0 space-y-1">
-                    <span className="block text-xs text-[#efcdab]">Quantité</span>
+                <CompactLineGrid type="sale">
+                  <CompactField label="Quantité">
                     <QuantityStepper
                       value={line.quantity}
                       onDecrease={() => patchLine(line.item_id, { quantity: line.quantity - 1 })}
                       onIncrease={() => patchLine(line.item_id, { quantity: line.quantity + 1 })}
                       onChange={(next) => patchLine(line.item_id, { quantity: next })}
-                      extraAction={{ label: 'MAX', onClick: () => patchLine(line.item_id, { quantity: Number(line.stock ?? 0) }) }}
                     />
-                  </label>
-                  <label className="min-w-0 space-y-1">
-                    <span className="block text-xs text-[#efcdab]">Prix unité</span>
+                  </CompactField>
+                  <CompactField label="MAX">
+                    <button type="button" className="saas-primary-btn !h-9 !min-h-9 !w-12 !px-0 !py-0 text-[10px] font-semibold tracking-wide" onClick={() => patchLine(line.item_id, { quantity: Number(line.stock ?? 0) })}>MAX</button>
+                  </CompactField>
+                  <CompactField label="Prix unité">
                     <input className="saas-input money-chip !h-9 !min-h-9 w-full text-center text-xs" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
-                  </label>
-                  <label className="min-w-0 space-y-1">
-                    <span className="block text-xs text-[#efcdab]">Total ligne</span>
+                  </CompactField>
+                  <CompactField label="Total ligne">
                     <p className="saas-input !h-9 !min-h-9 money-chip flex items-center justify-center text-xs font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
-                  </label>
+                  </CompactField>
                   <label className="min-w-0 space-y-1">
                     <span className="sr-only">Action</span>
                     <div className="flex h-9 items-center justify-center">
                       <RemoveLineButton onClick={() => removeLine(line.item_id)} />
                     </div>
                   </label>
-                </div>
+                </CompactLineGrid>
               </div>
             ))}
           </div>

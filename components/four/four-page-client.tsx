@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
-import { QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
+import { CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; buy_price?: number; sell_price?: number; category_key?: string | null; type_key?: string | null };
 type LineKind = 'buy' | 'sell';
@@ -142,29 +142,26 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                   </div>
                   <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#ffe8ca]">{line.item_name}</p>
                 </div>
-                <div className="mt-2 grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:inline-grid lg:w-auto lg:grid-cols-[6.75rem_8.25rem_6.25rem_1.25rem] lg:items-end">
-                  <label className="min-w-0 space-y-1">
-                    <span className="block text-xs text-[#efcdab]">Type</span>
+                <CompactLineGrid type="four">
+                  <CompactField label="Type">
                     <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, movement_kind: e.target.value as LineKind } : entry))}>
                       <option value="buy">Achat</option>
                       <option value="sell">Vente</option>
                     </select>
-                  </label>
+                  </CompactField>
 
-                  <label className="min-w-0 space-y-1">
-                    <span className="block text-xs text-[#efcdab]">Quantité</span>
+                  <CompactField label="Quantité">
                     <QuantityStepper
                       value={line.quantity}
                       onDecrease={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, entry.quantity - 1) } : entry))}
                       onIncrease={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: entry.quantity + 1 } : entry))}
                       onChange={(next) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, next || 1) } : entry))}
                     />
-                  </label>
+                  </CompactField>
 
-                  <label className="min-w-0 space-y-1">
-                    <span className="block text-xs text-[#efcdab]">Prix</span>
+                  <CompactField label="Prix">
                     <input className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.unit_price} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, unit_price: Math.max(0, Number(e.target.value || 0)) } : entry))} />
-                  </label>
+                  </CompactField>
 
                   <label className="min-w-0 space-y-1">
                     <span className="sr-only">Action</span>
@@ -172,7 +169,7 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                       <RemoveLineButton onClick={() => setDraftLines((cur) => cur.filter((_, i) => i !== idx))} />
                     </div>
                   </label>
-                </div>
+                </CompactLineGrid>
               </div>
             ))}
           </div>
