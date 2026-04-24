@@ -45,6 +45,7 @@ export default async function DrugsPage() {
         canProductionCokeCreate={permissions.includes('drugs.production.coke.create')}
         canProductionMethCreate={permissions.includes('drugs.production.meth.create')}
         canProductionHistoryView={permissions.includes('drugs.production.history.view') || permissions.includes('drugs.production.access')}
+        canGoFastView={permissions.includes('drugs.gofast.view')}
       />
     </div>
   );

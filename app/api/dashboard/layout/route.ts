@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'cigarette', 'activity', 'four', 'drugs'];
+const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'cigarette', 'activity', 'four', 'drugs', 'robberies'];
 
 export async function GET() {
   const session = await getSession();

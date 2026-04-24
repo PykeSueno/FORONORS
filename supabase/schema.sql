@@ -994,3 +994,72 @@ values
   ('four.messages.view'),
   ('four.messages.manage')
 on conflict (name) do nothing;
+
+create table if not exists public.gofast_runs (
+  id bigint generated always as identity primary key,
+  user_id uuid references public.users(id) on delete set null,
+  user_name text,
+  item_id bigint references public.items(id) on delete set null,
+  item_name text not null,
+  item_image text,
+  quantity integer not null default 0,
+  money_amount numeric(12,2) not null default 0,
+  status text not null default 'success',
+  money_before numeric(12,2),
+  money_after numeric(12,2),
+  stock_before integer,
+  stock_after integer,
+  lost_money numeric(12,2) not null default 0,
+  seized_quantity integer not null default 0,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_gofast_runs_created_at on public.gofast_runs(created_at desc);
+create index if not exists idx_gofast_runs_status_created_at on public.gofast_runs(status, created_at desc);
+
+alter table public.gofast_runs enable row level security;
+drop policy if exists "allow_service_role_all_gofast_runs" on public.gofast_runs;
+create policy "allow_service_role_all_gofast_runs"
+on public.gofast_runs
+for all
+using (true)
+with check (true);
+
+create table if not exists public.robbery_runs (
+  id bigint generated always as identity primary key,
+  user_id uuid references public.users(id) on delete set null,
+  user_name text,
+  robbery_type text not null,
+  money_amount numeric(12,2) not null default 0,
+  money_before numeric(12,2),
+  money_after numeric(12,2),
+  consumed_items jsonb not null default '[]'::jsonb,
+  participants jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_robbery_runs_created_at on public.robbery_runs(created_at desc);
+create index if not exists idx_robbery_runs_type_created_at on public.robbery_runs(robbery_type, created_at desc);
+
+alter table public.robbery_runs enable row level security;
+drop policy if exists "allow_service_role_all_robbery_runs" on public.robbery_runs;
+create policy "allow_service_role_all_robbery_runs"
+on public.robbery_runs
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('drugs.gofast.view'),
+  ('drugs.gofast.create'),
+  ('drugs.gofast.cancel'),
+  ('drugs.gofast.arrested'),
+  ('drugs.gofast.stats'),
+  ('drugs.gofast.logs'),
+  ('robberies.view'),
+  ('robberies.create'),
+  ('robberies.cancel'),
+  ('robberies.stats'),
+  ('robberies.logs')
+on conflict (name) do nothing;

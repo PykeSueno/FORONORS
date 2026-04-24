@@ -21,6 +21,7 @@ type DashboardFlags = {
   canActivityAccess: boolean; canActivityPreview: boolean;
   canFourAccess: boolean; canFourPreview: boolean;
   canDrugsAccess: boolean; canDrugsPreview: boolean;
+  canRobberiesAccess: boolean; canRobberiesPreview: boolean;
   canSaleObjectsAccess: boolean; canSaleObjectsPreview: boolean;
   canMoneyMovementsView: boolean; canStockMovementsView: boolean;
 };
@@ -60,6 +61,7 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
     flags.canActivityPreview ? { id: 'activity', href: '/dashboard/activite', enabled: flags.canActivityAccess, icon: '🎯', title: 'Activité', value: summary ? String(summary.values.activitiesToday) : '0', subtitle: 'Boîte / Cambriolage / Conteneur' } : null,
     flags.canFourPreview ? { id: 'four', href: '/dashboard/four', enabled: flags.canFourAccess, icon: '🔥', title: 'FOUR', value: summary ? formatUsd(summary.values.fourProfitToday) : '…', subtitle: summary ? `${formatUsd(summary.values.fourPurchasesToday)} achat / ${formatUsd(summary.values.fourSalesToday)} vente` : 'Achat / Vente' } : null,
     flags.canDrugsPreview ? { id: 'drugs', href: '/dashboard/drogues', enabled: flags.canDrugsAccess, icon: '🧪', title: 'Drogues', value: 'Module', subtitle: 'Transfo + vente + production' } : null
+    , flags.canRobberiesPreview ? { id: 'robberies', href: '/dashboard/braquage', enabled: flags.canRobberiesAccess, icon: '🥷', title: 'Braquage', value: 'Module', subtitle: 'Fleeca, Bijouterie, Morgue' } : null
   ].filter(Boolean) as Card[], [flags, summary]);
 
   const stockRows = useMemo(() => {

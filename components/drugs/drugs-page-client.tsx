@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { formatUsd } from '@/lib/currency';
@@ -115,7 +116,8 @@ export function DrugsPageClient({
   canProductionCreate,
   canProductionCokeCreate,
   canProductionMethCreate,
-  canProductionHistoryView
+  canProductionHistoryView,
+  canGoFastView
 }: {
   currentUserId: string;
   transfos: Transfo[];
@@ -137,6 +139,7 @@ export function DrugsPageClient({
   canProductionCokeCreate: boolean;
   canProductionMethCreate: boolean;
   canProductionHistoryView: boolean;
+  canGoFastView: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('transfo');
@@ -450,6 +453,12 @@ export function DrugsPageClient({
 
   return (
     <div className="space-y-4">
+      {canGoFastView ? (
+        <Link href="/dashboard/drogues/gofast" className="glass-card smooth-hover block p-4">
+          <p className="text-sm font-semibold text-[#ffe8ca]">🚚⚡ GoFast</p>
+          <p className="text-xs text-[#efcdab]">Livraison de pochons</p>
+        </Link>
+      ) : null}
       <section className="glass-card flex flex-wrap items-center justify-between gap-3 p-5">
         <div className="flex gap-2">
           <button className={`filter-pill ${tab === 'transfo' ? 'filter-pill-active' : ''}`} onClick={() => setTab('transfo')}>🧪 Transfo</button>

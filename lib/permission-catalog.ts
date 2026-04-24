@@ -1,4 +1,4 @@
-export const MODULE_ORDER = ['Dashboard', 'Argent', 'Vente objets', 'Items', 'Transactions', 'Transactions récentes', 'Activité', 'FOUR', 'Drogues', 'Tablette', 'Cigarette', 'Membres', 'Logs', 'Compte', 'Autres'] as const;
+export const MODULE_ORDER = ['Dashboard', 'Argent', 'Vente objets', 'Items', 'Transactions', 'Transactions récentes', 'Activité', 'FOUR', 'Drogues', 'Braquage', 'Tablette', 'Cigarette', 'Membres', 'Logs', 'Compte', 'Autres'] as const;
 
 export const SECTION_ORDER = ['Vue', 'Historique', 'Mouvements', 'Vente objets', 'Création', 'Passages', 'Modification / Annulation', 'Sessions', 'Transactions', 'Messages', 'Stats', 'Logs', 'Sécurité', 'Gestion', 'Technique'] as const;
 
@@ -122,8 +122,20 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
   'drugs.production.cancel.own': { module: 'Drogues', section: 'Production', label: 'Annuler ses propres productions', hint: 'Permet d’annuler ses propres productions.' },
   'drugs.production.cancel.any': { module: 'Drogues', section: 'Production', label: 'Annuler toutes les productions', hint: 'Permet d’annuler toutes les productions.' },
   'drugs.production.history.view': { module: 'Drogues', section: 'Production', label: 'Voir l’historique des productions', hint: 'Permet de consulter l’historique des productions.' },
+  'drugs.gofast.view': { module: 'Drogues', section: 'Vue', label: 'Voir le module GoFast', hint: 'Permet d’afficher la bulle/page GoFast.' },
+  'drugs.gofast.create': { module: 'Drogues', section: 'Création', label: 'Créer un GoFast réussi', hint: 'Permet de valider un GoFast réussi.' },
+  'drugs.gofast.cancel': { module: 'Drogues', section: 'Modification / Annulation', label: 'Annuler un brouillon GoFast', hint: 'Permet d’annuler la saisie GoFast côté interface.' },
+  'drugs.gofast.arrested': { module: 'Drogues', section: 'Création', label: 'Créer un GoFast arrêté', hint: 'Permet de déclarer un GoFast arrêté.' },
+  'drugs.gofast.stats': { module: 'Drogues', section: 'Stats', label: 'Voir les stats GoFast', hint: 'Permet de consulter les statistiques GoFast.' },
+  'drugs.gofast.logs': { module: 'Drogues', section: 'Logs', label: 'Voir l’historique GoFast', hint: 'Permet de consulter les logs/historique GoFast.' },
   'drugs.logs.view': { module: 'Drogues', section: 'Logs', label: 'Voir les logs Drogues', hint: 'Permet de consulter les logs du module Drogues.' },
   'drugs.stats.view': { module: 'Drogues', section: 'Stats', label: 'Voir les stats Drogues', hint: 'Permet de consulter les statistiques Drogues.' },
+
+  'robberies.view': { module: 'Braquage', section: 'Vue', label: 'Voir le module Braquage', hint: 'Permet d’afficher la bulle/page Braquage.' },
+  'robberies.create': { module: 'Braquage', section: 'Création', label: 'Créer un braquage', hint: 'Permet de valider un braquage.' },
+  'robberies.cancel': { module: 'Braquage', section: 'Modification / Annulation', label: 'Annuler un brouillon braquage', hint: 'Permet d’annuler la saisie braquage côté interface.' },
+  'robberies.stats': { module: 'Braquage', section: 'Stats', label: 'Voir les stats braquage', hint: 'Permet de consulter les statistiques braquage.' },
+  'robberies.logs': { module: 'Braquage', section: 'Logs', label: 'Voir les logs braquage', hint: 'Permet de consulter les logs/historique braquage.' },
 
   'tablet.preview': { module: 'Tablette', section: 'Vue', label: 'Voir la bulle Tablette', hint: 'Permet d’afficher la bulle Tablette.' },
   'tablet.access': { module: 'Tablette', section: 'Vue', label: 'Accéder à Tablette', hint: 'Permet d’ouvrir le module Tablette.' },
