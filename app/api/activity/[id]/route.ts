@@ -60,8 +60,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (item.is_money_item) {
       const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
       if (!cash) return NextResponse.json({ message: 'Caisse introuvable.' }, { status: 404 });
-      await supabase.from('group_cash').update({ balance: Number(cash.balance) - Number(oldLine.quantity_added), updated_at: new Date().toISOString() }).eq('id', cash.id);
-      await supabase.from('cash_movements').insert({ type: 'activity_edit', amount: -Number(oldLine.quantity_added), label: `Correction activité #${activityId}`, user_id: session.userId });
+      const beforeBalance = Number(cash.balance);
+      const afterBalance = beforeBalance - Number(oldLine.quantity_added);
+      await supabase.from('group_cash').update({ balance: afterBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
+      await supabase.from('cash_movements').insert({ type: 'activity_edit', amount: -Number(oldLine.quantity_added), label: `Correction activité #${activityId}`, user_id: session.userId, before_amount: beforeBalance, after_amount: afterBalance });
     } else {
       const nextQuantity = Number(item.quantity) - Number(oldLine.quantity_added);
       if (nextQuantity < 0) return NextResponse.json({ message: `Stock insuffisant pour corriger ${oldLine.item_name}.` }, { status: 400 });
@@ -111,8 +113,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (moneyDelta !== 0) {
     const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
     if (!cash) return NextResponse.json({ message: 'Caisse introuvable.' }, { status: 404 });
-    await supabase.from('group_cash').update({ balance: Number(cash.balance) + moneyDelta, updated_at: new Date().toISOString() }).eq('id', cash.id);
-    await supabase.from('cash_movements').insert({ type: 'activity_edit', amount: moneyDelta, label: `Correction activité #${activityId}`, user_id: session.userId });
+    const beforeBalance = Number(cash.balance);
+    const afterBalance = beforeBalance + moneyDelta;
+    await supabase.from('group_cash').update({ balance: afterBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
+    await supabase.from('cash_movements').insert({ type: 'activity_edit', amount: moneyDelta, label: `Correction activité #${activityId}`, user_id: session.userId, before_amount: beforeBalance, after_amount: afterBalance });
   }
 
   await syncMoneyItemToGroupCash(supabase);

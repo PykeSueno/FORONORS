@@ -8,6 +8,7 @@ import { CompactActionField, CompactField, CompactLineGrid, QuantityStepper, Rem
 type Item = { id: number; name: string; image_url: string | null; quantity: number; buy_price?: number; sell_price?: number; category_key?: string | null; type_key?: string | null };
 type LineKind = 'buy' | 'sell';
 type FourLine = { item_id: number; item_name: string; item_image_url?: string | null; movement_kind: LineKind; quantity: number; unit_price: number };
+type FourCategory = 'objects' | 'equipment' | 'drugs';
 type FourTx = {
   id: number;
   counterparty: string | null;
@@ -22,13 +23,21 @@ type FourTx = {
 };
 
 function isAllowedFourItem(item: Item) {
+  return getFourItemCategory(item) !== null;
+}
+
+function getFourItemCategory(item: Item): FourCategory | null {
   const name = item.name.toLowerCase();
   const category = (item.category_key ?? '').toLowerCase();
   const type = (item.type_key ?? '').toLowerCase();
-  if (category === 'objects') return true;
-  if (name.includes('kit')) return true;
-  if (name.includes('disqueuse')) return true;
-  return category === 'drugs' && type === 'bag';
+  if (category === 'drugs') {
+    const isBag = type === 'bag' || name.includes('pochon');
+    const isRaw = name.includes('graine') || name.includes('table');
+    return isBag && !isRaw ? 'drugs' : null;
+  }
+  if (category === 'objects') return 'objects';
+  if (category === 'equipment' || name.includes('kit') || name.includes('disqueuse')) return 'equipment';
+  return null;
 }
 
 export function FourPageClient({ items, initialTransactions, canCreate, canEditOwn, canEditAny, canCancelOwn, canCancelAny, currentUserId }: {
@@ -45,13 +54,16 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
   const [query, setQuery] = useState('');
   const [counterparty, setCounterparty] = useState('');
   const [draftKind, setDraftKind] = useState<LineKind>('buy');
+  const [itemCategory, setItemCategory] = useState<FourCategory>('objects');
   const [draftLines, setDraftLines] = useState<FourLine[]>([]);
   const [editingTxId, setEditingTxId] = useState<number | null>(null);
   const [error, setError] = useState('');
 
   const availableItems = useMemo(
-    () => items.filter(isAllowedFourItem).filter((item) => item.name.toLowerCase().includes(query.toLowerCase())),
-    [items, query]
+    () => items
+      .filter((item) => isAllowedFourItem(item) && getFourItemCategory(item) === itemCategory)
+      .filter((item) => item.name.toLowerCase().includes(query.toLowerCase())),
+    [items, itemCategory, query]
   );
   const draftTotals = useMemo(() => {
     const purchases = draftLines.filter((line) => line.movement_kind === 'buy').reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
@@ -114,6 +126,11 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
             <button type="button" className={`filter-pill ${draftKind === 'buy' ? 'filter-pill-active' : ''}`} onClick={() => setDraftKind('buy')}>Achat</button>
             <button type="button" className={`filter-pill ${draftKind === 'sell' ? 'filter-pill-active' : ''}`} onClick={() => setDraftKind('sell')}>Vente</button>
             <input className="saas-input ml-auto w-full max-w-56" placeholder="Recherche item" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <button type="button" className={`filter-pill ${itemCategory === 'objects' ? 'filter-pill-active' : ''}`} onClick={() => setItemCategory('objects')}>Objets</button>
+            <button type="button" className={`filter-pill ${itemCategory === 'equipment' ? 'filter-pill-active' : ''}`} onClick={() => setItemCategory('equipment')}>Équipement</button>
+            <button type="button" className={`filter-pill ${itemCategory === 'drugs' ? 'filter-pill-active' : ''}`} onClick={() => setItemCategory('drugs')}>Drogue</button>
           </div>
           <div className="max-h-[520px] space-y-2 overflow-y-auto">
             {availableItems.map((item) => (

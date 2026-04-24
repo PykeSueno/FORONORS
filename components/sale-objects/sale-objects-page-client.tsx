@@ -310,7 +310,7 @@ export function SaleObjectsPageClient({
 
           <div className="space-y-2">
             {cart.map((line) => (
-              <div key={line.item_id} className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
+              <div key={line.item_id} className="overflow-hidden rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
                 <div className="flex items-start gap-2">
                   <div className="h-10 w-10 overflow-hidden rounded-lg border border-white/10 bg-[#1f120d]">
                     {line.image_url ? <Image src={line.image_url} alt={line.item_name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs text-[#f2d2ad]">📦</div>}
@@ -333,10 +333,10 @@ export function SaleObjectsPageClient({
                     <button type="button" className="saas-primary-btn !h-9 !min-h-9 !w-12 !px-0 !py-0 text-[10px] font-semibold tracking-wide" onClick={() => patchLine(line.item_id, { quantity: Number(line.stock ?? 0) })}>MAX</button>
                   </CompactField>
                   <CompactField label="Prix unité">
-                    <input className="saas-input money-chip !h-9 !min-h-9 w-full text-center text-xs" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
+                    <input className="saas-input !h-9 !min-h-9 w-full text-center text-xs" value={line.unit_price} onChange={(e) => patchLine(line.item_id, { unit_price: Number(e.target.value || 0) })} />
                   </CompactField>
                   <CompactField label="Total ligne">
-                    <p className="saas-input !h-9 !min-h-9 money-chip flex items-center justify-center text-xs font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
+                    <p className="saas-input !h-9 !min-h-9 flex items-center justify-center whitespace-nowrap px-1 text-xs font-semibold text-[#c8f3be]">{formatUsd(line.line_total)}</p>
                   </CompactField>
                   <CompactActionField>
                     <RemoveLineButton onClick={() => removeLine(line.item_id)} />

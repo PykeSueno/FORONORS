@@ -48,7 +48,9 @@ export async function PATCH(request: Request) {
       type: 'adjust',
       amount: delta,
       label: body.label?.trim() || 'Ajustement manuel',
-      user_id: session.userId
+      user_id: session.userId,
+      before_amount: previousBalance,
+      after_amount: nextBalance
     });
   }
 

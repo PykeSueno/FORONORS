@@ -75,15 +75,17 @@ export function MoneyMovementsPageClient({ rows, moneyItemImageUrl }: { rows: Ro
       <div className="mt-4 space-y-2">
         {filtered.map((row) => (
           <article key={row.id} className="group relative rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2b1a12]">{moneyMovementIcon(row.type)}</span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-[#ffe8ca]">{row.user_name} — {humanMoneyMovementLabel(row.type)} — {row.label}</p>
-                  <p className="text-xs text-[#efcdab]">{row.source} · {new Date(row.created_at).toLocaleString('fr-FR')}</p>
-                </div>
-              </div>
+            <div className="grid gap-2 md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2b1a12]">{moneyMovementIcon(row.type)}</span>
+              <p className="min-w-0 text-sm font-medium text-[#ffe8ca]">
+                <span className="block truncate">{row.user_name} — {humanMoneyMovementLabel(row.type)} — {row.label}</span>
+              </p>
               <p className={`text-sm font-semibold ${Number(row.amount) >= 0 ? 'text-[#bff0b9]' : 'text-[#f0b9b9]'}`}>{formatUsd(Number(row.amount))}</p>
+              <p className="text-xs text-[#efcdab]">{new Date(row.created_at).toLocaleString('fr-FR')}</p>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#efcdab]">
+              <p>📍 {row.source}</p>
+              <p>💼 Solde après : <span className="font-semibold text-[#ffe8ca]">{row.after_amount != null ? formatUsd(Number(row.after_amount)) : 'Indisponible'}</span></p>
             </div>
             <div className="pointer-events-none absolute left-3 top-full z-20 mt-1 hidden min-w-72 rounded-xl border border-white/10 bg-[#2a180f]/95 p-3 text-xs text-[#f2d2ae] shadow-xl group-hover:block">
               <p className="font-semibold text-[#ffe8c9]">Détail mouvement</p>

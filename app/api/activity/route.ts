@@ -205,13 +205,16 @@ export async function POST(request: Request) {
   if (moneyDeltaFromArgentItem !== 0) {
     const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
     if (!cash) return NextResponse.json({ message: 'Caisse groupe introuvable.' }, { status: 404 });
-    const nextBalance = Number(cash.balance) + moneyDeltaFromArgentItem;
+    const beforeBalance = Number(cash.balance);
+    const nextBalance = beforeBalance + moneyDeltaFromArgentItem;
     await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
     await supabase.from('cash_movements').insert({
       type: 'entry',
       amount: moneyDeltaFromArgentItem,
       label: `Entrée argent activité (${ACTIVITY_LABELS[body.activity_type]})`,
-      user_id: memberId
+      user_id: memberId,
+      before_amount: beforeBalance,
+      after_amount: nextBalance
     });
     await syncMoneyItemToGroupCash(supabase);
   }

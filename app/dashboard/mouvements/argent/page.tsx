@@ -26,31 +26,19 @@ export default async function MoneyMovementsGlobalPage() {
   if (!permissions.includes('money.movements.view')) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: rows }, { data: moneyItem }, { data: cash }] = await Promise.all([
+  const [{ data: rows }, { data: moneyItem }] = await Promise.all([
     supabase.from('cash_movements').select('id, type, amount, label, before_amount, after_amount, related_item_name, created_at, users(name, username)').order('created_at', { ascending: false }).limit(700),
-    supabase.from('items').select('image_url').eq('is_money_item', true).order('id').limit(1).maybeSingle(),
-    supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle()
+    supabase.from('items').select('image_url').eq('is_money_item', true).order('id').limit(1).maybeSingle()
   ]);
 
-  let runningAfter = Number(cash?.balance ?? NaN);
   const prepared = ((rows ?? []) as CashMovementRow[]).map((row) => {
-    const storedBefore = row.before_amount != null ? Number(row.before_amount) : null;
-    const storedAfter = row.after_amount != null ? Number(row.after_amount) : null;
-    let beforeAmount = Number.isFinite(storedBefore as number) ? Number(storedBefore) : null;
-    let afterAmount = Number.isFinite(storedAfter as number) ? Number(storedAfter) : null;
-
-    if (afterAmount == null && Number.isFinite(runningAfter)) afterAmount = Number(runningAfter);
-    if (beforeAmount == null && afterAmount != null) beforeAmount = afterAmount - Number(row.amount ?? 0);
-
-    if (beforeAmount != null) runningAfter = beforeAmount;
-
     return {
       id: row.id,
       type: row.type,
       amount: Number(row.amount ?? 0),
       label: row.label,
-      before_amount: beforeAmount,
-      after_amount: afterAmount,
+      before_amount: row.before_amount != null ? Number(row.before_amount) : null,
+      after_amount: row.after_amount != null ? Number(row.after_amount) : null,
       related_item_name: row.related_item_name,
       created_at: row.created_at,
       user_name: (Array.isArray(row.users) ? (row.users[0]?.name || row.users[0]?.username) : (row.users?.name || row.users?.username)) || 'Groupe',
