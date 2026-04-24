@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { DashboardShellClient } from '@/components/dashboard/dashboard-shell-client';
 import { sortMembersByGrade } from '@/lib/members';
 
-const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet', 'cigarette', 'activity', 'four', 'drugs', 'robberies'];
+const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -25,10 +25,12 @@ export default async function DashboardPage() {
   const canLogsPreview = canLogsAccess || has('logs.preview');
   const canTabletAccess = has('tablet.access');
   const canTabletPreview = canTabletAccess || has('tablet.preview');
-  const canActivityAccess = has('activity.access');
-  const canActivityPreview = canActivityAccess || has('activity.preview');
   const canCigaretteAccess = has('cigarette.access');
   const canCigarettePreview = canCigaretteAccess || has('cigarette.preview');
+  const canTabletCigaretteAccess = canTabletAccess || canCigaretteAccess;
+  const canTabletCigarettePreview = canTabletPreview || canCigarettePreview;
+  const canActivityAccess = has('activity.access');
+  const canActivityPreview = canActivityAccess || has('activity.preview');
   const canFourAccess = has('four.access');
   const canFourPreview = canFourAccess || has('four.preview');
   const canDrugsAccess = has('drugs.access');
@@ -133,9 +135,8 @@ export default async function DashboardPage() {
         canTransactionsRecentAccess, canTransactionsRecentPreview,
         canMembersAccess, canMembersPreview,
         canLogsAccess, canLogsPreview,
-        canTabletAccess, canTabletPreview,
+        canTabletCigaretteAccess, canTabletCigarettePreview,
         canActivityAccess, canActivityPreview,
-        canCigaretteAccess, canCigarettePreview,
         canFourAccess, canFourPreview,
         canDrugsAccess, canDrugsPreview,
         canSaleObjectsAccess, canSaleObjectsPreview,

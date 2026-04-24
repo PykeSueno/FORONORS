@@ -1030,11 +1030,14 @@ create table if not exists public.robbery_runs (
   user_id uuid references public.users(id) on delete set null,
   user_name text,
   robbery_type text not null,
+  status text not null default 'success',
   money_amount numeric(12,2) not null default 0,
+  lost_money numeric(12,2) not null default 0,
   money_before numeric(12,2),
   money_after numeric(12,2),
   consumed_items jsonb not null default '[]'::jsonb,
   participants jsonb not null default '[]'::jsonb,
+  note text,
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -1059,7 +1062,12 @@ values
   ('drugs.gofast.logs'),
   ('robberies.view'),
   ('robberies.create'),
+  ('robberies.arrested'),
   ('robberies.cancel'),
   ('robberies.stats'),
   ('robberies.logs')
 on conflict (name) do nothing;
+
+alter table public.robbery_runs add column if not exists status text not null default 'success';
+alter table public.robbery_runs add column if not exists lost_money numeric(12,2) not null default 0;
+alter table public.robbery_runs add column if not exists note text;

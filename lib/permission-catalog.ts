@@ -133,6 +133,7 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
 
   'robberies.view': { module: 'Braquage', section: 'Vue', label: 'Voir le module Braquage', hint: 'Permet d’afficher la bulle/page Braquage.' },
   'robberies.create': { module: 'Braquage', section: 'Création', label: 'Créer un braquage', hint: 'Permet de valider un braquage.' },
+  'robberies.arrested': { module: 'Braquage', section: 'Création', label: 'Déclarer un braquage arrêté', hint: 'Permet de valider un braquage arrêté.' },
   'robberies.cancel': { module: 'Braquage', section: 'Modification / Annulation', label: 'Annuler un brouillon braquage', hint: 'Permet d’annuler la saisie braquage côté interface.' },
   'robberies.stats': { module: 'Braquage', section: 'Stats', label: 'Voir les stats braquage', hint: 'Permet de consulter les statistiques braquage.' },
   'robberies.logs': { module: 'Braquage', section: 'Logs', label: 'Voir les logs braquage', hint: 'Permet de consulter les logs/historique braquage.' },

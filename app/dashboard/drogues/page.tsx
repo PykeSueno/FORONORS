@@ -13,12 +13,13 @@ export default async function DrugsPage() {
   if (!permissions.includes('drugs.access')) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: transfos }, { data: sales }, { data: productions }, { data: members }, { data: items }] = await Promise.all([
+  const [{ data: transfos }, { data: sales }, { data: productions }, { data: members }, { data: items }, { data: gofastRuns }] = await Promise.all([
     supabase.from('drug_transfos').select('*').order('created_at', { ascending: false }).limit(300),
     supabase.from('drug_sales').select('*').order('created_at', { ascending: false }).limit(300),
     supabase.from('drug_productions').select('*').order('created_at', { ascending: false }).limit(200),
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
-    supabase.from('items').select('id, name, image_url, quantity, sell_price, category_key, type_key').order('name', { ascending: true })
+    supabase.from('items').select('id, name, image_url, quantity, sell_price, category_key, type_key').order('name', { ascending: true }),
+    supabase.from('gofast_runs').select('*').order('created_at', { ascending: false }).limit(250)
   ]);
 
   return (
@@ -46,6 +47,11 @@ export default async function DrugsPage() {
         canProductionMethCreate={permissions.includes('drugs.production.meth.create')}
         canProductionHistoryView={permissions.includes('drugs.production.history.view') || permissions.includes('drugs.production.access')}
         canGoFastView={permissions.includes('drugs.gofast.view')}
+        canGoFastCreate={permissions.includes('drugs.gofast.create')}
+        canGoFastArrested={permissions.includes('drugs.gofast.arrested')}
+        canGoFastStats={permissions.includes('drugs.gofast.stats')}
+        canGoFastLogs={permissions.includes('drugs.gofast.logs')}
+        gofastRuns={gofastRuns ?? []}
       />
     </div>
   );

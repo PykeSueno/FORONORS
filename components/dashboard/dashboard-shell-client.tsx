@@ -16,8 +16,7 @@ type DashboardFlags = {
   canTransactionsRecentAccess: boolean; canTransactionsRecentPreview: boolean;
   canMembersAccess: boolean; canMembersPreview: boolean;
   canLogsAccess: boolean; canLogsPreview: boolean;
-  canTabletAccess: boolean; canTabletPreview: boolean;
-  canCigaretteAccess: boolean; canCigarettePreview: boolean;
+  canTabletCigaretteAccess: boolean; canTabletCigarettePreview: boolean;
   canActivityAccess: boolean; canActivityPreview: boolean;
   canFourAccess: boolean; canFourPreview: boolean;
   canDrugsAccess: boolean; canDrugsPreview: boolean;
@@ -56,8 +55,7 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
     flags.canTransactionsRecentPreview ? { id: 'transactions_recent', href: '/dashboard/transactions-recentes', enabled: flags.canTransactionsRecentAccess, icon: '🕒', title: 'Transactions récentes', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Historique' } : null,
     flags.canMembersPreview ? { id: 'members', href: '/dashboard/membres', enabled: flags.canMembersAccess, icon: '👥', title: 'Membres', value: summary ? String(summary.values.membersCount) : '…', subtitle: 'Gestion équipe' } : null,
     flags.canLogsPreview ? { id: 'logs', href: '/dashboard/logs', enabled: flags.canLogsAccess, icon: '🧾', title: 'Logs', value: summary ? String(summary.values.logsCount) : '…', subtitle: 'Traçabilité' } : null,
-    flags.canTabletPreview ? { id: 'tablet', href: '/dashboard/tablette', enabled: flags.canTabletAccess, icon: '📱', title: 'Tablette', value: summary ? String(summary.values.tabletPassagesToday) : '0', subtitle: 'Passages 8h → 8h' } : null,
-    flags.canCigarettePreview ? { id: 'cigarette', href: '/dashboard/cigarette', enabled: flags.canCigaretteAccess, icon: '🚬', title: 'Cigarette', value: summary ? String(summary.values.cigarettePassagesToday) : '…', subtitle: summary ? `Aujourd’hui ${formatUsd(summary.values.cigaretteRevenueToday)}` : 'Passages 4h → 20h' } : null,
+    flags.canTabletCigarettePreview ? { id: 'tablet_cigarette', href: '/dashboard/tablette-cigarette', enabled: flags.canTabletCigaretteAccess, icon: '📱🚬', title: 'Tablette & Cigarette', value: summary ? String(summary.values.tabletPassagesToday + summary.values.cigarettePassagesToday) : '…', subtitle: summary ? `Passages + ventes (${formatUsd(summary.values.cigaretteRevenueToday)})` : 'Passages, ventes et suivi' } : null,
     flags.canActivityPreview ? { id: 'activity', href: '/dashboard/activite', enabled: flags.canActivityAccess, icon: '🎯', title: 'Activité', value: summary ? String(summary.values.activitiesToday) : '0', subtitle: 'Boîte / Cambriolage / Conteneur' } : null,
     flags.canFourPreview ? { id: 'four', href: '/dashboard/four', enabled: flags.canFourAccess, icon: '🔥', title: 'FOUR', value: summary ? formatUsd(summary.values.fourProfitToday) : '…', subtitle: summary ? `${formatUsd(summary.values.fourPurchasesToday)} achat / ${formatUsd(summary.values.fourSalesToday)} vente` : 'Achat / Vente' } : null,
     flags.canDrugsPreview ? { id: 'drugs', href: '/dashboard/drogues', enabled: flags.canDrugsAccess, icon: '🧪', title: 'Drogues', value: 'Module', subtitle: 'Transfo + vente + production' } : null

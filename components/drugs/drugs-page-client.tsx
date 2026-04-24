@@ -1,12 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { SessionMemberSelector } from '@/components/shared/session-member-selector';
 import { RemoveLineButton } from '@/components/shared/line-controls';
+import { GoFastPageClient } from '@/components/drugs/gofast-page-client';
 
 type Member = { id: string; name: string; username: string };
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price?: number | null; category_key?: string | null; type_key?: string | null };
@@ -57,7 +57,7 @@ type Sale = {
 };
 type Production = { id: number; production_type: 'coke' | 'meth'; input_snapshot: Record<string, unknown>; output_snapshot: Record<string, unknown>; note?: string | null; created_at: string };
 
-type Tab = 'transfo' | 'sales' | 'production';
+type Tab = 'transfo' | 'sales' | 'production' | 'gofast';
 
 type DrugDef = {
   key: string;
@@ -117,7 +117,12 @@ export function DrugsPageClient({
   canProductionCokeCreate,
   canProductionMethCreate,
   canProductionHistoryView,
-  canGoFastView
+  canGoFastView,
+  canGoFastCreate,
+  canGoFastArrested,
+  canGoFastStats,
+  canGoFastLogs,
+  gofastRuns
 }: {
   currentUserId: string;
   transfos: Transfo[];
@@ -140,6 +145,11 @@ export function DrugsPageClient({
   canProductionMethCreate: boolean;
   canProductionHistoryView: boolean;
   canGoFastView: boolean;
+  canGoFastCreate: boolean;
+  canGoFastArrested: boolean;
+  canGoFastStats: boolean;
+  canGoFastLogs: boolean;
+  gofastRuns: Array<{ id: number; created_at: string; user_name: string | null; status: 'success' | 'arrested'; item_name: string; item_image: string | null; quantity: number; money_amount: number; lost_money: number; seized_quantity: number; stock_after: number; money_after: number | null }>;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('transfo');
@@ -271,6 +281,27 @@ export function DrugsPageClient({
     }
     return labels;
   }, [visibleTransfos]);
+
+  const gofastItems = useMemo(
+    () => items.filter((entry) => (entry.category_key ?? '').toLowerCase() === 'drugs' && (entry.type_key ?? '').toLowerCase() === 'bag' && !entry.name.toLowerCase().includes('graine') && !entry.name.toLowerCase().includes('table')),
+    [items]
+  );
+  const gofastWeekStats = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - start.getDay());
+    const startIso = start.toISOString();
+    const weekRows = gofastRuns.filter((entry) => entry.created_at >= startIso);
+    return {
+      successCount: weekRows.filter((entry) => entry.status === 'success').length,
+      arrestedCount: weekRows.filter((entry) => entry.status === 'arrested').length,
+      sentQty: weekRows.reduce((sum, entry) => sum + (entry.status === 'success' ? Number(entry.quantity) : 0), 0),
+      seizedQty: weekRows.reduce((sum, entry) => sum + Number(entry.seized_quantity ?? 0), 0),
+      moneyIn: weekRows.reduce((sum, entry) => sum + Number(entry.money_amount ?? 0), 0),
+      moneyLost: weekRows.reduce((sum, entry) => sum + Number(entry.lost_money ?? 0), 0)
+    };
+  }, [gofastRuns]);
 
   function addOrIncrementSaleLine(itemId: number) {
     setSaleLines((current) => {
@@ -453,17 +484,12 @@ export function DrugsPageClient({
 
   return (
     <div className="space-y-4">
-      {canGoFastView ? (
-        <Link href="/dashboard/drogues/gofast" className="glass-card smooth-hover block p-4">
-          <p className="text-sm font-semibold text-[#ffe8ca]">🚚⚡ GoFast</p>
-          <p className="text-xs text-[#efcdab]">Livraison de pochons</p>
-        </Link>
-      ) : null}
       <section className="glass-card flex flex-wrap items-center justify-between gap-3 p-5">
         <div className="flex gap-2">
           <button className={`filter-pill ${tab === 'transfo' ? 'filter-pill-active' : ''}`} onClick={() => setTab('transfo')}>🧪 Transfo</button>
           <button className={`filter-pill ${tab === 'sales' ? 'filter-pill-active' : ''}`} onClick={() => setTab('sales')}>💸 Vente drogue</button>
           {(canProductionAccess || canProductionHistoryView) ? <button className={`filter-pill ${tab === 'production' ? 'filter-pill-active' : ''}`} onClick={() => setTab('production')}>🏭 Production</button> : null}
+          {canGoFastView ? <button className={`filter-pill ${tab === 'gofast' ? 'filter-pill-active' : ''}`} onClick={() => setTab('gofast')}>🚚 GoFast</button> : null}
         </div>
         <p className="text-xs text-[#f1d2ad]">Module détaillé — stock, argent, membres, logs {isSyncing ? '· synchronisation…' : ''}</p>
       </section>
@@ -603,6 +629,18 @@ export function DrugsPageClient({
             ) : null}
           </article>
         </section>
+      ) : null}
+
+      {tab === 'gofast' && canGoFastView ? (
+        <GoFastPageClient
+          items={gofastItems}
+          runs={gofastRuns}
+          stats={gofastWeekStats}
+          canCreate={canGoFastCreate}
+          canArrested={canGoFastArrested}
+          canStats={canGoFastStats}
+          canLogs={canGoFastLogs}
+        />
       ) : null}
 
       {tab === 'sales' ? (
