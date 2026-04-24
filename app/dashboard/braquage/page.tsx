@@ -40,7 +40,7 @@ export default async function RobberyPage() {
   const supabase = getSupabaseAdmin();
   const [{ data: runs }, { data: items }, { data: members }] = await Promise.all([
     supabase.from('robbery_runs').select('*').order('created_at', { ascending: false }).limit(300),
-    supabase.from('items').select('id, name, quantity, image_url').order('name', { ascending: true }),
+    supabase.from('items').select('id, name, quantity, image_url, category_key, type_key').order('name', { ascending: true }),
     supabase.from('users').select('id, name, username').order('username', { ascending: true })
   ]);
 

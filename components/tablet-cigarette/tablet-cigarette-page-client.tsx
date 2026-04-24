@@ -129,6 +129,11 @@ export function TabletCigarettePageClient(props: {
             </div>
           </article>
           <article className="glass-card p-5 space-y-2">
+            <label className="text-xs text-[#efcdab]">Membre</label>
+            <select className="saas-input" value={memberId} onChange={(e) => { setMemberId(e.target.value); const member = membersById.get(e.target.value); setMemberLabel(member ? (member.name || member.username) : defaultMemberLabel); }}>
+              {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
+            </select>
+            <p className="text-[11px] text-[#efcdab]">Membre sélectionné: <span className="font-semibold text-[#ffe8ca]">{memberLabel}</span></p>
             {canTabletManageDaily ? (<><label className="text-xs text-[#efcdab]">Dépôt matin tablette</label><div className="flex gap-2"><input className="saas-input" value={deposit} onChange={(e) => setDeposit(e.target.value)} /><button className="saas-primary-btn" onClick={() => void saveTabletDeposit()}>Enregistrer</button></div></>) : null}
             {canTabletCreatePassage ? <button className="saas-primary-btn" onClick={() => void createTabletPassage()}>Valider passage tablette</button> : null}
           </article>
@@ -175,11 +180,55 @@ export function TabletCigarettePageClient(props: {
       ) : null}
 
       {(tab === 'stats' && canStats) ? (
-        <section className="grid gap-2 md:grid-cols-4">
-          <Stat label="Passages tablette" value={String(tabletPassagesState.length)} icon="📱" />
-          <Stat label="Passages cigarette" value={String(cigarettePassagesState.length)} icon="🚬" />
-          <Stat label="Recette cigarette" value={formatUsd(cigarettePassagesState.reduce((sum, row) => sum + Number(row.revenue_amount ?? 0), 0))} icon="💵" />
-          <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="🏦" />
+        <section className="space-y-3">
+          <div className="grid gap-2 md:grid-cols-4">
+            <Stat label="Passages tablette" value={String(tabletPassagesState.length)} icon="📱" />
+            <Stat label="Passages cigarette" value={String(cigarettePassagesState.length)} icon="🚬" />
+            <Stat label="Recette cigarette" value={formatUsd(cigarettePassagesState.reduce((sum, row) => sum + Number(row.revenue_amount ?? 0), 0))} icon="💵" />
+            <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="🏦" />
+          </div>
+          <article className="glass-card p-5">
+            <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Tablette</h4>
+            <div className="mt-2 overflow-x-auto">
+              <table className="min-w-full text-left text-xs text-[#efcdab]">
+                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent rapporté</th><th className="px-2 py-1">Argent restant</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
+                <tbody>
+                  {Array.from(tabletPassagesState.reduce((acc, row) => {
+                    const prev = acc.get(row.member_label) ?? { count: 0, money: 0, last: row.created_at, remaining: row.after_cash };
+                    prev.count += 1;
+                    prev.money += Number(row.after_cash) - Number(row.before_cash);
+                    prev.remaining = Number(row.after_cash);
+                    if (new Date(row.created_at).getTime() > new Date(prev.last).getTime()) prev.last = row.created_at;
+                    acc.set(row.member_label, prev);
+                    return acc;
+                  }, new Map<string, { count: number; money: number; remaining: number; last: string }>()).entries()).map(([name, row]) => (
+                    <tr key={name} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{name}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{formatUsd(row.remaining)}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+          <article className="glass-card p-5">
+            <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Cigarette</h4>
+            <div className="mt-2 overflow-x-auto">
+              <table className="min-w-full text-left text-xs text-[#efcdab]">
+                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent rapporté</th><th className="px-2 py-1">Qté vendue</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
+                <tbody>
+                  {Array.from(cigarettePassagesState.reduce((acc, row) => {
+                    const prev = acc.get(row.member_label) ?? { count: 0, money: 0, qty: 0, last: row.created_at };
+                    prev.count += 1;
+                    prev.money += Number(row.revenue_amount ?? 0);
+                    prev.qty += Number(row.quantity_sold ?? 0);
+                    if (new Date(row.created_at).getTime() > new Date(prev.last).getTime()) prev.last = row.created_at;
+                    acc.set(row.member_label, prev);
+                    return acc;
+                  }, new Map<string, { count: number; money: number; qty: number; last: string }>()).entries()).map(([name, row]) => (
+                    <tr key={name} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{name}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{row.qty}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
         </section>
       ) : null}
 

@@ -576,7 +576,7 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
                   className="flex w-full items-center justify-between text-left"
                   onClick={() => setOpenModules((current) => ({ ...current, [module.moduleName]: !current[module.moduleName] }))}
                 >
-                  <h4 className="text-sm font-semibold text-[#ffe9ce]">{module.moduleName}</h4>
+                  <h4 className="text-sm font-semibold text-[#ffe9ce]">{module.moduleName.toUpperCase()}</h4>
                   <span className="text-xs text-[#efcba8]">{openModules[module.moduleName] ? '−' : '+'}</span>
                 </button>
                 {openModules[module.moduleName] ? <div className="mt-3 space-y-3">

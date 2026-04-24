@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 
-type Item = { id: number; name: string; quantity: number; image_url: string | null };
+type Item = { id: number; name: string; quantity: number; image_url: string | null; category_key?: string | null; type_key?: string | null };
 type Run = {
   id: number;
   created_at: string;
@@ -59,6 +59,8 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
   const [arrestedOpen, setArrestedOpen] = useState(false);
   const [lostMoney, setLostMoney] = useState(0);
   const [seizedNote, setSeizedNote] = useState('');
+  const [seizedQuery, setSeizedQuery] = useState('');
+  const [seizedCategory, setSeizedCategory] = useState('all');
   const [seizedRows, setSeizedRows] = useState<Array<{ item_id: number; quantity: number }>>([]);
 
   const selectedDef = useMemo(() => ROBBERY_DEFS.find((entry) => entry.key === robberyType) ?? ROBBERY_DEFS[0], [robberyType]);
@@ -69,6 +71,15 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
   }), [items, selectedDef]);
 
   const canValidate = canCreate && !saving && moneyAmount > 0 && selectedMembers.length > 0 && availability.every((entry) => entry.ok);
+  const seizedRowsById = useMemo(() => new Map(seizedRows.map((row) => [row.item_id, row.quantity])), [seizedRows]);
+  const filteredSeizableItems = useMemo(() => {
+    const q = seizedQuery.trim().toLowerCase();
+    return items.filter((item) => {
+      if (seizedCategory !== 'all' && (item.category_key ?? 'stock').toLowerCase() !== seizedCategory) return false;
+      if (q && !item.name.toLowerCase().includes(q)) return false;
+      return Number(item.quantity ?? 0) > 0;
+    });
+  }, [items, seizedCategory, seizedQuery]);
 
   async function submit(action: 'success' | 'arrested') {
     setError('');
@@ -173,28 +184,58 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
           <label className="text-xs text-[#efcdab]">Argent rapporté</label>
           <input className="saas-input" value={moneyAmount} onChange={(event) => setMoneyAmount(Math.max(0, Number(event.target.value || 0)))} />
 
-          {canCreate ? <button type="button" className="saas-primary-btn" disabled={!canValidate} onClick={() => void submit('success')}>Valider braquage</button> : <p className="text-sm text-[#efcdab]">Permission manquante pour valider.</p>}
-          <button type="button" className="saas-ghost-btn" onClick={() => { setMoneyAmount(0); setSelectedMembers([]); setError(''); }}>Annuler</button>
+          <div className="grid grid-cols-2 gap-2">
+            {canCreate ? <button type="button" className="saas-primary-btn" disabled={!canValidate} onClick={() => void submit('success')}>Valider</button> : <p className="rounded-lg border border-white/10 bg-[#3f281b]/50 px-3 py-2 text-sm text-[#efcdab]">Permission manquante</p>}
+            <button type="button" className="saas-ghost-btn" onClick={() => { setMoneyAmount(0); setSelectedMembers([]); setError(''); }}>Annuler</button>
+          </div>
 
           {canArrested ? <button type="button" className="saas-ghost-btn w-full" onClick={() => setArrestedOpen((cur) => !cur)}>🚔 Braquage arrêté</button> : null}
           {arrestedOpen ? (
-            <div className="space-y-2 rounded-xl border border-rose-200/20 bg-rose-500/10 p-3">
+            <div className="space-y-3 rounded-xl border border-rose-200/20 bg-rose-500/10 p-4">
+              <p className="text-sm font-semibold text-[#ffe8ca]">Braquage arrêté</p>
               <label className="text-xs text-[#efcdab]">Argent perdu / saisi</label>
               <input className="saas-input" value={lostMoney} onChange={(event) => setLostMoney(Math.max(0, Number(event.target.value || 0)))} />
 
               <label className="text-xs text-[#efcdab]">Ressources saisies (stock)</label>
-              <div className="space-y-1">
-                {seizedRows.map((row, idx) => (
-                  <div key={`${idx}-${row.item_id}`} className="grid grid-cols-[1fr_5rem_auto] gap-1">
-                    <select className="saas-input" value={row.item_id} onChange={(e) => setSeizedRows((cur) => cur.map((entry, i) => i === idx ? { ...entry, item_id: Number(e.target.value || 0) } : entry))}>
-                      <option value={0}>Ressource</option>
-                      {items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
-                    <input className="saas-input" value={row.quantity} onChange={(e) => setSeizedRows((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(0, Number(e.target.value || 0)) } : entry))} />
-                    <button type="button" className="saas-ghost-btn" onClick={() => setSeizedRows((cur) => cur.filter((_, i) => i !== idx))}>✕</button>
-                  </div>
-                ))}
-                <button type="button" className="saas-ghost-btn w-full" onClick={() => setSeizedRows((cur) => [...cur, { item_id: 0, quantity: 1 }])}>+ Ajouter ressource saisie</button>
+              <div className="grid gap-2 md:grid-cols-[1fr_10rem]">
+                <input className="saas-input" placeholder="Recherche item" value={seizedQuery} onChange={(e) => setSeizedQuery(e.target.value)} />
+                <select className="saas-input" value={seizedCategory} onChange={(e) => setSeizedCategory(e.target.value)}>
+                  <option value="all">Toutes catégories</option>
+                  <option value="objects">Objets</option>
+                  <option value="equipment">Équipement</option>
+                  <option value="drugs">Drogues</option>
+                </select>
+              </div>
+              <div className="max-h-52 space-y-1 overflow-auto rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">
+                {filteredSeizableItems.map((item) => {
+                  const selectedQty = seizedRowsById.get(item.id) ?? 0;
+                  return (
+                    <div key={item.id} className="grid grid-cols-[2.2rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-white/10 bg-[#4f3220]/45 px-2 py-1.5">
+                      <div className="h-8 w-8 overflow-hidden rounded-md border border-white/10 bg-[#1f120d]">
+                        {item.image_url ? <Image src={item.image_url} alt={item.name} width={32} height={32} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-[10px]">📦</div>}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-[#ffe8ca]">{item.name}</p>
+                        <p className="text-[10px] text-[#efcdab]">{item.category_key || 'stock'} · Dispo {item.quantity}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0" onClick={() => setSeizedRows((cur) => {
+                          const current = cur.find((row) => row.item_id === item.id);
+                          if (!current) return cur;
+                          if (current.quantity <= 1) return cur.filter((row) => row.item_id !== item.id);
+                          return cur.map((row) => row.item_id === item.id ? { ...row, quantity: row.quantity - 1 } : row);
+                        })}>−</button>
+                        <span className="w-6 text-center text-xs text-[#ffe8ca]">{selectedQty}</span>
+                        <button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0" onClick={() => setSeizedRows((cur) => {
+                          const current = cur.find((row) => row.item_id === item.id);
+                          if (!current) return [...cur, { item_id: item.id, quantity: 1 }];
+                          if (current.quantity >= Number(item.quantity)) return cur;
+                          return cur.map((row) => row.item_id === item.id ? { ...row, quantity: row.quantity + 1 } : row);
+                        })}>+</button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <label className="text-xs text-[#efcdab]">Note (optionnelle)</label>
