@@ -1,51 +1,111 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
+import type { PayrollPreview } from '@/lib/payroll';
 
-type Member = { id: string; label: string };
-type PaymentRow = { id: number; member_label: string; reason: string; amount: number; created_at: string };
+type HistoryRun = {
+  id: number;
+  week_start: string;
+  week_end: string;
+  validated_at: string;
+  validated_by_label: string | null;
+  group_balance_before: number;
+  group_balance_after: number;
+  reserve_kept: number;
+  envelope: number;
+  total_distributed: number;
+};
+
+type HistoryRunMember = {
+  id: number;
+  payroll_run_id: number;
+  member_user_id: string | null;
+  member_label: string;
+  amount: number;
+  score_total: number;
+  money_contribution: number;
+  activity_count: number;
+  participation_count: number;
+};
+
+type LogRow = { id: number; action: string; summary: string; created_at: string; actor_name: string | null };
 
 export function MoneyPayPageClient({
-  canCreate,
+  canConfigure,
+  canAdjust,
+  canValidate,
   canHistory,
-  balance,
-  payEstimates,
-  members,
-  payments
+  canLogs,
+  currentPreview,
+  previousPreview,
+  history,
+  historyMembers,
+  logs
 }: {
-  canCreate: boolean;
+  canConfigure: boolean;
+  canAdjust: boolean;
+  canValidate: boolean;
   canHistory: boolean;
-  balance: number;
-  payEstimates: Record<string, { recommended: number; previousRecommended: number; minimum: number; maximum: number; activityIndex: number; economyIndex: number }>;
-  members: Member[];
-  payments: PaymentRow[];
+  canLogs: boolean;
+  currentPreview: PayrollPreview;
+  previousPreview: PayrollPreview;
+  history: HistoryRun[];
+  historyMembers: HistoryRunMember[];
+  logs: LogRow[];
 }) {
-  const [memberId, setMemberId] = useState(members[0]?.id ?? '');
-  const [amount, setAmount] = useState('');
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
+  const [config, setConfig] = useState(currentPreview.config);
+  const [excludedIds, setExcludedIds] = useState<string[]>([]);
+  const [manualAdjustments, setManualAdjustments] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
-  const selectedMember = members.find((member) => member.id === memberId) ?? null;
-  const safeAmount = Math.max(0, Number(amount || 0));
-  const estimate = selectedMember ? payEstimates[selectedMember.id] : null;
+  const [error, setError] = useState('');
 
-  async function submitPayment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const effectivePreview = useMemo(() => {
+    const rows = currentPreview.members.map((row) => {
+      const excluded = excludedIds.includes(row.memberId);
+      const adjusted = Number(manualAdjustments[row.memberId]);
+      const pay = Number.isFinite(adjusted) && adjusted >= 0 ? adjusted : row.proposedPay;
+      return { ...row, eligible: row.eligible && !excluded, reason: excluded ? 'Exclu manuellement' : row.reason, proposedPay: excluded ? 0 : pay };
+    });
+    const total = rows.reduce((sum, row) => sum + (row.eligible ? Math.max(0, Number(row.proposedPay || 0)) : 0), 0);
+    return {
+      ...currentPreview,
+      config,
+      members: rows,
+      totalProposed: Math.round(total),
+      balanceAfter: currentPreview.balance - Math.round(total)
+    };
+  }, [config, currentPreview, excludedIds, manualAdjustments]);
+
+  const historyByRun = useMemo(() => {
+    const map = new Map<number, HistoryRunMember[]>();
+    for (const row of historyMembers) {
+      const list = map.get(row.payroll_run_id) ?? [];
+      list.push(row);
+      map.set(row.payroll_run_id, list);
+    }
+    return map;
+  }, [historyMembers]);
+
+  async function validatePayroll() {
     if (submitting) return;
     setSubmitting(true);
     setError('');
-
-    const response = await fetch('/api/money/payments', {
+    const response = await fetch('/api/money/payroll', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_user_id: memberId, amount: Number(amount), reason })
+      body: JSON.stringify({
+        week_start_iso: currentPreview.weekStartIso,
+        config,
+        excluded_member_ids: excludedIds,
+        manual_adjustments: manualAdjustments
+      })
     });
-
     setSubmitting(false);
+
     if (!response.ok) {
-      const data = (await response.json().catch(() => ({}))) as { message?: string };
-      setError(data.message ?? 'Création paye impossible.');
+      const payload = await response.json().catch(() => ({ message: 'Validation paye impossible.' }));
+      setError(payload.message ?? 'Validation paye impossible.');
       return;
     }
 
@@ -54,120 +114,136 @@ export function MoneyPayPageClient({
 
   return (
     <div className="space-y-4">
-      <section className="glass-card p-5">
-        <div className="grid gap-2 sm:grid-cols-3">
-          <div className="rounded-xl border border-white/10 bg-[#2f1d14]/55 p-3">
-            <p className="text-xs text-[#efcdab]">💳 Solde groupe actuel</p>
-            <p className="text-2xl font-bold text-[#ffe5c0]">{formatUsd(balance)}</p>
-          </div>
-          <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 p-3">
-            <p className="text-xs text-[#d8f2d1]">📈 Estimation semaine</p>
-            <p className="text-sm font-semibold text-[#ebffe5]">{estimate ? formatUsd(estimate.recommended) : 'Sélectionne un membre'}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-[#2f1d14]/55 p-3">
-            <p className="text-xs text-[#efcdab]">🕓 Semaine passée</p>
-            <p className="text-sm font-semibold text-[#ffe5c0]">{estimate ? formatUsd(estimate.previousRecommended) : '—'}</p>
-          </div>
+      <section className="grid gap-2 lg:grid-cols-5">
+        <Card label="💳 Argent groupe" value={formatUsd(effectivePreview.balance)} />
+        <Card label="🛡️ Réserve conservée" value={formatUsd(effectivePreview.reserveKept)} />
+        <Card label="📦 Enveloppe paye" value={formatUsd(effectivePreview.envelope)} />
+        <Card label="✅ Total payes calculées" value={formatUsd(effectivePreview.totalProposed)} />
+        <Card label="🏦 Solde après paye" value={formatUsd(effectivePreview.balanceAfter)} />
+      </section>
+
+      <section className="glass-card p-4">
+        <h3 className="text-sm font-semibold text-[#fff1dd]">Comparaison semaines</h3>
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <article className="rounded-xl border border-white/10 bg-[#3b2518]/60 p-3 text-xs text-[#efcdab]">
+            <p className="font-semibold text-[#ffe8ca]">Semaine actuelle</p>
+            <p>{currentPreview.weekStartIso.slice(0, 10)} → {currentPreview.weekEndIso.slice(0, 10)}</p>
+            <p>Éligibles: {currentPreview.eligibleCount} · Enveloppe: {formatUsd(currentPreview.envelope)}</p>
+          </article>
+          <article className="rounded-xl border border-white/10 bg-[#3b2518]/60 p-3 text-xs text-[#efcdab]">
+            <p className="font-semibold text-[#ffe8ca]">Semaine passée</p>
+            <p>{previousPreview.weekStartIso.slice(0, 10)} → {previousPreview.weekEndIso.slice(0, 10)}</p>
+            <p>Éligibles: {previousPreview.eligibleCount} · Enveloppe: {formatUsd(previousPreview.envelope)}</p>
+          </article>
         </div>
       </section>
 
-      {canCreate ? (
-        <form className="glass-card space-y-4 p-5" onSubmit={submitPayment}>
-          <h3 className="text-lg font-semibold text-[#fff1dd]">🧑‍💼 Payer un membre</h3>
-          <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <p className="mb-1 text-xs text-[#efcdab]">👤 Membre</p>
-              <select className="saas-input w-full" value={memberId} onChange={(e) => setMemberId(e.target.value)} required>
-                <option value="">Sélectionner un membre</option>
-                {members.map((member) => <option key={member.id} value={member.id}>{member.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <p className="mb-1 text-xs text-[#efcdab]">💰 Montant</p>
-              <input className="saas-input w-full" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Ex: 5000" required />
-            </div>
-          </div>
-          <div>
-            <p className="mb-1 text-xs text-[#efcdab]">🧾 Raison</p>
-            <input className="saas-input w-full" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex: Paye hebdomadaire" required />
-          </div>
+      <section className="glass-card p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-[#fff1dd]">Réglages paye</h3>
+        <div className="grid gap-2 md:grid-cols-4">
+          <Field label="Réserve minimale" value={config.reserveMinimum} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, reserveMinimum: Math.max(0, v) }))} disabled={!canConfigure} />
+          <Field label="% distribuable" value={Math.round(config.distributablePercent * 100)} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, distributablePercent: Math.max(0, Math.min(100, v)) / 100 }))} disabled={!canConfigure} />
+          <Field label="Plafond membre" value={config.memberCap} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, memberCap: Math.max(0, v) }))} disabled={!canConfigure} />
+          <Field label="Minimum membre" value={config.memberMinimum} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, memberMinimum: Math.max(0, v) }))} disabled={!canConfigure} />
+        </div>
+        <div className="grid gap-2 md:grid-cols-5">
+          <Field label="Poids argent (%)" value={Math.round(config.weights.money * 100)} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, weights: { ...cur.weights, money: Math.max(0, v) / 100 } }))} disabled={!canConfigure} />
+          <Field label="Poids activité (%)" value={Math.round(config.weights.activity * 100)} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, weights: { ...cur.weights, activity: Math.max(0, v) / 100 } }))} disabled={!canConfigure} />
+          <Field label="Poids participation (%)" value={Math.round(config.weights.participation * 100)} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, weights: { ...cur.weights, participation: Math.max(0, v) / 100 } }))} disabled={!canConfigure} />
+          <Field label="Seuil actions" value={config.minActions} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, minActions: Math.max(0, v) }))} disabled={!canConfigure} />
+          <Field label="Seuil argent" value={config.minMoney} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, minMoney: Math.max(0, v) }))} disabled={!canConfigure} />
+        </div>
+      </section>
 
-          <div className="grid gap-2 rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 md:grid-cols-2">
-            <div className="rounded-xl border border-white/10 bg-[#2e1d14]/55 p-3">
-              <p className="text-xs text-[#efcdab]">👤 Membre sélectionné</p>
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-[#5a3926] text-sm font-semibold text-[#ffe8ca]">
-                  {(selectedMember?.label ?? '?').slice(0, 1).toUpperCase()}
+      <section className="glass-card p-4">
+        <h3 className="text-sm font-semibold text-[#fff1dd]">Membres · contribution / éligibilité / paye</h3>
+        <div className="mt-2 space-y-2 max-h-[520px] overflow-auto pr-1">
+          {effectivePreview.members.map((member) => (
+            <article key={member.memberId} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]">
+              <div className="grid gap-2 md:grid-cols-[1.5fr_repeat(6,minmax(0,1fr))] md:items-center">
+                <div>
+                  <p className="font-semibold text-[#ffe8ca]">{member.memberLabel}</p>
+                  <p>{member.reason}</p>
                 </div>
-                <p className="text-sm font-semibold text-[#fff2de]">{selectedMember?.label ?? 'Aucun membre'}</p>
+                <p>💵 {formatUsd(member.moneyContribution)}</p>
+                <p>🎯 {member.activityCount} actions</p>
+                <p>🤝 {member.participationCount} participations</p>
+                <p>📊 {member.totalScore.toFixed(2)}</p>
+                <p className="font-semibold text-[#ffe8ca]">{formatUsd(member.proposedPay)}</p>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    className={`saas-ghost-btn !py-1 !px-2 ${excludedIds.includes(member.memberId) ? 'opacity-50' : ''}`}
+                    onClick={() => setExcludedIds((cur) => cur.includes(member.memberId) ? cur.filter((id) => id !== member.memberId) : [...cur, member.memberId])}
+                  >
+                    {excludedIds.includes(member.memberId) ? 'Inclure' : 'Exclure'}
+                  </button>
+                  <input
+                    className="saas-input !h-8 w-24"
+                    value={manualAdjustments[member.memberId] ?? ''}
+                    onChange={(event) => canAdjust && setManualAdjustments((cur) => ({ ...cur, [member.memberId]: Math.max(0, Number(event.target.value || 0)) }))}
+                    placeholder="Ajuster"
+                    disabled={!canAdjust}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-[#2e1d14]/55 p-3">
-              <p className="text-xs text-[#efcdab]">💸 Récapitulatif</p>
-              <p className="mt-2 text-sm text-[#ffe8ca]">Montant: <span className="font-semibold">{formatUsd(safeAmount)}</span></p>
-              <p className="text-xs text-[#efcdab]">Après paye: {formatUsd(balance - safeAmount)}</p>
-              <p className="mt-1 text-xs text-[#efcdab]">Raison: {reason || '—'}</p>
-            </div>
-          </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-          {estimate ? (
-            <div className="grid gap-2 rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 md:grid-cols-5">
-            <div className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-2">
-              <p className="text-[11px] text-[#efcdab]">Estimation recommandée</p>
-              <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(estimate.recommended)}</p>
-            </div>
-              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
-                <p className="text-[11px] text-[#efcdab]">Semaine passée</p>
-                <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(estimate.previousRecommended)}</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
-                <p className="text-[11px] text-[#efcdab]">Minimum conseillé</p>
-                <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(estimate.minimum)}</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
-                <p className="text-[11px] text-[#efcdab]">Maximum conseillé</p>
-                <p className="text-sm font-semibold text-[#ffe8ca]">{formatUsd(estimate.maximum)}</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
-                <p className="text-[11px] text-[#efcdab]">Indice activité</p>
-                <p className="text-sm font-semibold text-[#ffe8ca]">{estimate.activityIndex.toFixed(2)}</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-[#2e1d14]/55 p-2">
-                <p className="text-[11px] text-[#efcdab]">Indice économie groupe</p>
-                <p className="text-sm font-semibold text-[#ffe8ca]">{estimate.economyIndex.toFixed(2)}</p>
-              </div>
-              <div className="md:col-span-5 flex flex-wrap gap-2">
-                <button type="button" className="saas-ghost-btn" onClick={() => setAmount(String(estimate.minimum))}>Appliquer minimum</button>
-                <button type="button" className="saas-ghost-btn" onClick={() => setAmount(String(estimate.recommended))}>Appliquer recommandé</button>
-                <button type="button" className="saas-ghost-btn" onClick={() => setAmount(String(estimate.maximum))}>Appliquer maximum</button>
-                <p className="text-[11px] text-[#efcdab] self-center">Estimation basée sur 30 jours (activité + économie groupe), avec fallback automatique si historique partiel.</p>
-              </div>
-            </div>
-          ) : null}
-
-          {error ? <p className="rounded-xl border border-red-300/45 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
-          <button className="saas-primary-btn w-full" disabled={submitting}>{submitting ? 'Validation…' : 'Valider la paye'}</button>
-        </form>
-      ) : null}
+      <section className="glass-card p-4">
+        <h3 className="text-sm font-semibold text-[#fff1dd]">Validation</h3>
+        <p className="mt-1 text-xs text-[#efcdab]">Le total distribué ne peut pas dépasser l’enveloppe. La semaine est figée après validation.</p>
+        {error ? <p className="mt-2 rounded-lg border border-red-300/50 bg-red-500/10 px-2 py-1 text-xs text-red-100">{error}</p> : null}
+        {canValidate ? <button className="saas-primary-btn mt-3" disabled={submitting} onClick={() => void validatePayroll()}>{submitting ? 'Validation…' : 'Valider les payes'}</button> : <p className="mt-2 text-xs text-[#efcdab]">Permission manquante pour valider.</p>}
+      </section>
 
       {canHistory ? (
-        <section className="glass-card p-5">
-          <h3 className="text-lg font-semibold text-[#fff1dd]">Historique des payes</h3>
-          <div className="mt-3 space-y-2">
-            {payments.map((payment) => (
-              <article key={payment.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-sm text-[#ffe4c6]">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold">👤 {payment.member_label}</p>
-                  <p className="rounded-full border border-white/10 bg-[#2e1d14]/60 px-2 py-0.5 text-xs">💰 {formatUsd(payment.amount)}</p>
+        <section className="glass-card p-4">
+          <h3 className="text-sm font-semibold text-[#fff1dd]">Historique paye</h3>
+          <div className="mt-2 space-y-2">
+            {history.map((run) => (
+              <article key={run.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]">
+                <p className="font-semibold text-[#ffe8ca]">Semaine {run.week_start.slice(0, 10)} → {run.week_end.slice(0, 10)} · {formatUsd(Number(run.total_distributed ?? 0))}</p>
+                <p>Validée par {run.validated_by_label || 'N/A'} · {new Date(run.validated_at).toLocaleString('fr-FR')}</p>
+                <p>Avant: {formatUsd(Number(run.group_balance_before ?? 0))} · Après: {formatUsd(Number(run.group_balance_after ?? 0))} · Réserve: {formatUsd(Number(run.reserve_kept ?? 0))}</p>
+                <div className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {(historyByRun.get(run.id) ?? []).map((member) => (
+                    <p key={member.id} className="rounded-lg border border-white/10 bg-[#2b1a12]/55 px-2 py-1">{member.member_label}: <span className="text-[#ffe8ca]">{formatUsd(Number(member.amount ?? 0))}</span></p>
+                  ))}
                 </div>
-                <p className="mt-1 text-xs text-[#efcdab]">🧾 {payment.reason.replace(/^Paye:\s*/i, '')}</p>
-                <p className="text-xs text-[#efcdab]">🕒 {new Date(payment.created_at).toLocaleString('fr-FR')}</p>
               </article>
             ))}
-            {payments.length === 0 ? <p className="text-sm text-[#f2d2ae]">Aucune paye enregistrée.</p> : null}
+            {history.length === 0 ? <p className="text-xs text-[#efcdab]">Aucun historique de paye.</p> : null}
+          </div>
+        </section>
+      ) : null}
+
+      {canLogs ? (
+        <section className="glass-card p-4">
+          <h3 className="text-sm font-semibold text-[#fff1dd]">Logs paye</h3>
+          <div className="mt-2 space-y-1">
+            {logs.map((entry) => (
+              <p key={entry.id} className="rounded-lg border border-white/10 bg-[#2b1a12]/55 px-2 py-1 text-xs text-[#efcdab]">[{new Date(entry.created_at).toLocaleString('fr-FR')}] <span className="text-[#ffe8ca]">{entry.action}</span> · {entry.summary}</p>
+            ))}
+            {logs.length === 0 ? <p className="text-xs text-[#efcdab]">Aucun log paye.</p> : null}
           </div>
         </section>
       ) : null}
     </div>
+  );
+}
+
+function Card({ label, value }: { label: string; value: string }) {
+  return <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3"><p className="text-xs text-[#efcdab]">{label}</p><p className="text-lg font-semibold text-[#ffe8ca]">{value}</p></article>;
+}
+
+function Field({ label, value, onChange, disabled }: { label: string; value: number; onChange: (next: number) => void; disabled?: boolean }) {
+  return (
+    <label className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-2 text-xs text-[#efcdab]">
+      <span>{label}</span>
+      <input className="saas-input mt-1" value={value} onChange={(event) => onChange(Number(event.target.value || 0))} disabled={disabled} />
+    </label>
   );
 }

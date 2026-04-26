@@ -117,6 +117,13 @@ values
   ('money.pay.create'),
   ('money.pay.history.view'),
   ('money.pay.logs.view'),
+  ('payroll.view'),
+  ('payroll.preview'),
+  ('payroll.configure'),
+  ('payroll.adjust'),
+  ('payroll.validate'),
+  ('payroll.history'),
+  ('payroll.logs'),
   ('money.history.view'),
   ('money.quick_sale.access'),
   ('money.quick_sale.create'),
@@ -398,6 +405,62 @@ with check (true);
 drop policy if exists "allow_service_role_all_item_stock_movements" on public.item_stock_movements;
 create policy "allow_service_role_all_item_stock_movements"
 on public.item_stock_movements
+for all
+using (true)
+with check (true);
+
+create table if not exists public.payroll_runs (
+  id bigint generated always as identity primary key,
+  week_start timestamptz not null,
+  week_end timestamptz not null,
+  validated_at timestamptz not null default timezone('utc', now()),
+  validated_by uuid references public.users(id) on delete set null,
+  validated_by_label text,
+  group_balance_before numeric(12,2) not null default 0,
+  group_balance_after numeric(12,2) not null default 0,
+  reserve_kept numeric(12,2) not null default 0,
+  envelope numeric(12,2) not null default 0,
+  total_distributed numeric(12,2) not null default 0,
+  config_snapshot jsonb not null default '{}'::jsonb,
+  excluded_members jsonb not null default '[]'::jsonb,
+  manual_adjustments jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.payroll_run_members (
+  id bigint generated always as identity primary key,
+  payroll_run_id bigint not null references public.payroll_runs(id) on delete cascade,
+  member_user_id uuid references public.users(id) on delete set null,
+  member_label text not null,
+  amount numeric(12,2) not null default 0,
+  score_total numeric(12,4) not null default 0,
+  score_money numeric(12,4) not null default 0,
+  score_activity numeric(12,4) not null default 0,
+  score_participation numeric(12,4) not null default 0,
+  money_contribution numeric(12,2) not null default 0,
+  activity_count integer not null default 0,
+  participation_count integer not null default 0,
+  detail_snapshot jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create unique index if not exists idx_payroll_runs_week_start on public.payroll_runs(week_start);
+create index if not exists idx_payroll_runs_validated_at on public.payroll_runs(validated_at desc);
+create index if not exists idx_payroll_run_members_run_id on public.payroll_run_members(payroll_run_id);
+
+alter table public.payroll_runs enable row level security;
+alter table public.payroll_run_members enable row level security;
+
+drop policy if exists "allow_service_role_all_payroll_runs" on public.payroll_runs;
+create policy "allow_service_role_all_payroll_runs"
+on public.payroll_runs
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_payroll_run_members" on public.payroll_run_members;
+create policy "allow_service_role_all_payroll_run_members"
+on public.payroll_run_members
 for all
 using (true)
 with check (true);

@@ -23,7 +23,15 @@ const LEGACY_TO_CANONICAL: Record<string, string> = {
   'money.quick_sale.access': 'sale.objects.access',
   'money.quick_sale.create': 'sale.objects.create',
   'money.quick_sale.details.view': 'sale.objects.history.view',
-  'money.quick_sale.logs.view': 'sale.objects.history.view'
+  'money.quick_sale.logs.view': 'sale.objects.history.view',
+
+  'payroll.view': 'money.pay.access',
+  'payroll.preview': 'money.pay.access',
+  'payroll.configure': 'money.pay.create',
+  'payroll.adjust': 'money.pay.create',
+  'payroll.validate': 'money.pay.create',
+  'payroll.history': 'money.pay.history.view',
+  'payroll.logs': 'money.pay.logs.view'
 };
 
 const CANONICAL_TO_ALIASES = Object.entries(LEGACY_TO_CANONICAL).reduce<Record<string, string[]>>((acc, [legacy, canonical]) => {
