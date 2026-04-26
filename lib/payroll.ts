@@ -52,6 +52,10 @@ export type PayrollPreview = {
   members: PayrollMemberRow[];
 };
 
+function normalizeLabel(value: string | null | undefined) {
+  return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 export function weekWindow(now: Date, shiftWeeks = 0) {
   const start = new Date(now);
   start.setUTCHours(0, 0, 0, 0);
@@ -146,23 +150,34 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     { data: gofastRows },
     { data: robberyRows },
     { data: activityRows },
-    { data: activityMemberRows },
     { data: tabletRows },
     { data: cigaretteRows }
   ] = await Promise.all([
     supabase.from('users').select('id, name, username, is_active').order('username', { ascending: true }),
     supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle(),
-    supabase.from('transactions').select('member_user_id, actor_user_id, total_money_in, total_money_out, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
+    supabase.from('transactions').select('member_user_id, actor_user_id, member_label, total_money_in, total_money_out, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
     supabase.from('four_transactions').select('created_by, profit_loss, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
     supabase.from('sale_object_orders').select('created_by, total_amount, created_at, status').in('status', ['pending_receipt', 'received']).gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
     supabase.from('drug_sales').select('created_by, actual_amount, member_user_ids, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
-    supabase.from('gofast_runs').select('user_id, money_amount, participants, created_at, status').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
-    supabase.from('robbery_runs').select('user_id, money_amount, participants, created_at, status').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
-    supabase.from('activities').select('id, member_user_id, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
-    supabase.from('activity_members').select('activity_id, member_user_id'),
-    supabase.from('tablet_passages').select('member_user_id, before_cash, after_cash, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
-    supabase.from('cigarette_passages').select('member_user_id, revenue_amount, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000)
+    supabase.from('gofast_runs').select('user_id, user_name, money_amount, participants, created_at, status').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
+    supabase.from('robbery_runs').select('user_id, user_name, money_amount, participants, created_at, status').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
+    supabase.from('activities').select('id, member_user_id, member_label, created_by, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
+    supabase.from('tablet_passages').select('member_user_id, member_label, before_cash, after_cash, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
+    supabase.from('cigarette_passages').select('member_user_id, member_label, revenue_amount, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000)
   ]);
+
+  const memberIdByLabel = new Map<string, string>();
+  for (const member of members ?? []) {
+    const id = member.id as string;
+    const keys = [normalizeLabel(member.name as string | null), normalizeLabel(member.username as string | null)];
+    for (const key of keys) if (key) memberIdByLabel.set(key, id);
+  }
+  const resolveMemberId = (candidate?: string | null, fallbackLabel?: string | null) => {
+    const direct = (candidate ?? '').trim();
+    if (direct) return direct;
+    const fallback = normalizeLabel(fallbackLabel);
+    return fallback ? (memberIdByLabel.get(fallback) ?? null) : null;
+  };
 
   const moneyByMember = new Map<string, number>();
   const activityByMember = new Map<string, number>();
@@ -185,28 +200,31 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     const inAmount = Number(row.total_money_in ?? 0);
     const outAmount = Number(row.total_money_out ?? 0);
     const contribution = Math.max(0, inAmount - outAmount);
-    addMoney(row.member_user_id ?? row.actor_user_id, contribution);
-    addActivity(row.member_user_id ?? row.actor_user_id, 1);
+    const memberId = resolveMemberId(row.member_user_id ?? row.actor_user_id, row.member_label);
+    addMoney(memberId, contribution);
+    addActivity(memberId, 1);
   }
 
   for (const row of fourRows ?? []) {
     const profit = Math.max(0, Number(row.profit_loss ?? 0));
-    addMoney(row.created_by, profit);
-    addActivity(row.created_by, 1);
+    const memberId = resolveMemberId(row.created_by, null);
+    addMoney(memberId, profit);
+    addActivity(memberId, 1);
   }
 
   for (const row of saleRows ?? []) {
-    addMoney(row.created_by, Math.max(0, Number(row.total_amount ?? 0)));
-    addActivity(row.created_by, 1);
+    const memberId = resolveMemberId(row.created_by, null);
+    addMoney(memberId, Math.max(0, Number(row.total_amount ?? 0)));
+    addActivity(memberId, 1);
   }
 
   for (const row of drugRows ?? []) {
     const amount = Math.max(0, Number(row.actual_amount ?? 0));
-    const participants = normalizeParticipantIds(row.member_user_ids, row.created_by);
+    const participants = normalizeParticipantIds(row.member_user_ids, resolveMemberId(row.created_by, null));
     const split = splitAmount(amount, participants);
-    if (split.length === 0) addMoney(row.created_by, amount);
+    if (split.length === 0) addMoney(resolveMemberId(row.created_by, null), amount);
     for (const entry of split) addMoney(entry.memberId, entry.value);
-    for (const memberId of (participants.length > 0 ? participants : [row.created_by]).filter(Boolean) as string[]) {
+    for (const memberId of (participants.length > 0 ? participants : [resolveMemberId(row.created_by, null)]).filter(Boolean) as string[]) {
       addActivity(memberId, 1);
       addParticipation(memberId, 1);
     }
@@ -214,11 +232,11 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
 
   for (const row of gofastRows ?? []) {
     const amount = Math.max(0, Number(row.money_amount ?? 0));
-    const participants = normalizeParticipantIds(row.participants, row.user_id);
+    const participants = normalizeParticipantIds(row.participants, resolveMemberId(row.user_id, row.user_name));
     const split = splitAmount(amount, participants);
-    if (split.length === 0) addMoney(row.user_id, amount);
+    if (split.length === 0) addMoney(resolveMemberId(row.user_id, row.user_name), amount);
     for (const entry of split) addMoney(entry.memberId, entry.value);
-    for (const memberId of (participants.length > 0 ? participants : [row.user_id]).filter(Boolean) as string[]) {
+    for (const memberId of (participants.length > 0 ? participants : [resolveMemberId(row.user_id, row.user_name)]).filter(Boolean) as string[]) {
       addActivity(memberId, 1);
       addParticipation(memberId, 1.5);
     }
@@ -226,26 +244,32 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
 
   for (const row of robberyRows ?? []) {
     const amount = Math.max(0, Number(row.money_amount ?? 0));
-    const participants = normalizeParticipantIds(row.participants, row.user_id);
+    const participants = normalizeParticipantIds(row.participants, resolveMemberId(row.user_id, row.user_name));
     const split = splitAmount(amount, participants);
-    if (split.length === 0) addMoney(row.user_id, amount);
+    if (split.length === 0) addMoney(resolveMemberId(row.user_id, row.user_name), amount);
     for (const entry of split) addMoney(entry.memberId, entry.value);
-    for (const memberId of (participants.length > 0 ? participants : [row.user_id]).filter(Boolean) as string[]) {
+    for (const memberId of (participants.length > 0 ? participants : [resolveMemberId(row.user_id, row.user_name)]).filter(Boolean) as string[]) {
       addActivity(memberId, 1);
       addParticipation(memberId, 1.5);
     }
   }
 
+  const activityIds = (activityRows ?? []).map((row: { id: number | string }) => Number(row.id)).filter((value: number) => Number.isFinite(value) && value > 0);
   const activityMembersByActivityId = new Map<number, string[]>();
-  for (const row of activityMemberRows ?? []) {
-    const activityId = Number(row.activity_id ?? 0);
-    if (!activityId || !row.member_user_id) continue;
-    const ids = activityMembersByActivityId.get(activityId) ?? [];
-    ids.push(row.member_user_id);
-    activityMembersByActivityId.set(activityId, ids);
+  if (activityIds.length > 0) {
+    const { data: activityMemberRows } = await supabase.from('activity_members').select('activity_id, member_user_id, member_label').in('activity_id', activityIds);
+    for (const row of activityMemberRows ?? []) {
+      const activityId = Number(row.activity_id ?? 0);
+      const memberId = resolveMemberId(row.member_user_id, row.member_label);
+      if (!activityId || !memberId) continue;
+      const ids = activityMembersByActivityId.get(activityId) ?? [];
+      ids.push(memberId);
+      activityMembersByActivityId.set(activityId, Array.from(new Set(ids)));
+    }
   }
   for (const row of activityRows ?? []) {
-    const ids = activityMembersByActivityId.get(Number(row.id)) ?? (row.member_user_id ? [row.member_user_id] : []);
+    const fallbackMemberId = resolveMemberId(row.member_user_id ?? row.created_by, row.member_label);
+    const ids = activityMembersByActivityId.get(Number(row.id)) ?? (fallbackMemberId ? [fallbackMemberId] : []);
     for (const memberId of ids) {
       addActivity(memberId, 1);
       addParticipation(memberId, 0.7);
@@ -254,20 +278,22 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
 
   for (const row of tabletRows ?? []) {
     const delta = Math.max(0, Number(row.after_cash ?? 0) - Number(row.before_cash ?? 0));
-    addMoney(row.member_user_id, delta);
-    addActivity(row.member_user_id, 1);
+    const memberId = resolveMemberId(row.member_user_id, row.member_label);
+    addMoney(memberId, delta);
+    addActivity(memberId, 1);
   }
 
   for (const row of cigaretteRows ?? []) {
-    addMoney(row.member_user_id, Math.max(0, Number(row.revenue_amount ?? 0)));
-    addActivity(row.member_user_id, 1);
+    const memberId = resolveMemberId(row.member_user_id, row.member_label);
+    addMoney(memberId, Math.max(0, Number(row.revenue_amount ?? 0)));
+    addActivity(memberId, 1);
   }
 
   const maxMoney = Math.max(1, ...Array.from(moneyByMember.values()));
   const maxActivity = Math.max(1, ...Array.from(activityByMember.values()));
   const maxParticipation = Math.max(1, ...Array.from(participationByMember.values()));
 
-  const rows: PayrollMemberRow[] = (members ?? []).map((member) => {
+  const rows: PayrollMemberRow[] = (members ?? []).map((member: { id: string; name?: string | null; username?: string | null; is_active?: boolean | null }) => {
     const memberId = member.id as string;
     const moneyContribution = Number(moneyByMember.get(memberId) ?? 0);
     const activityCount = Number(activityByMember.get(memberId) ?? 0);
