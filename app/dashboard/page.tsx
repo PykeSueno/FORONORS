@@ -2,7 +2,7 @@ import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { DashboardShellClient } from '@/components/dashboard/dashboard-shell-client';
-import { buildPayrollPreview, weekWindow, DEFAULT_PAYROLL_CONFIG } from '@/lib/payroll';
+import { buildPayrollPreview, payrollDisplayWindow, weekWindow, DEFAULT_PAYROLL_CONFIG } from '@/lib/payroll';
 
 const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
 
@@ -51,13 +51,15 @@ export default async function DashboardPage() {
 
   const myPayEstimate = session
     ? await (async () => {
-        const currentWeek = weekWindow(new Date(), 0);
-        const previousWeek = weekWindow(new Date(), -1);
-        const nowIso = new Date().toISOString();
+        const now = new Date();
+        const displayWindow = payrollDisplayWindow(now);
+        const currentWeek = { startIso: displayWindow.startIso, endIso: displayWindow.endIso };
+        const previousWeek = weekWindow(new Date(displayWindow.startIso), -1);
+        const displayStartIso = displayWindow.startIso;
         const [currentPreview, previousPreview, activeCustomRun] = await Promise.all([
           buildPayrollPreview(supabase, { weekStartIso: currentWeek.startIso, weekEndIso: currentWeek.endIso, config: DEFAULT_PAYROLL_CONFIG }),
           buildPayrollPreview(supabase, { weekStartIso: previousWeek.startIso, weekEndIso: previousWeek.endIso, config: DEFAULT_PAYROLL_CONFIG })
-          , supabase.from('payroll_runs').select('id, week_start, week_end, period_mode').eq('period_mode', 'custom').lte('week_start', nowIso).gt('week_end', nowIso).order('validated_at', { ascending: false }).limit(1).maybeSingle()
+          , supabase.from('payroll_runs').select('id, week_start, week_end, period_mode').eq('period_mode', 'custom').lte('week_start', displayStartIso).gt('week_end', displayStartIso).order('validated_at', { ascending: false }).limit(1).maybeSingle()
         ]);
         const currentMember = currentPreview.members.find((entry) => entry.memberId === session.userId);
         const previousMember = previousPreview.members.find((entry) => entry.memberId === session.userId);

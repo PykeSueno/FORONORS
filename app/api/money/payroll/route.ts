@@ -4,7 +4,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
-import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, weekWindow, type PayrollConfig } from '@/lib/payroll';
+import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, weekWindow, type PayrollConfig } from '@/lib/payroll';
 
 type ValidateBody = {
   week_start_iso?: string;
@@ -33,8 +33,9 @@ export async function GET(request: Request) {
   const period = (url.searchParams.get('period') ?? 'current').toLowerCase();
   const customStart = url.searchParams.get('start');
   const customEnd = url.searchParams.get('end');
-  const currentWindow = weekWindow(new Date(), 0);
-  const previousWindow = weekWindow(new Date(), -1);
+  const displayWindow = payrollDisplayWindow(new Date());
+  const currentWindow = { startIso: displayWindow.startIso, endIso: displayWindow.endIso };
+  const previousWindow = weekWindow(new Date(displayWindow.startIso), -1);
   const selectedWindow = period === 'custom' && customStart && customEnd
     ? { startIso: new Date(customStart).toISOString(), endIso: new Date(customEnd).toISOString(), mode: 'custom' as const }
     : period === 'previous'

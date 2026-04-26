@@ -4,7 +4,7 @@ import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { MoneyPayPageClient } from '@/components/dashboard/money-pay-page-client';
-import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, weekWindow } from '@/lib/payroll';
+import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, weekWindow } from '@/lib/payroll';
 
 export default async function MoneyPayPage() {
   const session = await getSession();
@@ -22,12 +22,14 @@ export default async function MoneyPayPage() {
   if (!canView || !canPreview) redirect('/dashboard/argent');
 
   const supabase = getSupabaseAdmin();
-  const current = weekWindow(new Date(), 0);
-  const previous = weekWindow(new Date(), -1);
+  const now = new Date();
+  const displayWindow = payrollDisplayWindow(now);
+  const current = { startIso: displayWindow.startIso, endIso: displayWindow.endIso };
+  const previous = weekWindow(new Date(displayWindow.startIso), -1);
   const customDefaultStart = '2026-04-20T00:00:00.000Z';
-  const customDefaultEnd = new Date().toISOString();
+  const customDefaultEnd = now.toISOString();
 
-  const [currentPreview, previousPreview, customPreview, historyRes, detailsRes, logsRes] = await Promise.all([
+  const [currentPreview, previousPreview, customPreview, historyRes, detailsRes, logsRes, paidRunRes] = await Promise.all([
     buildPayrollPreview(supabase, { weekStartIso: current.startIso, weekEndIso: current.endIso, config: DEFAULT_PAYROLL_CONFIG }),
     buildPayrollPreview(supabase, { weekStartIso: previous.startIso, weekEndIso: previous.endIso, config: DEFAULT_PAYROLL_CONFIG }),
     buildPayrollPreview(supabase, { weekStartIso: customDefaultStart, weekEndIso: customDefaultEnd, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'custom', excludeAlreadyPaid: true }),
@@ -39,12 +41,26 @@ export default async function MoneyPayPage() {
       : Promise.resolve({ data: [] }),
     canLogs
       ? supabase.from('audit_logs').select('id, action, summary, created_at, actor_name').in('action', ['payroll_validated', 'payroll_adjusted', 'payroll_member_excluded']).order('created_at', { ascending: false }).limit(80)
-      : Promise.resolve({ data: [] })
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from('payroll_runs')
+      .select('id')
+      .eq('period_mode', 'weekly')
+      .eq('week_start', current.startIso)
+      .eq('week_end', current.endIso)
+      .order('validated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
   ]);
+  const payrollStatus = paidRunRes.data?.id
+    ? 'Payée'
+    : now.getUTCDay() <= 1
+      ? 'À payer'
+      : 'Nouvelle semaine';
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Paye 💸" subtitle="Semaine glissante dimanche → dimanche · calcul contribution + enveloppe sécurisée" />
+      <InternalPageHeader title="Paye 💸" subtitle={`Statut: ${payrollStatus} · Période active ${current.startIso.slice(0, 10)} → ${current.endIso.slice(0, 10)}`} />
       <MoneyPayPageClient
         canConfigure={canConfigure}
         canAdjust={canAdjust}

@@ -67,6 +67,33 @@ export function weekWindow(now: Date, shiftWeeks = 0) {
   return { startIso: start.toISOString(), endIso: end.toISOString() };
 }
 
+export function payrollDisplayWindow(now: Date) {
+  const base = weekWindow(now, 0);
+  const day = now.getUTCDay(); // 0 sunday, 1 monday
+  if (day === 0 || day === 1) {
+    const previous = weekWindow(now, -1);
+    const deadline = new Date(previous.endIso);
+    deadline.setUTCDate(deadline.getUTCDate() + 1);
+    deadline.setUTCHours(23, 59, 59, 999);
+    return {
+      startIso: previous.startIso,
+      endIso: previous.endIso,
+      fallbackLabel: 'À payer',
+      validationDeadlineIso: deadline.toISOString()
+    };
+  }
+
+  const deadline = new Date(base.endIso);
+  deadline.setUTCDate(deadline.getUTCDate() + 1);
+  deadline.setUTCHours(23, 59, 59, 999);
+  return {
+    startIso: base.startIso,
+    endIso: base.endIso,
+    fallbackLabel: 'En cours',
+    validationDeadlineIso: deadline.toISOString()
+  };
+}
+
 function roundMoney(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.round(value));
