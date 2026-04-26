@@ -1143,3 +1143,51 @@ on conflict (name) do nothing;
 alter table public.robbery_runs add column if not exists status text not null default 'success';
 alter table public.robbery_runs add column if not exists lost_money numeric(12,2) not null default 0;
 alter table public.robbery_runs add column if not exists note text;
+
+create table if not exists public.payroll_exclusions (
+  id bigint generated always as identity primary key,
+  week_start timestamptz not null,
+  week_end timestamptz not null,
+  member_user_id uuid not null references public.users(id) on delete cascade,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  unique(week_start, week_end, member_user_id)
+);
+create index if not exists idx_payroll_exclusions_period on public.payroll_exclusions(week_start, week_end);
+alter table public.payroll_exclusions enable row level security;
+drop policy if exists "allow_service_role_all_payroll_exclusions" on public.payroll_exclusions;
+create policy "allow_service_role_all_payroll_exclusions" on public.payroll_exclusions for all using (true) with check (true);
+
+create table if not exists public.processor_sessions (
+  id bigint generated always as identity primary key,
+  participant_user_ids jsonb not null default '[]'::jsonb,
+  bottles integer not null default 0,
+  processors_count integer not null default 0,
+  vehicle_suggested text not null default 'car',
+  vehicle_used text not null default 'car',
+  material_cost numeric(12,2) not null default 0,
+  boat_fee numeric(12,2) not null default 0,
+  estimated_gain_avg numeric(12,2) not null default 0,
+  estimated_gain_max numeric(12,2) not null default 0,
+  estimated_profit_avg numeric(12,2) not null default 0,
+  estimated_profit_max numeric(12,2) not null default 0,
+  real_received numeric(12,2) not null default 0,
+  real_profit numeric(12,2) not null default 0,
+  before_group_cash numeric(12,2) not null default 0,
+  after_group_cash numeric(12,2) not null default 0,
+  validated_by uuid references public.users(id) on delete set null,
+  status text not null default 'validated',
+  created_at timestamptz not null default timezone('utc', now())
+);
+create index if not exists idx_processor_sessions_created_at on public.processor_sessions(created_at desc);
+alter table public.processor_sessions enable row level security;
+drop policy if exists "allow_service_role_all_processor_sessions" on public.processor_sessions;
+create policy "allow_service_role_all_processor_sessions" on public.processor_sessions for all using (true) with check (true);
+
+insert into public.permissions (name)
+values
+  ('tobacco.processor.view'),
+  ('tobacco.processor.create'),
+  ('tobacco.processor.stats'),
+  ('tobacco.processor.logs')
+on conflict (name) do nothing;

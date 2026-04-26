@@ -29,7 +29,7 @@ export default async function MoneyPayPage() {
   const customDefaultStart = '2026-04-20T00:00:00.000Z';
   const customDefaultEnd = now.toISOString();
 
-  const [currentPreview, previousPreview, customPreview, historyRes, detailsRes, logsRes, paidRunRes] = await Promise.all([
+  const [currentPreview, previousPreview, customPreview, historyRes, detailsRes, logsRes, paidRunRes, exclusionsRes] = await Promise.all([
     buildPayrollPreview(supabase, { weekStartIso: current.startIso, weekEndIso: current.endIso, config: DEFAULT_PAYROLL_CONFIG }),
     buildPayrollPreview(supabase, { weekStartIso: previous.startIso, weekEndIso: previous.endIso, config: DEFAULT_PAYROLL_CONFIG }),
     buildPayrollPreview(supabase, { weekStartIso: customDefaultStart, weekEndIso: customDefaultEnd, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'custom', excludeAlreadyPaid: true }),
@@ -50,7 +50,12 @@ export default async function MoneyPayPage() {
       .eq('week_end', current.endIso)
       .order('validated_at', { ascending: false })
       .limit(1)
-      .maybeSingle()
+      .maybeSingle(),
+    supabase
+      .from('payroll_exclusions')
+      .select('member_user_id')
+      .eq('week_start', current.startIso)
+      .eq('week_end', current.endIso)
   ]);
   const payrollStatus = paidRunRes.data?.id
     ? 'Payée'
@@ -72,6 +77,7 @@ export default async function MoneyPayPage() {
         customPreview={customPreview}
         customDefaultStart={customDefaultStart}
         customDefaultEnd={customDefaultEnd}
+        initialExcludedIds={(exclusionsRes.data ?? []).map((row) => String(row.member_user_id))}
         history={historyRes.data ?? []}
         historyMembers={detailsRes.data ?? []}
         logs={logsRes.data ?? []}

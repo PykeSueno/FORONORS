@@ -27,8 +27,9 @@ export default async function DashboardPage() {
   const canTabletPreview = canTabletAccess || has('tablet.preview');
   const canCigaretteAccess = has('cigarette.access');
   const canCigarettePreview = canCigaretteAccess || has('cigarette.preview');
-  const canTabletCigaretteAccess = canTabletAccess || canCigaretteAccess;
-  const canTabletCigarettePreview = canTabletPreview || canCigarettePreview;
+  const canProcessorAccess = has('tobacco.processor.view');
+  const canTabletCigaretteAccess = canTabletAccess || canCigaretteAccess || canProcessorAccess;
+  const canTabletCigarettePreview = canTabletPreview || canCigarettePreview || canProcessorAccess;
   const canActivityAccess = has('activity.access');
   const canActivityPreview = canActivityAccess || has('activity.preview');
   const canFourAccess = has('four.access');

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
+import { computeProcessorEstimates, PROCESSOR_BOAT_FROM_BOTTLES } from '@/lib/processor';
 
 type TabletDay = { id: number; business_day: string; deposited_amount: number; chest_amount: number; passages_count: number; kits_added: number; cutters_added: number } | null;
 type CigaretteDay = { id: number; business_day: string; chest_amount: number; passages_count: number; total_revenue: number; packs_sold: number; packs_deposit_remaining?: number } | null;
@@ -9,7 +10,7 @@ type CigaretteDay = { id: number; business_day: string; chest_amount: number; pa
 type TabletPassage = { id: number; member_label: string; before_cash: number; after_cash: number; before_kits: number; after_kits: number; before_cutters: number; after_cutters: number; created_at: string };
 type CigarettePassage = { id: number; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; created_at: string };
 
-type Tab = 'tablet' | 'cigarette' | 'history' | 'stats';
+type Tab = 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
 
 export function TabletCigarettePageClient(props: {
   members: Array<{ id: string; name: string; username: string }>;
@@ -31,12 +32,18 @@ export function TabletCigarettePageClient(props: {
   canCigaretteCreateForAny: boolean;
   canHistory: boolean;
   canStats: boolean;
+  canProcessorView: boolean;
+  canProcessorCreate: boolean;
+  canProcessorStats: boolean;
+  canProcessorLogs: boolean;
+  processorSessions: Array<Record<string, unknown>>;
   defaultMemberId: string;
   defaultMemberLabel: string;
 }) {
   const {
     members, tabletBusinessDay, cigaretteBusinessDay, tabletDay, cigaretteDay, tabletPassages, cigarettePassages, groupCash, kitsInStock, cuttersInStock, packsInStock,
     canTabletAccess, canCigaretteAccess, canTabletManageDaily, canTabletCreatePassage, canCigaretteCreatePassage, canCigaretteCreateForAny, canHistory, canStats,
+    canProcessorView, canProcessorCreate, canProcessorStats, canProcessorLogs, processorSessions,
     defaultMemberId, defaultMemberLabel
   } = props;
 
@@ -56,6 +63,13 @@ export function TabletCigarettePageClient(props: {
   const [kitsState, setKitsState] = useState(kitsInStock);
   const [cuttersState, setCuttersState] = useState(cuttersInStock);
   const [packsState, setPacksState] = useState(packsInStock);
+  const [processorSessionsState, setProcessorSessionsState] = useState(processorSessions);
+  const [processorParticipants, setProcessorParticipants] = useState<string[]>([defaultMemberId]);
+  const [processorBottles, setProcessorBottles] = useState(2);
+  const [processorBoatFee, setProcessorBoatFee] = useState(false);
+  const [processorRealReceived, setProcessorRealReceived] = useState('');
+  const [processorRealFee, setProcessorRealFee] = useState('');
+  const processorEstimate = useMemo(() => computeProcessorEstimates(processorBottles, processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES), [processorBottles, processorBoatFee]);
 
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
 
@@ -105,12 +119,38 @@ export function TabletCigarettePageClient(props: {
     return [...tabletRows, ...cigaretteRows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [tabletPassagesState, cigarettePassagesState]);
 
+  async function createProcessorSession(cancelled = false) {
+    setError('');
+    const response = await fetch('/api/tobacco/processor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        participant_user_ids: processorParticipants,
+        bottles: processorBottles,
+        boat_fee_applied: processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES,
+        real_received: Number(processorRealReceived || processorEstimate.gainAverage),
+        real_fee: Number(processorRealFee || processorEstimate.boatFee),
+        vehicle_used: processorEstimate.vehicleSuggested,
+        cancelled
+      })
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ message: 'Session processeur impossible.' }));
+      return setError(payload.message ?? 'Session processeur impossible.');
+    }
+    const payload = await response.json() as { session?: Record<string, unknown>; cashAfter?: number };
+    if (payload.session) setProcessorSessionsState((cur) => [payload.session as Record<string, unknown>, ...cur]);
+    if (typeof payload.cashAfter === 'number') setGroupCashState(payload.cashAfter);
+    setStatus(cancelled ? 'Session processeur annulée.' : 'Session processeur validée.');
+  }
+
   return (
     <div className="space-y-4">
       <section className="glass-card p-4">
         <div className="flex flex-wrap gap-2">
           {canTabletAccess ? <button type="button" className={`filter-pill ${tab === 'tablet' ? 'filter-pill-active' : ''}`} onClick={() => setTab('tablet')}>📱 Tablette</button> : null}
-          {canCigaretteAccess ? <button type="button" className={`filter-pill ${tab === 'cigarette' ? 'filter-pill-active' : ''}`} onClick={() => setTab('cigarette')}>🚬 Cigarette</button> : null}
+          {canCigaretteAccess ? <button type="button" className={`filter-pill ${tab === 'cigarette' ? 'filter-pill-active' : ''}`} onClick={() => setTab('cigarette')}>🚬 Cigarette / Tabac</button> : null}
+          {canProcessorView ? <button type="button" className={`filter-pill ${tab === 'processor' ? 'filter-pill-active' : ''}`} onClick={() => setTab('processor')}>⚙️ Processeur</button> : null}
           {canHistory ? <button type="button" className={`filter-pill ${tab === 'history' ? 'filter-pill-active' : ''}`} onClick={() => setTab('history')}>📚 Historique</button> : null}
           {canStats ? <button type="button" className={`filter-pill ${tab === 'stats' ? 'filter-pill-active' : ''}`} onClick={() => setTab('stats')}>📊 Stats</button> : null}
         </div>
@@ -136,6 +176,37 @@ export function TabletCigarettePageClient(props: {
             <p className="text-[11px] text-[#efcdab]">Membre sélectionné: <span className="font-semibold text-[#ffe8ca]">{memberLabel}</span></p>
             {canTabletManageDaily ? (<><label className="text-xs text-[#efcdab]">Dépôt matin tablette</label><div className="flex gap-2"><input className="saas-input" value={deposit} onChange={(e) => setDeposit(e.target.value)} /><button className="saas-primary-btn" onClick={() => void saveTabletDeposit()}>Enregistrer</button></div></>) : null}
             {canTabletCreatePassage ? <button className="saas-primary-btn" onClick={() => void createTabletPassage()}>Valider passage tablette</button> : null}
+          </article>
+        </section>
+      ) : null}
+
+      {(tab === 'processor' && canProcessorView) ? (
+        <section className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
+          <article className="glass-card p-5 space-y-2">
+            <h3 className="text-base font-semibold text-[#fff1dd]">Processeur — Nouvelle session</h3>
+            <label className="text-xs text-[#efcdab]">Participants</label>
+            <select className="saas-input" multiple value={processorParticipants} onChange={(event) => setProcessorParticipants(Array.from(event.currentTarget.selectedOptions).map((option) => option.value))}>
+              {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
+            </select>
+            <label className="text-xs text-[#efcdab]">Bouteilles</label>
+            <input className="saas-input" type="number" min={1} max={12} value={processorBottles} onChange={(event) => setProcessorBottles(Math.max(1, Math.min(12, Number(event.target.value || 0))))} />
+            {processorBottles < 2 ? <p className="text-xs text-amber-200">⚠️ Minimum conseillé : 2 bouteilles.</p> : null}
+            <label className="inline-flex items-center gap-2 text-xs text-[#efcdab]"><input type="checkbox" checked={processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES} onChange={(e) => setProcessorBoatFee(e.target.checked)} /> Appliquer frais bateau (1500$)</label>
+            <p className="text-xs text-[#efcdab]">Véhicule conseillé: <span className="text-[#ffe8ca] font-semibold">{processorEstimate.vehicleSuggested === 'boat' ? 'Bateau' : 'Voiture'}</span></p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Stat label="Coût matos" value={formatUsd(processorEstimate.materialCost)} icon="🧰" />
+              <Stat label="Frais bateau" value={formatUsd(processorEstimate.boatFee)} icon="🛥️" />
+              <Stat label="Processeurs" value={String(processorEstimate.processors)} icon="⚙️" />
+              <Stat label="Gain moyen" value={formatUsd(processorEstimate.gainAverage)} icon="💵" />
+              <Stat label="Gain max" value={formatUsd(processorEstimate.gainMax)} icon="📈" />
+              <Stat label="Bénéfice moyen" value={formatUsd(processorEstimate.profitAverage)} icon="📊" />
+            </div>
+          </article>
+          <article className="glass-card p-5 space-y-2">
+            <h3 className="text-base font-semibold text-[#fff1dd]">Résultat réel</h3>
+            <input className="saas-input" placeholder="Argent reçu réel" value={processorRealReceived} onChange={(e) => setProcessorRealReceived(e.target.value)} />
+            <input className="saas-input" placeholder="Frais réels" value={processorRealFee} onChange={(e) => setProcessorRealFee(e.target.value)} />
+            {canProcessorCreate ? <div className="flex gap-2"><button className="saas-primary-btn" onClick={() => void createProcessorSession(false)}>Valider session</button><button className="saas-ghost-btn" onClick={() => void createProcessorSession(true)}>Annuler</button></div> : <p className="text-xs text-[#efcdab]">Permission create requise.</p>}
           </article>
         </section>
       ) : null}
@@ -229,6 +300,32 @@ export function TabletCigarettePageClient(props: {
               </table>
             </div>
           </article>
+          {canProcessorStats ? (
+            <article className="glass-card p-5">
+              <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Processeur</h4>
+              <div className="mt-2 grid gap-2 md:grid-cols-4">
+                <Stat label="Sessions" value={String(processorSessionsState.filter((row) => row.status === 'validated').length)} icon="🧾" />
+                <Stat label="Bouteilles" value={String(processorSessionsState.reduce((sum, row) => sum + Number(row.bottles ?? 0), 0))} icon="🍾" />
+                <Stat label="Argent reçu" value={formatUsd(processorSessionsState.reduce((sum, row) => sum + Number(row.real_received ?? 0), 0))} icon="💵" />
+                <Stat label="Bénéfice réel" value={formatUsd(processorSessionsState.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0))} icon="📈" />
+              </div>
+            </article>
+          ) : null}
+        </section>
+      ) : null}
+
+      {(tab === 'history' && canProcessorLogs && processorSessionsState.length > 0) ? (
+        <section className="glass-card p-5">
+          <h3 className="text-base font-semibold text-[#fff1dd]">Historique Processeur</h3>
+          <div className="mt-3 space-y-2">
+            {processorSessionsState.slice(0, 50).map((entry) => (
+              <article key={String(entry.id)} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#f1d2ad]">
+                <p className="font-semibold text-[#ffe8ca]">{String(entry.status) === 'cancelled' ? '❌' : '✅'} {new Date(String(entry.created_at)).toLocaleString('fr-FR')} · {Number(entry.bottles ?? 0)} bouteilles · {String(entry.vehicle_used ?? entry.vehicle_suggested)}</p>
+                <p>Participants: {Array.isArray(entry.participant_user_ids) ? (entry.participant_user_ids as string[]).join(', ') : '-'}</p>
+                <p>Coût matos: {formatUsd(Number(entry.material_cost ?? 0))} · Frais bateau: {formatUsd(Number(entry.boat_fee ?? 0))} · Reçu: {formatUsd(Number(entry.real_received ?? 0))} · Bénéfice: {formatUsd(Number(entry.real_profit ?? 0))}</p>
+              </article>
+            ))}
+          </div>
         </section>
       ) : null}
 

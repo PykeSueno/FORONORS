@@ -41,17 +41,27 @@ export async function GET(request: Request) {
     : period === 'previous'
       ? { ...previousWindow, mode: 'weekly' as const }
       : { ...currentWindow, mode: 'weekly' as const };
+  const exclusionFetch = (startIso: string, endIso: string) => supabase
+    .from('payroll_exclusions')
+    .select('member_user_id')
+    .eq('week_start', startIso)
+    .eq('week_end', endIso);
 
-  const [current, previous, selected, historyRes, logsRes] = await Promise.all([
-    buildPayrollPreview(supabase, { weekStartIso: currentWindow.startIso, weekEndIso: currentWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'weekly' }),
-    buildPayrollPreview(supabase, { weekStartIso: previousWindow.startIso, weekEndIso: previousWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'weekly' }),
-    buildPayrollPreview(supabase, { weekStartIso: selectedWindow.startIso, weekEndIso: selectedWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: selectedWindow.mode, excludeAlreadyPaid: selectedWindow.mode === 'custom' }),
+  const [currentExcludedRes, previousExcludedRes, selectedExcludedRes, historyRes, logsRes] = await Promise.all([
+    exclusionFetch(currentWindow.startIso, currentWindow.endIso),
+    exclusionFetch(previousWindow.startIso, previousWindow.endIso),
+    exclusionFetch(selectedWindow.startIso, selectedWindow.endIso),
     canHistory
       ? supabase.from('payroll_runs').select('id, week_start, week_end, period_mode, validated_at, validated_by_label, group_balance_before, group_balance_after, reserve_kept, envelope, total_distributed, config_snapshot, excluded_members, manual_adjustments').order('validated_at', { ascending: false }).limit(40)
       : Promise.resolve({ data: [] }),
     canLogs
       ? supabase.from('audit_logs').select('id, action, summary, created_at, actor_name').in('action', ['payroll_validated', 'payroll_preview', 'payroll_adjusted', 'payroll_member_excluded']).order('created_at', { ascending: false }).limit(80)
       : Promise.resolve({ data: [] })
+  ]);
+  const [current, previous, selected] = await Promise.all([
+    buildPayrollPreview(supabase, { weekStartIso: currentWindow.startIso, weekEndIso: currentWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'weekly', excludedMemberIds: (currentExcludedRes.data ?? []).map((row) => String(row.member_user_id)) }),
+    buildPayrollPreview(supabase, { weekStartIso: previousWindow.startIso, weekEndIso: previousWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'weekly', excludedMemberIds: (previousExcludedRes.data ?? []).map((row) => String(row.member_user_id)) }),
+    buildPayrollPreview(supabase, { weekStartIso: selectedWindow.startIso, weekEndIso: selectedWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: selectedWindow.mode, excludeAlreadyPaid: selectedWindow.mode === 'custom', excludedMemberIds: (selectedExcludedRes.data ?? []).map((row) => String(row.member_user_id)) })
   ]);
 
   return NextResponse.json({

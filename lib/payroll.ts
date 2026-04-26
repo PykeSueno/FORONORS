@@ -202,11 +202,12 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     { data: robberyRows },
     { data: activityRows },
     { data: tabletRows },
-    { data: cigaretteRows }
+    { data: cigaretteRows },
+    { data: processorRows }
   ] = await Promise.all([
     supabase.from('users').select('id, name, username, is_active').order('username', { ascending: true }),
     supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle(),
-    supabase.from('transactions').select('member_user_id, actor_user_id, member_label, total_money_in, total_money_out, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
+    supabase.from('transactions').select('member_user_id, actor_user_id, member_label, total_money_in, total_money_out, reason, summary, transaction_type, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
     supabase.from('four_transactions').select('created_by, profit_loss, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
     supabase.from('sale_object_orders').select('created_by, total_amount, created_at, status').in('status', ['pending_receipt', 'received']).gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
     supabase.from('drug_sales').select('created_by, actual_amount, member_user_ids, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
@@ -214,7 +215,8 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     supabase.from('robbery_runs').select('user_id, user_name, money_amount, participants, created_at, status').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
     supabase.from('activities').select('id, member_user_id, member_label, created_by, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
     supabase.from('tablet_passages').select('member_user_id, member_label, before_cash, after_cash, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
-    supabase.from('cigarette_passages').select('member_user_id, member_label, revenue_amount, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000)
+    supabase.from('cigarette_passages').select('member_user_id, member_label, revenue_amount, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
+    supabase.from('processor_sessions').select('participant_user_ids, validated_by, real_received, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000)
   ]);
 
   const memberIdByLabel = new Map<string, string>();
@@ -251,7 +253,10 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     if (isAlreadyPaid(row.created_at)) continue;
     const inAmount = Number(row.total_money_in ?? 0);
     const outAmount = Number(row.total_money_out ?? 0);
-    const contribution = Math.max(0, inAmount - outAmount);
+    const blob = `${String((row as { reason?: string }).reason ?? '')} ${String((row as { summary?: string }).summary ?? '')} ${String((row as { transaction_type?: string }).transaction_type ?? '')}`.toLowerCase();
+    const isUsefulPurchase = ['stock', 'matériel', 'materiel', 'kit', 'disqueuse', 'fourniture', 'four', 'braquage', 'drogue', 'tablet', 'tablette', 'tabac', 'cigarette', 'processeur']
+      .some((needle) => blob.includes(needle));
+    const contribution = Math.max(0, inAmount) + (isUsefulPurchase ? Math.max(0, outAmount) : 0);
     const memberId = resolveMemberId(row.member_user_id ?? row.actor_user_id, row.member_label);
     addMoney(memberId, contribution);
     addActivity(memberId, 1);
@@ -347,6 +352,18 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     const memberId = resolveMemberId(row.member_user_id, row.member_label);
     addMoney(memberId, Math.max(0, Number(row.revenue_amount ?? 0)));
     addActivity(memberId, 1);
+  }
+
+  for (const row of processorRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
+    const participants = normalizeParticipantIds(row.participant_user_ids, resolveMemberId(row.validated_by, null));
+    const amount = Math.max(0, Number(row.real_received ?? 0));
+    const split = splitAmount(amount, participants);
+    for (const entry of split) addMoney(entry.memberId, entry.value);
+    for (const memberId of participants) {
+      addActivity(memberId, 1.5);
+      addParticipation(memberId, 1.5);
+    }
   }
 
   const maxMoney = Math.max(1, ...Array.from(moneyByMember.values()));

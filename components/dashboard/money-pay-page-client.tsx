@@ -43,6 +43,7 @@ export function MoneyPayPageClient({
   customPreview,
   customDefaultStart,
   customDefaultEnd,
+  initialExcludedIds,
   history,
   historyMembers,
   logs
@@ -57,6 +58,7 @@ export function MoneyPayPageClient({
   customPreview: PayrollPreview;
   customDefaultStart: string;
   customDefaultEnd: string;
+  initialExcludedIds: string[];
   history: HistoryRun[];
   historyMembers: HistoryRunMember[];
   logs: LogRow[];
@@ -66,10 +68,72 @@ export function MoneyPayPageClient({
   const [customStart, setCustomStart] = useState(customDefaultStart.slice(0, 16));
   const [customEnd, setCustomEnd] = useState(customDefaultEnd.slice(0, 16));
   const [selectedPreview, setSelectedPreview] = useState<PayrollPreview>(currentPreview);
-  const [excludedIds, setExcludedIds] = useState<string[]>([]);
+  const [excludedIds, setExcludedIds] = useState<string[]>(initialExcludedIds);
   const [manualAdjustments, setManualAdjustments] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const periodKey = `${selectedPreview.weekStartIso}__${selectedPreview.weekEndIso}`;
+
+  function computeWithConfig(preview: PayrollPreview, excluded: string[], cfg: PayrollPreview['config'], adjustments: Record<string, number>) {
+    const maxMoney = Math.max(1, ...preview.members.map((row) => Number(row.moneyContribution ?? 0)));
+    const maxActivity = Math.max(1, ...preview.members.map((row) => Number(row.activityCount ?? 0)));
+    const maxParticipation = Math.max(1, ...preview.members.map((row) => Number(row.participationCount ?? 0)));
+    const excludedSet = new Set(excluded);
+
+    const rows = preview.members.map((row) => {
+      const active = Boolean(row.isActive);
+      const excludedMember = excludedSet.has(row.memberId);
+      const hasEligibilitySignal = Number(row.activityCount ?? 0) >= cfg.minActions || Number(row.moneyContribution ?? 0) >= cfg.minMoney;
+      const eligible = active && hasEligibilitySignal && !excludedMember;
+      const moneyScore = Number(row.moneyContribution ?? 0) / maxMoney;
+      const activityScore = Number(row.activityCount ?? 0) / maxActivity;
+      const participationScore = Number(row.participationCount ?? 0) / maxParticipation;
+      return {
+        ...row,
+        eligible,
+        reason: excludedMember ? 'Exclu manuellement' : row.reason,
+        moneyScore,
+        activityScore,
+        participationScore,
+        totalScore: eligible
+          ? (moneyScore * cfg.weights.money) + (activityScore * cfg.weights.activity) + (participationScore * cfg.weights.participation)
+          : 0,
+        proposedPay: 0
+      };
+    });
+
+    const pool = Math.max(0, Math.round(preview.envelope));
+    const eligibleRows = rows.filter((row) => row.eligible);
+    const totalScore = eligibleRows.reduce((sum, row) => sum + row.totalScore, 0);
+    if (pool > 0 && totalScore > 0) {
+      for (const row of eligibleRows) {
+        const proportional = pool * (row.totalScore / totalScore);
+        row.proposedPay = Math.min(cfg.memberCap, Math.max(cfg.memberMinimum, Math.round(proportional)));
+      }
+      const currentTotal = eligibleRows.reduce((sum, row) => sum + row.proposedPay, 0);
+      if (currentTotal > pool && currentTotal > 0) {
+        const scale = pool / currentTotal;
+        for (const row of eligibleRows) row.proposedPay = Math.max(0, Math.round(row.proposedPay * scale));
+      }
+    }
+
+    for (const row of rows) {
+      if (!row.eligible) continue;
+      const adjusted = Number(adjustments[row.memberId]);
+      if (Number.isFinite(adjusted) && adjusted >= 0) row.proposedPay = Math.max(0, Math.min(cfg.memberCap, Math.round(adjusted)));
+    }
+    const total = rows.reduce((sum, row) => sum + (row.eligible ? Math.max(0, Number(row.proposedPay || 0)) : 0), 0);
+    return {
+      ...preview,
+      config: cfg,
+      members: rows,
+      totalProposed: Math.round(total),
+      balanceAfter: preview.balance - Math.round(total),
+      eligibleCount: rows.filter((row) => row.eligible).length,
+      ineligibleCount: rows.filter((row) => !row.eligible).length
+    };
+  }
 
   async function loadCustomPreview(startIso: string, endIso: string) {
     const response = await fetch(`/api/money/payroll?period=custom&start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`, { cache: 'no-store' });
@@ -79,21 +143,18 @@ export function MoneyPayPageClient({
   }
 
   const effectivePreview = useMemo(() => {
-    const rows = selectedPreview.members.map((row) => {
-      const excluded = excludedIds.includes(row.memberId);
-      const adjusted = Number(manualAdjustments[row.memberId]);
-      const pay = Number.isFinite(adjusted) && adjusted >= 0 ? adjusted : row.proposedPay;
-      return { ...row, eligible: row.eligible && !excluded, reason: excluded ? 'Exclu manuellement' : row.reason, proposedPay: excluded ? 0 : pay };
-    });
-    const total = rows.reduce((sum, row) => sum + (row.eligible ? Math.max(0, Number(row.proposedPay || 0)) : 0), 0);
-    return {
-      ...selectedPreview,
-      config,
-      members: rows,
-      totalProposed: Math.round(total),
-      balanceAfter: selectedPreview.balance - Math.round(total)
-    };
+    return computeWithConfig(selectedPreview, excludedIds, config, manualAdjustments);
   }, [config, excludedIds, manualAdjustments, selectedPreview]);
+
+  async function toggleExclusion(memberId: string) {
+    const willExclude = !excludedIds.includes(memberId);
+    setExcludedIds((cur) => willExclude ? [...cur, memberId] : cur.filter((id) => id !== memberId));
+    await fetch('/api/money/payroll/exclusions', {
+      method: willExclude ? 'POST' : 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week_start_iso: selectedPreview.weekStartIso, week_end_iso: selectedPreview.weekEndIso, member_user_id: memberId })
+    }).catch(() => {});
+  }
 
   const historyByRun = useMemo(() => {
     const map = new Map<number, HistoryRunMember[]>();
@@ -145,9 +206,9 @@ export function MoneyPayPageClient({
       <section className="glass-card p-4">
         <h3 className="text-sm font-semibold text-[#fff1dd]">Période de calcul</h3>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button className={`filter-pill ${periodMode === 'current' ? 'filter-pill-active' : ''}`} onClick={() => { setPeriodMode('current'); setSelectedPreview(currentPreview); setExcludedIds([]); setManualAdjustments({}); }}>Semaine actuelle</button>
-          <button className={`filter-pill ${periodMode === 'previous' ? 'filter-pill-active' : ''}`} onClick={() => { setPeriodMode('previous'); setSelectedPreview(previousPreview); setExcludedIds([]); setManualAdjustments({}); }}>Semaine passée</button>
-          <button className={`filter-pill ${periodMode === 'custom' ? 'filter-pill-active' : ''}`} onClick={() => { setPeriodMode('custom'); setSelectedPreview(customPreview); setExcludedIds([]); setManualAdjustments({}); }}>Période personnalisée</button>
+          <button className={`filter-pill ${periodMode === 'current' ? 'filter-pill-active' : ''}`} onClick={() => { setPeriodMode('current'); setSelectedPreview(currentPreview); setManualAdjustments({}); }}>Semaine actuelle</button>
+          <button className={`filter-pill ${periodMode === 'previous' ? 'filter-pill-active' : ''}`} onClick={() => { setPeriodMode('previous'); setSelectedPreview(previousPreview); setManualAdjustments({}); }}>Semaine passée</button>
+          <button className={`filter-pill ${periodMode === 'custom' ? 'filter-pill-active' : ''}`} onClick={() => { setPeriodMode('custom'); setSelectedPreview(customPreview); setManualAdjustments({}); }}>Période personnalisée</button>
         </div>
         {periodMode === 'custom' ? (
           <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
@@ -156,7 +217,7 @@ export function MoneyPayPageClient({
             <button className="saas-primary-btn" onClick={() => void loadCustomPreview(new Date(customStart).toISOString(), new Date(customEnd).toISOString())}>Appliquer</button>
           </div>
         ) : null}
-        <p className="mt-2 text-xs text-[#efcdab]">Période active: {effectivePreview.weekStartIso.slice(0, 16).replace('T', ' ')} → {effectivePreview.weekEndIso.slice(0, 16).replace('T', ' ')}</p>
+        <p className="mt-2 text-xs text-[#efcdab]">Période active: {effectivePreview.weekStartIso.slice(0, 16).replace('T', ' ')} → {effectivePreview.weekEndIso.slice(0, 16).replace('T', ' ')} · Exclusions: {excludedIds.length} ({periodKey})</p>
       </section>
 
       <section className="glass-card p-4">
@@ -211,9 +272,9 @@ export function MoneyPayPageClient({
                   <button
                     type="button"
                     className={`saas-ghost-btn !py-1 !px-2 ${excludedIds.includes(member.memberId) ? 'opacity-50' : ''}`}
-                    onClick={() => setExcludedIds((cur) => cur.includes(member.memberId) ? cur.filter((id) => id !== member.memberId) : [...cur, member.memberId])}
+                    onClick={() => void toggleExclusion(member.memberId)}
                   >
-                    {excludedIds.includes(member.memberId) ? 'Inclure' : 'Exclure'}
+                    {excludedIds.includes(member.memberId) ? 'Réinclure' : 'Exclure'}
                   </button>
                   <input
                     className="saas-input !h-8 w-24"

@@ -14,7 +14,8 @@ export default async function TabletCigarettePage() {
   const permissions = await getUserPermissions(session.userId);
   const canTabletAccess = permissions.includes('tablet.access');
   const canCigaretteAccess = permissions.includes('cigarette.access');
-  if (!canTabletAccess && !canCigaretteAccess) redirect('/dashboard');
+  const canProcessorView = permissions.includes('tobacco.processor.view');
+  if (!canTabletAccess && !canCigaretteAccess && !canProcessorView) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const tabletBusinessDay = getTabletBusinessDate();
@@ -38,11 +39,14 @@ export default async function TabletCigarettePage() {
     ? await supabase.from('cigarette_passages').select('id, cigarette_day_id, business_day, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at').eq('business_day', cigaretteBusinessDay).eq('status', 'validated').order('created_at', { ascending: false }).then((res) => res.data ?? [])
     : [];
 
+  const processorSessions = canProcessorView
+    ? await supabase.from('processor_sessions').select('*').order('created_at', { ascending: false }).limit(100).then((res) => res.data ?? [])
+    : [];
   const currentMember = (membersRes.data ?? []).find((member) => member.id === session.userId);
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Tablette & Cigarette" subtitle="Passages, ventes et suivi" />
+      <InternalPageHeader title="Tablette & Tabac" subtitle="Tablette / Tabac / Processeur" />
       <TabletCigarettePageClient
         members={membersRes.data ?? []}
         tabletBusinessDay={tabletBusinessDay}
@@ -63,6 +67,11 @@ export default async function TabletCigarettePage() {
         canCigaretteCreateForAny={permissions.includes('cigarette.passage.create.any')}
         canHistory={permissions.includes('tablet.access') || permissions.includes('cigarette.history.view')}
         canStats={permissions.includes('tablet.stats.view') || permissions.includes('cigarette.stats.view')}
+        canProcessorView={canProcessorView}
+        canProcessorCreate={permissions.includes('tobacco.processor.create')}
+        canProcessorStats={permissions.includes('tobacco.processor.stats')}
+        canProcessorLogs={permissions.includes('tobacco.processor.logs')}
+        processorSessions={processorSessions as Array<Record<string, unknown>>}
         defaultMemberId={session.userId}
         defaultMemberLabel={currentMember?.name || currentMember?.username || session.username}
       />
