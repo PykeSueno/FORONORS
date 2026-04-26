@@ -6,6 +6,7 @@ export type AppUser = {
   username: string;
   password_hash: string;
   role: string | null;
+  role_id: number | null;
   is_active: boolean;
   created_at: string;
 };

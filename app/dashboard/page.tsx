@@ -1,13 +1,108 @@
-export default function DashboardPage() {
+import { getSession } from '@/lib/auth';
+import { getUserPermissions } from '@/lib/permissions';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { DashboardShellClient } from '@/components/dashboard/dashboard-shell-client';
+import { buildPayrollPreview, payrollDisplayWindow, weekWindow, DEFAULT_PAYROLL_CONFIG } from '@/lib/payroll';
+
+const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
+
+export default async function DashboardPage() {
+  const session = await getSession();
+  const permissions = session ? await getUserPermissions(session.userId) : [];
+  const has = (perm: string) => permissions.includes(perm);
+
+  const canMoneyAccess = has('money.access');
+  const canMoneyPreview = canMoneyAccess || has('money.preview');
+  const canItemsAccess = has('items.access');
+  const canItemsPreview = canItemsAccess || has('items.preview');
+  const canTransactionsAccess = has('transactions.access');
+  const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
+  const canTransactionsRecentAccess = has('transactions.recent.access');
+  const canTransactionsRecentPreview = canTransactionsRecentAccess || has('transactions.recent.preview');
+  const canMembersAccess = has('members.access');
+  const canMembersPreview = canMembersAccess || has('members.preview');
+  const canLogsAccess = has('logs.access');
+  const canLogsPreview = canLogsAccess || has('logs.preview');
+  const canTabletAccess = has('tablet.access');
+  const canTabletPreview = canTabletAccess || has('tablet.preview');
+  const canCigaretteAccess = has('cigarette.access');
+  const canCigarettePreview = canCigaretteAccess || has('cigarette.preview');
+  const canProcessorAccess = has('tobacco.processor.view');
+  const canTabletCigaretteAccess = canTabletAccess || canCigaretteAccess || canProcessorAccess;
+  const canTabletCigarettePreview = canTabletPreview || canCigarettePreview || canProcessorAccess;
+  const canActivityAccess = has('activity.access');
+  const canActivityPreview = canActivityAccess || has('activity.preview');
+  const canFourAccess = has('four.access');
+  const canFourPreview = canFourAccess || has('four.preview');
+  const canDrugsAccess = has('drugs.access');
+  const canDrugsPreview = canDrugsAccess || has('drugs.preview');
+  const canSaleObjectsAccess = has('sale.objects.access');
+  const canSaleObjectsPreview = canSaleObjectsAccess || has('sale.objects.preview');
+  const canRobberiesAccess = has('robberies.view');
+  const canRobberiesPreview = canRobberiesAccess;
+  const canUpdatePassword = has('account.password.update');
+  const canMoneyMovementsView = has('money.movements.view');
+  const canStockMovementsView = has('items.movements.view');
+
+  const supabase = getSupabaseAdmin();
+
+  const { data: user } = session
+    ? await supabase.from('users').select('name, role, dashboard_layout').eq('id', session.userId).maybeSingle()
+    : { data: null };
+
+  const myPayEstimate = session
+    ? await (async () => {
+        const now = new Date();
+        const displayWindow = payrollDisplayWindow(now);
+        const currentWeek = { startIso: displayWindow.startIso, endIso: displayWindow.endIso };
+        const previousWeek = weekWindow(new Date(displayWindow.startIso), -1);
+        const displayStartIso = displayWindow.startIso;
+        const [currentPreview, previousPreview, activeCustomRun] = await Promise.all([
+          buildPayrollPreview(supabase, { weekStartIso: currentWeek.startIso, weekEndIso: currentWeek.endIso, config: DEFAULT_PAYROLL_CONFIG }),
+          buildPayrollPreview(supabase, { weekStartIso: previousWeek.startIso, weekEndIso: previousWeek.endIso, config: DEFAULT_PAYROLL_CONFIG })
+          , supabase.from('payroll_runs').select('id, week_start, week_end, period_mode').eq('period_mode', 'custom').lte('week_start', displayStartIso).gt('week_end', displayStartIso).order('validated_at', { ascending: false }).limit(1).maybeSingle()
+        ]);
+        const currentMember = currentPreview.members.find((entry) => entry.memberId === session.userId);
+        const previousMember = previousPreview.members.find((entry) => entry.memberId === session.userId);
+        if (activeCustomRun.data?.id) {
+          const { data: customMember } = await supabase.from('payroll_run_members').select('amount').eq('payroll_run_id', activeCustomRun.data.id).eq('member_user_id', session.userId).maybeSingle();
+          return {
+            currentEstimate: Number.isFinite(Number(customMember?.amount)) ? Number(customMember?.amount ?? 0) : 0,
+            previousEstimate: Number.isFinite(Number(previousMember?.proposedPay)) ? Number(previousMember?.proposedPay ?? 0) : 0
+          };
+        }
+        return {
+          currentEstimate: Number.isFinite(Number(currentMember?.proposedPay)) ? Number(currentMember?.proposedPay ?? 0) : 0,
+          previousEstimate: Number.isFinite(Number(previousMember?.proposedPay)) ? Number(previousMember?.proposedPay ?? 0) : 0
+        };
+      })()
+    : { currentEstimate: 0, previousEstimate: 0 };
+
+  const initialOrder = (Array.isArray(user?.dashboard_layout) ? user?.dashboard_layout.filter((value: unknown) => typeof value === 'string') : DEFAULT_ORDER) as string[];
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <p className="mt-2 text-sm text-coffee-200/80">
-        Espace principal prêt. Utilisez le menu pour gérer les membres.
-      </p>
-      <div className="mt-6 rounded-xl border border-dashed border-coffee-700 p-8 text-sm text-coffee-200/70">
-        Contenu à venir.
-      </div>
-    </div>
+    <DashboardShellClient
+      name={user?.name || session?.username || 'Utilisateur'}
+      role={user?.role || session?.role || 'Utilisateur'}
+      payEstimateCurrent={myPayEstimate.currentEstimate}
+      payEstimatePrevious={myPayEstimate.previousEstimate}
+      canUpdatePassword={canUpdatePassword}
+      initialOrder={initialOrder}
+      flags={{
+        canMoneyAccess, canMoneyPreview,
+        canItemsAccess, canItemsPreview,
+        canTransactionsAccess, canTransactionsPreview,
+        canTransactionsRecentAccess, canTransactionsRecentPreview,
+        canMembersAccess, canMembersPreview,
+        canLogsAccess, canLogsPreview,
+        canTabletCigaretteAccess, canTabletCigarettePreview,
+        canActivityAccess, canActivityPreview,
+        canFourAccess, canFourPreview,
+        canDrugsAccess, canDrugsPreview,
+        canSaleObjectsAccess, canSaleObjectsPreview,
+        canRobberiesAccess, canRobberiesPreview,
+        canMoneyMovementsView, canStockMovementsView
+      }}
+    />
   );
 }
