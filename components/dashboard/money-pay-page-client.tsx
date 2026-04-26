@@ -8,6 +8,7 @@ type HistoryRun = {
   id: number;
   week_start: string;
   week_end: string;
+  period_mode?: 'weekly' | 'custom';
   validated_at: string;
   validated_by_label: string | null;
   group_balance_before: number;
@@ -39,6 +40,9 @@ export function MoneyPayPageClient({
   canLogs,
   currentPreview,
   previousPreview,
+  customPreview,
+  customDefaultStart,
+  customDefaultEnd,
   history,
   historyMembers,
   logs
@@ -50,18 +54,32 @@ export function MoneyPayPageClient({
   canLogs: boolean;
   currentPreview: PayrollPreview;
   previousPreview: PayrollPreview;
+  customPreview: PayrollPreview;
+  customDefaultStart: string;
+  customDefaultEnd: string;
   history: HistoryRun[];
   historyMembers: HistoryRunMember[];
   logs: LogRow[];
 }) {
   const [config, setConfig] = useState(currentPreview.config);
+  const [periodMode, setPeriodMode] = useState<'current' | 'previous' | 'custom'>('current');
+  const [customStart, setCustomStart] = useState(customDefaultStart.slice(0, 16));
+  const [customEnd, setCustomEnd] = useState(customDefaultEnd.slice(0, 16));
+  const [selectedPreview, setSelectedPreview] = useState<PayrollPreview>(currentPreview);
   const [excludedIds, setExcludedIds] = useState<string[]>([]);
   const [manualAdjustments, setManualAdjustments] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  async function loadCustomPreview(startIso: string, endIso: string) {
+    const response = await fetch(`/api/money/payroll?period=custom&start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`, { cache: 'no-store' });
+    if (!response.ok) return;
+    const payload = await response.json() as { selected?: PayrollPreview };
+    if (payload.selected) setSelectedPreview(payload.selected);
+  }
+
   const effectivePreview = useMemo(() => {
-    const rows = currentPreview.members.map((row) => {
+    const rows = selectedPreview.members.map((row) => {
       const excluded = excludedIds.includes(row.memberId);
       const adjusted = Number(manualAdjustments[row.memberId]);
       const pay = Number.isFinite(adjusted) && adjusted >= 0 ? adjusted : row.proposedPay;
@@ -69,13 +87,13 @@ export function MoneyPayPageClient({
     });
     const total = rows.reduce((sum, row) => sum + (row.eligible ? Math.max(0, Number(row.proposedPay || 0)) : 0), 0);
     return {
-      ...currentPreview,
+      ...selectedPreview,
       config,
       members: rows,
       totalProposed: Math.round(total),
-      balanceAfter: currentPreview.balance - Math.round(total)
+      balanceAfter: selectedPreview.balance - Math.round(total)
     };
-  }, [config, currentPreview, excludedIds, manualAdjustments]);
+  }, [config, excludedIds, manualAdjustments, selectedPreview]);
 
   const historyByRun = useMemo(() => {
     const map = new Map<number, HistoryRunMember[]>();
@@ -95,7 +113,9 @@ export function MoneyPayPageClient({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        week_start_iso: currentPreview.weekStartIso,
+        week_start_iso: selectedPreview.weekStartIso,
+        week_end_iso: selectedPreview.weekEndIso,
+        period_mode: selectedPreview.periodMode ?? (periodMode === 'custom' ? 'custom' : 'weekly'),
         config,
         excluded_member_ids: excludedIds,
         manual_adjustments: manualAdjustments
@@ -123,12 +143,29 @@ export function MoneyPayPageClient({
       </section>
 
       <section className="glass-card p-4">
+        <h3 className="text-sm font-semibold text-[#fff1dd]">Période de calcul</h3>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button className={`filter-pill ${periodMode === 'current' ? 'filter-pill-active' : ''}`} onClick={() => { setPeriodMode('current'); setSelectedPreview(currentPreview); setExcludedIds([]); setManualAdjustments({}); }}>Semaine actuelle</button>
+          <button className={`filter-pill ${periodMode === 'previous' ? 'filter-pill-active' : ''}`} onClick={() => { setPeriodMode('previous'); setSelectedPreview(previousPreview); setExcludedIds([]); setManualAdjustments({}); }}>Semaine passée</button>
+          <button className={`filter-pill ${periodMode === 'custom' ? 'filter-pill-active' : ''}`} onClick={() => { setPeriodMode('custom'); setSelectedPreview(customPreview); setExcludedIds([]); setManualAdjustments({}); }}>Période personnalisée</button>
+        </div>
+        {periodMode === 'custom' ? (
+          <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+            <input className="saas-input" type="datetime-local" value={customStart} onChange={(event) => setCustomStart(event.target.value)} />
+            <input className="saas-input" type="datetime-local" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} />
+            <button className="saas-primary-btn" onClick={() => void loadCustomPreview(new Date(customStart).toISOString(), new Date(customEnd).toISOString())}>Appliquer</button>
+          </div>
+        ) : null}
+        <p className="mt-2 text-xs text-[#efcdab]">Période active: {effectivePreview.weekStartIso.slice(0, 16).replace('T', ' ')} → {effectivePreview.weekEndIso.slice(0, 16).replace('T', ' ')}</p>
+      </section>
+
+      <section className="glass-card p-4">
         <h3 className="text-sm font-semibold text-[#fff1dd]">Comparaison semaines</h3>
         <div className="mt-2 grid gap-2 md:grid-cols-2">
           <article className="rounded-xl border border-white/10 bg-[#3b2518]/60 p-3 text-xs text-[#efcdab]">
             <p className="font-semibold text-[#ffe8ca]">Semaine actuelle</p>
-            <p>{currentPreview.weekStartIso.slice(0, 10)} → {currentPreview.weekEndIso.slice(0, 10)}</p>
-            <p>Éligibles: {currentPreview.eligibleCount} · Enveloppe: {formatUsd(currentPreview.envelope)}</p>
+            <p>{effectivePreview.weekStartIso.slice(0, 10)} → {effectivePreview.weekEndIso.slice(0, 10)}</p>
+            <p>Éligibles: {effectivePreview.eligibleCount} · Enveloppe: {formatUsd(effectivePreview.envelope)}</p>
           </article>
           <article className="rounded-xl border border-white/10 bg-[#3b2518]/60 p-3 text-xs text-[#efcdab]">
             <p className="font-semibold text-[#ffe8ca]">Semaine passée</p>
@@ -205,7 +242,7 @@ export function MoneyPayPageClient({
           <div className="mt-2 space-y-2">
             {history.map((run) => (
               <article key={run.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]">
-                <p className="font-semibold text-[#ffe8ca]">Semaine {run.week_start.slice(0, 10)} → {run.week_end.slice(0, 10)} · {formatUsd(Number(run.total_distributed ?? 0))}</p>
+                <p className="font-semibold text-[#ffe8ca]">{run.period_mode === 'custom' ? 'Période personnalisée' : 'Semaine'} {run.week_start.slice(0, 10)} → {run.week_end.slice(0, 10)} · {formatUsd(Number(run.total_distributed ?? 0))}</p>
                 <p>Validée par {run.validated_by_label || 'N/A'} · {new Date(run.validated_at).toLocaleString('fr-FR')}</p>
                 <p>Avant: {formatUsd(Number(run.group_balance_before ?? 0))} · Après: {formatUsd(Number(run.group_balance_after ?? 0))} · Réserve: {formatUsd(Number(run.reserve_kept ?? 0))}</p>
                 <div className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">

@@ -413,6 +413,7 @@ create table if not exists public.payroll_runs (
   id bigint generated always as identity primary key,
   week_start timestamptz not null,
   week_end timestamptz not null,
+  period_mode text not null default 'weekly',
   validated_at timestamptz not null default timezone('utc', now()),
   validated_by uuid references public.users(id) on delete set null,
   validated_by_label text,
@@ -426,6 +427,9 @@ create table if not exists public.payroll_runs (
   manual_adjustments jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.payroll_runs
+  add column if not exists period_mode text not null default 'weekly';
 
 create table if not exists public.payroll_run_members (
   id bigint generated always as identity primary key,
@@ -444,7 +448,8 @@ create table if not exists public.payroll_run_members (
   created_at timestamptz not null default timezone('utc', now())
 );
 
-create unique index if not exists idx_payroll_runs_week_start on public.payroll_runs(week_start);
+drop index if exists idx_payroll_runs_week_start;
+create index if not exists idx_payroll_runs_week_start on public.payroll_runs(week_start);
 create index if not exists idx_payroll_runs_validated_at on public.payroll_runs(validated_at desc);
 create index if not exists idx_payroll_run_members_run_id on public.payroll_run_members(payroll_run_id);
 

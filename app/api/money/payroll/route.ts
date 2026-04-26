@@ -8,12 +8,14 @@ import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, weekWindow, type PayrollCo
 
 type ValidateBody = {
   week_start_iso?: string;
+  week_end_iso?: string;
+  period_mode?: 'weekly' | 'custom';
   config?: Partial<PayrollConfig>;
   excluded_member_ids?: string[];
   manual_adjustments?: Record<string, number>;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
@@ -27,14 +29,24 @@ export async function GET() {
   if (!canView || !canPreview) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
+  const url = new URL(request.url);
+  const period = (url.searchParams.get('period') ?? 'current').toLowerCase();
+  const customStart = url.searchParams.get('start');
+  const customEnd = url.searchParams.get('end');
   const currentWindow = weekWindow(new Date(), 0);
   const previousWindow = weekWindow(new Date(), -1);
+  const selectedWindow = period === 'custom' && customStart && customEnd
+    ? { startIso: new Date(customStart).toISOString(), endIso: new Date(customEnd).toISOString(), mode: 'custom' as const }
+    : period === 'previous'
+      ? { ...previousWindow, mode: 'weekly' as const }
+      : { ...currentWindow, mode: 'weekly' as const };
 
-  const [current, previous, historyRes, logsRes] = await Promise.all([
-    buildPayrollPreview(supabase, { weekStartIso: currentWindow.startIso, weekEndIso: currentWindow.endIso, config: DEFAULT_PAYROLL_CONFIG }),
-    buildPayrollPreview(supabase, { weekStartIso: previousWindow.startIso, weekEndIso: previousWindow.endIso, config: DEFAULT_PAYROLL_CONFIG }),
+  const [current, previous, selected, historyRes, logsRes] = await Promise.all([
+    buildPayrollPreview(supabase, { weekStartIso: currentWindow.startIso, weekEndIso: currentWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'weekly' }),
+    buildPayrollPreview(supabase, { weekStartIso: previousWindow.startIso, weekEndIso: previousWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'weekly' }),
+    buildPayrollPreview(supabase, { weekStartIso: selectedWindow.startIso, weekEndIso: selectedWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: selectedWindow.mode, excludeAlreadyPaid: selectedWindow.mode === 'custom' }),
     canHistory
-      ? supabase.from('payroll_runs').select('id, week_start, week_end, validated_at, validated_by_label, group_balance_before, group_balance_after, reserve_kept, envelope, total_distributed, config_snapshot, excluded_members, manual_adjustments').order('validated_at', { ascending: false }).limit(40)
+      ? supabase.from('payroll_runs').select('id, week_start, week_end, period_mode, validated_at, validated_by_label, group_balance_before, group_balance_after, reserve_kept, envelope, total_distributed, config_snapshot, excluded_members, manual_adjustments').order('validated_at', { ascending: false }).limit(40)
       : Promise.resolve({ data: [] }),
     canLogs
       ? supabase.from('audit_logs').select('id, action, summary, created_at, actor_name').in('action', ['payroll_validated', 'payroll_preview', 'payroll_adjusted', 'payroll_member_excluded']).order('created_at', { ascending: false }).limit(80)
@@ -44,6 +56,7 @@ export async function GET() {
   return NextResponse.json({
     current,
     previous,
+    selected,
     history: historyRes.data ?? [],
     logs: logsRes.data ?? []
   });
@@ -65,8 +78,9 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as ValidateBody;
   const now = new Date();
+  const periodMode = body.period_mode === 'custom' ? 'custom' : 'weekly';
   const weekStartIso = body.week_start_iso ?? weekWindow(now, 0).startIso;
-  const weekEndIso = (() => {
+  const weekEndIso = body.week_end_iso ?? (() => {
     const d = new Date(weekStartIso);
     d.setUTCDate(d.getUTCDate() + 7);
     return d.toISOString();
@@ -78,11 +92,12 @@ export async function POST(request: Request) {
 
   const supabase = getSupabaseAdmin();
   const [{ data: existing }, preview] = await Promise.all([
-    supabase.from('payroll_runs').select('id').eq('week_start', weekStartIso).limit(1).maybeSingle(),
-    buildPayrollPreview(supabase, { weekStartIso, weekEndIso, config, excludedMemberIds, manualAdjustments })
+    supabase.from('payroll_runs').select('id, week_start, week_end').lt('week_start', weekEndIso).gt('week_end', weekStartIso).order('validated_at', { ascending: false }).limit(10),
+    buildPayrollPreview(supabase, { weekStartIso, weekEndIso, config, excludedMemberIds, manualAdjustments, excludeAlreadyPaid: periodMode === 'custom', periodMode })
   ]);
 
-  if (existing?.id) return NextResponse.json({ message: 'Une paye existe déjà pour cette semaine.' }, { status: 409 });
+  const overlaps = (existing ?? []).filter((run) => weekStartIso < String(run.week_end) && weekEndIso > String(run.week_start));
+  if (overlaps.length > 0 && !canConfigure) return NextResponse.json({ message: 'Une paye existe déjà sur une période qui se chevauche.' }, { status: 409 });
   if (preview.totalProposed <= 0) return NextResponse.json({ message: 'Aucune paye calculée à valider.' }, { status: 400 });
   if (preview.totalProposed > preview.envelope) return NextResponse.json({ message: 'Le total dépasse l’enveloppe disponible.' }, { status: 400 });
   if (preview.balanceAfter < 0) return NextResponse.json({ message: 'Fonds insuffisants.' }, { status: 400 });
@@ -103,6 +118,7 @@ export async function POST(request: Request) {
     .insert({
       week_start: weekStartIso,
       week_end: weekEndIso,
+      period_mode: periodMode,
       validated_at: new Date().toISOString(),
       validated_by: session.userId,
       validated_by_label: actorLabel,
@@ -175,6 +191,7 @@ export async function POST(request: Request) {
       balance: balanceAfter,
       weekStartIso,
       weekEndIso,
+      periodMode,
       reserveKept: preview.reserveKept,
       envelope: preview.envelope,
       totalDistributed: preview.totalProposed,

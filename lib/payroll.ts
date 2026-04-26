@@ -50,6 +50,7 @@ export type PayrollPreview = {
   eligibleCount: number;
   ineligibleCount: number;
   members: PayrollMemberRow[];
+  periodMode?: 'weekly' | 'custom';
 };
 
 function normalizeLabel(value: string | null | undefined) {
@@ -130,6 +131,9 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   config?: Partial<PayrollConfig>;
   excludedMemberIds?: string[];
   manualAdjustments?: Record<string, number>;
+  excludeAlreadyPaid?: boolean;
+  ignorePayrollRunId?: number | null;
+  periodMode?: 'weekly' | 'custom';
 }) {
   const cfg: PayrollConfig = {
     ...DEFAULT_PAYROLL_CONFIG,
@@ -139,6 +143,26 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
 
   const excluded = new Set((args.excludedMemberIds ?? []).filter(Boolean));
   const manualAdjustments = args.manualAdjustments ?? {};
+  const skipAlreadyPaid = Boolean(args.excludeAlreadyPaid);
+
+  const paidRanges: Array<{ start: string; end: string }> = [];
+  if (skipAlreadyPaid) {
+    const { data: paidRuns } = await supabase
+      .from('payroll_runs')
+      .select('id, week_start, week_end')
+      .lt('week_start', args.weekEndIso)
+      .gt('week_end', args.weekStartIso)
+      .order('validated_at', { ascending: false })
+      .limit(120);
+    for (const run of paidRuns ?? []) {
+      if (args.ignorePayrollRunId && Number(run.id) === Number(args.ignorePayrollRunId)) continue;
+      paidRanges.push({ start: String(run.week_start), end: String(run.week_end) });
+    }
+  }
+  const isAlreadyPaid = (createdAt?: string | null) => {
+    if (!createdAt || paidRanges.length === 0) return false;
+    return paidRanges.some((range) => createdAt >= range.start && createdAt < range.end);
+  };
 
   const [
     { data: members },
@@ -197,6 +221,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   };
 
   for (const row of txRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
     const inAmount = Number(row.total_money_in ?? 0);
     const outAmount = Number(row.total_money_out ?? 0);
     const contribution = Math.max(0, inAmount - outAmount);
@@ -206,6 +231,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   }
 
   for (const row of fourRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
     const profit = Math.max(0, Number(row.profit_loss ?? 0));
     const memberId = resolveMemberId(row.created_by, null);
     addMoney(memberId, profit);
@@ -213,12 +239,14 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   }
 
   for (const row of saleRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
     const memberId = resolveMemberId(row.created_by, null);
     addMoney(memberId, Math.max(0, Number(row.total_amount ?? 0)));
     addActivity(memberId, 1);
   }
 
   for (const row of drugRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
     const amount = Math.max(0, Number(row.actual_amount ?? 0));
     const participants = normalizeParticipantIds(row.member_user_ids, resolveMemberId(row.created_by, null));
     const split = splitAmount(amount, participants);
@@ -231,6 +259,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   }
 
   for (const row of gofastRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
     const amount = Math.max(0, Number(row.money_amount ?? 0));
     const participants = normalizeParticipantIds(row.participants, resolveMemberId(row.user_id, row.user_name));
     const split = splitAmount(amount, participants);
@@ -243,6 +272,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   }
 
   for (const row of robberyRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
     const amount = Math.max(0, Number(row.money_amount ?? 0));
     const participants = normalizeParticipantIds(row.participants, resolveMemberId(row.user_id, row.user_name));
     const split = splitAmount(amount, participants);
@@ -268,6 +298,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     }
   }
   for (const row of activityRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
     const fallbackMemberId = resolveMemberId(row.member_user_id ?? row.created_by, row.member_label);
     const ids = activityMembersByActivityId.get(Number(row.id)) ?? (fallbackMemberId ? [fallbackMemberId] : []);
     for (const memberId of ids) {
@@ -277,6 +308,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   }
 
   for (const row of tabletRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
     const delta = Math.max(0, Number(row.after_cash ?? 0) - Number(row.before_cash ?? 0));
     const memberId = resolveMemberId(row.member_user_id, row.member_label);
     addMoney(memberId, delta);
@@ -284,6 +316,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   }
 
   for (const row of cigaretteRows ?? []) {
+    if (isAlreadyPaid(row.created_at)) continue;
     const memberId = resolveMemberId(row.member_user_id, row.member_label);
     addMoney(memberId, Math.max(0, Number(row.revenue_amount ?? 0)));
     addActivity(memberId, 1);
@@ -371,6 +404,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     balanceAfter: balance - totalProposed,
     eligibleCount: rows.filter((row) => row.eligible).length,
     ineligibleCount: rows.filter((row) => !row.eligible).length,
-    members: rows.sort((a, b) => (b.eligible ? 1 : 0) - (a.eligible ? 1 : 0) || b.totalScore - a.totalScore || b.proposedPay - a.proposedPay)
+    members: rows.sort((a, b) => (b.eligible ? 1 : 0) - (a.eligible ? 1 : 0) || b.totalScore - a.totalScore || b.proposedPay - a.proposedPay),
+    periodMode: args.periodMode ?? 'weekly'
   } satisfies PayrollPreview;
 }
