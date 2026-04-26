@@ -1191,3 +1191,13 @@ values
   ('tobacco.processor.stats'),
   ('tobacco.processor.logs')
 on conflict (name) do nothing;
+
+alter table public.processor_sessions add column if not exists operation_type text not null default 'production';
+alter table public.processor_sessions add column if not exists stock_after integer not null default 0;
+alter table public.processor_sessions add column if not exists unit_price numeric(12,2) not null default 0;
+
+insert into public.permissions (name)
+values
+  ('tobacco.processor.production'),
+  ('tobacco.processor.sale')
+on conflict (name) do nothing;

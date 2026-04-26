@@ -216,7 +216,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     supabase.from('activities').select('id, member_user_id, member_label, created_by, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
     supabase.from('tablet_passages').select('member_user_id, member_label, before_cash, after_cash, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
     supabase.from('cigarette_passages').select('member_user_id, member_label, revenue_amount, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
-    supabase.from('processor_sessions').select('participant_user_ids, validated_by, real_received, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000)
+    supabase.from('processor_sessions').select('participant_user_ids, validated_by, real_received, operation_type, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000)
   ]);
 
   const memberIdByLabel = new Map<string, string>();
@@ -357,7 +357,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   for (const row of processorRows ?? []) {
     if (isAlreadyPaid(row.created_at)) continue;
     const participants = normalizeParticipantIds(row.participant_user_ids, resolveMemberId(row.validated_by, null));
-    const amount = Math.max(0, Number(row.real_received ?? 0));
+    const amount = row.operation_type === 'sale' ? Math.max(0, Number(row.real_received ?? 0)) : 0;
     const split = splitAmount(amount, participants);
     for (const entry of split) addMoney(entry.memberId, entry.value);
     for (const memberId of participants) {

@@ -22,9 +22,9 @@ export async function GET() {
     for (const memberId of (row.participant_user_ids ?? []) as string[]) {
       const prev = memberMap.get(memberId) ?? { sessions: 0, cash: 0, profit: 0, bottles: 0, last: row.created_at };
       prev.sessions += 1;
-      prev.cash += Number(row.real_received ?? 0);
+      prev.cash += Number(row.operation_type === 'sale' ? row.real_received : 0);
       prev.profit += Number(row.real_profit ?? 0);
-      prev.bottles += Number(row.bottles ?? 0);
+      prev.bottles += Number(row.operation_type === 'production' ? row.bottles : 0);
       if (new Date(row.created_at).getTime() > new Date(prev.last).getTime()) prev.last = row.created_at;
       memberMap.set(memberId, prev);
     }
@@ -34,9 +34,10 @@ export async function GET() {
     week,
     global: {
       sessions: rows.length,
-      bottles: rows.reduce((s, r) => s + Number(r.bottles ?? 0), 0),
-      processors: rows.reduce((s, r) => s + Number(r.processors_count ?? 0), 0),
-      realReceived: rows.reduce((s, r) => s + Number(r.real_received ?? 0), 0),
+      bottles: rows.reduce((s, r) => s + Number(r.operation_type === 'production' ? r.bottles : 0), 0),
+      processorsProduced: rows.reduce((s, r) => s + Number(r.operation_type === 'production' ? r.processors_count : 0), 0),
+      processorsSold: rows.reduce((s, r) => s + Number(r.operation_type === 'sale' ? r.processors_count : 0), 0),
+      realReceived: rows.reduce((s, r) => s + Number(r.operation_type === 'sale' ? r.real_received : 0), 0),
       realProfit: rows.reduce((s, r) => s + Number(r.real_profit ?? 0), 0),
       estimatedProfitAvg: rows.reduce((s, r) => s + Number(r.estimated_profit_avg ?? 0), 0),
       boatSessions: rows.filter((r) => String(r.vehicle_used) === 'boat').length,

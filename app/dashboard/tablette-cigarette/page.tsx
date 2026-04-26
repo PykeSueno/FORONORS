@@ -21,14 +21,15 @@ export default async function TabletCigarettePage() {
   const tabletBusinessDay = getTabletBusinessDate();
   const cigaretteBusinessDay = getCigaretteBusinessDate();
 
-  const [membersRes, cashRes, tabletDayRes, cigaretteDayRes, kitItemRes, cutterItemRes, cigaretteItemRes] = await Promise.all([
+  const [membersRes, cashRes, tabletDayRes, cigaretteDayRes, kitItemRes, cutterItemRes, cigaretteItemRes, processorItemRes] = await Promise.all([
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
     supabase.from('tablet_days').select('*').eq('business_day', tabletBusinessDay).maybeSingle(),
     supabase.from('cigarette_days').select('*').eq('business_day', cigaretteBusinessDay).maybeSingle(),
     supabase.from('items').select('name, quantity').ilike('name', '%kit%').limit(1).maybeSingle(),
     supabase.from('items').select('name, quantity').ilike('name', '%disqueuse%').limit(1).maybeSingle(),
-    supabase.from('items').select('id, quantity').eq('name', CIGARETTE_ITEM_NAME).maybeSingle()
+    supabase.from('items').select('id, quantity').eq('name', CIGARETTE_ITEM_NAME).maybeSingle(),
+    supabase.from('items').select('id, quantity, image_url').eq('name', 'Processeur').maybeSingle()
   ]);
 
   const tabletPassages = tabletDayRes.data?.id
@@ -59,6 +60,8 @@ export default async function TabletCigarettePage() {
         kitsInStock={Number(kitItemRes.data?.quantity ?? 0)}
         cuttersInStock={Number(cutterItemRes.data?.quantity ?? 0)}
         packsInStock={Number(cigaretteItemRes.data?.quantity ?? 0)}
+        processorInStock={Number(processorItemRes.data?.quantity ?? 0)}
+        processorImageUrl={String(processorItemRes.data?.image_url ?? '')}
         canTabletAccess={canTabletAccess}
         canCigaretteAccess={canCigaretteAccess}
         canTabletManageDaily={permissions.includes('tablet.daily.manage')}
@@ -69,6 +72,8 @@ export default async function TabletCigarettePage() {
         canStats={permissions.includes('tablet.stats.view') || permissions.includes('cigarette.stats.view')}
         canProcessorView={canProcessorView}
         canProcessorCreate={permissions.includes('tobacco.processor.create')}
+        canProcessorProduction={permissions.includes('tobacco.processor.production') || permissions.includes('tobacco.processor.create')}
+        canProcessorSale={permissions.includes('tobacco.processor.sale') || permissions.includes('tobacco.processor.create')}
         canProcessorStats={permissions.includes('tobacco.processor.stats')}
         canProcessorLogs={permissions.includes('tobacco.processor.logs')}
         processorSessions={processorSessions as Array<Record<string, unknown>>}

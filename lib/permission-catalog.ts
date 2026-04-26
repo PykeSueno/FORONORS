@@ -164,6 +164,8 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
   'cigarette.edit.any': { module: 'Tablette & Tabac', section: 'Gestion', label: 'Modifier / annuler tous les passages Cigarette', hint: 'Permet de corriger ou annuler tous les passages Cigarette.' },
   'tobacco.processor.view': { module: 'Tablette & Tabac', section: 'Vue', label: 'Voir l’onglet Processeur', hint: 'Permet de consulter la page Processeur.' },
   'tobacco.processor.create': { module: 'Tablette & Tabac', section: 'Création', label: 'Créer une session Processeur', hint: 'Permet de valider une session Processeur.' },
+  'tobacco.processor.production': { module: 'Tablette & Tabac', section: 'Création', label: 'Valider une production Processeur', hint: 'Permet de valider la production/récupération de processeurs.' },
+  'tobacco.processor.sale': { module: 'Tablette & Tabac', section: 'Création', label: 'Valider une vente Processeur', hint: 'Permet de valider la vente de processeurs.' },
   'tobacco.processor.stats': { module: 'Tablette & Tabac', section: 'Stats', label: 'Voir les stats Processeur', hint: 'Permet de consulter les statistiques Processeur.' },
   'tobacco.processor.logs': { module: 'Tablette & Tabac', section: 'Logs', label: 'Voir les logs Processeur', hint: 'Permet de consulter les logs Processeur.' },
 
