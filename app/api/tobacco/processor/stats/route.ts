@@ -37,6 +37,8 @@ export async function GET() {
       bottles: rows.reduce((s, r) => s + Number(r.operation_type === 'production' ? r.bottles : 0), 0),
       processorsProduced: rows.reduce((s, r) => s + Number(r.operation_type === 'production' ? r.processors_count : 0), 0),
       processorsSold: rows.reduce((s, r) => s + Number(r.operation_type === 'sale' ? r.processors_count : 0), 0),
+      processorsAccepted: rows.reduce((s, r) => s + Number(r.operation_type === 'sale' ? r.accepted_count : 0), 0),
+      processorsRejected: rows.reduce((s, r) => s + Number(r.operation_type === 'sale' ? r.rejected_count : 0), 0),
       realReceived: rows.reduce((s, r) => s + Number(r.operation_type === 'sale' ? r.real_received : 0), 0),
       realProfit: rows.reduce((s, r) => s + Number(r.real_profit ?? 0), 0),
       estimatedProfitAvg: rows.reduce((s, r) => s + Number(r.estimated_profit_avg ?? 0), 0),

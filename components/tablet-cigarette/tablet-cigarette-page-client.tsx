@@ -10,7 +10,7 @@ type CigaretteDay = { id: number; business_day: string; chest_amount: number; pa
 type TabletPassage = { id: number; member_label: string; before_cash: number; after_cash: number; before_kits: number; after_kits: number; before_cutters: number; after_cutters: number; created_at: string };
 type CigarettePassage = { id: number; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; created_at: string };
 
-type Tab = 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
+type Tab = 'home' | 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
 
 export function TabletCigarettePageClient(props: {
   members: Array<{ id: string; name: string; username: string }>;
@@ -51,7 +51,7 @@ export function TabletCigarettePageClient(props: {
     defaultMemberId, defaultMemberLabel
   } = props;
 
-  const [tab, setTab] = useState<Tab>(canTabletAccess ? 'tablet' : (canCigaretteAccess ? 'cigarette' : 'processor'));
+  const [tab, setTab] = useState<Tab>('home');
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
 
@@ -189,12 +189,39 @@ export function TabletCigarettePageClient(props: {
       <section className="glass-card p-4">
         <div className="flex flex-wrap gap-2">
           {canTabletAccess ? <button type="button" className={`filter-pill ${tab === 'tablet' ? 'filter-pill-active' : ''}`} onClick={() => setTab('tablet')}>📱 Tablette</button> : null}
+          <button type="button" className={`filter-pill ${tab === 'home' ? 'filter-pill-active' : ''}`} onClick={() => setTab('home')}>🏠 Accueil</button>
           {canCigaretteAccess ? <button type="button" className={`filter-pill ${tab === 'cigarette' ? 'filter-pill-active' : ''}`} onClick={() => setTab('cigarette')}>🚬 Cigarette / Tabac</button> : null}
           {canProcessorView ? <button type="button" className={`filter-pill ${tab === 'processor' ? 'filter-pill-active' : ''}`} onClick={() => setTab('processor')}>⚙️ Processeur</button> : null}
           {canHistory ? <button type="button" className={`filter-pill ${tab === 'history' ? 'filter-pill-active' : ''}`} onClick={() => setTab('history')}>📚 Historique</button> : null}
           {canStats ? <button type="button" className={`filter-pill ${tab === 'stats' ? 'filter-pill-active' : ''}`} onClick={() => setTab('stats')}>📊 Stats</button> : null}
         </div>
       </section>
+
+      {(tab === 'home') ? (
+        <section className="grid gap-4 md:grid-cols-3">
+          <article className="glass-card p-4 space-y-2">
+            <h3 className="font-semibold text-[#ffe8ca]">📱 Tablette</h3>
+            <MiniStat label="Passages jour" value={String(tabletDayState?.passages_count ?? 0)} />
+            <MiniStat label="Stock kits" value={String(kitsState)} />
+            <MiniStat label="Argent généré" value={formatUsd(Math.max(0, Number(tabletDayState?.deposited_amount ?? 0) - Number(tabletDayState?.chest_amount ?? 0)))} />
+            {canTabletAccess ? <button className="saas-primary-btn w-full" onClick={() => setTab('tablet')}>Ouvrir Tablette</button> : null}
+          </article>
+          <article className="glass-card p-4 space-y-2">
+            <h3 className="font-semibold text-[#ffe8ca]">🚬 Cigarette</h3>
+            <MiniStat label="Passages jour" value={String(cigaretteDayState?.passages_count ?? 0)} />
+            <MiniStat label="Stock paquets" value={String(packsState)} />
+            <MiniStat label="Argent généré" value={formatUsd(Number(cigaretteDayState?.total_revenue ?? 0))} />
+            {canCigaretteAccess ? <button className="saas-primary-btn w-full" onClick={() => setTab('cigarette')}>Ouvrir Cigarette</button> : null}
+          </article>
+          <article className="glass-card p-4 space-y-2">
+            <h3 className="font-semibold text-[#ffe8ca]">⚙️ Processeur</h3>
+            <MiniStat label="Stock actuel" value={String(processorStockState)} />
+            <MiniStat label="Produits sem." value={String(processorStatsQuick.produced)} />
+            <MiniStat label="Argent généré" value={formatUsd(processorStatsQuick.revenue)} />
+            {canProcessorView ? <button className="saas-primary-btn w-full" onClick={() => setTab('processor')}>Ouvrir Processeur</button> : null}
+          </article>
+        </section>
+      ) : null}
 
       {(tab === 'tablet' && canTabletAccess) ? (
         <section className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">

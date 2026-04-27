@@ -106,7 +106,12 @@ export async function POST(request: Request) {
   const unitPrice = Math.max(0, Number(body.unit_price ?? 100));
   if (!sellerId || quantity <= 0) return NextResponse.json({ message: 'Vendeur / quantité invalides.' }, { status: 400 });
   if (processorStock < quantity) return NextResponse.json({ message: 'Stock processeur insuffisant.' }, { status: 400 });
-  const received = quantity * unitPrice;
+  let accepted = 0;
+  for (let i = 0; i < quantity; i += 1) {
+    if (Math.random() < 0.5) accepted += 1;
+  }
+  const rejected = Math.max(0, quantity - accepted);
+  const received = accepted * unitPrice;
   const after = before + received;
   const nextStock = processorStock - quantity;
 
@@ -120,15 +125,17 @@ export async function POST(request: Request) {
     material_cost: 0,
     boat_fee: 0,
     estimated_gain_avg: received,
-    estimated_gain_max: received,
+    estimated_gain_max: quantity * unitPrice,
     estimated_profit_avg: received,
-    estimated_profit_max: received,
+    estimated_profit_max: quantity * unitPrice,
     real_received: received,
     real_profit: received,
     before_group_cash: before,
     after_group_cash: after,
     stock_after: nextStock,
     unit_price: unitPrice,
+    accepted_count: accepted,
+    rejected_count: rejected,
     validated_by: session.userId,
     status: 'validated'
   }).select('*').maybeSingle();
@@ -138,9 +145,9 @@ export async function POST(request: Request) {
     supabase.from('items').update({ quantity: nextStock, updated_at: new Date().toISOString() }).eq('id', processorItemId),
     supabase.from('stock_movements').insert({ item_id: processorItemId, item_name: 'Processeur', quantity_delta: -quantity, transaction_type: 'processor_sale', user_id: sellerId }),
     supabase.from('group_cash').update({ balance: after, updated_at: new Date().toISOString() }).eq('id', cash.id),
-    supabase.from('cash_movements').insert({ type: 'processor_sale', amount: received, label: `Vente processeur ${quantity} unités`, user_id: sellerId, before_amount: before, after_amount: after }),
-    supabase.from('transactions').insert({ actor_user_id: session.userId, member_user_id: sellerId, member_label: 'Vente Processeur', reason: 'Vente Processeur', total_money_in: received, total_money_out: 0, stock_in_count: 0, stock_out_count: quantity, profit_loss: received, summary: `Vente processeur x${quantity}` })
+    supabase.from('cash_movements').insert({ type: 'processor_sale', amount: received, label: `Vente processeur ${quantity} unités (${accepted} acceptés / ${rejected} refusés)`, user_id: sellerId, before_amount: before, after_amount: after }),
+    supabase.from('transactions').insert({ actor_user_id: session.userId, member_user_id: sellerId, member_label: 'Vente Processeur', reason: 'Vente Processeur', total_money_in: received, total_money_out: 0, stock_in_count: 0, stock_out_count: quantity, profit_loss: received, summary: `Vente processeur x${quantity} (${accepted}/${quantity})` })
   ]);
-  await createAuditLog({ actorUserId: session.userId, action: 'processor_sale_created', entityType: 'processor_session', entityId: created.id, summary: `Vente processeur ${quantity} unités`, newValues: { sellerId, ...created } });
-  return NextResponse.json({ session: created, cashAfter: after, processorStock: nextStock });
+  await createAuditLog({ actorUserId: session.userId, action: 'processor_sale_created', entityType: 'processor_session', entityId: created.id, summary: `Vente processeur ${quantity} unités (${accepted} acceptés / ${rejected} refusés)`, newValues: { sellerId, accepted, rejected, ...created } });
+  return NextResponse.json({ session: { ...created, accepted_count: accepted, rejected_count: rejected }, cashAfter: after, processorStock: nextStock });
 }

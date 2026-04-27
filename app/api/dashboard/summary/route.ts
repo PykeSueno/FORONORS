@@ -33,6 +33,7 @@ export async function GET() {
   const canCigarettePreview = canCigaretteAccess || has('cigarette.preview');
   const canTabletAccess = has('tablet.access');
   const canTabletPreview = canTabletAccess || has('tablet.preview');
+  const canProcessorPreview = has('tobacco.processor.view');
   const canActivityAccess = has('activity.access');
   const canActivityPreview = canActivityAccess || has('activity.preview');
   const canFourAccess = has('four.access');
@@ -52,7 +53,7 @@ export async function GET() {
   dayStart.setHours(0, 0, 0, 0);
   const dayStartIso = dayStart.toISOString();
 
-  const [{ data: cash }, { data: itemQuantities }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { count: saleObjectsToday }, { data: cigaretteToday }, { data: tabletToday }, { count: activitiesToday }, { data: fourTodayRows }] = await Promise.all([
+  const [{ data: cash }, { data: itemQuantities }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { count: saleObjectsToday }, { data: cigaretteToday }, { data: tabletToday }, { count: processorToday }, { count: activitiesToday }, { data: fourTodayRows }] = await Promise.all([
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItemsPreview ? supabase.from('items').select('quantity') : Promise.resolve({ data: [] }),
     canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
@@ -70,6 +71,9 @@ export async function GET() {
     canTabletPreview
       ? supabase.from('tablet_days').select('passages_count').eq('business_day', tabletBusinessDay).maybeSingle()
       : Promise.resolve({ data: null }),
+    canProcessorPreview
+      ? supabase.from('processor_sessions').select('id', { count: 'exact', head: true }).eq('status', 'validated').gte('created_at', dayStartIso)
+      : Promise.resolve({ count: 0 }),
     canActivityPreview
       ? supabase.from('activities').select('id', { count: 'exact', head: true }).gte('created_at', activityDayStart.toISOString()).lt('created_at', activityDayEnd.toISOString())
       : Promise.resolve({ count: 0 }),
@@ -96,6 +100,7 @@ export async function GET() {
       logsCount: logsCount ?? 0,
       saleObjectsToday: Number(saleObjectsToday ?? 0),
       tabletPassagesToday: Number(tabletToday?.passages_count ?? 0),
+      processorOperationsToday: Number(processorToday ?? 0),
       activitiesToday: Number(activitiesToday ?? 0),
       cigarettePassagesToday: Number(cigaretteToday?.passages_count ?? 0),
       cigaretteRevenueToday: Number(cigaretteToday?.total_revenue ?? 0),

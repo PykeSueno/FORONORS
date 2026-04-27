@@ -1201,3 +1201,5 @@ values
   ('tobacco.processor.production'),
   ('tobacco.processor.sale')
 on conflict (name) do nothing;
+alter table public.processor_sessions add column if not exists accepted_count integer not null default 0;
+alter table public.processor_sessions add column if not exists rejected_count integer not null default 0;
