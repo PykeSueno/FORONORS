@@ -74,10 +74,11 @@ export function TabletCigarettePageClient(props: {
   const [processorRealFee, setProcessorRealFee] = useState('');
   const [processorSaleMemberId, setProcessorSaleMemberId] = useState(defaultMemberId);
   const [processorSaleQty, setProcessorSaleQty] = useState(10);
-  const [processorSalePrice, setProcessorSalePrice] = useState(100);
+  const [processorSoldQty, setProcessorSoldQty] = useState(5);
   const [processorStockState, setProcessorStockState] = useState(processorInStock);
   const processorEstimate = useMemo(() => computeProcessorEstimates(processorBottles, processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES), [processorBottles, processorBoatFee]);
-  const processorSaleTotal = Math.max(0, processorSaleQty * processorSalePrice);
+  const processorSaleTotalEstimated = Math.max(0, Math.floor(processorSaleQty * 0.5) * 100);
+  const processorSaleTotalReal = Math.max(0, processorSoldQty * 100);
   const processorStatsQuick = useMemo(() => {
     const rows = processorSessionsState.filter((row) => row.status === 'validated');
     return {
@@ -170,7 +171,7 @@ export function TabletCigarettePageClient(props: {
         operation_type: 'sale',
         seller_user_id: processorSaleMemberId,
         quantity: processorSaleQty,
-        unit_price: processorSalePrice
+        sold_quantity: processorSoldQty
       })
     });
     if (!response.ok) {
@@ -258,7 +259,7 @@ export function TabletCigarettePageClient(props: {
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <MiniStat label="Stock actuel" value={String(processorStockState)} />
                 <MiniStat label="Coût / bouteille" value={formatUsd(300)} />
-                <MiniStat label="Prix / processeur" value={formatUsd(processorSalePrice)} />
+                <MiniStat label="Prix / processeur" value={formatUsd(100)} />
                 <MiniStat label="Bénéfice estimé" value={formatUsd(processorEstimate.profitAverage)} />
               </div>
             </div>
@@ -310,10 +311,11 @@ export function TabletCigarettePageClient(props: {
               </select>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <input className="saas-input !h-9" type="number" min={1} max={processorStockState} value={processorSaleQty} onChange={(e) => setProcessorSaleQty(Math.max(1, Number(e.target.value || 0)))} />
-                <input className="saas-input !h-9" type="number" min={1} value={processorSalePrice} onChange={(e) => setProcessorSalePrice(Math.max(1, Number(e.target.value || 0)))} />
+                <input className="saas-input !h-9" type="number" min={0} max={Math.min(50, processorSaleQty)} value={processorSoldQty} onChange={(e) => setProcessorSoldQty(Math.max(0, Math.min(50, Number(e.target.value || 0))))} />
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <MiniStat label="Total vente" value={formatUsd(processorSaleTotal)} />
+                <MiniStat label="Estimation (50%)" value={formatUsd(processorSaleTotalEstimated)} />
+                <MiniStat label="Total reçu réel" value={formatUsd(processorSaleTotalReal)} />
                 <MiniStat label="Stock après" value={String(Math.max(0, processorStockState - processorSaleQty))} />
               </div>
               {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void createProcessorSale()}>Valider vente</button> : null}

@@ -11,7 +11,7 @@ type Body = {
   seller_user_id?: string;
   bottles?: number;
   quantity?: number;
-  unit_price?: number;
+  sold_quantity?: number;
   vehicle_used?: 'car' | 'boat';
   boat_fee_applied?: boolean;
   real_received?: number;
@@ -103,13 +103,26 @@ export async function POST(request: Request) {
 
   const sellerId = String(body.seller_user_id ?? '');
   const quantity = Math.max(0, Number(body.quantity ?? 0));
-  const unitPrice = Math.max(0, Number(body.unit_price ?? 100));
+  const unitPrice = 100;
+  const soldQuantity = Math.max(0, Math.min(quantity, Number(body.sold_quantity ?? Math.floor(quantity * 0.5))));
   if (!sellerId || quantity <= 0) return NextResponse.json({ message: 'Vendeur / quantité invalides.' }, { status: 400 });
   if (processorStock < quantity) return NextResponse.json({ message: 'Stock processeur insuffisant.' }, { status: 400 });
-  let accepted = 0;
-  for (let i = 0; i < quantity; i += 1) {
-    if (Math.random() < 0.5) accepted += 1;
-  }
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+  const { data: todayRows } = await supabase
+    .from('processor_sessions')
+    .select('accepted_count')
+    .eq('operation_type', 'sale')
+    .eq('status', 'validated')
+    .contains('participant_user_ids', [sellerId])
+    .gte('created_at', dayStart.toISOString())
+    .lt('created_at', dayEnd.toISOString())
+    .limit(500);
+  const soldToday = (todayRows ?? []).reduce((sum, row) => sum + Math.max(0, Number(row.accepted_count ?? 0)), 0);
+  if (soldToday + soldQuantity > 50) return NextResponse.json({ message: 'Limite journalière atteinte (50 processeurs vendus max par membre).' }, { status: 400 });
+  const accepted = soldQuantity;
   const rejected = Math.max(0, quantity - accepted);
   const received = accepted * unitPrice;
   const after = before + received;
