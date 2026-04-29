@@ -4,31 +4,12 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { isPawnshopNordAllowed, isPawnshopSudAllowed, isReservedPawnshopItem } from '@/lib/sale-objects-rules';
 
 type SaleLineInput = { item_id: number; quantity: number; unit_price?: number };
 
 const PAWNSHOP_SUD = 'Pawnshop Sud';
 const PAWNSHOP_NORD = 'Pawnshop Nord';
-const PAWNSHOP_SUD_ALLOWED = ['oeuf de faberge', 'album', 'bouteille', "livre denfant", 'ventilateur', 'statue maltese falcon'];
-const PAWNSHOP_NORD_ALLOWED = ['culotte', 'chicha', 'chaine hifi', 'buste grec', 'poids de muscu', 'bouteille de vin rouge'];
-
-function normalizeItemName(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’']/g, '')
-    .toLowerCase()
-    .trim();
-}
-
-function isPawnshopNordAllowed(name: string) {
-  const normalized = normalizeItemName(name);
-  return PAWNSHOP_NORD_ALLOWED.some((entry) => normalized.includes(normalizeItemName(entry)));
-}
-function isPawnshopSudAllowed(name: string) {
-  const normalized = normalizeItemName(name);
-  return PAWNSHOP_SUD_ALLOWED.some((entry) => normalized.includes(normalizeItemName(entry)));
-}
 
 function isPawnshop(buyerType: string) {
   return buyerType === 'pawnshop_sud' || buyerType === 'pawnshop_nord';
@@ -107,7 +88,7 @@ export async function POST(request: Request) {
     if (buyerType === 'pawnshop_sud' && !isPawnshopSudAllowed(item.name)) {
       return NextResponse.json({ message: `${item.name} n’est pas autorisé pour Pawnshop Sud.` }, { status: 400 });
     }
-    if (buyerType === 'group' && (isPawnshopNordAllowed(item.name) || isPawnshopSudAllowed(item.name))) {
+    if (buyerType === 'group' && isReservedPawnshopItem(item.name)) {
       return NextResponse.json({ message: `${item.name} est réservé à un pawnshop.` }, { status: 400 });
     }
     const qty = Math.max(1, Number(line.quantity));

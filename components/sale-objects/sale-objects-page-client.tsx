@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 import { tryCopyText } from '@/lib/copy';
 import { CompactActionField, CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
+import { isPawnshopNordAllowed, isPawnshopSudAllowed, isReservedPawnshopItem } from '@/lib/sale-objects-rules';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
 type SaleRow = {
@@ -30,18 +31,8 @@ type SaleRow = {
 
 type CartLine = { item_id: number; item_name: string; image_url: string | null; stock: number; quantity: number; unit_price: number; line_total: number };
 type Member = { id: string; name: string | null; username: string | null };
-const PAWNSHOP_NORD_ALLOWED = ['culotte', 'chicha', 'chaine hifi', 'buste grec', 'poids de muscu', 'bouteille de vin rouge', 'bouteille de vin'];
 const PAWNSHOP_PHONE = '8202043';
 const PAWNSHOP_RIB = 'ZT96CO';
-
-function normalizeItemName(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’']/g, '')
-    .toLowerCase()
-    .trim();
-}
 
 function saleStatusMeta(status: SaleRow['status']) {
   if (status === 'paid') return { label: 'Reçu', badge: 'bg-emerald-500/20 text-emerald-200', detail: 'Argent reçu', stockHint: 'Stock sorti' };
@@ -94,10 +85,9 @@ export function SaleObjectsPageClient({
 
   const buyerScopedItems = useMemo(() => {
     return items.filter((item) => {
-      const normalized = normalizeItemName(item.name);
-      const isNordItem = PAWNSHOP_NORD_ALLOWED.some((entry) => normalized.includes(normalizeItemName(entry)));
-      if (buyerType === 'pawnshop_nord') return isNordItem;
-      return !isNordItem;
+      if (buyerType === 'pawnshop_nord') return isPawnshopNordAllowed(item.name);
+      if (buyerType === 'pawnshop_sud') return isPawnshopSudAllowed(item.name);
+      return !isReservedPawnshopItem(item.name);
     });
   }, [items, buyerType]);
 
