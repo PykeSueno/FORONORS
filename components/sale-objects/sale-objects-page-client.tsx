@@ -96,7 +96,7 @@ export function SaleObjectsPageClient({
       const target = resolveItemRouting(item, routing);
       return target === buyerType;
     });
-  }, [items, buyerType]);
+  }, [items, buyerType, routing]);
 
   const filteredItems = useMemo(() => buyerScopedItems.filter((item) => item.name.toLowerCase().includes(query.toLowerCase())), [buyerScopedItems, query]);
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.line_total, 0), [cart]);
@@ -386,6 +386,51 @@ export function SaleObjectsPageClient({
           </article>
         ) : null}
       </section>
+
+      {canRoutingView ? (
+        <section className="glass-card p-5">
+          <h4 className="text-base font-semibold text-[#fff1dd]">Configuration objets</h4>
+          <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto]">
+            <input className="saas-input" placeholder="Recherche objet" value={routingQuery} onChange={(e) => setRoutingQuery(e.target.value)} />
+            <select className="saas-input" value={routingFilter} onChange={(e) => setRoutingFilter(e.target.value as 'all' | SaleObjectRouting)}>
+              <option value="all">Tous</option>
+              <option value="group">Groupe</option>
+              <option value="pawnshop_nord">Pawnshop Nord</option>
+              <option value="pawnshop_sud">Pawnshop Sud</option>
+            </select>
+          </div>
+          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+            {items
+              .filter((item) => item.name.toLowerCase().includes(routingQuery.toLowerCase()))
+              .filter((item) => routingFilter === 'all' || resolveItemRouting(item, routing) === routingFilter)
+              .map((item) => (
+                <div key={`routing-${item.id}`} className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#3b2418]/45 p-2">
+                  <span className="flex-1 text-sm text-[#ffe8ca]">{item.name} · stock {item.quantity}</span>
+                  <select
+                    className="saas-input !h-8 w-44"
+                    value={resolveItemRouting(item, routing)}
+                    disabled={!canRoutingEdit}
+                    onChange={(e) => setRouting((current) => ({ ...current, [String(item.id)]: e.target.value as SaleObjectRouting }))}
+                  >
+                    <option value="group">Groupe</option>
+                    <option value="pawnshop_nord">Pawnshop Nord</option>
+                    <option value="pawnshop_sud">Pawnshop Sud</option>
+                  </select>
+                </div>
+              ))}
+          </div>
+          {canRoutingEdit ? (
+            <button
+              className="saas-primary-btn mt-3"
+              onClick={() => fetch('/api/sale-objects/routing', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ routing }) }).then(() => setCopyFeedback('Configuration objets enregistrée.'))}
+            >
+              Enregistrer configuration objets
+            </button>
+          ) : (
+            <p className="mt-2 text-xs text-[#efcdab]">Lecture seule (permission modification manquante).</p>
+          )}
+        </section>
+      ) : null}
 
       {detail ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">

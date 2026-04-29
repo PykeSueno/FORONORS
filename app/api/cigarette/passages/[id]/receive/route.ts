@@ -4,13 +4,16 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 
-export async function POST(_: Request, { params }: { params: { id: string } }) {
+export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
   const can = await hasUserPermission(session.userId, 'cigarette.passage.create');
   if (!can) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
   const supabase = getSupabaseAdmin();
-  const { data: passage } = await supabase.from('cigarette_passages').select('*').eq('id', Number(params.id)).maybeSingle();
+  const passageId = Number(id);
+  if (!Number.isFinite(passageId) || passageId <= 0) return NextResponse.json({ message: 'Identifiant invalide.' }, { status: 400 });
+  const { data: passage } = await supabase.from('cigarette_passages').select('*').eq('id', passageId).maybeSingle();
   if (!passage) return NextResponse.json({ message: 'Passage introuvable.' }, { status: 404 });
   if (passage.status !== 'pending_bank') return NextResponse.json({ message: 'Statut invalide.' }, { status: 400 });
   const { data: cash } = await supabase.from('group_cash').select('id,balance').order('id').limit(1).maybeSingle();

@@ -21,6 +21,11 @@ function buyerNameFromType(buyerType: string, customBuyer?: string) {
   return (customBuyer ?? '').trim() || 'Groupe';
 }
 
+function parseRouting(raw: string | null | undefined): Record<string, SaleObjectRouting> {
+  if (!raw) return {};
+  try { return JSON.parse(raw) as Record<string, SaleObjectRouting>; } catch { return {}; }
+}
+
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
@@ -32,10 +37,6 @@ export async function GET() {
   if (!canAccess && !canHistory) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
-function parseRouting(raw: string | null | undefined): Record<string, SaleObjectRouting> {
-  if (!raw) return {};
-  try { return JSON.parse(raw) as Record<string, SaleObjectRouting>; } catch { return {}; }
-}
 
   const { data } = await supabase
     .from('sale_object_orders')
