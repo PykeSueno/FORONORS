@@ -9,7 +9,8 @@ type SaleLineInput = { item_id: number; quantity: number; unit_price?: number };
 
 const PAWNSHOP_SUD = 'Pawnshop Sud';
 const PAWNSHOP_NORD = 'Pawnshop Nord';
-const PAWNSHOP_NORD_ALLOWED = ['culotte', 'chicha', 'chaine hifi', 'buste grec', 'poids de muscu', 'bouteille de vin rouge', 'bouteille de vin'];
+const PAWNSHOP_SUD_ALLOWED = ['oeuf de faberge', 'album', 'bouteille', "livre denfant", 'ventilateur', 'statue maltese falcon'];
+const PAWNSHOP_NORD_ALLOWED = ['culotte', 'chicha', 'chaine hifi', 'buste grec', 'poids de muscu', 'bouteille de vin rouge'];
 
 function normalizeItemName(value: string) {
   return value
@@ -23,6 +24,10 @@ function normalizeItemName(value: string) {
 function isPawnshopNordAllowed(name: string) {
   const normalized = normalizeItemName(name);
   return PAWNSHOP_NORD_ALLOWED.some((entry) => normalized.includes(normalizeItemName(entry)));
+}
+function isPawnshopSudAllowed(name: string) {
+  const normalized = normalizeItemName(name);
+  return PAWNSHOP_SUD_ALLOWED.some((entry) => normalized.includes(normalizeItemName(entry)));
 }
 
 function isPawnshop(buyerType: string) {
@@ -99,8 +104,11 @@ export async function POST(request: Request) {
     if (buyerType === 'pawnshop_nord' && !isPawnshopNordAllowed(item.name)) {
       return NextResponse.json({ message: `${item.name} n’est pas autorisé pour Pawnshop Nord.` }, { status: 400 });
     }
-    if (buyerType !== 'pawnshop_nord' && isPawnshopNordAllowed(item.name)) {
-      return NextResponse.json({ message: `${item.name} est réservé à Pawnshop Nord.` }, { status: 400 });
+    if (buyerType === 'pawnshop_sud' && !isPawnshopSudAllowed(item.name)) {
+      return NextResponse.json({ message: `${item.name} n’est pas autorisé pour Pawnshop Sud.` }, { status: 400 });
+    }
+    if (buyerType === 'group' && (isPawnshopNordAllowed(item.name) || isPawnshopSudAllowed(item.name))) {
+      return NextResponse.json({ message: `${item.name} est réservé à un pawnshop.` }, { status: 400 });
     }
     const qty = Math.max(1, Number(line.quantity));
     const stockBefore = Number(item.quantity ?? 0);
