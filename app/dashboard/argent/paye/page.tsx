@@ -6,6 +6,8 @@ import { InternalPageHeader } from '@/components/dashboard/internal-page-header'
 import { MoneyPayPageClient } from '@/components/dashboard/money-pay-page-client';
 import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, weekWindow } from '@/lib/payroll';
 
+export const dynamic = 'force-dynamic';
+
 export default async function MoneyPayPage() {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -28,11 +30,25 @@ export default async function MoneyPayPage() {
   const previous = weekWindow(new Date(displayWindow.startIso), -1);
   const customDefaultStart = '2026-04-20T00:00:00.000Z';
   const customDefaultEnd = now.toISOString();
+  const { data: savedConfigRow } = await supabase.from('app_settings').select('value').eq('key', 'payroll_config').maybeSingle();
+  let persistedConfig = DEFAULT_PAYROLL_CONFIG;
+  let rawSavedConfig: Record<string, unknown> = {};
+  try {
+    rawSavedConfig = savedConfigRow?.value ? JSON.parse(savedConfigRow.value) : {};
+    persistedConfig = {
+      ...DEFAULT_PAYROLL_CONFIG,
+      ...rawSavedConfig,
+      weights: {
+        ...DEFAULT_PAYROLL_CONFIG.weights,
+        ...((rawSavedConfig as { weights?: Record<string, unknown> }).weights ?? {})
+      }
+    };
+  } catch {}
 
   const [currentPreview, previousPreview, customPreview, historyRes, detailsRes, logsRes, paidRunRes, exclusionsRes] = await Promise.all([
-    buildPayrollPreview(supabase, { weekStartIso: current.startIso, weekEndIso: current.endIso, config: DEFAULT_PAYROLL_CONFIG }),
-    buildPayrollPreview(supabase, { weekStartIso: previous.startIso, weekEndIso: previous.endIso, config: DEFAULT_PAYROLL_CONFIG }),
-    buildPayrollPreview(supabase, { weekStartIso: customDefaultStart, weekEndIso: customDefaultEnd, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'custom', excludeAlreadyPaid: true }),
+    buildPayrollPreview(supabase, { weekStartIso: current.startIso, weekEndIso: current.endIso, config: persistedConfig }),
+    buildPayrollPreview(supabase, { weekStartIso: previous.startIso, weekEndIso: previous.endIso, config: persistedConfig }),
+    buildPayrollPreview(supabase, { weekStartIso: customDefaultStart, weekEndIso: customDefaultEnd, config: persistedConfig, periodMode: 'custom', excludeAlreadyPaid: true }),
     canHistory
       ? supabase.from('payroll_runs').select('id, week_start, week_end, period_mode, validated_at, validated_by_label, group_balance_before, group_balance_after, reserve_kept, envelope, total_distributed').order('validated_at', { ascending: false }).limit(30)
       : Promise.resolve({ data: [] }),
