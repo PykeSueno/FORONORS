@@ -66,13 +66,18 @@ export async function GET(request: Request) {
     buildPayrollPreview(supabase, { weekStartIso: previousWindow.startIso, weekEndIso: previousWindow.endIso, config: persistedConfig, periodMode: 'weekly', excludedMemberIds: (previousExcludedRes.data ?? []).map((row) => String(row.member_user_id)) }),
     buildPayrollPreview(supabase, { weekStartIso: selectedWindow.startIso, weekEndIso: selectedWindow.endIso, config: persistedConfig, periodMode: selectedWindow.mode, excludeAlreadyPaid: selectedWindow.mode === 'custom', excludedMemberIds: (selectedExcludedRes.data ?? []).map((row) => String(row.member_user_id)) })
   ]);
+  const paidKey = `payroll_paid_members:${selectedWindow.startIso}:${selectedWindow.endIso}`;
+  const { data: paidSetting } = await supabase.from('app_settings').select('value').eq('key', paidKey).maybeSingle();
+  let paidMembers: Record<string, number> = {};
+  try { paidMembers = paidSetting?.value ? JSON.parse(paidSetting.value) as Record<string, number> : {}; } catch {}
 
   return NextResponse.json({
     current,
     previous,
     selected,
     history: historyRes.data ?? [],
-    logs: logsRes.data ?? []
+    logs: logsRes.data ?? [],
+    paidMembers
   });
 }
 

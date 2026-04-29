@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import type { PayrollPreview } from '@/lib/payroll';
 
@@ -73,6 +73,7 @@ export function MoneyPayPageClient({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [saveFeedback, setSaveFeedback] = useState('');
+  const [paidMembers, setPaidMembers] = useState<Record<string, number>>({});
 
   const periodKey = `${selectedPreview.weekStartIso}__${selectedPreview.weekEndIso}`;
 
@@ -139,9 +140,18 @@ export function MoneyPayPageClient({
   async function loadCustomPreview(startIso: string, endIso: string) {
     const response = await fetch(`/api/money/payroll?period=custom&start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`, { cache: 'no-store' });
     if (!response.ok) return;
-    const payload = await response.json() as { selected?: PayrollPreview };
+    const payload = await response.json() as { selected?: PayrollPreview; paidMembers?: Record<string, number> };
     if (payload.selected) setSelectedPreview(payload.selected);
+    setPaidMembers(payload.paidMembers ?? {});
   }
+
+  useEffect(() => {
+    const period = periodMode === 'previous' ? 'previous' : periodMode === 'custom' ? 'custom' : 'current';
+    const query = period === 'custom'
+      ? `/api/money/payroll?period=custom&start=${encodeURIComponent(selectedPreview.weekStartIso)}&end=${encodeURIComponent(selectedPreview.weekEndIso)}`
+      : `/api/money/payroll?period=${period}`;
+    fetch(query, { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((payload) => setPaidMembers(payload?.paidMembers ?? {})).catch(() => {});
+  }, [periodMode, selectedPreview.weekStartIso, selectedPreview.weekEndIso]);
 
   const effectivePreview = useMemo(() => {
     return computeWithConfig(selectedPreview, excludedIds, config, manualAdjustments);
@@ -207,6 +217,17 @@ export function MoneyPayPageClient({
     window.location.reload();
   }
 
+  async function payMember(memberId: string, memberLabel: string, amount: number) {
+    const response = await fetch('/api/money/payroll/member-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week_start_iso: selectedPreview.weekStartIso, week_end_iso: selectedPreview.weekEndIso, member_id: memberId, member_label: memberLabel, amount })
+    });
+    const payload = await response.json().catch(() => ({} as { message?: string; after?: number; paid?: Record<string, number> }));
+    if (!response.ok) return setError(payload.message ?? 'Paiement impossible.');
+    setPaidMembers(payload.paid ?? {});
+  }
+
   return (
     <div className="space-y-4">
       <section className="grid gap-2 lg:grid-cols-5">
@@ -214,7 +235,8 @@ export function MoneyPayPageClient({
         <Card label="🛡️ Réserve conservée" value={formatUsd(effectivePreview.reserveKept)} />
         <Card label="📦 Enveloppe paye" value={formatUsd(effectivePreview.envelope)} />
         <Card label="✅ Total payes calculées" value={formatUsd(effectivePreview.totalProposed)} />
-        <Card label="🏦 Solde après paye" value={formatUsd(effectivePreview.balanceAfter)} />
+        <Card label="🏦 Solde après paye" value={formatUsd(effectivePreview.balance - Object.values(paidMembers).reduce((s, v) => s + Number(v || 0), 0))} />
+        <Card label="✅ Total payé" value={formatUsd(Object.values(paidMembers).reduce((s, v) => s + Number(v || 0), 0))} />
       </section>
 
       <section className="glass-card p-4">
@@ -301,6 +323,9 @@ export function MoneyPayPageClient({
                     placeholder="Ajuster"
                     disabled={!canAdjust}
                   />
+                  <button className="saas-primary-btn !py-1 !px-2" disabled={Boolean(paidMembers[member.memberId]) || !member.eligible} onClick={() => void payMember(member.memberId, member.memberLabel, member.proposedPay)}>
+                    {excludedIds.includes(member.memberId) ? 'Exclu' : paidMembers[member.memberId] ? 'Payé' : member.eligible ? 'Payer' : 'Reporté'}
+                  </button>
                 </div>
               </div>
             </article>
@@ -308,12 +333,7 @@ export function MoneyPayPageClient({
         </div>
       </section>
 
-      <section className="glass-card p-4">
-        <h3 className="text-sm font-semibold text-[#fff1dd]">Validation</h3>
-        <p className="mt-1 text-xs text-[#efcdab]">Le total distribué ne peut pas dépasser l’enveloppe. La semaine est figée après validation.</p>
-        {error ? <p className="mt-2 rounded-lg border border-red-300/50 bg-red-500/10 px-2 py-1 text-xs text-red-100">{error}</p> : null}
-        {canValidate ? <button className="saas-primary-btn mt-3" disabled={submitting} onClick={() => void validatePayroll()}>{submitting ? 'Validation…' : 'Valider les payes'}</button> : <p className="mt-2 text-xs text-[#efcdab]">Permission manquante pour valider.</p>}
-      </section>
+      {error ? <p className="mt-2 rounded-lg border border-red-300/50 bg-red-500/10 px-2 py-1 text-xs text-red-100">{error}</p> : null}
 
       {canHistory ? (
         <section className="glass-card p-4">
