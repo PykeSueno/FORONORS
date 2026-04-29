@@ -29,7 +29,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Passage cigarette autorisé uniquement entre 4h et 20h.' }, { status: 400 });
   }
 
-  const body = (await request.json()) as { member_user_id?: string | null; member_label?: string };
+  const body = (await request.json()) as { member_user_id?: string | null; member_label?: string; payment_mode?: 'cash' | 'bank' };
+  const paymentMode = body.payment_mode === 'bank' ? 'bank' : 'cash';
   const requestedMemberId = body.member_user_id || session.userId;
   if (requestedMemberId !== session.userId && !canCreateAny) {
     return NextResponse.json({ message: 'Vous ne pouvez créer un passage que pour votre compte.' }, { status: 403 });
@@ -131,7 +132,7 @@ export async function POST(request: Request) {
   const afterPacks = beforePacks - CIGARETTE_SALE_QTY;
   const afterDepositPacks = beforeDepositPacks - CIGARETTE_SALE_QTY;
   const afterChest = beforeChest + CIGARETTE_REVENUE;
-  const afterGroupCash = beforeGroupCash + CIGARETTE_REVENUE;
+  const afterGroupCash = paymentMode === 'cash' ? beforeGroupCash + CIGARETTE_REVENUE : beforeGroupCash;
 
   const { data: createdPassage, error: createPassageError } = await supabase
     .from('cigarette_passages')
@@ -150,7 +151,7 @@ export async function POST(request: Request) {
       after_chest: afterChest,
       before_group_cash: beforeGroupCash,
       after_group_cash: afterGroupCash,
-      status: 'validated',
+      status: paymentMode === 'cash' ? 'validated' : 'pending_bank',
       created_by: session.userId
     })
     .select('id, business_day, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at')
@@ -160,7 +161,9 @@ export async function POST(request: Request) {
   }
 
   const { error: updateItemError } = await supabase.from('items').update({ quantity: afterPacks, updated_at: new Date().toISOString() }).eq('id', item.id);
-  const { error: updateCashError } = await supabase.from('group_cash').update({ balance: afterGroupCash, updated_at: new Date().toISOString() }).eq('id', cash.id);
+  const { error: updateCashError } = paymentMode === 'cash'
+    ? await supabase.from('group_cash').update({ balance: afterGroupCash, updated_at: new Date().toISOString() }).eq('id', cash.id)
+    : { error: null } as { error: null };
   const { error: updateDayError } = await supabase.from('cigarette_days').update({
     chest_amount: afterChest,
     passages_count: Number(day.passages_count ?? 0) + 1,
@@ -180,7 +183,7 @@ export async function POST(request: Request) {
     quantity_delta: -CIGARETTE_SALE_QTY,
     user_id: requestedMemberId
   });
-  const { error: cashMovementError } = await supabase.from('cash_movements').insert({
+  const { error: cashMovementError } = paymentMode === 'cash' ? await supabase.from('cash_movements').insert({
     type: 'cigarette_passage',
     amount: CIGARETTE_REVENUE,
     label: `Passage Cigarette (${memberLabel})`,
@@ -188,7 +191,7 @@ export async function POST(request: Request) {
     before_amount: beforeGroupCash,
     after_amount: afterGroupCash,
     related_item_name: CIGARETTE_ITEM_NAME
-  });
+  }) : { error: null } as { error: null };
   if (stockMovementError || cashMovementError) {
     return NextResponse.json({ message: 'Traçabilité du passage cigarette incomplète.' }, { status: 500 });
   }

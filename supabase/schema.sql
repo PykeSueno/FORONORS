@@ -139,7 +139,9 @@ values
   ('sale.objects.edit.any'),
   ('sale.objects.cancel.own'),
   ('sale.objects.cancel.any'),
-  ('sale.objects.history.view')
+  ('sale.objects.history.view'),
+  ('sale_objects.routing.view'),
+  ('sale_objects.routing.edit')
 on conflict (name) do nothing;
 
 

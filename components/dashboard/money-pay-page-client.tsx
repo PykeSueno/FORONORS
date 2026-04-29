@@ -72,6 +72,7 @@ export function MoneyPayPageClient({
   const [manualAdjustments, setManualAdjustments] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [saveFeedback, setSaveFeedback] = useState('');
 
   const periodKey = `${selectedPreview.weekStartIso}__${selectedPreview.weekEndIso}`;
 
@@ -166,6 +167,19 @@ export function MoneyPayPageClient({
     return map;
   }, [historyMembers]);
 
+
+  async function saveConfig() {
+    setError('');
+    const response = await fetch('/api/money/payroll', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config }) });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ message: 'Sauvegarde impossible.' }));
+      setError(payload.message ?? 'Sauvegarde impossible.');
+      return;
+    }
+    setSaveFeedback('Réglages enregistrés.');
+    setTimeout(() => setSaveFeedback(''), 1500);
+  }
+
   async function validatePayroll() {
     if (submitting) return;
     setSubmitting(true);
@@ -201,7 +215,7 @@ export function MoneyPayPageClient({
         <Card label="📦 Enveloppe paye" value={formatUsd(effectivePreview.envelope)} />
         <Card label="✅ Total payes calculées" value={formatUsd(effectivePreview.totalProposed)} />
         <Card label="🏦 Solde après paye" value={formatUsd(effectivePreview.balanceAfter)} />
-      </section>
+      {canConfigure ? <button className='saas-primary-btn' onClick={()=>void saveConfig()}>Enregistrer les réglages</button> : null}{saveFeedback ? <p className='text-xs text-[#efcdab]'>{saveFeedback}</p> : null}</section>
 
       <section className="glass-card p-4">
         <h3 className="text-sm font-semibold text-[#fff1dd]">Période de calcul</h3>

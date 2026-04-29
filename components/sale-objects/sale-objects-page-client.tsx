@@ -1,12 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 import { tryCopyText } from '@/lib/copy';
 import { CompactActionField, CompactField, CompactLineGrid, QuantityStepper, RemoveLineButton } from '@/components/shared/line-controls';
-import { isPawnshopNordAllowed, isPawnshopSudAllowed, isReservedPawnshopItem } from '@/lib/sale-objects-rules';
+import { resolveItemRouting, type SaleObjectRouting } from '@/lib/sale-objects-rules';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
 type SaleRow = {
@@ -53,7 +53,9 @@ export function SaleObjectsPageClient({
   currentUserId,
   members,
   defaultSellerId,
-  defaultSellerLabel
+  defaultSellerLabel,
+  canRoutingView,
+  canRoutingEdit
 }: {
   items: Item[];
   initialSales: SaleRow[];
@@ -68,6 +70,8 @@ export function SaleObjectsPageClient({
   members: Member[];
   defaultSellerId: string;
   defaultSellerLabel: string;
+  canRoutingView: boolean;
+  canRoutingEdit: boolean;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -82,12 +86,15 @@ export function SaleObjectsPageClient({
   const [sellerLabel, setSellerLabel] = useState(defaultSellerLabel);
   const [copyFeedback, setCopyFeedback] = useState('');
   const [copyFallbackText, setCopyFallbackText] = useState('');
+  const [routing, setRouting] = useState<Record<string, SaleObjectRouting>>({});
+  const [routingFilter, setRoutingFilter] = useState<'all' | SaleObjectRouting>('all');
+  const [routingQuery, setRoutingQuery] = useState('');
+
 
   const buyerScopedItems = useMemo(() => {
     return items.filter((item) => {
-      if (buyerType === 'pawnshop_nord') return isPawnshopNordAllowed(item.name);
-      if (buyerType === 'pawnshop_sud') return isPawnshopSudAllowed(item.name);
-      return !isReservedPawnshopItem(item.name);
+      const target = resolveItemRouting(item, routing);
+      return target === buyerType;
     });
   }, [items, buyerType]);
 
@@ -95,6 +102,12 @@ export function SaleObjectsPageClient({
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.line_total, 0), [cart]);
   const visibleSales = useMemo(() => sales.filter((sale) => sale.status !== 'canceled'), [sales]);
   const isPawnshopBuyer = buyerType === 'pawnshop_nord' || buyerType === 'pawnshop_sud';
+
+  useEffect(() => {
+    if (!canRoutingView) return;
+    fetch('/api/sale-objects/routing', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((d) => { if (d?.routing) setRouting(d.routing as Record<string, SaleObjectRouting>); }).catch(() => {});
+  }, [canRoutingView]);
+
 
   function upsertLine(item: Item) {
     setCart((current) => {

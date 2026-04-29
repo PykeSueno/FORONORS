@@ -4,7 +4,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
-import { isPawnshopNordAllowed, isPawnshopSudAllowed, isReservedPawnshopItem } from '@/lib/sale-objects-rules';
+import { resolveItemRouting, type SaleObjectRouting } from '@/lib/sale-objects-rules';
 
 type SaleLineInput = { item_id: number; quantity: number; unit_price?: number };
 
@@ -32,6 +32,11 @@ export async function GET() {
   if (!canAccess && !canHistory) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
+function parseRouting(raw: string | null | undefined): Record<string, SaleObjectRouting> {
+  if (!raw) return {};
+  try { return JSON.parse(raw) as Record<string, SaleObjectRouting>; } catch { return {}; }
+}
+
   const { data } = await supabase
     .from('sale_object_orders')
     .select('id, buyer_name, buyer_type, status, total_amount, sale_lines, cash_before, cash_after, created_by, received_by, canceled_by, received_at, canceled_at, created_at, updated_at, creator:created_by(name, username), receiver:received_by(name, username), canceler:canceled_by(name, username)')
@@ -73,7 +78,11 @@ export async function POST(request: Request) {
   const { data: sellerExists } = await supabase.from('users').select('id').eq('id', sellerUserId).maybeSingle();
   if (!sellerExists) return NextResponse.json({ message: 'Vendeur invalide.' }, { status: 400 });
   const itemIds = Array.from(new Set(lines.map((line) => Number(line.item_id))));
-  const { data: items } = await supabase.from('items').select('id, name, quantity, sell_price, image_url, category_label, category_key').in('id', itemIds).eq('category_key', 'objects');
+  const [{ data: items }, { data: routingSetting }] = await Promise.all([
+    supabase.from('items').select('id, name, quantity, sell_price, image_url, category_label, category_key').in('id', itemIds).eq('category_key', 'objects'),
+    supabase.from('app_settings').select('value').eq('key', 'sale_objects_routing').maybeSingle()
+  ]);
+  const routing = parseRouting(routingSetting?.value);
   if (!items || items.length === 0) return NextResponse.json({ message: 'Objets introuvables.' }, { status: 404 });
   const itemMap = new Map(items.map((item) => [item.id, item]));
 
@@ -82,14 +91,9 @@ export async function POST(request: Request) {
   for (const line of lines) {
     const item = itemMap.get(Number(line.item_id));
     if (!item) return NextResponse.json({ message: `Objet #${line.item_id} introuvable.` }, { status: 404 });
-    if (buyerType === 'pawnshop_nord' && !isPawnshopNordAllowed(item.name)) {
-      return NextResponse.json({ message: `${item.name} n’est pas autorisé pour Pawnshop Nord.` }, { status: 400 });
-    }
-    if (buyerType === 'pawnshop_sud' && !isPawnshopSudAllowed(item.name)) {
-      return NextResponse.json({ message: `${item.name} n’est pas autorisé pour Pawnshop Sud.` }, { status: 400 });
-    }
-    if (buyerType === 'group' && isReservedPawnshopItem(item.name)) {
-      return NextResponse.json({ message: `${item.name} est réservé à un pawnshop.` }, { status: 400 });
+    const itemRouting = resolveItemRouting({ id: item.id, name: item.name }, routing);
+    if (itemRouting !== buyerType) {
+      return NextResponse.json({ message: `${item.name} n’est pas autorisé pour cet acheteur.` }, { status: 400 });
     }
     const qty = Math.max(1, Number(line.quantity));
     const stockBefore = Number(item.quantity ?? 0);

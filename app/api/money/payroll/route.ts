@@ -29,6 +29,9 @@ export async function GET(request: Request) {
   if (!canView || !canPreview) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
+  const { data: cfgSetting } = await supabase.from('app_settings').select('value').eq('key', 'payroll_config').maybeSingle();
+  let persistedConfig = DEFAULT_PAYROLL_CONFIG;
+  try { persistedConfig = { ...DEFAULT_PAYROLL_CONFIG, ...(cfgSetting?.value ? JSON.parse(cfgSetting.value) : {}) }; } catch {}
   const url = new URL(request.url);
   const period = (url.searchParams.get('period') ?? 'current').toLowerCase();
   const customStart = url.searchParams.get('start');
@@ -59,9 +62,9 @@ export async function GET(request: Request) {
       : Promise.resolve({ data: [] })
   ]);
   const [current, previous, selected] = await Promise.all([
-    buildPayrollPreview(supabase, { weekStartIso: currentWindow.startIso, weekEndIso: currentWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'weekly', excludedMemberIds: (currentExcludedRes.data ?? []).map((row) => String(row.member_user_id)) }),
-    buildPayrollPreview(supabase, { weekStartIso: previousWindow.startIso, weekEndIso: previousWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: 'weekly', excludedMemberIds: (previousExcludedRes.data ?? []).map((row) => String(row.member_user_id)) }),
-    buildPayrollPreview(supabase, { weekStartIso: selectedWindow.startIso, weekEndIso: selectedWindow.endIso, config: DEFAULT_PAYROLL_CONFIG, periodMode: selectedWindow.mode, excludeAlreadyPaid: selectedWindow.mode === 'custom', excludedMemberIds: (selectedExcludedRes.data ?? []).map((row) => String(row.member_user_id)) })
+    buildPayrollPreview(supabase, { weekStartIso: currentWindow.startIso, weekEndIso: currentWindow.endIso, config: persistedConfig, periodMode: 'weekly', excludedMemberIds: (currentExcludedRes.data ?? []).map((row) => String(row.member_user_id)) }),
+    buildPayrollPreview(supabase, { weekStartIso: previousWindow.startIso, weekEndIso: previousWindow.endIso, config: persistedConfig, periodMode: 'weekly', excludedMemberIds: (previousExcludedRes.data ?? []).map((row) => String(row.member_user_id)) }),
+    buildPayrollPreview(supabase, { weekStartIso: selectedWindow.startIso, weekEndIso: selectedWindow.endIso, config: persistedConfig, periodMode: selectedWindow.mode, excludeAlreadyPaid: selectedWindow.mode === 'custom', excludedMemberIds: (selectedExcludedRes.data ?? []).map((row) => String(row.member_user_id)) })
   ]);
 
   return NextResponse.json({
@@ -235,4 +238,17 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, payrollRunId: createdRun.id });
+}
+
+
+export async function PUT(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+  const [canView, canConfigure] = await Promise.all([hasUserPermission(session.userId, 'payroll.view'), hasUserPermission(session.userId, 'payroll.configure')]);
+  if (!canView || !canConfigure) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const body = await request.json() as { config?: Partial<PayrollConfig> };
+  const next = { ...DEFAULT_PAYROLL_CONFIG, ...(body.config ?? {}), weights: { ...DEFAULT_PAYROLL_CONFIG.weights, ...(body.config?.weights ?? {}) } };
+  const supabase = getSupabaseAdmin();
+  await supabase.from('app_settings').upsert({ key: 'payroll_config', value: JSON.stringify(next), updated_at: new Date().toISOString() });
+  return NextResponse.json({ ok: true, config: next });
 }

@@ -66,6 +66,8 @@ export default async function SaleObjectsPage() {
         members={(members ?? []) as SaleMember[]}
         defaultSellerId={session.userId}
         defaultSellerLabel={currentMember?.name || currentMember?.username || 'Groupe'}
+        canRoutingView={permissions.includes('sale_objects.routing.view')}
+        canRoutingEdit={permissions.includes('sale_objects.routing.edit')}
       />
     </div>
   );

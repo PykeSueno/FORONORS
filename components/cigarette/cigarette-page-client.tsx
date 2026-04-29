@@ -65,6 +65,7 @@ export function CigarettePageClient({
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
   const [error, setError] = useState('');
   const [statusFeedback, setStatusFeedback] = useState('');
+  const [paymentMode, setPaymentMode] = useState<'cash'|'bank'>('cash');
 
   useEffect(() => {
     setDayState(day);
@@ -80,7 +81,7 @@ export function CigarettePageClient({
     const response = await fetch('/api/cigarette/passages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_user_id: memberId, member_label: memberLabel })
+      body: JSON.stringify({ member_user_id: memberId, member_label: memberLabel, payment_mode: paymentMode })
     });
     if (!response.ok) {
       const data = (await response.json()) as { message?: string };
@@ -122,7 +123,7 @@ export function CigarettePageClient({
         <section className="glass-card p-5">
           <h3 className="text-base font-semibold text-[#fff1dd]">B. Passage Cigarette</h3>
           <p className="mt-1 text-xs text-[#efcdab]">Chaque passage retire {CIGARETTE_SALE_QTY} paquets et ajoute {formatUsd(CIGARETTE_REVENUE)} au dépôt Cigarette + au groupe.</p>
-          <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto]">
+          <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto_auto]">
             <select
               className="saas-input"
               value={memberId}
@@ -137,7 +138,7 @@ export function CigarettePageClient({
                 <option key={member.id} value={member.id}>{member.name || member.username}</option>
               ))}
             </select>
-            <button className="saas-primary-btn" onClick={() => void createPassage()}>Valider passage</button>
+            <select className="saas-input" value={paymentMode} onChange={(e)=>setPaymentMode(e.target.value as 'cash'|'bank')}><option value="cash">Cash</option><option value="bank">Bank</option></select><button className="saas-primary-btn" onClick={() => void createPassage()}>Valider passage</button>
           </div>
           <p className="mt-1 text-[11px] text-[#efcdab]">Membre sélectionné: <span className="font-semibold text-[#ffe8ca]">{memberLabel}</span></p>
           {!canCreateForAny ? <p className="mt-1 text-[11px] text-[#efcdab]">Permission manquante pour sélectionner un autre membre.</p> : null}
@@ -163,7 +164,7 @@ export function CigarettePageClient({
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">📚 Dépôt paquets {passage.before_deposit_packs ?? '—'} → {passage.after_deposit_packs ?? '—'}</p>
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">🏦 Dépôt {formatUsd(passage.before_chest)} → {formatUsd(passage.after_chest)}</p>
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">💵 Groupe {formatUsd(passage.before_group_cash)} → {formatUsd(passage.after_group_cash)}</p>
-                <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">🧾 Qté {passage.quantity_sold} · Recette {formatUsd(passage.revenue_amount)} · État {passage.status}</p>
+                <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">🧾 Qté {passage.quantity_sold} · Recette {formatUsd(passage.revenue_amount)} · État {passage.status === 'validated' ? 'Cash reçu' : passage.status === 'pending_bank' ? 'Bank en attente' : passage.status === 'received_bank' ? 'Bank reçu' : passage.status}</p>{passage.status === 'pending_bank' ? <button className='saas-ghost-btn' onClick={()=>fetch(`/api/cigarette/passages/${passage.id}/receive`,{method:'POST'}).then(()=>window.location.reload())}>Virement reçu</button> : null}
               </div>
             </article>
           ))}

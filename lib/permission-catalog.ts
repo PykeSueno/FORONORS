@@ -51,6 +51,8 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = {
   'sale.objects.cancel.own': { module: 'Vente objets', section: 'Modification / Annulation', label: 'Annuler ses ventes objets', hint: 'Permet d’annuler uniquement ses ventes objets.' },
   'sale.objects.cancel.any': { module: 'Vente objets', section: 'Modification / Annulation', label: 'Annuler toutes les ventes objets', hint: 'Permet d’annuler toutes les ventes objets.' },
   'sale.objects.history.view': { module: 'Vente objets', section: 'Historique', label: 'Voir l’historique Vente objets', hint: 'Permet de consulter l’historique des ventes objets.' },
+  'sale_objects.routing.view': { module: 'Vente objets', section: 'Gestion', label: 'Voir Configuration objets', hint: 'Permet d’ouvrir la configuration d’affectation des objets vendables.' },
+  'sale_objects.routing.edit': { module: 'Vente objets', section: 'Gestion', label: 'Modifier Configuration objets', hint: 'Permet de modifier et sauvegarder les affectations des objets vendables.' },
 
   'transactions.preview': { module: 'Transactions', section: 'Vue', label: 'Voir la bulle Transactions', hint: 'Permet d’afficher la bulle Transactions.' },
   'transactions.access': { module: 'Transactions', section: 'Vue', label: 'Accéder à Transactions', hint: 'Permet d’ouvrir la page Transactions.' },
