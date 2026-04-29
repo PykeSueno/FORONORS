@@ -247,7 +247,25 @@ export async function PUT(request: Request) {
   const [canView, canConfigure] = await Promise.all([hasUserPermission(session.userId, 'payroll.view'), hasUserPermission(session.userId, 'payroll.configure')]);
   if (!canView || !canConfigure) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
   const body = await request.json() as { config?: Partial<PayrollConfig> };
-  const next = { ...DEFAULT_PAYROLL_CONFIG, ...(body.config ?? {}), weights: { ...DEFAULT_PAYROLL_CONFIG.weights, ...(body.config?.weights ?? {}) } };
+  const source = { ...DEFAULT_PAYROLL_CONFIG, ...(body.config ?? {}), weights: { ...DEFAULT_PAYROLL_CONFIG.weights, ...(body.config?.weights ?? {}) } };
+  const num = (value: unknown, fallback: number, min = 0) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(min, parsed);
+  };
+  const next: PayrollConfig = {
+    reserveMinimum: num(source.reserveMinimum, DEFAULT_PAYROLL_CONFIG.reserveMinimum),
+    distributablePercent: Math.min(1, num(source.distributablePercent, DEFAULT_PAYROLL_CONFIG.distributablePercent)),
+    memberCap: num(source.memberCap, DEFAULT_PAYROLL_CONFIG.memberCap),
+    memberMinimum: num(source.memberMinimum, DEFAULT_PAYROLL_CONFIG.memberMinimum),
+    minActions: Math.round(num(source.minActions, DEFAULT_PAYROLL_CONFIG.minActions)),
+    minMoney: num(source.minMoney, DEFAULT_PAYROLL_CONFIG.minMoney),
+    weights: {
+      money: num(source.weights.money, DEFAULT_PAYROLL_CONFIG.weights.money),
+      activity: num(source.weights.activity, DEFAULT_PAYROLL_CONFIG.weights.activity),
+      participation: num(source.weights.participation, DEFAULT_PAYROLL_CONFIG.weights.participation)
+    }
+  };
   const supabase = getSupabaseAdmin();
   await supabase.from('app_settings').upsert({ key: 'payroll_config', value: JSON.stringify(next), updated_at: new Date().toISOString() });
   return NextResponse.json({ ok: true, config: next });

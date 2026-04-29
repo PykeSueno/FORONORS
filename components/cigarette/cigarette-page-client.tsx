@@ -32,6 +32,16 @@ type CigarettePassage = {
   created_at: string;
 };
 
+function passageStatusLabel(status: string) {
+  if (status === 'pending_bank') return 'Bank en attente';
+  if (status === 'received_bank') return 'Bank reçu';
+  return 'Cash reçu';
+}
+
+function passagePaymentMode(status: string) {
+  return status === 'pending_bank' || status === 'received_bank' ? 'Bank' : 'Cash';
+}
+
 export function CigarettePageClient({
   day,
   businessDay,
@@ -98,7 +108,24 @@ export function CigarettePageClient({
     if (data.day) setDayState((current) => ({ ...(current ?? {}), ...data.day } as NonNullable<CigaretteDay>));
     if (typeof data.packsInStock === 'number') setPacksInStockState(data.packsInStock);
     if (typeof data.groupCash === 'number') setGroupCashState(data.groupCash);
-    setStatusFeedback('Passage cigarette validé.');
+    setStatusFeedback(paymentMode === 'bank' ? 'Passage bank enregistré. Virement requis.' : 'Passage cash validé.');
+    setTimeout(() => setStatusFeedback(''), 1400);
+  }
+
+  async function receiveBankPassage(passageId: number) {
+    setError('');
+    const response = await fetch(`/api/cigarette/passages/${passageId}/receive`, { method: 'POST' });
+    if (!response.ok) {
+      const data = (await response.json()) as { message?: string };
+      setError(data.message ?? 'Validation virement impossible.');
+      return;
+    }
+    const payload = (await response.json()) as { after?: number };
+    setPassagesState((current) => current.map((entry) => (
+      entry.id === passageId ? { ...entry, status: 'received_bank' } : entry
+    )));
+    if (typeof payload.after === 'number') setGroupCashState(payload.after);
+    setStatusFeedback('Virement reçu validé.');
     setTimeout(() => setStatusFeedback(''), 1400);
   }
 
@@ -122,7 +149,7 @@ export function CigarettePageClient({
       {canCreatePassage ? (
         <section className="glass-card p-5">
           <h3 className="text-base font-semibold text-[#fff1dd]">B. Passage Cigarette</h3>
-          <p className="mt-1 text-xs text-[#efcdab]">Chaque passage retire {CIGARETTE_SALE_QTY} paquets et ajoute {formatUsd(CIGARETTE_REVENUE)} au dépôt Cigarette + au groupe.</p>
+          <p className="mt-1 text-xs text-[#efcdab]">Chaque passage retire {CIGARETTE_SALE_QTY} paquets. Mode Cash: argent ajouté au groupe immédiatement. Mode Bank: en attente de virement.</p>
           <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto_auto]">
             <select
               className="saas-input"
@@ -140,6 +167,7 @@ export function CigarettePageClient({
             </select>
             <select className="saas-input" value={paymentMode} onChange={(e)=>setPaymentMode(e.target.value as 'cash'|'bank')}><option value="cash">Cash</option><option value="bank">Bank</option></select><button className="saas-primary-btn" onClick={() => void createPassage()}>Valider passage</button>
           </div>
+          {paymentMode === 'bank' ? <p className="mt-1 text-[11px] text-amber-200">⚠️ Le membre doit faire un virement. L’argent ne sera ajouté qu’au clic “Virement reçu”.</p> : null}
           <p className="mt-1 text-[11px] text-[#efcdab]">Membre sélectionné: <span className="font-semibold text-[#ffe8ca]">{memberLabel}</span></p>
           {!canCreateForAny ? <p className="mt-1 text-[11px] text-[#efcdab]">Permission manquante pour sélectionner un autre membre.</p> : null}
 
@@ -164,7 +192,8 @@ export function CigarettePageClient({
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">📚 Dépôt paquets {passage.before_deposit_packs ?? '—'} → {passage.after_deposit_packs ?? '—'}</p>
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">🏦 Dépôt {formatUsd(passage.before_chest)} → {formatUsd(passage.after_chest)}</p>
                 <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">💵 Groupe {formatUsd(passage.before_group_cash)} → {formatUsd(passage.after_group_cash)}</p>
-                <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">🧾 Qté {passage.quantity_sold} · Recette {formatUsd(passage.revenue_amount)} · État {passage.status === 'validated' ? 'Cash reçu' : passage.status === 'pending_bank' ? 'Bank en attente' : passage.status === 'received_bank' ? 'Bank reçu' : passage.status}</p>{passage.status === 'pending_bank' ? <button className='saas-ghost-btn' onClick={()=>fetch(`/api/cigarette/passages/${passage.id}/receive`,{method:'POST'}).then(()=>window.location.reload())}>Virement reçu</button> : null}
+                <p className="rounded-lg border border-white/10 bg-[#2c1a12]/50 px-2 py-1">💵 Montant {formatUsd(passage.revenue_amount)} · Mode {passagePaymentMode(passage.status)} · Statut {passageStatusLabel(passage.status)}</p>
+                {passage.status === 'pending_bank' ? <button className='saas-ghost-btn' onClick={() => void receiveBankPassage(passage.id)}>Virement reçu</button> : null}
               </div>
             </article>
           ))}

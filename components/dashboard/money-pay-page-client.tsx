@@ -215,7 +215,7 @@ export function MoneyPayPageClient({
         <Card label="📦 Enveloppe paye" value={formatUsd(effectivePreview.envelope)} />
         <Card label="✅ Total payes calculées" value={formatUsd(effectivePreview.totalProposed)} />
         <Card label="🏦 Solde après paye" value={formatUsd(effectivePreview.balanceAfter)} />
-      {canConfigure ? <button className='saas-primary-btn' onClick={()=>void saveConfig()}>Enregistrer les réglages</button> : null}{saveFeedback ? <p className='text-xs text-[#efcdab]'>{saveFeedback}</p> : null}</section>
+      </section>
 
       <section className="glass-card p-4">
         <h3 className="text-sm font-semibold text-[#fff1dd]">Période de calcul</h3>
@@ -264,6 +264,10 @@ export function MoneyPayPageClient({
           <Field label="Poids participation (%)" value={Math.round(config.weights.participation * 100)} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, weights: { ...cur.weights, participation: Math.max(0, v) / 100 } }))} disabled={!canConfigure} />
           <Field label="Seuil actions" value={config.minActions} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, minActions: Math.max(0, v) }))} disabled={!canConfigure} />
           <Field label="Seuil argent" value={config.minMoney} onChange={(v) => canConfigure && setConfig((cur) => ({ ...cur, minMoney: Math.max(0, v) }))} disabled={!canConfigure} />
+        </div>
+        <div className="flex items-center gap-3">
+          {canConfigure ? <button className="saas-primary-btn" onClick={() => void saveConfig()}>Enregistrer les réglages</button> : null}
+          {saveFeedback ? <p className="text-xs text-[#efcdab]">{saveFeedback}</p> : null}
         </div>
       </section>
 
