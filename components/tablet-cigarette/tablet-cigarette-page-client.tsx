@@ -8,7 +8,7 @@ type TabletDay = { id: number; business_day: string; deposited_amount: number; c
 type CigaretteDay = { id: number; business_day: string; chest_amount: number; passages_count: number; total_revenue: number; packs_sold: number; packs_deposit_remaining?: number } | null;
 
 type TabletPassage = { id: number; member_label: string; before_cash: number; after_cash: number; before_kits: number; after_kits: number; before_cutters: number; after_cutters: number; created_at: string };
-type CigarettePassage = { id: number; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; created_at: string };
+type CigarettePassage = { id: number; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; status?: string; created_at: string };
 
 type Tab = 'home' | 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
 
@@ -79,6 +79,9 @@ export function TabletCigarettePageClient(props: {
   const processorEstimate = useMemo(() => computeProcessorEstimates(processorBottles, processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES), [processorBottles, processorBoatFee]);
   const processorSaleTotalEstimated = Math.max(0, Math.floor(processorSaleQty * 0.5) * 100);
   const processorSaleTotalReal = Math.max(0, processorSoldQty * 100);
+  const [cigarettePaymentMode, setCigarettePaymentMode] = useState<'cash' | 'bank'>('cash');
+  const processorSoldToday = useMemo(() => processorSessionsState.filter((row) => row.operation_type === 'sale' && row.status === 'validated' && Array.isArray(row.participant_user_ids) && row.participant_user_ids.includes(processorSaleMemberId)).filter((row) => String(row.created_at ?? '').slice(0, 10) === new Date().toISOString().slice(0, 10)).reduce((sum, row) => sum + Number(row.accepted_count ?? 0), 0), [processorSessionsState, processorSaleMemberId]);
+  const processorRemainingToday = Math.max(0, 50 - processorSoldToday);
   const processorStatsQuick = useMemo(() => {
     const rows = processorSessionsState.filter((row) => row.status === 'validated');
     return {
@@ -102,7 +105,7 @@ export function TabletCigarettePageClient(props: {
 
   async function createTabletPassage() {
     setError('');
-    const response = await fetch('/api/tablet/passages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ member_user_id: memberId, member_label: memberLabel }) });
+    const response = await fetch('/api/tablet/passages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ member_user_id: memberId, member_label: memberLabel, payment_mode: cigarettePaymentMode }) });
     if (!response.ok) {
       const data = await response.json().catch(() => ({ message: 'Passage tablette impossible.' }));
       return setError(data.message ?? 'Passage tablette impossible.');
@@ -118,7 +121,7 @@ export function TabletCigarettePageClient(props: {
 
   async function createCigarettePassage() {
     setError('');
-    const response = await fetch('/api/cigarette/passages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ member_user_id: memberId, member_label: memberLabel }) });
+    const response = await fetch('/api/cigarette/passages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ member_user_id: memberId, member_label: memberLabel, payment_mode: cigarettePaymentMode }) });
     if (!response.ok) {
       const data = await response.json().catch(() => ({ message: 'Passage cigarette impossible.' }));
       return setError(data.message ?? 'Passage cigarette impossible.');
@@ -128,12 +131,12 @@ export function TabletCigarettePageClient(props: {
     if (payload.day) setCigaretteDayState(payload.day);
     if (typeof payload.groupCash === 'number') setGroupCashState(payload.groupCash);
     if (typeof payload.packsInStock === 'number') setPacksState(payload.packsInStock);
-    setStatus('Passage cigarette validé.');
+    setStatus(cigarettePaymentMode === 'bank' ? 'Passage bank en attente de virement.' : 'Passage cash validé.');
   }
 
   const combinedHistory = useMemo(() => {
     const tabletRows = tabletPassagesState.map((entry) => ({ id: `t-${entry.id}`, type: 'tablet' as const, created_at: entry.created_at, member: entry.member_label, detail: `💰 ${entry.before_cash}$ → ${entry.after_cash}$ · 🧰 ${entry.before_kits}→${entry.after_kits} · 🪚 ${entry.before_cutters}→${entry.after_cutters}` }));
-    const cigaretteRows = cigarettePassagesState.map((entry) => ({ id: `c-${entry.id}`, type: 'cigarette' as const, created_at: entry.created_at, member: entry.member_label, detail: `🚬 ${entry.before_packs}→${entry.after_packs} · 💵 ${formatUsd(entry.revenue_amount)} · Groupe ${formatUsd(entry.before_group_cash)}→${formatUsd(entry.after_group_cash)}` }));
+    const cigaretteRows = cigarettePassagesState.map((entry) => ({ id: `c-${entry.id}`, type: 'cigarette' as const, created_at: entry.created_at, member: entry.member_label, detail: `🚬 ${entry.before_packs}→${entry.after_packs} · 💵 ${formatUsd(entry.revenue_amount)} · Statut ${entry.status === 'pending_bank' ? 'En attente' : entry.status === 'received_bank' ? 'Reçu' : 'Cash reçu'} · Groupe ${formatUsd(entry.before_group_cash)}→${formatUsd(entry.after_group_cash)}` }));
     return [...tabletRows, ...cigaretteRows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [tabletPassagesState, cigarettePassagesState]);
 
@@ -204,6 +207,7 @@ export function TabletCigarettePageClient(props: {
             <h3 className="font-semibold text-[#ffe8ca]">📱 Tablette</h3>
             <MiniStat label="Passages jour" value={String(tabletDayState?.passages_count ?? 0)} />
             <MiniStat label="Stock kits" value={String(kitsState)} />
+            <MiniStat label="Stock disqueuses" value={String(cuttersState)} />
             <MiniStat label="Argent généré" value={formatUsd(Math.max(0, Number(tabletDayState?.deposited_amount ?? 0) - Number(tabletDayState?.chest_amount ?? 0)))} />
             {canTabletAccess ? <button className="saas-primary-btn w-full" onClick={() => setTab('tablet')}>Ouvrir Tablette</button> : null}
           </article>
@@ -309,16 +313,17 @@ export function TabletCigarettePageClient(props: {
               <select className="saas-input !h-9" value={processorSaleMemberId} onChange={(e) => setProcessorSaleMemberId(e.target.value)}>
                 {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
               </select>
+              <p className="text-xs text-[#efcdab]">Déjà vendu aujourd’hui: <b>{processorSoldToday}</b> · Restant possible: <b>{processorRemainingToday}</b>/50</p>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <input className="saas-input !h-9" type="number" min={1} max={processorStockState} value={processorSaleQty} onChange={(e) => setProcessorSaleQty(Math.max(1, Number(e.target.value || 0)))} />
-                <input className="saas-input !h-9" type="number" min={0} max={Math.min(50, processorSaleQty)} value={processorSoldQty} onChange={(e) => setProcessorSoldQty(Math.max(0, Math.min(50, Number(e.target.value || 0))))} />
+                <input className="saas-input !h-9" type="number" min={0} max={Math.min(processorRemainingToday, processorSaleQty)} value={processorSoldQty} onChange={(e) => setProcessorSoldQty(Math.max(0, Math.min(processorRemainingToday, Number(e.target.value || 0))))} />
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <MiniStat label="Estimation (50%)" value={formatUsd(processorSaleTotalEstimated)} />
                 <MiniStat label="Total reçu réel" value={formatUsd(processorSaleTotalReal)} />
                 <MiniStat label="Stock après" value={String(Math.max(0, processorStockState - processorSaleQty))} />
               </div>
-              {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void createProcessorSale()}>Valider vente</button> : null}
+              {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" disabled={processorSoldQty > processorRemainingToday} onClick={() => void createProcessorSale()}>Valider vente</button> : null}
             </article> : null}
           </div>
 
@@ -364,7 +369,7 @@ export function TabletCigarettePageClient(props: {
             <select className="saas-input" value={memberId} onChange={(e) => { setMemberId(e.target.value); const member = membersById.get(e.target.value); setMemberLabel(member ? (member.name || member.username) : defaultMemberLabel); }} disabled={!canCigaretteCreateForAny}>
               {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
             </select>
-            {canCigaretteCreatePassage ? <button className="saas-primary-btn" onClick={() => void createCigarettePassage()}>Valider passage cigarette</button> : null}
+            <div className="grid grid-cols-3 gap-2"><button type="button" className={`filter-pill ${cigarettePaymentMode === 'cash' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('cash')}>Cash</button><button type="button" className={`filter-pill ${cigarettePaymentMode === 'bank' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('bank')}>Bank</button>{canCigaretteCreatePassage ? <button className="saas-primary-btn" onClick={() => void createCigarettePassage()}>Valider passage cigarette</button> : null}</div>{cigarettePaymentMode === 'bank' ? <p className="text-xs text-[#efcdab]">Virement en attente · RIB: <b>ZT96CO</b> · Téléphone IG: <b>8202043</b></p> : null}
           </article>
         </section>
       ) : null}

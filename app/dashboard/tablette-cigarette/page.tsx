@@ -37,7 +37,7 @@ export default async function TabletCigarettePage() {
     : [];
 
   const cigarettePassages = permissions.includes('cigarette.history.view')
-    ? await supabase.from('cigarette_passages').select('id, cigarette_day_id, business_day, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at').eq('business_day', cigaretteBusinessDay).eq('status', 'validated').order('created_at', { ascending: false }).then((res) => res.data ?? [])
+    ? await supabase.from('cigarette_passages').select('id, cigarette_day_id, business_day, member_label, quantity_sold, revenue_amount, before_packs, after_packs, before_deposit_packs, after_deposit_packs, before_chest, after_chest, before_group_cash, after_group_cash, status, created_at').eq('business_day', cigaretteBusinessDay).order('created_at', { ascending: false }).then((res) => res.data ?? [])
     : [];
 
   const processorSessions = canProcessorView
