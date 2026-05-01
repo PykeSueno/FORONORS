@@ -14,6 +14,9 @@ type Body = {
   money_amount?: number;
   lost_money?: number;
   participant_ids?: string[];
+  braqueur_ids?: string[];
+  hostage_ids?: string[];
+  mule_ids?: string[];
   seized_resources?: Array<{ item_id: number; quantity: number }>;
   note?: string;
 };
@@ -62,7 +65,10 @@ export async function POST(request: Request) {
 
   if (!body.robbery_type || !STOCK_REQUIREMENTS[body.robbery_type]) return NextResponse.json({ message: 'Type de braquage invalide.' }, { status: 400 });
 
-  const participants = Array.from(new Set((body.participant_ids ?? []).filter(Boolean)));
+  const braqueurs = Array.from(new Set((body.braqueur_ids ?? []).filter(Boolean)));
+  const hostages = Array.from(new Set((body.hostage_ids ?? []).filter(Boolean)));
+  const muleRecup = Array.from(new Set((body.mule_ids ?? []).filter(Boolean)));
+  const participants = Array.from(new Set([...(body.participant_ids ?? []), ...braqueurs, ...hostages, ...muleRecup].filter(Boolean)));
   if (participants.length === 0) return NextResponse.json({ message: 'Ajoute au moins un participant.' }, { status: 400 });
 
   const moneyAmount = Math.max(0, Number(body.money_amount ?? 0));
@@ -138,7 +144,11 @@ export async function POST(request: Request) {
       money_before: moneyBefore,
       money_after: moneyAfter,
       consumed_items: consumed,
-      participants: users.map((entry) => ({ id: entry.id, label: entry.name || entry.username || 'Membre' })),
+      participants: users.map((entry) => ({
+        id: entry.id,
+        label: entry.name || entry.username || 'Membre',
+        role: braqueurs.includes(entry.id) ? 'braqueur' : hostages.includes(entry.id) ? 'otage_apporte' : muleRecup.includes(entry.id) ? 'plan_mule_recup' : 'participant'
+      })),
       note: (body.note ?? '').trim() || null
     })
   ]);
@@ -158,6 +168,9 @@ export async function POST(request: Request) {
       moneyAfter,
       consumed,
       participants,
+      braqueurs,
+      hostages,
+      muleRecup,
       note: (body.note ?? '').trim()
     }
   });

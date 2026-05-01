@@ -16,7 +16,7 @@ type Run = {
   lost_money?: number | null;
   money_after: number | null;
   consumed_items: Array<{ itemName: string; required: number }>;
-  participants: Array<{ label: string }>;
+  participants: Array<{ label: string; role?: string }>;
   note?: string | null;
 };
 
@@ -52,6 +52,9 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
   const router = useRouter();
   const [robberyType, setRobberyType] = useState<RobberyType>('fleeca');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [braqueurIds, setBraqueurIds] = useState<string[]>([]);
+  const [hostageIds, setHostageIds] = useState<string[]>([]);
+  const [muleIds, setMuleIds] = useState<string[]>([]);
   const [moneyAmount, setMoneyAmount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -92,6 +95,9 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
       money_amount: Math.max(0, moneyAmount),
       lost_money: Math.max(0, lostMoney),
       participant_ids: selectedMembers,
+      braqueur_ids: braqueurIds,
+      hostage_ids: hostageIds,
+      mule_ids: muleIds,
       seized_resources: seizedRows.filter((row) => row.item_id > 0 && row.quantity > 0),
       note: seizedNote
     };
@@ -113,6 +119,9 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
     setSeizedNote('');
     setSeizedRows([]);
     setSelectedMembers([]);
+    setBraqueurIds([]);
+    setHostageIds([]);
+    setMuleIds([]);
     setArrestedOpen(false);
     router.refresh();
   }
@@ -160,33 +169,29 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
         </article>
 
         <article className="glass-card space-y-3 p-5">
-          <h3 className="text-base font-semibold text-[#fff1dd]">Participants</h3>
-          <div className="max-h-56 space-y-1 overflow-auto rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">
-            {members.map((member) => {
-              const checked = selectedMembers.includes(member.id);
-              return (
-                <label key={member.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#4f3220]/55 px-2 py-1.5 text-sm text-[#f8e2c6]">
-                  <span className="truncate pr-2">{member.label}</span>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-[#ffcf9a]"
-                    checked={checked}
-                    onChange={(event) => {
-                      if (event.target.checked) setSelectedMembers((cur) => cur.includes(member.id) ? cur : [...cur, member.id]);
-                      else setSelectedMembers((cur) => cur.filter((id) => id !== member.id));
-                    }}
-                  />
-                </label>
-              );
-            })}
-          </div>
+          <h3 className="text-base font-semibold text-[#fff1dd]">Participants par rôle</h3>
+          {[['Braqueurs', braqueurIds, setBraqueurIds], ['Otages apportés', hostageIds, setHostageIds], ['Plan Mule / Récup', muleIds, setMuleIds]].map(([title, values, setter]) => (
+            <div key={String(title)}>
+              <p className="text-xs text-[#efcdab] mb-1">{String(title)}</p>
+              <div className="max-h-32 space-y-1 overflow-auto rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">
+                {members.map((member) => {
+                  const checked = (values as string[]).includes(member.id);
+                  return <label key={`${String(title)}-${member.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#4f3220]/55 px-2 py-1.5 text-sm text-[#f8e2c6]"><span className="truncate pr-2">{member.label}</span><input type="checkbox" className="h-4 w-4 accent-[#ffcf9a]" checked={checked} onChange={(event)=>{ if(event.target.checked){ setSelectedMembers((cur)=>cur.includes(member.id)?cur:[...cur,member.id]); (setter as (fn:any)=>void)((cur:string[])=>cur.includes(member.id)?cur:[...cur,member.id]); setBraqueurIds((cur)=>String(title)==='Braqueurs'? (cur.includes(member.id)?cur:[...cur,member.id]) : cur.filter((id)=>id!==member.id)); setHostageIds((cur)=>String(title)==='Otages apportés'? (cur.includes(member.id)?cur:[...cur,member.id]) : cur.filter((id)=>id!==member.id)); setMuleIds((cur)=>String(title)==='Plan Mule / Récup'? (cur.includes(member.id)?cur:[...cur,member.id]) : cur.filter((id)=>id!==member.id)); } else { (setter as (fn:any)=>void)((cur:string[])=>cur.filter((id)=>id!==member.id)); }} } /></label>;
+                })}
+              </div>
+            </div>
+          ))}
+          <p className="text-xs text-[#efcdab]">Récap: Braqueurs {braqueurIds.length} · Otages {hostageIds.length} · Plan Mule/Récup {muleIds.length}</p>
 
           <label className="text-xs text-[#efcdab]">Argent rapporté</label>
           <input className="saas-input" value={moneyAmount} onChange={(event) => setMoneyAmount(Math.max(0, Number(event.target.value || 0)))} />
 
           <div className="grid grid-cols-2 gap-2">
             {canCreate ? <button type="button" className="saas-primary-btn" disabled={!canValidate} onClick={() => void submit('success')}>Valider</button> : <p className="rounded-lg border border-white/10 bg-[#3f281b]/50 px-3 py-2 text-sm text-[#efcdab]">Permission manquante</p>}
-            <button type="button" className="saas-ghost-btn" onClick={() => { setMoneyAmount(0); setSelectedMembers([]); setError(''); }}>Annuler</button>
+            <button type="button" className="saas-ghost-btn" onClick={() => { setMoneyAmount(0); setSelectedMembers([]);
+    setBraqueurIds([]);
+    setHostageIds([]);
+    setMuleIds([]); setError(''); }}>Annuler</button>
           </div>
 
           {canArrested ? <button type="button" className="saas-ghost-btn w-full" onClick={() => setArrestedOpen((cur) => !cur)}>🚔 Braquage arrêté</button> : null}
@@ -288,7 +293,7 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
               <article key={run.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-sm text-[#f1d2ad]">
                 <p className="font-semibold text-[#ffe8ca]">{(run.status ?? 'success') === 'success' ? '✅' : '🚔'} {run.robbery_type.toUpperCase()} — {(run.status ?? 'success') === 'success' ? formatUsd(run.money_amount) : `Perte ${formatUsd(Number(run.lost_money ?? 0))}`}</p>
                 <p className="text-xs">{run.user_name || 'Groupe'} · {new Date(run.created_at).toLocaleString('fr-FR')}</p>
-                <p className="text-xs">Participants: {(run.participants ?? []).map((entry) => entry.label).join(', ') || '—'}</p>
+                <p className="text-xs">Braqueurs: {(run.participants ?? []).filter((entry)=>entry.role==='braqueur').map((entry)=>entry.label).join(', ') || '—'} · Otages: {(run.participants ?? []).filter((entry)=>entry.role==='otage_apporte').map((entry)=>entry.label).join(', ') || '—'} · Plan Mule/Récup: {(run.participants ?? []).filter((entry)=>entry.role==='plan_mule_recup').map((entry)=>entry.label).join(', ') || '—'}</p>
                 <p className="text-xs">Ressources: {(run.consumed_items ?? []).map((entry) => `${entry.itemName} x${entry.required}`).join(' · ') || '—'}</p>
                 <p className="text-xs">Solde après: {run.money_after != null ? formatUsd(run.money_after) : '—'}</p>
                 {run.note ? <p className="text-xs">Note: {run.note}</p> : null}
