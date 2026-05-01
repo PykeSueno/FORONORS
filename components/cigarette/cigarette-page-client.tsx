@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CIGARETTE_REVENUE, CIGARETTE_SALE_QTY, getCigaretteWindowLabel, isCigarettePassageHourAllowed } from '@/lib/cigarette';
+import { CIGARETTE_SALE_QTY, getCigaretteWindowLabel, isCigarettePassageHourAllowed } from '@/lib/cigarette';
 import { formatUsd } from '@/lib/currency';
 
 type CigaretteDay = {

@@ -35,7 +35,6 @@ type LogRow = { id: number; action: string; summary: string; created_at: string;
 export function MoneyPayPageClient({
   canConfigure,
   canAdjust,
-  canValidate,
   canHistory,
   canLogs,
   currentPreview,
@@ -50,7 +49,6 @@ export function MoneyPayPageClient({
 }: {
   canConfigure: boolean;
   canAdjust: boolean;
-  canValidate: boolean;
   canHistory: boolean;
   canLogs: boolean;
   currentPreview: PayrollPreview;
@@ -70,7 +68,6 @@ export function MoneyPayPageClient({
   const [selectedPreview, setSelectedPreview] = useState<PayrollPreview>(currentPreview);
   const [excludedIds, setExcludedIds] = useState<string[]>(initialExcludedIds);
   const [manualAdjustments, setManualAdjustments] = useState<Record<string, number>>({});
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [saveFeedback, setSaveFeedback] = useState('');
   const [paidMembers, setPaidMembers] = useState<Record<string, number>>({});
@@ -188,33 +185,6 @@ export function MoneyPayPageClient({
     }
     setSaveFeedback('Réglages enregistrés.');
     setTimeout(() => setSaveFeedback(''), 1500);
-  }
-
-  async function validatePayroll() {
-    if (submitting) return;
-    setSubmitting(true);
-    setError('');
-    const response = await fetch('/api/money/payroll', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        week_start_iso: selectedPreview.weekStartIso,
-        week_end_iso: selectedPreview.weekEndIso,
-        period_mode: selectedPreview.periodMode ?? (periodMode === 'custom' ? 'custom' : 'weekly'),
-        config,
-        excluded_member_ids: excludedIds,
-        manual_adjustments: manualAdjustments
-      })
-    });
-    setSubmitting(false);
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({ message: 'Validation paye impossible.' }));
-      setError(payload.message ?? 'Validation paye impossible.');
-      return;
-    }
-
-    window.location.reload();
   }
 
   async function payMember(memberId: string, memberLabel: string, amount: number) {

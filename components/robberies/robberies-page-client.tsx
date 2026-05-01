@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { type Dispatch, type SetStateAction, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 
@@ -65,6 +65,11 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
   const [seizedQuery, setSeizedQuery] = useState('');
   const [seizedCategory, setSeizedCategory] = useState('all');
   const [seizedRows, setSeizedRows] = useState<Array<{ item_id: number; quantity: number }>>([]);
+  const roleBlocks: Array<{ title: string; values: string[]; setValues: Dispatch<SetStateAction<string[]>> }> = [
+    { title: 'Braqueurs', values: braqueurIds, setValues: setBraqueurIds },
+    { title: 'Otages apportés', values: hostageIds, setValues: setHostageIds },
+    { title: 'Plan Mule / Récup', values: muleIds, setValues: setMuleIds }
+  ];
 
   const selectedDef = useMemo(() => ROBBERY_DEFS.find((entry) => entry.key === robberyType) ?? ROBBERY_DEFS[0], [robberyType]);
   const availability = useMemo(() => selectedDef.stockResources.map((need) => {
@@ -170,13 +175,23 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
 
         <article className="glass-card space-y-3 p-5">
           <h3 className="text-base font-semibold text-[#fff1dd]">Participants par rôle</h3>
-          {[['Braqueurs', braqueurIds, setBraqueurIds], ['Otages apportés', hostageIds, setHostageIds], ['Plan Mule / Récup', muleIds, setMuleIds]].map(([title, values, setter]) => (
-            <div key={String(title)}>
-              <p className="text-xs text-[#efcdab] mb-1">{String(title)}</p>
+          {roleBlocks.map(({ title, values, setValues }) => (
+            <div key={title}>
+              <p className="text-xs text-[#efcdab] mb-1">{title}</p>
               <div className="max-h-32 space-y-1 overflow-auto rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">
                 {members.map((member) => {
-                  const checked = (values as string[]).includes(member.id);
-                  return <label key={`${String(title)}-${member.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#4f3220]/55 px-2 py-1.5 text-sm text-[#f8e2c6]"><span className="truncate pr-2">{member.label}</span><input type="checkbox" className="h-4 w-4 accent-[#ffcf9a]" checked={checked} onChange={(event)=>{ if(event.target.checked){ setSelectedMembers((cur)=>cur.includes(member.id)?cur:[...cur,member.id]); (setter as (fn:any)=>void)((cur:string[])=>cur.includes(member.id)?cur:[...cur,member.id]); setBraqueurIds((cur)=>String(title)==='Braqueurs'? (cur.includes(member.id)?cur:[...cur,member.id]) : cur.filter((id)=>id!==member.id)); setHostageIds((cur)=>String(title)==='Otages apportés'? (cur.includes(member.id)?cur:[...cur,member.id]) : cur.filter((id)=>id!==member.id)); setMuleIds((cur)=>String(title)==='Plan Mule / Récup'? (cur.includes(member.id)?cur:[...cur,member.id]) : cur.filter((id)=>id!==member.id)); } else { (setter as (fn:any)=>void)((cur:string[])=>cur.filter((id)=>id!==member.id)); }} } /></label>;
+                  const checked = values.includes(member.id);
+                  return <label key={`${title}-${member.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#4f3220]/55 px-2 py-1.5 text-sm text-[#f8e2c6]"><span className="truncate pr-2">{member.label}</span><input type="checkbox" className="h-4 w-4 accent-[#ffcf9a]" checked={checked} onChange={(event) => {
+                    if (event.target.checked) {
+                      setSelectedMembers((cur) => cur.includes(member.id) ? cur : [...cur, member.id]);
+                      setValues((cur) => cur.includes(member.id) ? cur : [...cur, member.id]);
+                      if (title !== 'Braqueurs') setBraqueurIds((cur) => cur.filter((id) => id !== member.id));
+                      if (title !== 'Otages apportés') setHostageIds((cur) => cur.filter((id) => id !== member.id));
+                      if (title !== 'Plan Mule / Récup') setMuleIds((cur) => cur.filter((id) => id !== member.id));
+                    } else {
+                      setValues((cur) => cur.filter((id) => id !== member.id));
+                    }
+                  }} /></label>;
                 })}
               </div>
             </div>

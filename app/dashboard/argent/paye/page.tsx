@@ -85,7 +85,6 @@ export default async function MoneyPayPage() {
       <MoneyPayPageClient
         canConfigure={canConfigure}
         canAdjust={canAdjust}
-        canValidate={canValidate}
         canHistory={canHistory}
         canLogs={canLogs}
         currentPreview={currentPreview}
