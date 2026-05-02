@@ -18,7 +18,7 @@ export default async function MoneyPage() {
   const supabase = getSupabaseAdmin();
   const [{ data: cash }, { data: movements }] = await Promise.all([
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
-    canHistoryView ? supabase.from('cash_movements').select('id, type, amount, label, created_at, user_id, users(name, username)').order('created_at', { ascending: false }).limit(30) : Promise.resolve({ data: [] })
+    canHistoryView ? supabase.from('cash_movements').select('id, type, amount, label, created_at, user_id, before_amount, after_amount, users(name, username)').order('created_at', { ascending: false }).limit(30) : Promise.resolve({ data: [] })
   ]);
 
   return (

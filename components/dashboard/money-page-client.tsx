@@ -13,6 +13,8 @@ type Movement = {
   created_at: string;
   user_id: string | null;
   users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null;
+  before_amount?: number | null;
+  after_amount?: number | null;
 };
 
 function moneyMovementIcon(type: string) {
@@ -125,7 +127,11 @@ export function MoneyPageClient({
         <div className="mt-3 space-y-2">
           {movements.map((movement) => (
             <div key={movement.id} className="rounded-xl border border-white/10 bg-[#5a3924]/55 px-3 py-2 text-sm text-[#ffe4c6]">
-              {moneyMovementIcon(movement.type)} {Array.isArray(movement.users) ? (movement.users[0]?.name || movement.users[0]?.username) : (movement.users?.name || movement.users?.username) || 'Groupe'} — {humanMoneyMovementLabel(movement.type)} — {movement.label} — {formatUsd(Number(movement.amount))} · {new Date(movement.created_at).toLocaleString('fr-FR')}
+              <p>{moneyMovementIcon(movement.type)} {Array.isArray(movement.users) ? (movement.users[0]?.name || movement.users[0]?.username) : (movement.users?.name || movement.users?.username) || 'Groupe'} — {humanMoneyMovementLabel(movement.type)} — {movement.label}</p>
+              {movement.before_amount != null && movement.after_amount != null ? (
+                <p className="text-xs text-[#efcdab]">Avant : {formatUsd(Number(movement.before_amount))} · Mouvement : {Number(movement.amount) >= 0 ? '+' : ''}{formatUsd(Number(movement.amount))} · Après : {formatUsd(Number(movement.after_amount))}</p>
+              ) : null}
+              <p className="text-xs text-[#efcdab]">{new Date(movement.created_at).toLocaleString('fr-FR')}</p>
             </div>
           ))}
         </div>

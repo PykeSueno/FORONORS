@@ -47,7 +47,7 @@ export default async function TabletCigarettePage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Travail" subtitle="Tablette / Cigarette / Processeur" />
+      <InternalPageHeader title="Jobs" subtitle="Tablette / Cigarette / Processeur" />
       <TabletCigarettePageClient
         members={membersRes.data ?? []}
         tabletBusinessDay={tabletBusinessDay}
