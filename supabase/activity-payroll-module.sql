@@ -91,9 +91,8 @@ where lower(r.name) = 'patron'
 on conflict (role_id, permission_id) do nothing;
 
 -- Index utiles pour les vues Activites & Payes.
-create index if not exists idx_audit_logs_member_business on public.audit_logs(action, created_at desc);
+create index if not exists idx_audit_logs_activity_payroll on public.audit_logs(action, created_at desc);
 create index if not exists idx_cash_movements_activity_payroll on public.cash_movements(type, created_at desc);
-create index if not exists idx_payroll_exclusions_member_period on public.payroll_exclusions(member_user_id, week_start, week_end);
 create index if not exists idx_robbery_runs_participants_gin on public.robbery_runs using gin (participants);
 create index if not exists idx_gofast_runs_participants_gin on public.gofast_runs using gin (participants);
 create index if not exists idx_drug_sales_member_user_ids_gin on public.drug_sales using gin (member_user_ids);
