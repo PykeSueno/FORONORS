@@ -11,6 +11,7 @@ type TabletPassage = { id: number; member_label: string; before_cash: number; af
 type CigarettePassage = { id: number; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; status?: string; created_at: string };
 
 type Tab = 'home' | 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
+type HistoryCard = { id: string; title: string; meta: string; lines: string[] };
 
 export function TabletCigarettePageClient(props: {
   members: Array<{ id: string; name: string; username: string }>;
@@ -76,12 +77,20 @@ export function TabletCigarettePageClient(props: {
   const [processorSaleQty, setProcessorSaleQty] = useState(10);
   const [processorSoldQty, setProcessorSoldQty] = useState(5);
   const [processorStockState, setProcessorStockState] = useState(processorInStock);
+  const [cigarettePaymentMode, setCigarettePaymentMode] = useState<'cash' | 'bank'>('cash');
+
+  const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const processorEstimate = useMemo(() => computeProcessorEstimates(processorBottles, processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES), [processorBottles, processorBoatFee]);
   const processorSaleTotalEstimated = Math.max(0, Math.floor(processorSaleQty * 0.5) * 100);
   const processorSaleTotalReal = Math.max(0, processorSoldQty * 100);
-  const [cigarettePaymentMode, setCigarettePaymentMode] = useState<'cash' | 'bank'>('cash');
-  const processorSoldToday = useMemo(() => processorSessionsState.filter((row) => row.operation_type === 'sale' && row.status === 'validated' && Array.isArray(row.participant_user_ids) && row.participant_user_ids.includes(processorSaleMemberId)).filter((row) => String(row.created_at ?? '').slice(0, 10) === new Date().toISOString().slice(0, 10)).reduce((sum, row) => sum + Number(row.accepted_count ?? 0), 0), [processorSessionsState, processorSaleMemberId]);
+  const tabletGenerated = Math.max(0, Number(tabletDayState?.deposited_amount ?? 0) - Number(tabletDayState?.chest_amount ?? 0));
+
+  const processorSoldToday = useMemo(() => processorSessionsState
+    .filter((row) => row.operation_type === 'sale' && row.status === 'validated' && Array.isArray(row.participant_user_ids) && row.participant_user_ids.includes(processorSaleMemberId))
+    .filter((row) => String(row.created_at ?? '').slice(0, 10) === new Date().toISOString().slice(0, 10))
+    .reduce((sum, row) => sum + Number(row.accepted_count ?? 0), 0), [processorSessionsState, processorSaleMemberId]);
   const processorRemainingToday = Math.max(0, 50 - processorSoldToday);
+
   const processorStatsQuick = useMemo(() => {
     const rows = processorSessionsState.filter((row) => row.status === 'validated');
     return {
@@ -92,7 +101,55 @@ export function TabletCigarettePageClient(props: {
     };
   }, [processorSessionsState]);
 
-  const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
+  const historyColumns = useMemo(() => {
+    const tabletRows: HistoryCard[] = tabletPassagesState.map((entry) => ({
+      id: `t-${entry.id}`,
+      title: entry.member_label,
+      meta: new Date(entry.created_at).toLocaleString('fr-FR'),
+      lines: [
+        `Cash ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`,
+        `Kits ${entry.before_kits} -> ${entry.after_kits} · Disqueuses ${entry.before_cutters} -> ${entry.after_cutters}`
+      ]
+    }));
+
+    const cigaretteRows: HistoryCard[] = cigarettePassagesState.map((entry) => ({
+      id: `c-${entry.id}`,
+      title: entry.member_label,
+      meta: new Date(entry.created_at).toLocaleString('fr-FR'),
+      lines: [
+        `Paquets ${entry.before_packs} -> ${entry.after_packs} · ${formatUsd(entry.revenue_amount)}`,
+        `${entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reçu' : 'Cash'} · Groupe ${formatUsd(entry.before_group_cash)} -> ${formatUsd(entry.after_group_cash)}`
+      ]
+    }));
+
+    const processorRows: HistoryCard[] = processorSessionsState.slice(0, 100).map((entry) => {
+      const isSale = String(entry.operation_type) === 'sale';
+      const participantIds = Array.isArray(entry.participant_user_ids) ? entry.participant_user_ids as string[] : [];
+      const participants = participantIds
+        .map((id) => {
+          const member = membersById.get(id);
+          return member ? (member.name || member.username) : id;
+        })
+        .join(', ');
+      return {
+        id: `p-${String(entry.id)}`,
+        title: isSale ? 'Vente' : 'Production',
+        meta: new Date(String(entry.created_at)).toLocaleString('fr-FR'),
+        lines: [
+          `${participants || '-'} · Qté ${Number(entry.processors_count ?? 0)}`,
+          `${isSale ? 'Reçu' : 'Coût'} ${formatUsd(isSale ? Number(entry.real_received ?? 0) : Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))} · Stock ${Number(entry.stock_after ?? 0)}`
+        ]
+      };
+    });
+
+    return { tabletRows, cigaretteRows, processorRows };
+  }, [tabletPassagesState, cigarettePassagesState, processorSessionsState, membersById]);
+
+  function selectMember(id: string) {
+    setMemberId(id);
+    const member = membersById.get(id);
+    setMemberLabel(member ? (member.name || member.username) : defaultMemberLabel);
+  }
 
   async function saveTabletDeposit() {
     setError('');
@@ -133,12 +190,6 @@ export function TabletCigarettePageClient(props: {
     if (typeof payload.packsInStock === 'number') setPacksState(payload.packsInStock);
     setStatus(cigarettePaymentMode === 'bank' ? 'Passage bank en attente de virement.' : 'Passage cash validé.');
   }
-
-  const combinedHistory = useMemo(() => {
-    const tabletRows = tabletPassagesState.map((entry) => ({ id: `t-${entry.id}`, type: 'tablet' as const, created_at: entry.created_at, member: entry.member_label, detail: `💰 ${entry.before_cash}$ → ${entry.after_cash}$ · 🧰 ${entry.before_kits}→${entry.after_kits} · 🪚 ${entry.before_cutters}→${entry.after_cutters}` }));
-    const cigaretteRows = cigarettePassagesState.map((entry) => ({ id: `c-${entry.id}`, type: 'cigarette' as const, created_at: entry.created_at, member: entry.member_label, detail: `🚬 ${entry.before_packs}→${entry.after_packs} · 💵 ${formatUsd(entry.revenue_amount)} · Statut ${entry.status === 'pending_bank' ? 'En attente' : entry.status === 'received_bank' ? 'Reçu' : 'Cash reçu'} · Groupe ${formatUsd(entry.before_group_cash)}→${formatUsd(entry.after_group_cash)}` }));
-    return [...tabletRows, ...cigaretteRows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [tabletPassagesState, cigarettePassagesState]);
 
   async function createProcessorProduction() {
     setError('');
@@ -190,7 +241,7 @@ export function TabletCigarettePageClient(props: {
 
   return (
     <div className="space-y-4">
-      <section className="glass-card p-4">
+      <section className="glass-card p-3">
         <div className="flex flex-wrap gap-2">
           <button type="button" className={`filter-pill ${tab === 'home' ? 'filter-pill-active' : ''}`} onClick={() => setTab('home')}>🏠 Accueil</button>
           {canTabletAccess ? <button type="button" className={`filter-pill ${tab === 'tablet' ? 'filter-pill-active' : ''}`} onClick={() => setTab('tablet')}>📱 Tablette</button> : null}
@@ -201,14 +252,14 @@ export function TabletCigarettePageClient(props: {
         </div>
       </section>
 
-      {(tab === 'home') ? (
+      {tab === 'home' ? (
         <section className="grid gap-4 md:grid-cols-3">
           <article className="glass-card p-4 space-y-2">
             <h3 className="font-semibold text-[#ffe8ca]">📱 Tablette</h3>
             <MiniStat label="Passages jour" value={String(tabletDayState?.passages_count ?? 0)} />
             <MiniStat label="Stock kits" value={String(kitsState)} />
             <MiniStat label="Stock disqueuses" value={String(cuttersState)} />
-            <MiniStat label="Argent généré" value={formatUsd(Math.max(0, Number(tabletDayState?.deposited_amount ?? 0) - Number(tabletDayState?.chest_amount ?? 0)))} />
+            <MiniStat label="Argent généré" value={formatUsd(tabletGenerated)} />
             {canTabletAccess ? <button className="saas-primary-btn w-full" onClick={() => setTab('tablet')}>Ouvrir Tablette</button> : null}
           </article>
           <article className="glass-card p-4 space-y-2">
@@ -228,8 +279,8 @@ export function TabletCigarettePageClient(props: {
         </section>
       ) : null}
 
-      {(tab === 'tablet' && canTabletAccess) ? (
-        <section className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
+      {tab === 'tablet' && canTabletAccess ? (
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
           <article className="glass-card p-5">
             <h3 className="text-base font-semibold text-[#fff1dd]">Tablette — {tabletBusinessDay}</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -240,19 +291,90 @@ export function TabletCigarettePageClient(props: {
               <Stat label="Passages" value={String(tabletDayState?.passages_count ?? 0)} icon="🧾" />
             </div>
           </article>
-          <article className="glass-card p-5 space-y-2">
-            <label className="text-xs text-[#efcdab]">Membre</label>
-            <select className="saas-input" value={memberId} onChange={(e) => { setMemberId(e.target.value); const member = membersById.get(e.target.value); setMemberLabel(member ? (member.name || member.username) : defaultMemberLabel); }}>
-              {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
-            </select>
-            <p className="text-[11px] text-[#efcdab]">Membre sélectionné: <span className="font-semibold text-[#ffe8ca]">{memberLabel}</span></p>
-            {canTabletManageDaily ? (<><label className="text-xs text-[#efcdab]">Dépôt matin tablette</label><div className="flex gap-2"><input className="saas-input" value={deposit} onChange={(e) => setDeposit(e.target.value)} /><button className="saas-primary-btn" onClick={() => void saveTabletDeposit()}>Enregistrer</button></div></>) : null}
-            {canTabletCreatePassage ? <button className="saas-primary-btn" onClick={() => void createTabletPassage()}>Valider passage tablette</button> : null}
+
+          <article className="glass-card p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-base font-semibold text-[#fff1dd]">📱 Passage tablette</h3>
+              <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">{tabletBusinessDay}</span>
+            </div>
+
+            <div className="space-y-3">
+              <FieldLabel icon="👤" label="Membre" />
+              <select className="saas-input !h-10" value={memberId} onChange={(event) => selectMember(event.target.value)}>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
+              </select>
+
+              {canTabletManageDaily ? (
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <div>
+                    <FieldLabel icon="💵" label="Dépôt" />
+                    <input className="saas-input !h-10" value={deposit} onChange={(event) => setDeposit(event.target.value)} />
+                  </div>
+                  <button className="saas-primary-btn self-end !h-10 px-4" onClick={() => void saveTabletDeposit()}>Enregistrer</button>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-3 gap-2">
+                <MiniStat label="Kits" value={String(kitsState)} />
+                <MiniStat label="Disqueuses" value={String(cuttersState)} />
+                <MiniStat label="Argent" value={formatUsd(tabletGenerated)} />
+              </div>
+
+              {canTabletCreatePassage ? <button className="saas-primary-btn w-full" onClick={() => void createTabletPassage()}>Valider</button> : null}
+            </div>
           </article>
         </section>
       ) : null}
 
-      {(tab === 'processor' && canProcessorView) ? (
+      {tab === 'cigarette' && canCigaretteAccess ? (
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <article className="glass-card p-5">
+            <h3 className="text-base font-semibold text-[#fff1dd]">Cigarette — {cigaretteBusinessDay}</h3>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <Stat label="Paquets vendus" value={String(cigaretteDayState?.packs_sold ?? 0)} icon="🚬" />
+              <Stat label="Recette" value={formatUsd(Number(cigaretteDayState?.total_revenue ?? 0))} icon="💵" />
+              <Stat label="Dépôt Cigarette" value={formatUsd(Number(cigaretteDayState?.chest_amount ?? 0))} icon="🏦" />
+              <Stat label="Stock paquets" value={String(packsState)} icon="📦" />
+              <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="💰" />
+            </div>
+          </article>
+
+          <article className="glass-card p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-base font-semibold text-[#fff1dd]">🚬 Nouveau passage cigarette</h3>
+              <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">{packsState} paquets</span>
+            </div>
+
+            <div className="space-y-3">
+              <FieldLabel icon="👤" label="Membre" />
+              <select className="saas-input !h-10" value={memberId} onChange={(event) => selectMember(event.target.value)} disabled={!canCigaretteCreateForAny}>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
+              </select>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" className={`filter-pill justify-center ${cigarettePaymentMode === 'cash' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('cash')}>💵 Cash</button>
+                <button type="button" className={`filter-pill justify-center ${cigarettePaymentMode === 'bank' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('bank')}>🏦 Bank</button>
+              </div>
+
+              {cigarettePaymentMode === 'cash' ? (
+                <div className="rounded-xl border border-white/10 bg-[#2f1d14]/60 px-3 py-2 text-sm text-[#ffe8ca]">
+                  <span className="mr-2">✅</span>Ajout direct au groupe
+                </div>
+              ) : (
+                <div className="grid gap-2 rounded-xl border border-white/10 bg-[#2f1d14]/60 p-3 text-sm">
+                  <InfoRow label="RIB" value="ZT96CO" />
+                  <InfoRow label="Tel" value="8202043" />
+                  <InfoRow label="statut" value="en attente" />
+                </div>
+              )}
+
+              {canCigaretteCreatePassage ? <button className="saas-primary-btn w-full" onClick={() => void createCigarettePassage()}>Valider passage</button> : null}
+            </div>
+          </article>
+        </section>
+      ) : null}
+
+      {tab === 'processor' && canProcessorView ? (
         <section className="space-y-4">
           <article className="glass-card p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -278,45 +400,38 @@ export function TabletCigarettePageClient(props: {
                 ))}
                 <input className="saas-input !h-9 w-28" type="number" min={1} max={12} value={processorBottles} onChange={(event) => setProcessorBottles(Math.max(1, Math.min(12, Number(event.target.value || 0))))} />
               </div>
-              <div className="mt-2 rounded-xl border border-white/10 bg-[#2f1d14]/55 p-2 text-xs text-[#efcdab]">
-                <p>Participants ({processorParticipants.length})</p>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {members.filter((m) => processorParticipants.includes(m.id)).map((m) => <span key={m.id} className="rounded-full border border-white/10 bg-[#4a2f20]/60 px-2 py-0.5">{m.name || m.username}</span>)}
-                </div>
-              </div>
               <select className="saas-input mt-2" multiple value={processorParticipants} onChange={(event) => setProcessorParticipants(Array.from(event.currentTarget.selectedOptions).map((option) => option.value))}>
                 {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
               </select>
-              <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#efcdab]"><input type="checkbox" checked={processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES} onChange={(e) => setProcessorBoatFee(e.target.checked)} /> Frais bateau (1500$)</label>
+              <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#efcdab]"><input type="checkbox" checked={processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES} onChange={(event) => setProcessorBoatFee(event.target.checked)} /> Frais bateau (1500$)</label>
               <p className="mt-1 text-xs text-[#efcdab]">🚗/🛥️ Véhicule conseillé: <span className="font-semibold text-[#ffe8ca]">{processorEstimate.vehicleSuggested === 'boat' ? 'Bateau' : 'Voiture'}</span></p>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <MiniStat label="Coût matos" value={formatUsd(processorEstimate.materialCost)} />
                 <MiniStat label="Frais bateau" value={formatUsd(processorEstimate.boatFee)} />
                 <MiniStat label="Processeurs" value={String(processorEstimate.processors)} />
                 <MiniStat label="Stock après" value={String(processorStockState + processorEstimate.processors)} />
-                <MiniStat label="Bénéfice moy." value={formatUsd(processorEstimate.profitAverage)} />
               </div>
-              <input className="saas-input mt-2 !h-9" placeholder="Frais réels" value={processorRealFee} onChange={(e) => setProcessorRealFee(e.target.value)} />
+              <input className="saas-input mt-2 !h-9" placeholder="Frais réels" value={processorRealFee} onChange={(event) => setProcessorRealFee(event.target.value)} />
               {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void createProcessorProduction()}>Valider production</button> : null}
             </article> : null}
 
             {canProcessorSale ? <article className="glass-card flex h-full flex-col p-4">
               <h4 className="text-base font-semibold text-[#fff1dd]">💰 Vente processeurs</h4>
               <div className="mt-2 flex items-center gap-3 rounded-xl border border-white/10 bg-[#2f1d14]/55 p-2">
-                <div className="h-12 w-12 overflow-hidden rounded-lg border border-white/10 bg-[#4a2f20]/60 flex items-center justify-center text-lg">{processorImageUrl ? '🧠' : '⚙️'}</div>
+                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[#4a2f20]/60 text-lg">{processorImageUrl ? '🧠' : '⚙️'}</div>
                 <div>
                   <p className="text-sm text-[#ffe8ca]">Item Processeur</p>
                   <p className="text-xs text-[#efcdab]">Stock actuel: <span className="font-semibold">{processorStockState}</span></p>
                 </div>
               </div>
               <label className="mt-2 text-xs text-[#efcdab]">Vendeur</label>
-              <select className="saas-input !h-9" value={processorSaleMemberId} onChange={(e) => setProcessorSaleMemberId(e.target.value)}>
+              <select className="saas-input !h-9" value={processorSaleMemberId} onChange={(event) => setProcessorSaleMemberId(event.target.value)}>
                 {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
               </select>
               <p className="text-xs text-[#efcdab]">Déjà vendu aujourd’hui: <b>{processorSoldToday}</b> · Restant possible: <b>{processorRemainingToday}</b>/50</p>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <input className="saas-input !h-9" type="number" min={1} max={processorStockState} value={processorSaleQty} onChange={(e) => setProcessorSaleQty(Math.max(1, Number(e.target.value || 0)))} />
-                <input className="saas-input !h-9" type="number" min={0} max={Math.min(processorRemainingToday, processorSaleQty)} value={processorSoldQty} onChange={(e) => setProcessorSoldQty(Math.max(0, Math.min(processorRemainingToday, Number(e.target.value || 0))))} />
+                <input className="saas-input !h-9" type="number" min={1} max={processorStockState} value={processorSaleQty} onChange={(event) => setProcessorSaleQty(Math.max(1, Number(event.target.value || 0)))} />
+                <input className="saas-input !h-9" type="number" min={0} max={Math.min(processorRemainingToday, processorSaleQty)} value={processorSoldQty} onChange={(event) => setProcessorSoldQty(Math.max(0, Math.min(processorRemainingToday, Number(event.target.value || 0))))} />
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <MiniStat label="Estimation (50%)" value={formatUsd(processorSaleTotalEstimated)} />
@@ -326,72 +441,18 @@ export function TabletCigarettePageClient(props: {
               {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" disabled={processorSoldQty > processorRemainingToday} onClick={() => void createProcessorSale()}>Valider vente</button> : null}
             </article> : null}
           </div>
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <article className="glass-card p-4">
-              <h4 className="text-sm font-semibold text-[#fff1dd]">Historique récent</h4>
-              <div className="mt-2 space-y-2">
-                {processorSessionsState.slice(0, 6).map((entry) => (
-                  <div key={String(entry.id)} className="rounded-lg border border-white/10 bg-[#2f1d14]/55 px-2 py-1 text-xs text-[#efcdab]">
-                    <p className="text-[#ffe8ca]">{String(entry.operation_type) === 'sale' ? '💰 Vente' : '⚙️ Production'} · {Number(entry.processors_count ?? 0)} · {new Date(String(entry.created_at)).toLocaleString('fr-FR')}</p>
-                    <p>Stock après {Number(entry.stock_after ?? 0)} · Argent après {formatUsd(Number(entry.after_group_cash ?? 0))}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-            <article className="glass-card p-4">
-              <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Processeur</h4>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <MiniStat label="Produits sem." value={String(processorStatsQuick.produced)} />
-                <MiniStat label="Vendus sem." value={String(processorStatsQuick.sold)} />
-                <MiniStat label="Argent généré" value={formatUsd(processorStatsQuick.revenue)} />
-                <MiniStat label="Bénéfice net" value={formatUsd(processorStatsQuick.net)} />
-              </div>
-            </article>
-          </div>
         </section>
       ) : null}
 
-      {(tab === 'cigarette' && canCigaretteAccess) ? (
-        <section className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
-          <article className="glass-card p-5">
-            <h3 className="text-base font-semibold text-[#fff1dd]">Cigarette — {cigaretteBusinessDay}</h3>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              <Stat label="Paquets vendus" value={String(cigaretteDayState?.packs_sold ?? 0)} icon="🚬" />
-              <Stat label="Recette" value={formatUsd(Number(cigaretteDayState?.total_revenue ?? 0))} icon="💵" />
-              <Stat label="Dépôt Cigarette" value={formatUsd(Number(cigaretteDayState?.chest_amount ?? 0))} icon="🏦" />
-              <Stat label="Stock paquets" value={String(packsState)} icon="📦" />
-              <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="💰" />
-            </div>
-          </article>
-          <article className="glass-card p-5 space-y-2">
-            <label className="text-xs text-[#efcdab]">Membre</label>
-            <select className="saas-input" value={memberId} onChange={(e) => { setMemberId(e.target.value); const member = membersById.get(e.target.value); setMemberLabel(member ? (member.name || member.username) : defaultMemberLabel); }} disabled={!canCigaretteCreateForAny}>
-              {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
-            </select>
-            <div className="grid grid-cols-3 gap-2"><button type="button" className={`filter-pill ${cigarettePaymentMode === 'cash' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('cash')}>Cash</button><button type="button" className={`filter-pill ${cigarettePaymentMode === 'bank' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('bank')}>Bank</button>{canCigaretteCreatePassage ? <button className="saas-primary-btn" onClick={() => void createCigarettePassage()}>Valider passage cigarette</button> : null}</div>{cigarettePaymentMode === 'bank' ? <p className="text-xs text-[#efcdab]">Virement en attente · RIB: <b>ZT96CO</b> · Téléphone IG: <b>8202043</b></p> : null}
-          </article>
+      {tab === 'history' && canHistory ? (
+        <section className="grid gap-4 xl:grid-cols-3">
+          <HistoryColumn title="TABLETTE" icon="📱" rows={historyColumns.tabletRows} empty="Aucun passage tablette." />
+          <HistoryColumn title="CIGARETTE" icon="🚬" rows={historyColumns.cigaretteRows} empty="Aucun passage cigarette." />
+          <HistoryColumn title="PROCESSEUR" icon="⚙️" rows={canProcessorLogs ? historyColumns.processorRows : []} empty={canProcessorLogs ? 'Aucun log processeur.' : 'Accès historique processeur requis.'} />
         </section>
       ) : null}
 
-      {(tab === 'history' && canHistory) ? (
-        <section className="glass-card p-5">
-          <h3 className="text-base font-semibold text-[#fff1dd]">Historique unifié</h3>
-          <div className="mt-3 space-y-2">
-            {combinedHistory.map((entry) => (
-              <article key={entry.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-sm text-[#f1d2ad]">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold text-[#ffe8ca]">{entry.type === 'tablet' ? '📱 Tablette' : '🚬 Cigarette'} — {entry.member}</p>
-                  <p className="text-xs">{new Date(entry.created_at).toLocaleString('fr-FR')}</p>
-                </div>
-                <p className="mt-1 text-xs">{entry.detail}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {(tab === 'stats' && canStats) ? (
+      {tab === 'stats' && canStats ? (
         <section className="space-y-3">
           <div className="grid gap-2 md:grid-cols-4">
             <Stat label="Passages tablette" value={String(tabletPassagesState.length)} icon="📱" />
@@ -455,25 +516,18 @@ export function TabletCigarettePageClient(props: {
         </section>
       ) : null}
 
-      {(tab === 'history' && canProcessorLogs && processorSessionsState.length > 0) ? (
-        <section className="glass-card p-5">
-          <h3 className="text-base font-semibold text-[#fff1dd]">Historique Processeur</h3>
-          <div className="mt-3 space-y-2">
-            {processorSessionsState.slice(0, 50).map((entry) => (
-              <article key={String(entry.id)} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#f1d2ad]">
-                <p className="font-semibold text-[#ffe8ca]">{String(entry.operation_type) === 'sale' ? '💰 Vente' : '⚙️ Production'} · {new Date(String(entry.created_at)).toLocaleString('fr-FR')}</p>
-                <p>Membres: {Array.isArray(entry.participant_user_ids) ? (entry.participant_user_ids as string[]).join(', ') : '-'} · Qté: {Number(entry.processors_count ?? 0)}</p>
-                <p>Coût/Reçu: {formatUsd(Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))} / {formatUsd(Number(entry.real_received ?? 0))} · Stock après: {Number(entry.stock_after ?? 0)} · Argent après: {formatUsd(Number(entry.after_group_cash ?? 0))}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
       {status ? <p className="rounded-xl border border-white/10 bg-[#4a2f20]/45 px-3 py-2 text-sm text-[#efcdab]">{status}</p> : null}
     </div>
   );
+}
+
+function FieldLabel({ icon, label }: { icon: string; label: string }) {
+  return <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[#efcdab]"><span>{icon}</span>{label}</label>;
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return <div className="flex items-center justify-between gap-3"><span className="text-[#efcdab]">{label}</span><span className="font-semibold text-[#ffe8ca]">{value}</span></div>;
 }
 
 function Stat({ label, value, icon }: { label: string; value: string; icon: string }) {
@@ -482,4 +536,26 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: stri
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-lg border border-white/10 bg-[#3b2418]/60 px-2 py-2"><p className="text-[11px] text-[#efcdab]">{label}</p><p className="text-sm font-semibold text-[#ffe8ca]">{value}</p></div>;
+}
+
+function HistoryColumn({ title, icon, rows, empty }: { title: string; icon: string; rows: HistoryCard[]; empty: string }) {
+  return (
+    <article className="glass-card min-h-[360px] p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold tracking-[0.08em] text-[#fff1dd]">{icon} {title}</h3>
+        <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">{rows.length}</span>
+      </div>
+      <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+        {rows.length ? rows.map((row) => (
+          <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 p-2.5 text-xs text-[#efcdab]">
+            <div className="flex items-start justify-between gap-2">
+              <p className="font-semibold text-[#ffe8ca]">{row.title}</p>
+              <p className="shrink-0 text-[10px] text-[#d9b48f]">{row.meta}</p>
+            </div>
+            {row.lines.map((line) => <p key={line} className="mt-1 leading-relaxed">{line}</p>)}
+          </article>
+        )) : <p className="rounded-lg border border-white/10 bg-[#3f281b]/40 p-3 text-xs text-[#efcdab]">{empty}</p>}
+      </div>
+    </article>
+  );
 }
