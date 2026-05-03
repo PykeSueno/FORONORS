@@ -62,6 +62,7 @@ create index if not exists idx_activity_payroll_payments_paid_by on public.activ
 insert into public.permissions (name)
 values
   ('activity_payroll.view'),
+  ('activity_payroll.global.view'),
   ('activity_payroll.activities.view'),
   ('activity_payroll.payroll.view'),
   ('activity_payroll.payroll.configure'),
@@ -78,6 +79,7 @@ select r.id, p.id
 from public.roles r
 join public.permissions p on p.name in (
   'activity_payroll.view',
+  'activity_payroll.global.view',
   'activity_payroll.activities.view',
   'activity_payroll.payroll.view',
   'activity_payroll.payroll.configure',
