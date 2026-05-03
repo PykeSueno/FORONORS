@@ -21,8 +21,8 @@ export async function GET() {
   const canTransactionsAccess = has('transactions.access');
   const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
 
-  const canMembersAccess = has('members.access');
-  const canMembersPreview = canMembersAccess || has('members.preview');
+  const canMembersAccess = has('members.view');
+  const canMembersPreview = canMembersAccess;
 
   const canLogsAccess = has('logs.access');
   const canLogsPreview = canLogsAccess || has('logs.preview');
