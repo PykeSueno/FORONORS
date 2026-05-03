@@ -28,7 +28,6 @@ const STOCK_REQUIREMENTS: Record<RobberyType, StockReq[]> = {
     { name: 'munition de pistolet', qty: 1 },
     { name: 'perceuse', qty: 1 },
     { name: 'foret', qty: 4 },
-    { name: 'téléphone de hack', qty: 1 },
     { name: 'clé usb', qty: 1 }
   ],
   bijouterie: [
