@@ -77,6 +77,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const canCopyMemberPassword = userPermissions.includes('members.password.copy');
   const canCopyCredentials = userPermissions.includes('members.credentials.copy');
   const canEditMemberPassword = userPermissions.includes('members.password.edit');
+  const canRenameRole = userPermissions.includes('roles.rename');
 
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
   const sortedMembers = useMemo(() => sortMembersByGrade(members), [members]);
@@ -201,33 +202,36 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
         </div>
       </section>
 
-      {canManageRoles ? (
+      {(canManageRoles || canRenameRole) ? (
         <section className="glass-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-[#fff0d9]">Rôles</h2>
-            <form onSubmit={createRole} className="flex gap-2">
+            {canManageRoles ? <form onSubmit={createRole} className="flex gap-2">
               <input className="saas-input" placeholder="Nouveau rôle" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} required />
               <button type="submit" className="saas-primary-btn">Créer</button>
-            </form>
+            </form> : null}
           </div>
 
           <div className="mt-3 space-y-2">
             {sortedRoles.map((role) => (
-              <div key={role.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
+              <div key={role.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
                 <p className="font-medium text-[#fff2df]">{role.name}</p>
-                <button
-                  className={`saas-ghost-btn ${selectedRoleIds.includes(role.id) ? '!bg-[#6a452c]/70' : ''}`}
-                  onClick={() => {
-                    setSelectedRoleIds((current) => current.includes(role.id) ? current.filter((id) => id !== role.id) : [...current, role.id]);
-                    setIsRoleModalOpen(false);
-                  }}
-                >
-                  {selectedRoleIds.includes(role.id) ? 'Retirer' : 'Sélectionner'}
-                </button>
+                <div className="flex items-center gap-2">
+                  {canRenameRole ? <button className="saas-ghost-btn" onClick={() => { setSelectedRoleIds([role.id]); setIsRoleModalOpen(true); }}>✏️ Modifier le nom</button> : null}
+                  {canManageRoles ? <button
+                    className={`saas-ghost-btn ${selectedRoleIds.includes(role.id) ? '!bg-[#6a452c]/70' : ''}`}
+                    onClick={() => {
+                      setSelectedRoleIds((current) => current.includes(role.id) ? current.filter((id) => id !== role.id) : [...current, role.id]);
+                      setIsRoleModalOpen(false);
+                    }}
+                  >
+                    {selectedRoleIds.includes(role.id) ? 'Retirer' : 'Sélectionner'}
+                  </button> : null}
+                </div>
               </div>
             ))}
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#3b2418]/55 px-3 py-2">
+          {canManageRoles ? <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#3b2418]/55 px-3 py-2">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#f5d8b5]">Rôles sélectionnés</p>
               {selectedRoles.length === 0 ? <span className="text-xs text-[#efcdab]">Aucun</span> : selectedRoles.map((role) => (
@@ -240,7 +244,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
             <button className="saas-primary-btn" disabled={selectedRoles.length === 0} onClick={() => setIsRoleModalOpen(true)}>
               Gérer la sélection
             </button>
-          </div>
+          </div> : null}
         </section>
       ) : null}
 
@@ -267,6 +271,8 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
         <RoleManageModal
           selectedRoles={selectedRoles}
           permissions={permissions}
+          canManageRoles={canManageRoles}
+          canRenameRole={canRenameRole}
           onClose={() => setIsRoleModalOpen(false)}
           onSaved={async () => {
             await refreshAll();
@@ -440,7 +446,11 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
   );
 }
 
-function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError }: { selectedRoles: Role[]; permissions: Permission[]; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
+function isCriticalRoleName(name?: string) {
+  return ['patron', 'lead', 'admin', 'administrateur'].includes((name ?? '').trim().toLowerCase());
+}
+
+function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRenameRole, onClose, onSaved, onError }: { selectedRoles: Role[]; permissions: Permission[]; canManageRoles: boolean; canRenameRole: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
   const displayPermissions = useMemo(() => {
     const byCanonical = new Map<string, Permission>();
     for (const permission of permissions) {
@@ -464,8 +474,15 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
   });
   const [newPermission, setNewPermission] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const renameTarget = selectedRoles.length === 1 ? selectedRoles[0] : null;
+  const [roleNameDraft, setRoleNameDraft] = useState(renameTarget?.name ?? '');
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [criticalConfirmChecked, setCriticalConfirmChecked] = useState(false);
+  const [criticalConfirmName, setCriticalConfirmName] = useState('');
   const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const renameIsCritical = Boolean(renameTarget && (isCriticalRoleName(renameTarget.name) || isCriticalRoleName(roleNameDraft)));
+  const renameConfirmed = !renameIsCritical || (criticalConfirmChecked && criticalConfirmName.trim() === renameTarget?.name);
 
   const modules = useMemo(() => {
     const grouped: Record<string, Record<string, Permission[]>> = {};
@@ -509,7 +526,14 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
     });
   }, [modules]);
 
+  useEffect(() => {
+    setRoleNameDraft(renameTarget?.name ?? '');
+    setCriticalConfirmChecked(false);
+    setCriticalConfirmName('');
+  }, [renameTarget?.id, renameTarget?.name]);
+
   async function saveRole() {
+    if (!canManageRoles) return;
     if (isSaving) return;
     setIsSaving(true);
     const permissionIds = displayPermissions.filter((permission) => checked[permission.id]).map((permission) => permission.id);
@@ -528,6 +552,7 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
   }
 
   async function removeRole() {
+    if (!canManageRoles) return;
     if (selectedRoles.length !== 1) return onError('Suppression disponible uniquement avec un seul rôle sélectionné.');
     const response = await fetch(`/api/roles/${selectedRoles[0].id}`, { method: 'DELETE' });
     if (!response.ok) return onError('Suppression rôle impossible.');
@@ -536,6 +561,7 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
   }
 
   async function addPermission() {
+    if (!canManageRoles) return;
     const permissionName = newPermission.trim().toLowerCase();
     if (!permissionName) return;
 
@@ -547,6 +573,28 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
 
     if (!response.ok) return onError('Création permission impossible.');
     setNewPermission('');
+    await onSaved();
+  }
+
+  async function renameRole() {
+    if (!canRenameRole || !renameTarget || isRenaming) return;
+    const nextName = roleNameDraft.trim();
+    if (!nextName) return onError('Nom du rôle requis.');
+    if (nextName === renameTarget.name) return onError('Le nom est identique.');
+    if (!renameConfirmed) return onError('Double confirmation requise pour ce rôle critique.');
+
+    setIsRenaming(true);
+    const response = await fetch(`/api/roles/${renameTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nextName, confirm_critical: renameIsCritical ? renameConfirmed : false })
+    });
+    setIsRenaming(false);
+
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
+      return onError(data.message ?? 'Renommage du rôle impossible.');
+    }
     await onSaved();
   }
 
@@ -568,7 +616,31 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
             </div>
           </div>
 
-          <div className="space-y-3">
+          {canRenameRole && renameTarget ? (
+            <section className="rounded-xl border border-amber-200/15 bg-[#4f3220]/45 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#f5d8b5]">✏️ Modifier le nom</p>
+                {renameIsCritical ? <span className="rounded-full border border-rose-200/30 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100">Rôle critique</span> : null}
+              </div>
+              <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+                <input className="saas-input" value={roleNameDraft} onChange={(e) => setRoleNameDraft(e.target.value)} placeholder="Nouveau nom du rôle" />
+                <button className="saas-primary-btn" disabled={isRenaming || !roleNameDraft.trim() || roleNameDraft.trim() === renameTarget.name || !renameConfirmed} onClick={() => void renameRole()}>
+                  {isRenaming ? 'Sauvegarde…' : 'Sauvegarder'}
+                </button>
+              </div>
+              {renameIsCritical ? (
+                <div className="mt-3 space-y-2 rounded-xl border border-rose-200/20 bg-rose-500/10 p-3">
+                  <label className="flex items-center gap-2 text-xs text-[#ffe3c1]">
+                    <input type="checkbox" checked={criticalConfirmChecked} onChange={(e) => setCriticalConfirmChecked(e.target.checked)} />
+                    Je confirme le renommage de ce rôle critique.
+                  </label>
+                  <input className="saas-input text-xs" value={criticalConfirmName} onChange={(e) => setCriticalConfirmName(e.target.value)} placeholder={`Tape "${renameTarget.name}" pour confirmer`} />
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          {canManageRoles ? <div className="space-y-3">
             {modules.map((module) => (
               <section key={module.moduleName} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
                 <button
@@ -622,17 +694,17 @@ function RoleManageModal({ selectedRoles, permissions, onClose, onSaved, onError
                 </div> : null}
               </section>
             ))}
-          </div>
+          </div> : null}
 
-          <div className="flex gap-2">
+          {canManageRoles ? <div className="flex gap-2">
             <input className="saas-input flex-1" placeholder="Nouvelle permission" value={newPermission} onChange={(e) => setNewPermission(e.target.value)} />
             <button className="saas-ghost-btn" onClick={() => void addPermission()}>Ajouter</button>
-          </div>
+          </div> : null}
 
-          <div className="flex justify-end gap-2">
+          {canManageRoles ? <div className="flex justify-end gap-2">
             {selectedRoles.length === 1 ? <div className="flex items-center"><RemoveLineButton onClick={() => void removeRole()} title="Supprimer le rôle" /></div> : null}
             <button className="saas-primary-btn" disabled={isSaving} onClick={() => void saveRole()}>{isSaving ? 'Enregistrement…' : 'Enregistrer'}</button>
-          </div>
+          </div> : null}
         </div>
       </div>
     </div>
