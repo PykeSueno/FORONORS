@@ -5,42 +5,92 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizePermissionNames, toCanonicalPermission } from '@/lib/permission-normalization';
 
-async function ensureRolesManagePermission() {
+async function getAuthenticatedSession() {
   const session = await getSession();
   if (!session) return { error: NextResponse.json({ message: 'Non autorisé.' }, { status: 401 }) };
-
-  const canManageRoles = await hasUserPermission(session.userId, 'roles.manage');
-  if (!canManageRoles) return { error: NextResponse.json({ message: 'Accès refusé.' }, { status: 403 }) };
-
   return { session };
 }
 
+function isCriticalRoleName(name?: string | null) {
+  const normalized = (name ?? '').trim().toLowerCase();
+  return ['patron', 'lead', 'admin', 'administrateur'].includes(normalized);
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const access = await ensureRolesManagePermission();
+  const access = await getAuthenticatedSession();
   if ('error' in access) return access.error;
 
   const { id } = await params;
   const roleId = Number(id);
-  const body = (await request.json()) as { permission_ids?: number[]; name?: string; display_order?: number };
+  const body = (await request.json()) as { permission_ids?: number[]; name?: string; display_order?: number; confirm_critical?: boolean };
   const supabase = getSupabaseAdmin();
+  const wantsRename = body.name !== undefined;
+  const wantsManage = body.permission_ids !== undefined || body.display_order !== undefined;
+
+  if (wantsRename) {
+    const canRenameRole = await hasUserPermission(access.session.userId, 'roles.rename');
+    if (!canRenameRole) return NextResponse.json({ message: 'Permission renommage rôle manquante.' }, { status: 403 });
+  }
+
+  if (wantsManage) {
+    const canManageRoles = await hasUserPermission(access.session.userId, 'roles.manage');
+    if (!canManageRoles) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  }
 
   const { data: before } = await supabase
     .from('roles')
     .select('id, name, display_order, role_permissions(permission_id)')
     .eq('id', roleId)
     .maybeSingle();
+  if (!before) return NextResponse.json({ message: 'Rôle introuvable.' }, { status: 404 });
 
-  if (body.name !== undefined || body.display_order !== undefined) {
+  const newRoleName = body.name?.trim();
+  if (wantsRename) {
+    if (!newRoleName) return NextResponse.json({ message: 'Nom du rôle requis.' }, { status: 400 });
+    if (isCriticalRoleName(before.name) || isCriticalRoleName(newRoleName)) {
+      if (!body.confirm_critical) return NextResponse.json({ message: 'Confirmation requise pour renommer un rôle critique.' }, { status: 400 });
+    }
+    const { data: duplicate } = await supabase
+      .from('roles')
+      .select('id')
+      .ilike('name', newRoleName)
+      .neq('id', roleId)
+      .maybeSingle();
+    if (duplicate) return NextResponse.json({ message: 'Un rôle porte déjà ce nom.' }, { status: 400 });
+  }
+
+  if (wantsRename || body.display_order !== undefined) {
     const { error: updateRoleError } = await supabase
       .from('roles')
       .update({
-        ...(body.name !== undefined ? { name: body.name.trim() } : {}),
+        ...(newRoleName !== undefined ? { name: newRoleName } : {}),
         ...(body.display_order !== undefined ? { display_order: body.display_order } : {})
       })
       .eq('id', roleId);
 
     if (updateRoleError) {
       return NextResponse.json({ message: 'Mise à jour du rôle impossible.' }, { status: 400 });
+    }
+
+    if (newRoleName !== undefined && newRoleName !== before.name) {
+      const { error: updateUsersRoleError } = await supabase.from('users').update({ role: newRoleName }).eq('role_id', roleId);
+      if (updateUsersRoleError) return NextResponse.json({ message: 'Rôle renommé, mais synchronisation membres impossible.' }, { status: 400 });
+      await createAuditLog({
+        actorUserId: access.session.userId,
+        action: 'roles.rename',
+        entityType: 'role',
+        entityId: roleId,
+        summary: `Renommage du rôle ${before.name} en ${newRoleName}`,
+        oldValues: { name: before.name },
+        newValues: { name: newRoleName },
+        metadata: {
+          oldName: before.name,
+          newName: newRoleName,
+          adminUserId: access.session.userId,
+          renamedAt: new Date().toISOString(),
+          critical: isCriticalRoleName(before.name) || isCriticalRoleName(newRoleName)
+        }
+      });
     }
   }
 
@@ -71,15 +121,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
-  await createAuditLog({
-    actorUserId: access.session.userId,
-    action: 'roles.edit',
-    entityType: 'role',
-    entityId: roleId,
-    summary: `Modification du rôle ${body.name ?? (before as { name?: string } | null)?.name ?? roleId}`,
-    oldValues: before as Record<string, unknown> | null,
-    newValues: body as Record<string, unknown>
-  });
+  if (body.permission_ids !== undefined || body.display_order !== undefined) {
+    await createAuditLog({
+      actorUserId: access.session.userId,
+      action: 'roles.edit',
+      entityType: 'role',
+      entityId: roleId,
+      summary: `Modification du rôle ${newRoleName ?? before.name ?? roleId}`,
+      oldValues: before as Record<string, unknown> | null,
+      newValues: body as Record<string, unknown>
+    });
+  }
 
   const { data: updated } = await supabase
     .from('roles')
@@ -91,8 +143,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const access = await ensureRolesManagePermission();
+  const access = await getAuthenticatedSession();
   if ('error' in access) return access.error;
+  const canManageRoles = await hasUserPermission(access.session.userId, 'roles.manage');
+  if (!canManageRoles) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;
   const roleId = Number(id);
