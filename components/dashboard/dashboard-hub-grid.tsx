@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { PointerEvent, useEffect, useMemo, useState } from 'react';
+import { PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 type HubCardItem = {
   id: string;
@@ -21,15 +21,17 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
     return [...validStored, ...missing];
   }, [cards, initialOrder]);
 
-  const [order, setOrder] = useState<string[]>(initialNormalizedOrder);
   const [dragging, setDragging] = useState<string | null>(null);
   const [draftOrder, setDraftOrder] = useState<string[]>(initialNormalizedOrder);
   const [hasDragged, setHasDragged] = useState(false);
   const [pointerDrag, setPointerDrag] = useState<{ pointerId: number; cardId: string; startX: number; startY: number; startAt: number; draggingStarted: boolean } | null>(null);
+  const orderRef = useRef(initialNormalizedOrder);
+  const draftOrderRef = useRef(initialNormalizedOrder);
 
   useEffect(() => {
-    setOrder(initialNormalizedOrder);
     setDraftOrder(initialNormalizedOrder);
+    orderRef.current = initialNormalizedOrder;
+    draftOrderRef.current = initialNormalizedOrder;
   }, [initialNormalizedOrder]);
 
   const orderedCards = useMemo(() => {
@@ -40,7 +42,8 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   }, [cards, draftOrder]);
 
   async function persist(nextOrder: string[]) {
-    setOrder(nextOrder);
+    orderRef.current = nextOrder;
+    draftOrderRef.current = nextOrder;
     setDraftOrder(nextOrder);
     await fetch('/api/dashboard/layout', {
       method: 'PATCH',
@@ -52,12 +55,13 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   function moveCard(targetId: string) {
     if (!dragging || dragging === targetId) return;
     setHasDragged(true);
-    const next = [...draftOrder];
+    const next = [...draftOrderRef.current];
     const from = next.indexOf(dragging);
     const to = next.indexOf(targetId);
     if (from === -1 || to === -1) return;
     next.splice(from, 1);
     next.splice(to, 0, dragging);
+    draftOrderRef.current = next;
     setDraftOrder(next);
   }
 
@@ -66,7 +70,8 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
     setDragging(null);
     setPointerDrag(null);
     setHasDragged(false);
-    if (draftOrder.join('|') !== order.join('|')) void persist(draftOrder);
+    const latestOrder = draftOrderRef.current;
+    if (latestOrder.join('|') !== orderRef.current.join('|')) void persist(latestOrder);
   }
 
   function onPointerDown(event: PointerEvent<HTMLDivElement>, cardId: string) {
