@@ -10,12 +10,12 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const [canPayrollValidate, canMembersPay, canLegacyPay] = await Promise.all([
+  const [canPayrollValidate, canActivityPayrollPay, canLegacyPay] = await Promise.all([
     hasUserPermission(session.userId, 'payroll.validate'),
-    hasUserPermission(session.userId, 'members.payroll.pay'),
+    hasUserPermission(session.userId, 'activity_payroll.payroll.pay'),
     hasUserPermission(session.userId, 'money.pay.create')
   ]);
-  if (!canPayrollValidate && !canMembersPay && !canLegacyPay) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canPayrollValidate && !canActivityPayrollPay && !canLegacyPay) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = await request.json() as Body;
   try {
