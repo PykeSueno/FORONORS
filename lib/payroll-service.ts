@@ -162,7 +162,7 @@ export async function getMemberActivities(supabase: SupabaseClient, args: { star
     supabase.from('drug_sales').select('id, created_by, actual_amount, member_user_ids, member_labels, drug_type, status, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
     supabase.from('gofast_runs').select('id, user_id, user_name, money_amount, participants, status, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
     supabase.from('robbery_runs').select('id, user_id, user_name, money_amount, participants, robbery_type, status, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
-    supabase.from('activities').select('id, member_user_id, member_label, created_by, type, location, status, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
+    supabase.from('activities').select('id, activity_type, member_user_id, member_label, created_by, equipment_item_name, equipment_used, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
     supabase.from('tablet_passages').select('id, member_user_id, member_label, before_cash, after_cash, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
     supabase.from('cigarette_passages').select('id, member_user_id, member_label, revenue_amount, status, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
     supabase.from('processor_sessions').select('id, participant_user_ids, validated_by, real_received, operation_type, processors_count, status, created_at').eq('status', 'validated').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit)
@@ -211,7 +211,8 @@ export async function getMemberActivities(supabase: SupabaseClient, args: { star
   }
   for (const row of activityRows ?? []) {
     const ids = activityMembers.get(Number(row.id)) ?? normalizeParticipantIds([], row.member_user_id ?? row.created_by);
-    add(rows, { id: `activity-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Activités', action: String(row.type || 'Activité'), moneyGenerated: 0, participation: ids.length || 1, details: `${row.location ?? ''} ${row.status ?? ''}`.trim() });
+    const equipment = Number(row.equipment_used ?? 0) > 0 ? `${row.equipment_item_name ?? 'Équipement'} x${row.equipment_used}` : '';
+    add(rows, { id: `activity-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Activités', action: String(row.activity_type || 'Activité'), moneyGenerated: 0, participation: ids.length || 1, details: equipment });
   }
   for (const row of tabletRows ?? []) {
     const ids = row.member_user_id ? [String(row.member_user_id)] : [];
