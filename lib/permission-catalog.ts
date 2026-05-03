@@ -32,6 +32,7 @@ const EXACT: Record<string, PermissionInfo> = {
   'members.preview': { module: 'Membres', section: 'Vue', label: 'Voir la bulle Membres', hint: 'Permet d afficher la bulle Membres.' },
   'members.view': { module: 'Membres', section: 'Vue', label: 'Voir les membres', hint: 'Permet de consulter les membres.' },
   'roles.manage': { module: 'Membres', section: 'Gestion', label: 'Gerer roles et permissions', hint: 'Permet de gerer les roles et permissions.' },
+  'roles.rename': { module: 'Membres', section: 'Gestion', label: 'Renommer un role', hint: 'Permet de modifier le nom d un role existant.' },
   'robberies.view': { module: 'Braquage', section: 'Vue', label: 'Voir le module Braquage', hint: 'Permet d afficher la page Braquage.' },
   'robberies.create': { module: 'Braquage', section: 'Creation', label: 'Creer un braquage', hint: 'Permet de valider un braquage.' },
   'robberies.arrested': { module: 'Braquage', section: 'Creation', label: 'Declarer un braquage arrete', hint: 'Permet de valider un braquage arrete.' },
