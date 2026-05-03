@@ -29,7 +29,7 @@ const ROBBERY_DEFS: Array<{
   stockResources: Array<{ label: string; qty: number }>;
   nonStockPrereqs?: string[];
 }> = [
-  { key: 'fleeca', title: 'Fleeca', icon: '🏦', stockResources: [{ label: 'Munition de Pistolet', qty: 1 }, { label: 'Perceuse', qty: 1 }, { label: 'Foret', qty: 4 }, { label: 'Téléphone de hack', qty: 1 }, { label: 'Clé USB', qty: 1 }] },
+  { key: 'fleeca', title: 'Fleeca', icon: '🏦', stockResources: [{ label: 'Munition de Pistolet', qty: 1 }, { label: 'Perceuse', qty: 1 }, { label: 'Foret', qty: 4 }, { label: 'Clé USB', qty: 1 }] },
   { key: 'bijouterie', title: 'Bijouterie', icon: '💎', stockResources: [{ label: 'Gaz BZ', qty: 1 }, { label: 'Munition de Pistolet', qty: 1 }], nonStockPrereqs: ['Masque à gaz', 'Casse de carton'] },
   { key: 'morgue', title: 'Morgue', icon: '🟥', stockResources: [{ label: 'Carte rouge', qty: 1 }] }
 ];
