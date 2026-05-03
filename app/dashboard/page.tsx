@@ -19,8 +19,8 @@ export default async function DashboardPage() {
   const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
   const canTransactionsRecentAccess = has('transactions.recent.access');
   const canTransactionsRecentPreview = canTransactionsRecentAccess || has('transactions.recent.preview');
-  const canMembersAccess = has('members.access');
-  const canMembersPreview = canMembersAccess || has('members.preview');
+  const canMembersAccess = has('members.view');
+  const canMembersPreview = has('members.view');
   const canLogsAccess = has('logs.access');
   const canLogsPreview = canLogsAccess || has('logs.preview');
   const canTabletAccess = has('tablet.access');
