@@ -21,11 +21,11 @@ type Run = {
   note?: string | null;
 };
 type RobberyType = 'fleeca' | 'bijouterie' | 'morgue';
-type RoleStats = { memberId: string; name: string; total: number; braqueur: number; braqueurMoney: number; braqueurLast: string | null; mule: number; muleSuccess: number; muleLast: string | null; hostage: number; hostageLast: string | null };
-type Suggestion = { title: string; icon: string; names: Array<{ name: string; reason: string }> };
+type RoleStats = { memberId: string; name: string; total: number; braqueur: number; braqueurMoney: number; braqueurLast: string | null; mule: number; muleSuccess: number; muleLast: string | null; hostage: number; hostageLast: string | null; recentBraqueur: number; recentMule: number; recentHostage: number };
+type Suggestion = { title: string; icon: string; names: Array<{ name: string; reason: string; score: number }> };
 
 const ROBBERY_DEFS: Array<{ key: RobberyType; title: string; icon: string; stockResources: Array<{ label: string; qty: number }>; nonStockPrereqs?: string[] }> = [
-  { key: 'fleeca', title: 'Fleeca', icon: '🏦', stockResources: [{ label: 'Munition de Pistolet', qty: 1 }, { label: 'Perceuse', qty: 1 }, { label: 'Foret', qty: 4 }, { label: 'Clé USB', qty: 1 }] },
+  { key: 'fleeca', title: 'Fleeca', icon: '🏦', stockResources: [{ label: 'Pétoire', qty: 1 }, { label: 'Munition de Pistolet', qty: 1 }, { label: 'Perceuse', qty: 1 }, { label: 'Foret', qty: 4 }, { label: 'Clé USB', qty: 1 }] },
   { key: 'bijouterie', title: 'Bijouterie', icon: '💎', stockResources: [{ label: 'Gaz BZ', qty: 1 }, { label: 'Munition de Pistolet', qty: 1 }], nonStockPrereqs: ['Masque à gaz', 'Casse de carton'] },
   { key: 'morgue', title: 'Morgue', icon: '🟥', stockResources: [{ label: 'Carte rouge', qty: 1 }] }
 ];
@@ -36,19 +36,28 @@ function roleIcon(role?: string) { if (role === 'braqueur') return '🎯'; if (r
 function lastLabel(value: string | null) { return value ? new Date(value).toLocaleDateString('fr-FR') : 'Jamais'; }
 function lastTime(value: string | null) { return value ? new Date(value).getTime() : 0; }
 function isSuccess(run: Run) { return (run.status ?? 'success') === 'success'; }
+function ageDays(value: string | null) { if (!value) return 999; const diff = Date.now() - new Date(value).getTime(); return Number.isFinite(diff) ? Math.max(0, diff / 86400000) : 999; }
+function recentWeight(createdAt: string) { const age = ageDays(createdAt); if (age <= 14) return 2; if (age <= 30) return 1; if (age <= 60) return 0.45; return 0.15; }
+function roleCount(row: RoleStats, role: RoleKey) { return role === 'braqueur' ? row.braqueur : role === 'plan_mule_recup' ? row.mule : row.hostage; }
+function roleRecent(row: RoleStats, role: RoleKey) { return role === 'braqueur' ? row.recentBraqueur : role === 'plan_mule_recup' ? row.recentMule : row.recentHostage; }
+function roleLast(row: RoleStats, role: RoleKey) { return role === 'braqueur' ? row.braqueurLast : role === 'plan_mule_recup' ? row.muleLast : row.hostageLast; }
+function roleShortLabel(role: RoleKey) { return role === 'braqueur' ? 'braqueur' : role === 'plan_mule_recup' ? 'mule/récup' : 'otage'; }
+function otherRecent(row: RoleStats, role: RoleKey) { return role === 'braqueur' ? row.recentMule + row.recentHostage : role === 'plan_mule_recup' ? row.recentBraqueur + row.recentHostage : row.recentBraqueur + row.recentMule; }
 
 function buildRoleStats(runs: Run[], members: Array<{ id: string; label: string }>) {
   const rows = new Map<string, RoleStats>();
-  for (const member of members) rows.set(member.id, { memberId: member.id, name: member.label, total: 0, braqueur: 0, braqueurMoney: 0, braqueurLast: null, mule: 0, muleSuccess: 0, muleLast: null, hostage: 0, hostageLast: null });
+  const emptyStats = (memberId: string, name: string): RoleStats => ({ memberId, name, total: 0, braqueur: 0, braqueurMoney: 0, braqueurLast: null, mule: 0, muleSuccess: 0, muleLast: null, hostage: 0, hostageLast: null, recentBraqueur: 0, recentMule: 0, recentHostage: 0 });
+  for (const member of members) rows.set(member.id, emptyStats(member.id, member.label));
   for (const run of runs) {
     const braqueurs = (run.participants ?? []).filter((entry) => entry.role === 'braqueur');
     const braqueurShare = braqueurs.length > 0 ? Number(run.money_amount ?? 0) / braqueurs.length : 0;
+    const weight = recentWeight(run.created_at);
     for (const participant of run.participants ?? []) {
       const key = participant.id || participant.label;
-      const row = rows.get(key) ?? { memberId: key, name: participant.label, total: 0, braqueur: 0, braqueurMoney: 0, braqueurLast: null, mule: 0, muleSuccess: 0, muleLast: null, hostage: 0, hostageLast: null };
-      if (participant.role === 'braqueur') { row.braqueur += 1; row.braqueurMoney += braqueurShare; if (!row.braqueurLast || run.created_at > row.braqueurLast) row.braqueurLast = run.created_at; }
-      if (participant.role === 'plan_mule_recup') { row.mule += 1; if (isSuccess(run)) row.muleSuccess += 1; if (!row.muleLast || run.created_at > row.muleLast) row.muleLast = run.created_at; }
-      if (participant.role === 'otage_apporte') { row.hostage += 1; if (!row.hostageLast || run.created_at > row.hostageLast) row.hostageLast = run.created_at; }
+      const row = rows.get(key) ?? emptyStats(key, participant.label);
+      if (participant.role === 'braqueur') { row.braqueur += 1; row.recentBraqueur += weight; row.braqueurMoney += braqueurShare; if (!row.braqueurLast || run.created_at > row.braqueurLast) row.braqueurLast = run.created_at; }
+      if (participant.role === 'plan_mule_recup') { row.mule += 1; row.recentMule += weight; if (isSuccess(run)) row.muleSuccess += 1; if (!row.muleLast || run.created_at > row.muleLast) row.muleLast = run.created_at; }
+      if (participant.role === 'otage_apporte') { row.hostage += 1; row.recentHostage += weight; if (!row.hostageLast || run.created_at > row.hostageLast) row.hostageLast = run.created_at; }
       if (participant.role === 'braqueur' || participant.role === 'plan_mule_recup' || participant.role === 'otage_apporte') row.total += 1;
       rows.set(key, row);
     }
@@ -56,13 +65,50 @@ function buildRoleStats(runs: Run[], members: Array<{ id: string; label: string 
   return Array.from(rows.values());
 }
 
+function rotationScore(row: RoleStats, role: RoleKey) {
+  const targetCount = roleCount(row, role);
+  const recentTarget = roleRecent(row, role);
+  const idleBonus = Math.min(26, ageDays(roleLast(row, role)) / 3);
+  const lowRoleBonus = Math.max(0, 4 - targetCount) * 7;
+  const helpBonus = Math.min(24, otherRecent(row, role) * (role === 'braqueur' ? 7 : 4));
+  const participationBonus = Math.min(12, Math.max(0, row.total - targetCount) * 1.8);
+  let score = 55 + idleBonus + lowRoleBonus + helpBonus + participationBonus - recentTarget * 18 - targetCount * 2.5;
+  if (role === 'braqueur') score += row.recentMule * 6 + row.recentHostage * 5 - row.recentBraqueur * 7;
+  if (role === 'plan_mule_recup') score += (row.recentBraqueur + row.recentHostage) * 3 - row.recentMule * 7;
+  if (role === 'otage_apporte') score += (row.recentBraqueur + row.recentMule) * 3 - row.recentHostage * 7;
+  return score;
+}
+
+function rotationReason(row: RoleStats, role: RoleKey, score: number) {
+  const label = roleShortLabel(role);
+  const targetCount = roleCount(row, role);
+  const recentTarget = roleRecent(row, role);
+  const other = otherRecent(row, role);
+  const days = ageDays(roleLast(row, role));
+  if (role === 'braqueur' && row.recentBraqueur < 0.5 && row.recentMule + row.recentHostage >= 1) {
+    return `${row.name} monte en braqueur: il a aidé récemment en mule/récup ou otage sans prendre le rôle principal.`;
+  }
+  if (recentTarget >= 2) {
+    return `${row.name} reste dans la liste avec ${Math.round(score)} pts, mais son score est réduit car il a déjà tenu le rôle ${label} récemment.`;
+  }
+  if (targetCount === 0) {
+    return `${row.name} est prioritaire: aucun passage enregistré en ${label}, la rotation l’avantage.`;
+  }
+  if (days >= 21) {
+    return `${row.name} remonte en ${label}: son dernier passage date d’environ ${Math.round(days)} jours.`;
+  }
+  if (other >= 1.5) {
+    return `${row.name} est favorisé en ${label}: il a davantage aidé sur d’autres rôles que sur celui-ci.`;
+  }
+  return `${row.name} ressort en ${label} grâce à un équilibre faible volume, participation et ancienneté du rôle.`;
+}
+
 function suggest(rows: RoleStats[], role: RoleKey): Suggestion['names'] {
-  const roleCount = (row: RoleStats) => role === 'braqueur' ? row.braqueur : role === 'plan_mule_recup' ? row.mule : row.hostage;
-  const roleLast = (row: RoleStats) => role === 'braqueur' ? row.braqueurLast : role === 'plan_mule_recup' ? row.muleLast : row.hostageLast;
   return [...rows]
-    .sort((a, b) => roleCount(a) - roleCount(b) || lastTime(roleLast(a)) - lastTime(roleLast(b)) || a.total - b.total || a.name.localeCompare(b.name, 'fr'))
+    .map((row) => ({ row, score: rotationScore(row, role) }))
+    .sort((a, b) => b.score - a.score || lastTime(roleLast(a.row, role)) - lastTime(roleLast(b.row, role)) || a.row.total - b.row.total || a.row.name.localeCompare(b.row.name, 'fr'))
     .slice(0, 3)
-    .map((row) => ({ name: row.name, reason: `${row.name} est conseillé en ${role === 'braqueur' ? 'braqueur' : role === 'plan_mule_recup' ? 'mule/récup' : 'otage'} car il a peu tenu ce rôle récemment.` }));
+    .map(({ row, score }) => ({ name: row.name, score: Math.round(score), reason: rotationReason(row, role, score) }));
 }
 
 export function RobberiesPageClient({ runs, items, members, canCreate, canArrested, canStats, canLogs, stats, playerStats }: {
@@ -154,7 +200,7 @@ function ArrestedBox(props: { lostMoney: number; setLostMoney: (v: number) => vo
   return <div className="space-y-3 rounded-xl border border-rose-200/20 bg-rose-500/10 p-4"><p className="text-sm font-semibold text-[#ffe8ca]">Braquage arrêté</p><label className="text-xs text-[#efcdab]">Argent perdu / saisi</label><input className="saas-input" value={props.lostMoney} onChange={(event) => props.setLostMoney(Math.max(0, Number(event.target.value || 0)))} /><label className="text-xs text-[#efcdab]">Ressources saisies (stock)</label><div className="grid gap-2 md:grid-cols-[1fr_10rem]"><input className="saas-input" placeholder="Recherche item" value={props.seizedQuery} onChange={(e) => props.setSeizedQuery(e.target.value)} /><select className="saas-input" value={props.seizedCategory} onChange={(e) => props.setSeizedCategory(e.target.value)}><option value="all">Toutes catégories</option><option value="objects">Objets</option><option value="equipment">Équipement</option><option value="drugs">Drogues</option></select></div><div className="max-h-52 space-y-1 overflow-auto rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">{props.filteredItems.map((item) => { const selectedQty = props.seizedRowsById.get(item.id) ?? 0; return <div key={item.id} className="grid grid-cols-[2.2rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-white/10 bg-[#4f3220]/45 px-2 py-1.5"><div className="h-8 w-8 overflow-hidden rounded-md border border-white/10 bg-[#1f120d]">{item.image_url ? <Image src={item.image_url} alt={item.name} width={32} height={32} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-[10px]">📦</div>}</div><div className="min-w-0"><p className="truncate text-xs font-semibold text-[#ffe8ca]">{item.name}</p><p className="text-[10px] text-[#efcdab]">{item.category_key || 'stock'} · Dispo {item.quantity}</p></div><div className="flex items-center gap-1"><button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0" onClick={() => props.setSeizedRows((cur) => { const current = cur.find((row) => row.item_id === item.id); if (!current) return cur; if (current.quantity <= 1) return cur.filter((row) => row.item_id !== item.id); return cur.map((row) => row.item_id === item.id ? { ...row, quantity: row.quantity - 1 } : row); })}>−</button><span className="w-6 text-center text-xs text-[#ffe8ca]">{selectedQty}</span><button type="button" className="saas-ghost-btn !h-7 !min-h-7 !px-2 !py-0" onClick={() => props.setSeizedRows((cur) => { const current = cur.find((row) => row.item_id === item.id); if (!current) return [...cur, { item_id: item.id, quantity: 1 }]; if (current.quantity >= Number(item.quantity)) return cur; return cur.map((row) => row.item_id === item.id ? { ...row, quantity: row.quantity + 1 } : row); })}>+</button></div></div>; })}</div><label className="text-xs text-[#efcdab]">Note (optionnelle)</label><textarea className="saas-input h-20" value={props.seizedNote} onChange={(e) => props.setSeizedNote(e.target.value)} /><button type="button" className="saas-primary-btn w-full" onClick={() => void props.submit()}>Valider braquage arrêté</button></div>;
 }
 
-function RotationSuggestions({ suggestions }: { suggestions: Suggestion[] }) { return <section className="glass-card p-5"><h3 className="text-base font-semibold text-[#fff1dd]">🔁 Suggestion de rotation</h3><div className="mt-3 grid gap-3 lg:grid-cols-3">{suggestions.map((block) => <article key={block.title} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3"><p className="font-semibold text-[#ffe8ca]">{block.icon} {block.title}</p><div className="mt-2 space-y-2">{block.names.map((entry) => <div key={`${block.title}-${entry.name}`} className="rounded-lg border border-white/10 bg-[#2f1d14]/55 p-2 text-xs text-[#efcdab]"><p className="font-semibold text-[#ffe8ca]">{entry.name}</p><p>{entry.reason}</p></div>)}</div></article>)}</div></section>; }
+function RotationSuggestions({ suggestions }: { suggestions: Suggestion[] }) { return <section className="glass-card p-5"><h3 className="text-base font-semibold text-[#fff1dd]">🔁 Suggestion de rotation</h3><div className="mt-3 grid gap-3 lg:grid-cols-3">{suggestions.map((block) => <article key={block.title} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3"><p className="font-semibold text-[#ffe8ca]">{block.icon} {block.title}</p><div className="mt-2 space-y-2">{block.names.map((entry) => <div key={`${block.title}-${entry.name}`} className="rounded-lg border border-white/10 bg-[#2f1d14]/55 p-2 text-xs text-[#efcdab]"><div className="flex items-center justify-between gap-2"><p className="font-semibold text-[#ffe8ca]">{entry.name}</p><span className="rounded-full border border-amber-200/20 bg-amber-500/10 px-2 py-0.5 text-[10px] text-[#ffe8ca]">{entry.score} pts</span></div><p className="mt-1">{entry.reason}</p></div>)}</div></article>)}</div></section>; }
 
 function RoleRanking({ title, icon, rows, role }: { title: string; icon: string; rows: RoleStats[]; role: RoleKey }) {
   const sorted = [...rows].filter((row) => role === 'braqueur' ? row.braqueur > 0 : role === 'plan_mule_recup' ? row.mule > 0 : row.hostage > 0).sort((a, b) => role === 'braqueur' ? b.braqueur - a.braqueur || b.braqueurMoney - a.braqueurMoney : role === 'plan_mule_recup' ? b.mule - a.mule || b.muleSuccess - a.muleSuccess : b.hostage - a.hostage);
