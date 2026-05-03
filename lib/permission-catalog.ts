@@ -1,4 +1,4 @@
-export const MODULE_ORDER = ['Dashboard', 'Argent', 'Vente objets', 'Items', 'Transactions', 'Transactions recentes', 'Activite', 'Activites & Payes', 'FOUR', 'Drogues', 'Braquage', 'Travail', 'Membres', 'Logs', 'Compte', 'Autres'] as const;
+export const MODULE_ORDER = ['Dashboard', 'Argent', 'Vente objets', 'Items', 'Transactions', 'Transactions recentes', 'Activite', 'Activites & Payes', 'FOUR', 'Drogues', 'Braquage', 'Travail', 'Membres', 'Roles', 'Logs', 'Compte', 'Autres'] as const;
 
 export const SECTION_ORDER = ['Vue', 'Historique', 'Mouvements', 'Vente objets', 'Creation', 'Passages', 'Modification / Annulation', 'Sessions', 'Transactions', 'Messages', 'Stats', 'Logs', 'Securite', 'Gestion', 'Technique'] as const;
 
@@ -31,8 +31,8 @@ const EXACT: Record<string, PermissionInfo> = {
   'members.access': { module: 'Membres', section: 'Vue', label: 'Acceder a Membres', hint: 'Permet d ouvrir le module Membres.' },
   'members.preview': { module: 'Membres', section: 'Vue', label: 'Voir la bulle Membres', hint: 'Permet d afficher la bulle Membres.' },
   'members.view': { module: 'Membres', section: 'Vue', label: 'Voir les membres', hint: 'Permet de consulter les membres.' },
-  'roles.manage': { module: 'Membres', section: 'Gestion', label: 'Gerer roles et permissions', hint: 'Permet de gerer les roles et permissions.' },
-  'roles.rename': { module: 'Membres', section: 'Gestion', label: 'Renommer un role', hint: 'Permet de modifier le nom d un role existant.' },
+  'roles.manage': { module: 'Roles', section: 'Gestion', label: 'Gerer roles et permissions', hint: 'Permet de gerer les roles et permissions.' },
+  'roles.rename': { module: 'Roles', section: 'Gestion', label: 'Renommer un role', hint: 'Permet de modifier le nom d un role existant.' },
   'robberies.view': { module: 'Braquage', section: 'Vue', label: 'Voir le module Braquage', hint: 'Permet d afficher la page Braquage.' },
   'robberies.create': { module: 'Braquage', section: 'Creation', label: 'Creer un braquage', hint: 'Permet de valider un braquage.' },
   'robberies.arrested': { module: 'Braquage', section: 'Creation', label: 'Declarer un braquage arrete', hint: 'Permet de valider un braquage arrete.' },
@@ -45,7 +45,7 @@ const EXACT: Record<string, PermissionInfo> = {
 };
 
 const PREFIX_MODULES: Array<[string, string]> = [
-  ['dashboard.', 'Dashboard'], ['money.', 'Argent'], ['payroll.', 'Argent'], ['sale.objects.', 'Vente objets'], ['sale_objects.', 'Vente objets'], ['items.', 'Items'], ['transactions.recent.', 'Transactions recentes'], ['transactions.', 'Transactions'], ['activity_payroll.', 'Activites & Payes'], ['activity.', 'Activite'], ['four.', 'FOUR'], ['drugs.', 'Drogues'], ['robberies.', 'Braquage'], ['tablet.', 'Travail'], ['cigarette.', 'Travail'], ['tobacco.processor.', 'Travail'], ['members.', 'Membres'], ['roles.', 'Membres'], ['logs.', 'Logs'], ['account.', 'Compte']
+  ['dashboard.', 'Dashboard'], ['money.', 'Argent'], ['payroll.', 'Argent'], ['sale.objects.', 'Vente objets'], ['sale_objects.', 'Vente objets'], ['items.', 'Items'], ['transactions.recent.', 'Transactions recentes'], ['transactions.', 'Transactions'], ['activity_payroll.', 'Activites & Payes'], ['activity.', 'Activite'], ['four.', 'FOUR'], ['drugs.', 'Drogues'], ['robberies.', 'Braquage'], ['tablet.', 'Travail'], ['cigarette.', 'Travail'], ['tobacco.processor.', 'Travail'], ['members.', 'Membres'], ['roles.', 'Roles'], ['logs.', 'Logs'], ['account.', 'Compte']
 ];
 
 function humanize(name: string) {
