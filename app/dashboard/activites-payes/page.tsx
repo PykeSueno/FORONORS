@@ -56,6 +56,7 @@ export default async function ActivityPayrollPage() {
   const has = (permission: string) => permissions.includes(permission);
   if (!has('activity_payroll.view')) redirect('/dashboard');
 
+  const canGlobal = has('activity_payroll.global.view');
   const canActivities = has('activity_payroll.activities.view');
   const canPayroll = has('activity_payroll.payroll.view');
   const canConfigure = has('activity_payroll.payroll.configure');
@@ -80,7 +81,7 @@ export default async function ActivityPayrollPage() {
     periodState(supabase, current.startIso, current.endIso),
     periodState(supabase, previous.startIso, previous.endIso),
     periodState(supabase, customStart, customEnd),
-    canActivities || canHistory ? getMemberActivities(supabase, { startIso: activityStart.toISOString(), endIso: now.toISOString(), limit: 1500 }) : Promise.resolve([]),
+    canActivities || canGlobal || canHistory ? getMemberActivities(supabase, { startIso: activityStart.toISOString(), endIso: now.toISOString(), limit: 1500 }) : Promise.resolve([]),
     canHistory ? supabase.from('activity_payroll_payments').select('id, week_start, week_end, member_user_id, member_label, amount, paid_by, group_balance_before, group_balance_after, created_at').order('created_at', { ascending: false }).limit(120) : Promise.resolve({ data: [] }),
     canLogs ? supabase.from('audit_logs').select('id, action, summary, actor_name, entity_id, old_values, new_values, created_at').in('action', ['activity_payroll_config_updated', 'activity_payroll_member_paid', 'activity_payroll_member_adjusted', 'activity_payroll_member_excluded']).order('created_at', { ascending: false }).limit(200) : Promise.resolve({ data: [] })
   ]);
@@ -121,7 +122,7 @@ export default async function ActivityPayrollPage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Activités & Payes" subtitle="Suivi business, activité membre et paiement" />
+      <InternalPageHeader title="Activites & Payes" subtitle="Suivi business, activite membre et paiement" />
       <ActivityPayrollHubClient
         members={members}
         activities={activities}
@@ -135,6 +136,7 @@ export default async function ActivityPayrollPage() {
         initialExcludedIds={currentState.excluded}
         history={(historyRes.data ?? []) as HistoryPayment[]}
         logs={(logsRes.data ?? []) as AuditRow[]}
+        canGlobal={canGlobal}
         canActivities={canActivities}
         canPayroll={canPayroll}
         canConfigure={canConfigure}
