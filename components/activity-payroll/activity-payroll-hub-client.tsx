@@ -3,24 +3,43 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { formatUsd } from '@/lib/currency';
-import type { PayrollMemberRow } from '@/lib/payroll';
+import type { PayrollConfig, PayrollMemberRow, PayrollPreview } from '@/lib/payroll';
 import type { MemberActivityRow } from '@/lib/payroll-service';
 
 type Tab = 'global' | 'activities' | 'payroll' | 'history' | 'logs';
 type MemberSummary = { id: string; name: string; username: string; isActive: boolean; moneyGenerated: number; activityCount: number; proposedPay: number; lastActivity: string | null };
-type HistoryRow = { id: number; action: string; summary: string; actor_name: string | null; entity_id: string | null; old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null; created_at: string };
+type HistoryPayment = { id: number; week_start: string; week_end: string; member_user_id: string | null; member_label: string; amount: number; paid_by: string | null; group_balance_before: number; group_balance_after: number; created_at: string };
+type LogRow = { id: number; action: string; summary: string; actor_name: string | null; entity_id: string | null; old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null; created_at: string };
+
+type ApiPayload = {
+  selected?: PayrollPreview;
+  previous?: PayrollPreview;
+  state?: { paid: Record<string, number>; adjustments: Record<string, number>; excluded: string[] };
+  history?: HistoryPayment[];
+  logs?: LogRow[];
+  config?: PayrollConfig;
+  message?: string;
+};
 
 type Props = {
   members: MemberSummary[];
-  payrollRows: PayrollMemberRow[];
   activities: MemberActivityRow[];
-  history: HistoryRow[];
-  logs: HistoryRow[];
-  period: { startIso: string; endIso: string; previousStartIso: string; previousEndIso: string };
-  paidMembers: Record<string, number>;
+  currentPreview: PayrollPreview;
+  previousPreview: PayrollPreview;
+  customPreview: PayrollPreview;
+  customDefaultStart: string;
+  customDefaultEnd: string;
+  initialPaidMembers: Record<string, number>;
+  initialAdjustments: Record<string, number>;
+  initialExcludedIds: string[];
+  history: HistoryPayment[];
+  logs: LogRow[];
   canActivities: boolean;
   canPayroll: boolean;
+  canConfigure: boolean;
   canPay: boolean;
+  canAdjust: boolean;
+  canExclude: boolean;
   canHistory: boolean;
   canLogs: boolean;
 };
@@ -29,64 +48,124 @@ export function ActivityPayrollHubClient(props: Props) {
   const [tab, setTab] = useState<Tab>('global');
   const [memberFilter, setMemberFilter] = useState('all');
   const [moduleFilter, setModuleFilter] = useState('all');
-  const [periodFilter, setPeriodFilter] = useState<'all' | 'current' | 'previous'>('current');
+  const [activityPeriodFilter, setActivityPeriodFilter] = useState<'all' | 'current' | 'previous'>('current');
   const [dateFilter, setDateFilter] = useState('');
-  const [paidMembers, setPaidMembers] = useState(props.paidMembers);
+  const [periodMode, setPeriodMode] = useState<'current' | 'previous' | 'custom'>('current');
+  const [customStart, setCustomStart] = useState(props.customDefaultStart.slice(0, 16));
+  const [customEnd, setCustomEnd] = useState(props.customDefaultEnd.slice(0, 16));
+  const [selectedPreview, setSelectedPreview] = useState<PayrollPreview>(props.currentPreview);
+  const [previousPreview, setPreviousPreview] = useState<PayrollPreview>(props.previousPreview);
+  const [config, setConfig] = useState<PayrollConfig>(props.currentPreview.config);
+  const [paidMembers, setPaidMembers] = useState(props.initialPaidMembers);
+  const [adjustments, setAdjustments] = useState(props.initialAdjustments);
+  const [excludedIds, setExcludedIds] = useState(props.initialExcludedIds);
+  const [history, setHistory] = useState(props.history);
+  const [logs, setLogs] = useState(props.logs);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   const modules = useMemo(() => Array.from(new Set(props.activities.map((row) => row.module))).sort((a, b) => a.localeCompare(b, 'fr')), [props.activities]);
+  const previousRange = { startIso: props.previousPreview.weekStartIso, endIso: props.previousPreview.weekEndIso };
+  const selectedRange = { startIso: selectedPreview.weekStartIso, endIso: selectedPreview.weekEndIso };
+
   const filteredActivities = useMemo(() => props.activities.filter((row) => {
     if (memberFilter !== 'all' && !row.memberIds.includes(memberFilter)) return false;
     if (moduleFilter !== 'all' && row.module !== moduleFilter) return false;
     if (dateFilter && row.date.slice(0, 10) !== dateFilter) return false;
-    if (periodFilter === 'current' && !(row.date >= props.period.startIso && row.date < props.period.endIso)) return false;
-    if (periodFilter === 'previous' && !(row.date >= props.period.previousStartIso && row.date < props.period.previousEndIso)) return false;
+    if (activityPeriodFilter === 'current' && !(row.date >= props.currentPreview.weekStartIso && row.date < props.currentPreview.weekEndIso)) return false;
+    if (activityPeriodFilter === 'previous' && !(row.date >= previousRange.startIso && row.date < previousRange.endIso)) return false;
     return true;
-  }), [dateFilter, memberFilter, moduleFilter, periodFilter, props.activities, props.period]);
+  }), [activityPeriodFilter, dateFilter, memberFilter, moduleFilter, previousRange.endIso, previousRange.startIso, props.activities, props.currentPreview.weekEndIso, props.currentPreview.weekStartIso]);
 
-  const totals = useMemo(() => ({
+  const paidTotal = useMemo(() => Object.values(paidMembers).reduce((sum, amount) => sum + Number(amount || 0), 0), [paidMembers]);
+  const overviewTotals = useMemo(() => ({
     money: props.members.reduce((sum, member) => sum + member.moneyGenerated, 0),
     activities: props.members.reduce((sum, member) => sum + member.activityCount, 0),
-    payroll: props.payrollRows.reduce((sum, row) => sum + (row.eligible ? Number(row.proposedPay || 0) : 0), 0),
-    paid: Object.values(paidMembers).reduce((sum, amount) => sum + Number(amount || 0), 0)
-  }), [paidMembers, props.members, props.payrollRows]);
+    payroll: selectedPreview.totalProposed,
+    paid: paidTotal
+  }), [paidTotal, props.members, selectedPreview.totalProposed]);
 
-  function switchToMember(memberId: string) {
-    setMemberFilter(memberId);
-    setTab(props.canActivities ? 'activities' : 'global');
-  }
+  const effectivePreview = useMemo(() => recomputePreview(selectedPreview, config, excludedIds, adjustments), [adjustments, config, excludedIds, selectedPreview]);
 
-  async function pay(row: PayrollMemberRow) {
+  async function loadPeriod(nextMode: 'current' | 'previous' | 'custom', start = customStart, end = customEnd) {
     setError('');
     setMessage('');
+    const query = nextMode === 'custom'
+      ? `/api/activity-payroll/payroll?period=custom&start=${encodeURIComponent(new Date(start).toISOString())}&end=${encodeURIComponent(new Date(end).toISOString())}`
+      : `/api/activity-payroll/payroll?period=${nextMode}`;
+    const response = await fetch(query, { cache: 'no-store' });
+    const payload = await response.json().catch(() => ({} as ApiPayload));
+    if (!response.ok || !payload.selected || !payload.state) {
+      setError(payload.message ?? 'Chargement impossible.');
+      return;
+    }
+    setPeriodMode(nextMode);
+    setSelectedPreview(payload.selected);
+    if (payload.previous) setPreviousPreview(payload.previous);
+    setConfig(payload.selected.config);
+    setPaidMembers(payload.state.paid ?? {});
+    setAdjustments(payload.state.adjustments ?? {});
+    setExcludedIds(payload.state.excluded ?? []);
+    if (payload.history) setHistory(payload.history);
+    if (payload.logs) setLogs(payload.logs);
+  }
+
+  async function saveConfig() {
+    if (!props.canConfigure) return;
+    setSaving(true);
+    setError('');
+    setMessage('');
+    const response = await fetch('/api/activity-payroll/payroll', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config }) });
+    const payload = await response.json().catch(() => ({} as ApiPayload));
+    setSaving(false);
+    if (!response.ok) {
+      setError(payload.message ?? 'Sauvegarde impossible.');
+      return;
+    }
+    if (payload.config) setConfig(payload.config);
+    setMessage('Réglages enregistrés.');
+  }
+
+  async function payrollAction(action: 'pay' | 'adjust' | 'exclude', row: PayrollMemberRow, enabled = true) {
+    setError('');
+    setMessage('');
+    const amount = action === 'adjust' ? Number(adjustments[row.memberId] ?? row.proposedPay ?? 0) : Number(row.proposedPay ?? 0);
     const response = await fetch('/api/activity-payroll/payroll', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        week_start_iso: props.period.startIso,
-        week_end_iso: props.period.endIso,
-        member_id: row.memberId,
-        member_label: row.memberLabel,
-        amount: row.proposedPay
-      })
+      body: JSON.stringify({ action, week_start_iso: selectedPreview.weekStartIso, week_end_iso: selectedPreview.weekEndIso, member_id: row.memberId, member_label: row.memberLabel, amount, enabled })
     });
-    const payload = await response.json().catch(() => ({} as { message?: string; paid?: Record<string, number> }));
+    const payload = await response.json().catch(() => ({} as ApiPayload));
     if (!response.ok) {
-      setError(payload.message ?? 'Paiement impossible.');
+      setError(payload.message ?? 'Action impossible.');
       return;
     }
-    if (payload.paid) setPaidMembers(payload.paid);
-    setMessage('Paye versée.');
+    if (action === 'pay' && payload.state?.paid) setPaidMembers(payload.state.paid);
+    if (payload.state?.adjustments) setAdjustments(payload.state.adjustments);
+    if (payload.state?.excluded) setExcludedIds(payload.state.excluded);
+    if ('paid' in payload) setPaidMembers((payload as unknown as { paid: Record<string, number> }).paid);
+    if ('adjustments' in payload) setAdjustments((payload as unknown as { adjustments: Record<string, number> }).adjustments);
+    if ('excluded' in payload) setExcludedIds((payload as unknown as { excluded: string[] }).excluded);
+    setMessage(action === 'pay' ? 'Membre payé.' : action === 'adjust' ? 'Ajustement enregistré.' : enabled ? 'Membre exclu.' : 'Membre réinclus.');
+  }
+
+  function updateAdjustment(memberId: string, amount: number) {
+    setAdjustments((cur) => ({ ...cur, [memberId]: Math.max(0, Math.round(amount)) }));
+  }
+
+  function showMember(memberId: string) {
+    setMemberFilter(memberId);
+    setTab(props.canActivities ? 'activities' : 'global');
   }
 
   return (
     <div className="space-y-4">
       <section className="grid gap-2 md:grid-cols-4">
-        <Metric label="Argent généré" value={formatUsd(totals.money)} />
-        <Metric label="Activités" value={String(totals.activities)} />
-        <Metric label="Paye estimée" value={formatUsd(totals.payroll)} />
-        <Metric label="Déjà payé" value={formatUsd(totals.paid)} />
+        <Metric icon="💵" label="Argent généré" value={formatUsd(overviewTotals.money)} />
+        <Metric icon="🎯" label="Activités" value={String(overviewTotals.activities)} />
+        <Metric icon="🏦" label="Paye estimée" value={formatUsd(overviewTotals.payroll)} />
+        <Metric icon="✅" label="Déjà payé" value={formatUsd(overviewTotals.paid)} />
       </section>
 
       <section className="glass-card p-3"><div className="flex flex-wrap gap-2">
@@ -100,36 +179,73 @@ export function ActivityPayrollHubClient(props: Props) {
       {message ? <p className="rounded-lg border border-emerald-300/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">{message}</p> : null}
       {error ? <p className="rounded-lg border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
 
-      {tab === 'global' ? <section className="glass-card p-4">
-        <div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-base font-semibold text-[#fff1dd]">Par membre</h2><span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">{props.members.length} membres</span></div>
-        <div className="grid gap-2 xl:grid-cols-2">{props.members.map((member) => <article key={member.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3"><div className="grid gap-3 sm:grid-cols-[1.2fr_repeat(4,minmax(0,1fr))_auto] sm:items-center"><div><p className="font-semibold text-[#ffe8ca]">{member.name || member.username}</p><p className="text-xs text-[#efcdab]">{member.isActive ? 'Actif' : 'Inactif'}</p></div><Mini label="Argent" value={formatUsd(member.moneyGenerated)} /><Mini label="Activités" value={String(member.activityCount)} /><Mini label="Paye" value={formatUsd(member.proposedPay)} /><Mini label="Dernière" value={member.lastActivity ? new Date(member.lastActivity).toLocaleDateString('fr-FR') : '-'} /><button className="saas-primary-btn !h-9 whitespace-nowrap px-3" onClick={() => switchToMember(member.id)}>Voir détail</button></div></article>)}</div>
-      </section> : null}
-
-      {tab === 'activities' && props.canActivities ? <section className="glass-card p-4">
-        <div className="mb-3 grid gap-2 lg:grid-cols-4"><select className="saas-input !h-10" value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)}><option value="all">Tous les membres</option>{props.members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select><select className="saas-input !h-10" value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}><option value="all">Tous les modules</option>{modules.map((module) => <option key={module} value={module}>{module}</option>)}</select><select className="saas-input !h-10" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value as 'all' | 'current' | 'previous')}><option value="current">Semaine actuelle</option><option value="previous">Semaine passée</option><option value="all">Tout</option></select><input className="saas-input !h-10" type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} /></div>
-        <div className="max-h-[620px] overflow-auto pr-1"><table className="min-w-full text-left text-xs text-[#efcdab]"><thead className="sticky top-0 bg-[#2b1a12] text-[#ffe8ca]"><tr><th className="px-2 py-2">Date</th><th className="px-2 py-2">Membre</th><th className="px-2 py-2">Module</th><th className="px-2 py-2">Action</th><th className="px-2 py-2">Argent</th><th className="px-2 py-2">Participation</th><th className="px-2 py-2">Détails</th></tr></thead><tbody>{filteredActivities.map((row) => <tr key={row.id} className="border-t border-white/10"><td className="whitespace-nowrap px-2 py-2">{new Date(row.date).toLocaleString('fr-FR')}</td><td className="px-2 py-2 text-[#ffe8ca]">{row.memberLabels.join(', ') || '-'}</td><td className="px-2 py-2">{row.module}</td><td className="px-2 py-2">{row.action}</td><td className="px-2 py-2 font-semibold text-[#ffe8ca]">{formatUsd(row.moneyGenerated)}</td><td className="px-2 py-2">{row.participation}</td><td className="px-2 py-2">{row.details || '-'}</td></tr>)}</tbody></table>{filteredActivities.length === 0 ? <p className="p-3 text-xs text-[#efcdab]">Aucune activité.</p> : null}</div>
-      </section> : null}
-
-      {tab === 'payroll' && props.canPayroll ? <section className="glass-card p-4"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-base font-semibold text-[#fff1dd]">Payes</h2><span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">Paiement membre par membre</span></div><div className="space-y-2">{props.payrollRows.map((row) => { const isPaid = Boolean(paidMembers[row.memberId]); return <article key={row.memberId} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]"><div className="grid gap-2 xl:grid-cols-[1.2fr_repeat(5,minmax(0,1fr))_auto] xl:items-center"><div><p className="font-semibold text-[#ffe8ca]">{row.memberLabel}</p><p>{isPaid ? 'Payé' : row.eligible ? 'À payer' : 'Non éligible'}</p></div><Mini label="Rapporté" value={formatUsd(row.moneyContribution)} /><Mini label="Actions" value={String(row.activityCount)} /><Mini label="Implication" value={String(row.participationCount)} /><Mini label="Score" value={row.totalScore.toFixed(2)} /><Mini label="Paye" value={formatUsd(row.proposedPay)} />{props.canPay ? <button className="saas-primary-btn !h-9 px-3" disabled={isPaid || !row.eligible || row.proposedPay <= 0} onClick={() => void pay(row)}>{isPaid ? 'Payé' : 'Payer'}</button> : null}</div></article>; })}</div></section> : null}
-
-      {tab === 'history' && props.canHistory ? <List title="Historique" rows={props.history} /> : null}
-      {tab === 'logs' && props.canLogs ? <List title="Logs" rows={props.logs} verbose /> : null}
+      {tab === 'global' ? <GlobalView members={props.members} onDetail={showMember} /> : null}
+      {tab === 'activities' && props.canActivities ? <ActivitiesView activities={filteredActivities} members={props.members} modules={modules} memberFilter={memberFilter} moduleFilter={moduleFilter} periodFilter={activityPeriodFilter} dateFilter={dateFilter} setMemberFilter={setMemberFilter} setModuleFilter={setModuleFilter} setPeriodFilter={setActivityPeriodFilter} setDateFilter={setDateFilter} /> : null}
+      {tab === 'payroll' && props.canPayroll ? <PayrollView canAdjust={props.canAdjust} canConfigure={props.canConfigure} canExclude={props.canExclude} canPay={props.canPay} config={config} customEnd={customEnd} customStart={customStart} effectivePreview={effectivePreview} excludedIds={excludedIds} paidMembers={paidMembers} paidTotal={paidTotal} periodMode={periodMode} previousPreview={previousPreview} saving={saving} selectedRange={selectedRange} setConfig={setConfig} setCustomEnd={setCustomEnd} setCustomStart={setCustomStart} adjustments={adjustments} updateAdjustment={updateAdjustment} loadPeriod={loadPeriod} payrollAction={payrollAction} saveConfig={saveConfig} /> : null}
+      {tab === 'history' && props.canHistory ? <HistoryView rows={history} /> : null}
+      {tab === 'logs' && props.canLogs ? <LogsView rows={logs} /> : null}
     </div>
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return <button type="button" className={`filter-pill ${active ? 'filter-pill-active' : ''}`} onClick={onClick}>{children}</button>;
+function recomputePreview(preview: PayrollPreview, cfg: PayrollConfig, excluded: string[], adjustments: Record<string, number>): PayrollPreview {
+  const maxMoney = Math.max(1, ...preview.members.map((row) => Number(row.moneyContribution ?? 0)));
+  const maxActivity = Math.max(1, ...preview.members.map((row) => Number(row.activityCount ?? 0)));
+  const maxParticipation = Math.max(1, ...preview.members.map((row) => Number(row.participationCount ?? 0)));
+  const excludedSet = new Set(excluded);
+  const rows = preview.members.map((row) => {
+    const hasEligibilitySignal = Number(row.activityCount ?? 0) >= cfg.minActions || Number(row.moneyContribution ?? 0) >= cfg.minMoney;
+    const excludedMember = excludedSet.has(row.memberId);
+    const eligible = Boolean(row.isActive) && hasEligibilitySignal && !excludedMember;
+    const moneyScore = Number(row.moneyContribution ?? 0) / maxMoney;
+    const activityScore = Number(row.activityCount ?? 0) / maxActivity;
+    const participationScore = Number(row.participationCount ?? 0) / maxParticipation;
+    return { ...row, eligible, reason: excludedMember ? 'Exclu manuellement' : eligible ? 'Éligible' : row.reason, moneyScore, activityScore, participationScore, totalScore: eligible ? (moneyScore * cfg.weights.money) + (activityScore * cfg.weights.activity) + (participationScore * cfg.weights.participation) : 0, proposedPay: 0 };
+  });
+  const eligibleRows = rows.filter((row) => row.eligible);
+  const totalScore = eligibleRows.reduce((sum, row) => sum + row.totalScore, 0);
+  if (preview.envelope > 0 && totalScore > 0) {
+    for (const row of eligibleRows) row.proposedPay = Math.min(cfg.memberCap, Math.max(cfg.memberMinimum, Math.round(preview.envelope * (row.totalScore / totalScore))));
+    const total = eligibleRows.reduce((sum, row) => sum + row.proposedPay, 0);
+    if (total > preview.envelope && total > 0) {
+      const scale = preview.envelope / total;
+      for (const row of eligibleRows) row.proposedPay = Math.max(0, Math.round(row.proposedPay * scale));
+    }
+  }
+  for (const row of rows) {
+    const adjusted = Number(adjustments[row.memberId]);
+    if (row.eligible && Number.isFinite(adjusted) && adjusted >= 0) row.proposedPay = Math.min(cfg.memberCap, Math.round(adjusted));
+  }
+  const totalProposed = rows.reduce((sum, row) => sum + (row.eligible ? row.proposedPay : 0), 0);
+  return { ...preview, config: cfg, members: rows, totalProposed, balanceAfter: preview.balance - totalProposed, eligibleCount: rows.filter((row) => row.eligible).length, ineligibleCount: rows.filter((row) => !row.eligible).length };
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3"><p className="text-xs text-[#efcdab]">{label}</p><p className="text-lg font-semibold text-[#ffe8ca]">{value}</p></article>;
+function GlobalView({ members, onDetail }: { members: MemberSummary[]; onDetail: (memberId: string) => void }) {
+  return <section className="glass-card p-4"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-base font-semibold text-[#fff1dd]">👤 Par membre</h2><span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">{members.length} membres</span></div><div className="grid gap-2 xl:grid-cols-2">{members.map((member) => <article key={member.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3"><div className="grid gap-3 sm:grid-cols-[1.2fr_repeat(4,minmax(0,1fr))_auto] sm:items-center"><div><p className="font-semibold text-[#ffe8ca]">{member.name || member.username}</p><p className="text-xs text-[#efcdab]">{member.isActive ? '🟢 Actif' : '⚪ Inactif'}</p></div><Mini label="Argent" value={formatUsd(member.moneyGenerated)} /><Mini label="Activités" value={String(member.activityCount)} /><Mini label="Paye" value={formatUsd(member.proposedPay)} /><Mini label="Dernière" value={member.lastActivity ? new Date(member.lastActivity).toLocaleDateString('fr-FR') : '-'} /><button className="saas-primary-btn !h-9 whitespace-nowrap px-3" onClick={() => onDetail(member.id)}>Voir détail</button></div></article>)}</div></section>;
 }
 
-function Mini({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-[11px] text-[#efcdab]">{label}</p><p className="font-semibold text-[#ffe8ca]">{value}</p></div>;
+function ActivitiesView({ activities, members, modules, memberFilter, moduleFilter, periodFilter, dateFilter, setMemberFilter, setModuleFilter, setPeriodFilter, setDateFilter }: { activities: MemberActivityRow[]; members: MemberSummary[]; modules: string[]; memberFilter: string; moduleFilter: string; periodFilter: 'all' | 'current' | 'previous'; dateFilter: string; setMemberFilter: (value: string) => void; setModuleFilter: (value: string) => void; setPeriodFilter: (value: 'all' | 'current' | 'previous') => void; setDateFilter: (value: string) => void }) {
+  return <section className="glass-card p-4"><div className="mb-3 grid gap-2 lg:grid-cols-4"><select className="saas-input !h-10" value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)}><option value="all">Tous les membres</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select><select className="saas-input !h-10" value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}><option value="all">Tous les modules</option>{modules.map((module) => <option key={module} value={module}>{module}</option>)}</select><select className="saas-input !h-10" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value as 'all' | 'current' | 'previous')}><option value="current">Semaine actuelle</option><option value="previous">Semaine passée</option><option value="all">Tout</option></select><input className="saas-input !h-10" type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} /></div><div className="max-h-[620px] overflow-auto pr-1"><table className="min-w-full text-left text-xs text-[#efcdab]"><thead className="sticky top-0 bg-[#2b1a12] text-[#ffe8ca]"><tr><th className="px-2 py-2">Date</th><th className="px-2 py-2">Membre</th><th className="px-2 py-2">Module</th><th className="px-2 py-2">Action</th><th className="px-2 py-2">Argent</th><th className="px-2 py-2">Participation</th><th className="px-2 py-2">Détails</th></tr></thead><tbody>{activities.map((row) => <tr key={row.id} className="border-t border-white/10"><td className="whitespace-nowrap px-2 py-2">{new Date(row.date).toLocaleString('fr-FR')}</td><td className="px-2 py-2 text-[#ffe8ca]">{row.memberLabels.join(', ') || '-'}</td><td className="px-2 py-2">{row.module}</td><td className="px-2 py-2">{row.action}</td><td className="px-2 py-2 font-semibold text-[#ffe8ca]">{formatUsd(row.moneyGenerated)}</td><td className="px-2 py-2">{row.participation}</td><td className="px-2 py-2">{row.details || '-'}</td></tr>)}</tbody></table>{activities.length === 0 ? <p className="p-3 text-xs text-[#efcdab]">Aucune activité.</p> : null}</div></section>;
 }
 
-function List({ title, rows, verbose }: { title: string; rows: HistoryRow[]; verbose?: boolean }) {
-  return <section className="glass-card p-4"><h2 className="mb-3 text-base font-semibold text-[#fff1dd]">{title}</h2><div className="max-h-[620px] space-y-2 overflow-auto pr-1">{rows.map((row) => { const amount = Number((row.new_values?.amount ?? row.new_values?.totalDistributed ?? row.new_values?.moneyAmount ?? 0) as number); return <article key={row.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-[#ffe8ca]">{row.action}</p><p>{new Date(row.created_at).toLocaleString('fr-FR')}</p></div><p className="mt-1">{row.summary}</p><p className="mt-1">Membre: {String(row.new_values?.memberLabel ?? row.entity_id ?? '-')} · Montant: {amount ? formatUsd(amount) : '-'}</p>{verbose ? <p className="mt-1">Utilisateur: {row.actor_name || '-'} · Avant/Après: {JSON.stringify(row.old_values ?? {})} → {JSON.stringify(row.new_values ?? {})}</p> : <p className="mt-1">Validé par: {row.actor_name || '-'}</p>}</article>; })}{rows.length === 0 ? <p className="text-xs text-[#efcdab]">Aucune entrée.</p> : null}</div></section>;
+function PayrollView({ canAdjust, canConfigure, canExclude, canPay, config, customEnd, customStart, effectivePreview, excludedIds, paidMembers, paidTotal, periodMode, previousPreview, saving, selectedRange, setConfig, setCustomEnd, setCustomStart, adjustments, updateAdjustment, loadPeriod, payrollAction, saveConfig }: { canAdjust: boolean; canConfigure: boolean; canExclude: boolean; canPay: boolean; config: PayrollConfig; customEnd: string; customStart: string; effectivePreview: PayrollPreview; excludedIds: string[]; paidMembers: Record<string, number>; paidTotal: number; periodMode: 'current' | 'previous' | 'custom'; previousPreview: PayrollPreview; saving: boolean; selectedRange: { startIso: string; endIso: string }; setConfig: (fn: (cur: PayrollConfig) => PayrollConfig) => void; setCustomEnd: (value: string) => void; setCustomStart: (value: string) => void; adjustments: Record<string, number>; updateAdjustment: (memberId: string, amount: number) => void; loadPeriod: (mode: 'current' | 'previous' | 'custom', start?: string, end?: string) => Promise<void>; payrollAction: (action: 'pay' | 'adjust' | 'exclude', row: PayrollMemberRow, enabled?: boolean) => Promise<void>; saveConfig: () => Promise<void> }) {
+  return <div className="space-y-4"><section className="grid gap-2 lg:grid-cols-6"><Metric icon="💳" label="Argent groupe" value={formatUsd(effectivePreview.balance)} /><Metric icon="🛡️" label="Réserve conservée" value={formatUsd(effectivePreview.reserveKept)} /><Metric icon="📦" label="Enveloppe paye" value={formatUsd(effectivePreview.envelope)} /><Metric icon="✅" label="Total calculé" value={formatUsd(effectivePreview.totalProposed)} /><Metric icon="🏦" label="Solde après" value={formatUsd(effectivePreview.balance - paidTotal)} /><Metric icon="👥" label="Éligibles" value={String(effectivePreview.eligibleCount)} /></section><section className="glass-card p-4"><h3 className="text-sm font-semibold text-[#fff1dd]">📆 Période de calcul</h3><div className="mt-2 flex flex-wrap gap-2"><button className={`filter-pill ${periodMode === 'current' ? 'filter-pill-active' : ''}`} onClick={() => void loadPeriod('current')}>Semaine actuelle</button><button className={`filter-pill ${periodMode === 'previous' ? 'filter-pill-active' : ''}`} onClick={() => void loadPeriod('previous')}>Semaine passée</button><button className={`filter-pill ${periodMode === 'custom' ? 'filter-pill-active' : ''}`} onClick={() => void loadPeriod('custom')}>Période personnalisée</button></div>{periodMode === 'custom' ? <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]"><input className="saas-input" type="datetime-local" value={customStart} onChange={(event) => setCustomStart(event.target.value)} /><input className="saas-input" type="datetime-local" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /><button className="saas-primary-btn" onClick={() => void loadPeriod('custom', customStart, customEnd)}>Appliquer</button></div> : null}<p className="mt-2 text-xs text-[#efcdab]">Active: {selectedRange.startIso.slice(0, 10)} → {selectedRange.endIso.slice(0, 10)} · Exclusions: {excludedIds.length}</p></section><section className="glass-card p-4"><h3 className="text-sm font-semibold text-[#fff1dd]">📊 Comparaison</h3><div className="mt-2 grid gap-2 md:grid-cols-2"><CompareCard title="Période active" preview={effectivePreview} /><CompareCard title="Semaine passée" preview={previousPreview} /></div></section>{canConfigure ? <Settings config={config} saving={saving} setConfig={setConfig} saveConfig={saveConfig} /> : null}<section className="glass-card p-4"><h3 className="text-sm font-semibold text-[#fff1dd]">💸 Payes membres</h3><div className="mt-2 max-h-[560px] space-y-2 overflow-auto pr-1">{effectivePreview.members.map((member) => { const isPaid = Boolean(paidMembers[member.memberId]); const isExcluded = excludedIds.includes(member.memberId); return <article key={member.memberId} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]"><div className="grid gap-2 xl:grid-cols-[1.2fr_repeat(5,minmax(0,1fr))_320px] xl:items-center"><div><p className="font-semibold text-[#ffe8ca]">{member.memberLabel}</p><p>{isPaid ? 'Payé' : isExcluded ? 'Exclu' : member.eligible ? 'À payer' : member.reason}</p></div><Mini label="Argent" value={formatUsd(member.moneyContribution)} /><Mini label="Actions" value={String(member.activityCount)} /><Mini label="Implication" value={String(member.participationCount)} /><Mini label="Score" value={member.totalScore.toFixed(2)} /><Mini label="Paye" value={formatUsd(member.proposedPay)} /><div className="flex flex-wrap justify-end gap-2">{canAdjust ? <input className="saas-input !h-9 w-24" value={adjustments[member.memberId] ?? ''} placeholder="Ajuster" onChange={(event) => updateAdjustment(member.memberId, Number(event.target.value || 0))} /> : null}{canAdjust ? <button className="saas-ghost-btn !h-9 px-3" onClick={() => void payrollAction('adjust', member)}>Ajuster</button> : null}{canExclude ? <button className="saas-ghost-btn !h-9 px-3" onClick={() => void payrollAction('exclude', member, !isExcluded)}>{isExcluded ? 'Réinclure' : 'Exclure'}</button> : null}{canPay ? <button className="saas-primary-btn !h-9 px-3" disabled={isPaid || isExcluded || !member.eligible || member.proposedPay <= 0} onClick={() => void payrollAction('pay', member)}>{isPaid ? 'Payé' : 'Payer'}</button> : null}</div></div></article>; })}</div></section></div>;
 }
+
+function Settings({ config, saving, setConfig, saveConfig }: { config: PayrollConfig; saving: boolean; setConfig: (fn: (cur: PayrollConfig) => PayrollConfig) => void; saveConfig: () => Promise<void> }) {
+  return <section className="glass-card space-y-3 p-4"><h3 className="text-sm font-semibold text-[#fff1dd]">⚙️ Réglages paye</h3><div className="grid gap-2 md:grid-cols-4"><Field label="Réserve minimale" value={config.reserveMinimum} onChange={(v) => setConfig((cur) => ({ ...cur, reserveMinimum: v }))} /><Field label="% distribuable" value={Math.round(config.distributablePercent * 100)} onChange={(v) => setConfig((cur) => ({ ...cur, distributablePercent: Math.max(0, Math.min(100, v)) / 100 }))} /><Field label="Plafond membre" value={config.memberCap} onChange={(v) => setConfig((cur) => ({ ...cur, memberCap: v }))} /><Field label="Minimum membre" value={config.memberMinimum} onChange={(v) => setConfig((cur) => ({ ...cur, memberMinimum: v }))} /></div><div className="grid gap-2 md:grid-cols-5"><Field label="Poids argent (%)" value={Math.round(config.weights.money * 100)} onChange={(v) => setConfig((cur) => ({ ...cur, weights: { ...cur.weights, money: v / 100 } }))} /><Field label="Poids activité (%)" value={Math.round(config.weights.activity * 100)} onChange={(v) => setConfig((cur) => ({ ...cur, weights: { ...cur.weights, activity: v / 100 } }))} /><Field label="Poids implication (%)" value={Math.round(config.weights.participation * 100)} onChange={(v) => setConfig((cur) => ({ ...cur, weights: { ...cur.weights, participation: v / 100 } }))} /><Field label="Seuil actions" value={config.minActions} onChange={(v) => setConfig((cur) => ({ ...cur, minActions: v }))} /><Field label="Seuil argent" value={config.minMoney} onChange={(v) => setConfig((cur) => ({ ...cur, minMoney: v }))} /></div><button className="saas-primary-btn" disabled={saving} onClick={() => void saveConfig()}>{saving ? 'Enregistrement...' : 'Enregistrer les réglages'}</button></section>;
+}
+
+function HistoryView({ rows }: { rows: HistoryPayment[] }) {
+  return <section className="glass-card p-4"><h2 className="mb-3 text-base font-semibold text-[#fff1dd]">📜 Historique des payes</h2><div className="max-h-[620px] space-y-2 overflow-auto pr-1">{rows.map((row) => <article key={row.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-[#ffe8ca]">{row.member_label} · {formatUsd(Number(row.amount ?? 0))}</p><p>{new Date(row.created_at).toLocaleString('fr-FR')}</p></div><p>Période: {row.week_start.slice(0, 10)} → {row.week_end.slice(0, 10)} · Solde: {formatUsd(Number(row.group_balance_before ?? 0))} → {formatUsd(Number(row.group_balance_after ?? 0))}</p></article>)}{rows.length === 0 ? <p className="text-xs text-[#efcdab]">Aucune paye versée.</p> : null}</div></section>;
+}
+
+function LogsView({ rows }: { rows: LogRow[] }) {
+  return <section className="glass-card p-4"><h2 className="mb-3 text-base font-semibold text-[#fff1dd]">🧾 Logs paye</h2><div className="max-h-[620px] space-y-2 overflow-auto pr-1">{rows.map((row) => <article key={row.id} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-[#ffe8ca]">{row.action}</p><p>{new Date(row.created_at).toLocaleString('fr-FR')}</p></div><p>{row.summary}</p><p>Utilisateur: {row.actor_name || '-'}</p></article>)}{rows.length === 0 ? <p className="text-xs text-[#efcdab]">Aucun log.</p> : null}</div></section>;
+}
+
+function CompareCard({ title, preview }: { title: string; preview: PayrollPreview }) { return <article className="rounded-xl border border-white/10 bg-[#3b2518]/60 p-3 text-xs text-[#efcdab]"><p className="font-semibold text-[#ffe8ca]">{title}</p><p>{preview.weekStartIso.slice(0, 10)} → {preview.weekEndIso.slice(0, 10)}</p><p>Éligibles: {preview.eligibleCount} · Enveloppe: {formatUsd(preview.envelope)} · Total: {formatUsd(preview.totalProposed)}</p></article>; }
+function Metric({ icon, label, value }: { icon: string; label: string; value: string }) { return <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3"><p className="text-xs text-[#efcdab]">{icon} {label}</p><p className="text-lg font-semibold text-[#ffe8ca]">{value}</p></article>; }
+function Mini({ label, value }: { label: string; value: string }) { return <div><p className="text-[11px] text-[#efcdab]">{label}</p><p className="font-semibold text-[#ffe8ca]">{value}</p></div>; }
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) { return <button type="button" className={`filter-pill ${active ? 'filter-pill-active' : ''}`} onClick={onClick}>{children}</button>; }
+function Field({ label, value, onChange }: { label: string; value: number; onChange: (next: number) => void }) { return <label className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-2 text-xs text-[#efcdab]"><span>{label}</span><input className="saas-input mt-1" value={value} onChange={(event) => onChange(Math.max(0, Number(event.target.value || 0)))} /></label>; }
