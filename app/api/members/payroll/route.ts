@@ -14,18 +14,15 @@ type Body = {
   enabled?: boolean;
 };
 
-async function can(userId: string, primary: string, fallback?: string) {
-  const [a, b] = await Promise.all([
-    hasUserPermission(userId, primary),
-    fallback ? hasUserPermission(userId, fallback) : Promise.resolve(false)
-  ]);
-  return a || b;
+async function canAny(userId: string, permissions: string[]) {
+  const results = await Promise.all(permissions.map((permission) => hasUserPermission(userId, permission)));
+  return results.some(Boolean);
 }
 
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
-  if (!await can(session.userId, 'members.payroll.view', 'payroll.view')) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!await canAny(session.userId, ['members.payroll.view', 'payroll.view', 'money.pay.access'])) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const url = new URL(request.url);
   const start = url.searchParams.get('start') ?? '';
@@ -51,12 +48,12 @@ export async function POST(request: Request) {
   }
 
   const allowed = action === 'pay'
-    ? await can(session.userId, 'members.payroll.pay', 'payroll.validate')
+    ? await canAny(session.userId, ['members.payroll.pay', 'payroll.validate', 'money.pay.create'])
     : action === 'adjust'
-      ? await can(session.userId, 'members.payroll.adjust', 'payroll.adjust')
+      ? await canAny(session.userId, ['members.payroll.adjust', 'payroll.adjust', 'money.pay.create'])
       : action === 'exclude'
-        ? await can(session.userId, 'members.payroll.exclude', 'payroll.adjust')
-        : await can(session.userId, 'members.payroll.adjust', 'payroll.adjust');
+        ? await canAny(session.userId, ['members.payroll.exclude', 'payroll.adjust', 'money.pay.create'])
+        : await canAny(session.userId, ['members.payroll.adjust', 'payroll.adjust', 'money.pay.create']);
 
   if (!allowed) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
