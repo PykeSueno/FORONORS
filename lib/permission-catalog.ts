@@ -67,8 +67,8 @@ export const PERMISSION_LABELS: Record<string, PermissionInfo> = EXACT;
 export function describePermission(permissionName: string): PermissionInfo {
   const canonical = permissionName.trim();
   if (EXACT[canonical]) return EXACT[canonical];
-  const module = PREFIX_MODULES.find(([prefix]) => canonical.startsWith(prefix))?.[1] ?? 'Autres';
-  return { module, section: inferSection(canonical), label: humanize(canonical), hint: `Permission ${humanize(canonical)}.` };
+  const moduleName = PREFIX_MODULES.find(([prefix]) => canonical.startsWith(prefix))?.[1] ?? 'Autres';
+  return { module: moduleName, section: inferSection(canonical), label: humanize(canonical), hint: `Permission ${humanize(canonical)}.` };
 }
 
 export function permissionOrder(permissionName: string) {
