@@ -25,6 +25,7 @@ type StockReq = { name: string; qty: number };
 
 const STOCK_REQUIREMENTS: Record<RobberyType, StockReq[]> = {
   fleeca: [
+    { name: 'pétoire', qty: 1 },
     { name: 'munition de pistolet', qty: 1 },
     { name: 'perceuse', qty: 1 },
     { name: 'foret', qty: 4 },
