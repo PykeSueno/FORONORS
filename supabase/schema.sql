@@ -1249,6 +1249,16 @@ with check (true);
 
 insert into public.permissions (name)
 values
+  ('member_ops.view'),
+  ('member_ops.activities.view'),
+  ('member_ops.payroll.view'),
+  ('member_ops.payroll.pay'),
+  ('member_ops.payroll.adjust'),
+  ('member_ops.expenses.view'),
+  ('member_ops.expenses.create'),
+  ('member_ops.expenses.reimburse'),
+  ('member_ops.history.view'),
+  ('member_ops.logs.view'),
   ('expenses.view'),
   ('expenses.create'),
   ('expenses.reimburse'),

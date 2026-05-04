@@ -31,7 +31,23 @@ const LEGACY_TO_CANONICAL: Record<string, string> = {
   'payroll.adjust': 'money.pay.create',
   'payroll.validate': 'money.pay.create',
   'payroll.history': 'money.pay.history.view',
-  'payroll.logs': 'money.pay.logs.view'
+  'payroll.logs': 'money.pay.logs.view',
+
+  'activity_payroll.view': 'member_ops.view',
+  'activity_payroll.global.view': 'member_ops.view',
+  'activity_payroll.activities.view': 'member_ops.activities.view',
+  'activity_payroll.payroll.view': 'member_ops.payroll.view',
+  'activity_payroll.payroll.pay': 'member_ops.payroll.pay',
+  'activity_payroll.payroll.adjust': 'member_ops.payroll.adjust',
+  'activity_payroll.payroll.exclude': 'member_ops.payroll.adjust',
+  'activity_payroll.history.view': 'member_ops.history.view',
+  'activity_payroll.logs.view': 'member_ops.logs.view',
+
+  'expenses.view': 'member_ops.expenses.view',
+  'expenses.create': 'member_ops.expenses.create',
+  'expenses.reimburse': 'member_ops.expenses.reimburse',
+  'expenses.history.view': 'member_ops.history.view',
+  'expenses.logs.view': 'member_ops.logs.view'
 };
 
 const CANONICAL_TO_ALIASES = Object.entries(LEGACY_TO_CANONICAL).reduce<Record<string, string[]>>((acc, [legacy, canonical]) => {

@@ -7,7 +7,7 @@ import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
-type Action = 'pay' | 'adjust' | 'exclude';
+type Action = 'pay' | 'adjust' | 'exclude' | 'report';
 type Body = {
   action?: Action;
   week_start_iso?: string;
@@ -23,7 +23,7 @@ type Supabase = ReturnType<typeof getSupabaseAdmin>;
 
 const CONFIG_KEY = 'activity_payroll_config';
 
-function periodSettingKey(kind: 'adjustments' | 'excluded', start: string, end: string) {
+function periodSettingKey(kind: 'adjustments' | 'excluded' | 'reported', start: string, end: string) {
   return `activity_payroll_${kind}:${start}:${end}`;
 }
 
@@ -64,19 +64,20 @@ function normalizeConfig(source?: Partial<PayrollConfig>): PayrollConfig {
 }
 
 async function periodState(supabase: Supabase, start: string, end: string) {
-  const [adjustments, excluded, payments] = await Promise.all([
+  const [adjustments, excluded, reported, payments] = await Promise.all([
     readJsonSetting<Record<string, number>>(supabase, periodSettingKey('adjustments', start, end), {}),
     readJsonSetting<string[]>(supabase, periodSettingKey('excluded', start, end), []),
+    readJsonSetting<string[]>(supabase, periodSettingKey('reported', start, end), []),
     supabase.from('activity_payroll_payments').select('member_user_id, amount').eq('week_start', start).eq('week_end', end)
   ]);
   const paid = Object.fromEntries((payments.data ?? []).map((row) => [String(row.member_user_id), Number(row.amount ?? 0)]));
-  return { adjustments, excluded, paid };
+  return { adjustments, excluded, reported, paid };
 }
 
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
-  if (!await canAny(session.userId, ['activity_payroll.payroll.view'])) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!await canAny(session.userId, ['member_ops.payroll.view', 'activity_payroll.payroll.view'])) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
   const url = new URL(request.url);
@@ -98,7 +99,7 @@ export async function GET(request: Request) {
     periodState(supabase, previousWindow.startIso, previousWindow.endIso),
     periodState(supabase, selectedWindow.startIso, selectedWindow.endIso),
     supabase.from('activity_payroll_payments').select('id, week_start, week_end, member_user_id, member_label, amount, paid_by, group_balance_before, group_balance_after, created_at').order('created_at', { ascending: false }).limit(120),
-    supabase.from('audit_logs').select('id, action, summary, actor_name, entity_id, old_values, new_values, created_at').in('action', ['activity_payroll_config_updated', 'activity_payroll_member_paid', 'activity_payroll_member_adjusted', 'activity_payroll_member_excluded']).order('created_at', { ascending: false }).limit(160)
+    supabase.from('audit_logs').select('id, action, summary, actor_name, entity_id, old_values, new_values, created_at').in('action', ['activity_payroll_config_updated', 'activity_payroll_member_paid', 'activity_payroll_member_adjusted', 'activity_payroll_member_excluded', 'activity_payroll_member_reported', 'expense_created', 'expense_reimbursed', 'expense_cancelled', 'expense_updated']).order('created_at', { ascending: false }).limit(160)
   ]);
 
   const [current, previous, selected] = await Promise.all([
@@ -122,10 +123,10 @@ export async function POST(request: Request) {
   if (!weekStartIso || !weekEndIso || !memberId) return NextResponse.json({ message: 'Paramètres invalides.' }, { status: 400 });
 
   const allowed = action === 'pay'
-    ? await canAny(session.userId, ['activity_payroll.payroll.pay'])
+    ? await canAny(session.userId, ['member_ops.payroll.pay', 'activity_payroll.payroll.pay'])
     : action === 'adjust'
-      ? await canAny(session.userId, ['activity_payroll.payroll.adjust'])
-      : await canAny(session.userId, ['activity_payroll.payroll.exclude']);
+      ? await canAny(session.userId, ['member_ops.payroll.adjust', 'activity_payroll.payroll.adjust'])
+      : await canAny(session.userId, ['member_ops.payroll.adjust', 'activity_payroll.payroll.adjust', 'activity_payroll.payroll.exclude']);
   if (!allowed) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
@@ -154,10 +155,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, excluded: next });
   }
 
+  if (action === 'report') {
+    const key = periodSettingKey('reported', weekStartIso, weekEndIso);
+    const reported = await readJsonSetting<string[]>(supabase, key, []);
+    const next = body.enabled === false ? reported.filter((id) => id !== memberId) : Array.from(new Set([...reported, memberId]));
+    await writeJsonSetting(supabase, key, next);
+    await createAuditLog({ actorUserId: session.userId, action: 'activity_payroll_member_reported', entityType: 'activity_payroll', entityId: memberId, summary: `${body.enabled === false ? 'Reprise' : 'Report'} paye ${memberLabel}`, newValues: { weekStartIso, weekEndIso, memberId, memberLabel, reported: body.enabled !== false } });
+    return NextResponse.json({ ok: true, reported: next });
+  }
+
   const amount = Math.max(0, Math.round(Number(body.amount ?? 0)));
   if (amount <= 0) return NextResponse.json({ message: 'Montant invalide.' }, { status: 400 });
   const { data: existing } = await supabase.from('activity_payroll_payments').select('id').eq('week_start', weekStartIso).eq('week_end', weekEndIso).eq('member_user_id', memberId).maybeSingle();
   if (existing) return NextResponse.json({ message: 'Membre déjà payé sur cette période.' }, { status: 409 });
+  const flags = await periodState(supabase, weekStartIso, weekEndIso);
+  if (flags.excluded.includes(memberId)) return NextResponse.json({ message: 'Membre exclu de la paye sur cette période.' }, { status: 409 });
+  if (flags.reported.includes(memberId)) return NextResponse.json({ message: 'Paye reportée pour ce membre sur cette période.' }, { status: 409 });
 
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
   if (!cash) return NextResponse.json({ message: 'Caisse groupe introuvable.' }, { status: 404 });
@@ -167,7 +180,7 @@ export async function POST(request: Request) {
 
   await Promise.all([
     supabase.from('group_cash').update({ balance: after, updated_at: new Date().toISOString() }).eq('id', cash.id),
-    supabase.from('cash_movements').insert({ type: 'activity_payroll_member_payment', amount: -amount, label: `Activités & Payes ${memberLabel} (${weekStartIso.slice(0, 10)})`, user_id: session.userId, before_amount: before, after_amount: after }),
+    supabase.from('cash_movements').insert({ type: 'exit', amount: -amount, label: `Paye membre — ${memberLabel}`, user_id: session.userId, before_amount: before, after_amount: after }),
     supabase.from('activity_payroll_payments').insert({ week_start: weekStartIso, week_end: weekEndIso, member_user_id: memberId, member_label: memberLabel, amount, paid_by: session.userId, group_balance_before: before, group_balance_after: after })
   ]);
   await syncMoneyItemToGroupCash(supabase);
