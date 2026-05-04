@@ -67,6 +67,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const [categoryFilter, setCategoryFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [editingActivity, setEditingActivity] = useState<RecentActivity | null>(null);
+  const [processorRecoveredQty, setProcessorRecoveredQty] = useState<number | null>(null);
 
   const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const availableTypes = useMemo(() => Array.from(new Set(items.filter((item) => !categoryFilter || item.category_key === categoryFilter).map((item) => item.type_key).filter(Boolean))) as string[], [items, categoryFilter]);
@@ -82,7 +83,8 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const divingBottleItem = useMemo(() => items.find((item) => item.name === 'Bouteille de Plongée'), [items]);
   const processorItem = useMemo(() => items.find((item) => item.name === 'Processeur'), [items]);
   const currentEquipment = activityType === 'burglary' ? kitItem : activityType === 'container' ? cutterItem : divingBottleItem;
-  const processorQuantity = activityType === 'processor' ? equipmentUsed * PROCESSOR_UNITS_PER_BOTTLE : 0;
+  const processorAutoQuantity = activityType === 'processor' ? equipmentUsed * PROCESSOR_UNITS_PER_BOTTLE : 0;
+  const processorQuantity = activityType === 'processor' ? (processorRecoveredQty ?? processorAutoQuantity) : 0;
   const selectedMembers = useMemo(() => members.filter((entry) => selectedMemberIds.includes(entry.id)), [members, selectedMemberIds]);
 
   useEffect(() => {
@@ -94,7 +96,10 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
     setActivityType(type);
     setError('');
     if (type === 'mailbox') setEquipmentUsed(0);
-    if (type === 'processor') setEquipmentUsed((current) => Math.max(1, current));
+    if (type === 'processor') {
+      setEquipmentUsed((current) => Math.max(1, current));
+      setProcessorRecoveredQty(null);
+    }
     if (type === 'processor' && processorItem) {
       setLines([{ item_id: processorItem.id, quantity: Math.max(1, equipmentUsed) * PROCESSOR_UNITS_PER_BOTTLE }]);
     }
@@ -102,8 +107,8 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
 
   useEffect(() => {
     if (activityType !== 'processor' || !processorItem) return;
-    setLines([{ item_id: processorItem.id, quantity: Math.max(0, equipmentUsed) * PROCESSOR_UNITS_PER_BOTTLE }]);
-  }, [activityType, equipmentUsed, processorItem]);
+    setLines([{ item_id: processorItem.id, quantity: processorQuantity }]);
+  }, [activityType, processorItem, processorQuantity]);
 
   function addItem(itemId: number) {
     if (activityType === 'processor' && processorItem) {
@@ -220,40 +225,48 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
         <section className="grid gap-4 lg:grid-rows-[auto_1fr]">
           <section className="glass-card p-5" onPaste={(e) => void onPaste(e)}>
             <h3 className="text-base font-semibold text-[#fff1dd]">A. Session activité</h3>
-            <label className="mt-3 block text-xs text-[#efccaa]">Session</label>
-            <SessionMemberSelector
-              members={members.map((member) => ({ id: member.id, label: member.name || member.username }))}
-              selectedMemberIds={selectedMemberIds}
-              onSelectedMemberIdsChange={setSelectedMemberIds}
-              groupMode={groupMode}
-              onGroupModeChange={setGroupMode}
-              defaultHint="Astuce : le membre connecté est pré-sélectionné par défaut."
-            />
+            {activityType !== 'processor' ? (
+              <>
+                <label className="mt-3 block text-xs text-[#efccaa]">Session</label>
+                <SessionMemberSelector
+                  members={members.map((member) => ({ id: member.id, label: member.name || member.username }))}
+                  selectedMemberIds={selectedMemberIds}
+                  onSelectedMemberIdsChange={setSelectedMemberIds}
+                  groupMode={groupMode}
+                  onGroupModeChange={setGroupMode}
+                  defaultHint="Astuce : le membre connecté est pré-sélectionné par défaut."
+                />
+              </>
+            ) : null}
 
           {activityType !== 'mailbox' ? (
             <>
-              <label className="mt-3 block text-xs text-[#efccaa]">{activityType === 'burglary' ? 'Kits pris' : activityType === 'container' ? 'Disqueuses prises' : 'Bouteilles de Plongée prises'}</label>
-              <div className="mt-1 flex items-center gap-2">
-                <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
-                  {currentEquipment?.image_url ? (
-                    <Image src={currentEquipment.image_url} alt={currentEquipment.name} width={40} height={40} className="h-full w-full object-cover" unoptimized />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">{activityType === 'processor' ? '🫧' : '🧰'}</div>
-                  )}
-                </div>
-                <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(-1)}>-</button>
-                <input className="saas-input w-20 text-center" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} inputMode="numeric" />
-                <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(1)}>+</button>
-              </div>
               {activityType === 'processor' ? (
-                <p className="mt-2 rounded-lg border border-white/10 bg-[#2f1d14]/60 px-3 py-2 text-xs text-[#efcdab]">
-                  1 bouteille = {PROCESSOR_UNITS_PER_BOTTLE} processeurs · Total récupéré: <b className="text-[#ffe8ca]">{processorQuantity}</b>
-                </p>
-              ) : null}
+                <>
+                  <label className="mt-3 block text-xs text-[#efccaa]">Nombre de bouteilles utilisées</label>
+                  <input className="saas-input mt-1 w-full text-center" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} inputMode="numeric" />
+                </>
+              ) : (
+                <>
+                  <label className="mt-3 block text-xs text-[#efccaa]">{activityType === 'burglary' ? 'Kits pris' : 'Disqueuses prises'}</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
+                      {currentEquipment?.image_url ? (
+                        <Image src={currentEquipment.image_url} alt={currentEquipment.name} width={40} height={40} className="h-full w-full object-cover" unoptimized />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🧰</div>
+                      )}
+                    </div>
+                    <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(-1)}>-</button>
+                    <input className="saas-input w-20 text-center" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} inputMode="numeric" />
+                    <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(1)}>+</button>
+                  </div>
+                </>
+              )}
             </>
           ) : null}
 
-          <div className="mt-3 rounded-xl border border-dashed border-[#f1cfaa]/60 bg-[#2e1d14]/40 p-3 text-sm text-[#f4d8b6]">
+          {activityType !== 'processor' ? <div className="mt-3 rounded-xl border border-dashed border-[#f1cfaa]/60 bg-[#2e1d14]/40 p-3 text-sm text-[#f4d8b6]">
             <p>Preuve image (Ctrl+V ou fichier)</p>
             {uploading ? <p className="mt-1 text-xs">Upload en cours...</p> : null}
             {proofImageUrl ? <Image src={proofImageUrl} alt="Preuve" width={480} height={220} className="mt-2 h-36 w-full rounded-xl object-cover" unoptimized /> : null}
@@ -263,7 +276,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
               </label>
               {proofImageUrl ? <RemoveLineButton onClick={() => setProofImageUrl('')} title="Supprimer l’image" /> : null}
             </div>
-          </div>
+          </div> : null}
 
             {error ? <p className="mt-3 text-sm text-red-100">{error}</p> : null}
           </section>
@@ -301,6 +314,18 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
 
         <section className="glass-card p-5 min-h-[700px]">
           <h3 className="text-base font-semibold text-[#fff1dd]">C. Récapitulatif</h3>
+          {activityType === 'processor' ? (
+            <div className="mt-3 rounded-xl border border-white/10 bg-[#2f1d14]/60 p-3">
+              <label className="block text-xs text-[#efccaa]">Processeurs récupérés</label>
+              <input
+                className="saas-input mt-1 w-full text-center"
+                value={processorQuantity}
+                onChange={(e) => setProcessorRecoveredQty(Math.max(0, Number(e.target.value || 0)))}
+                inputMode="numeric"
+              />
+              <p className="mt-1 text-xs text-[#efcdab]">Calcul de base: {equipmentUsed} bouteille(s) × {PROCESSOR_UNITS_PER_BOTTLE} = {processorAutoQuantity}</p>
+            </div>
+          ) : null}
           <div className="mt-2 space-y-2">
             {lines.map((line, idx) => {
               const item = itemMap.get(line.item_id);

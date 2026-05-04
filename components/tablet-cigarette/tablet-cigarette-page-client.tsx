@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { computeProcessorEstimates, PROCESSOR_BOAT_FROM_BOTTLES } from '@/lib/processor';
 
@@ -96,6 +96,11 @@ export function TabletCigarettePageClient(props: {
     .filter((row) => String(row.created_at ?? '').slice(0, 10) === new Date().toISOString().slice(0, 10))
     .reduce((sum, row) => sum + Number(row.processors_count ?? 0), 0), [processorSessionsState, processorSaleMemberId]);
   const processorRemainingToday = Math.max(0, 50 - processorSoldToday);
+  const processorSaleMax = Math.max(0, Math.min(50, processorRemainingToday, processorStockState));
+
+  useEffect(() => {
+    setProcessorSaleQty((current) => Math.max(0, Math.min(processorSaleMax, current)));
+  }, [processorSaleMax]);
 
   const processorStatsQuick = useMemo(() => {
     const rows = activeProcessorSessions.filter((row) => row.status === 'validated');
@@ -106,6 +111,24 @@ export function TabletCigarettePageClient(props: {
       net: rows.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0)
     };
   }, [activeProcessorSessions]);
+
+  const processorStatsByMember = useMemo(() => {
+    const map = new Map<string, { label: string; sold: number; revenue: number; sessions: number }>();
+    for (const row of activeProcessorSessions.filter((entry) => entry.status === 'validated')) {
+      const participantIds = Array.isArray(row.participant_user_ids) ? row.participant_user_ids as string[] : [];
+      for (const id of participantIds.filter((entry) => activeMemberIds.has(entry))) {
+        const member = membersById.get(id);
+        const current = map.get(id) ?? { label: member ? (member.name || member.username) : id, sold: 0, revenue: 0, sessions: 0 };
+        current.sessions += 1;
+        if (row.operation_type === 'sale') {
+          current.sold += Number(row.processors_count ?? 0);
+          current.revenue += Number(row.real_received ?? 0);
+        }
+        map.set(id, current);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.sold - a.sold || b.sessions - a.sessions);
+  }, [activeMemberIds, activeProcessorSessions, membersById]);
 
   const historyColumns = useMemo(() => {
     const tabletRows: HistoryCard[] = tabletPassagesState.map((entry) => ({
@@ -155,6 +178,14 @@ export function TabletCigarettePageClient(props: {
     setMemberId(id);
     const member = membersById.get(id);
     setMemberLabel(member ? (member.name || member.username) : defaultMemberLabel);
+  }
+
+  function setProcessorSaleQtySafe(value: number) {
+    setProcessorSaleQty(Math.max(0, Math.min(processorSaleMax, Number.isFinite(value) ? value : 0)));
+  }
+
+  function stepProcessorRealReceived(delta: number) {
+    setProcessorRealReceived(String(Math.max(0, Number(processorRealReceived || 0) + delta)));
   }
 
   async function saveTabletDeposit() {
@@ -449,10 +480,10 @@ export function TabletCigarettePageClient(props: {
               <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_180px]">
                 <div>
                   <FieldLabel icon="📦" label="Quantité mise en vente" />
-                  <div className="flex items-center gap-2">
-                    <button type="button" className="saas-ghost-btn !h-10 !px-3" onClick={() => setProcessorSaleQty((cur) => Math.max(0, cur - 1))}>-</button>
-                    <input className="saas-input !h-10 text-center" type="number" min={0} max={Math.min(processorRemainingToday, processorStockState)} value={processorSaleQty} onChange={(event) => setProcessorSaleQty(Math.max(0, Math.min(processorRemainingToday, processorStockState, Number(event.target.value || 0))))} />
-                    <button type="button" className="saas-ghost-btn !h-10 !px-3" onClick={() => setProcessorSaleQty((cur) => Math.min(processorRemainingToday, processorStockState, cur + 1))}>+</button>
+                  <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
+                    <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => setProcessorSaleQtySafe(processorSaleQty - 1)}>-</button>
+                    <div className="flex h-10 items-center justify-center rounded-lg border border-white/10 bg-[#24160f] text-sm font-semibold text-[#ffe8ca]">{processorSaleQty}</div>
+                    <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => setProcessorSaleQtySafe(processorSaleQty + 1)}>+</button>
                   </div>
                 </div>
                 <div className="rounded-xl border border-amber-200/20 bg-[#3a2418]/70 px-3 py-2">
@@ -464,7 +495,11 @@ export function TabletCigarettePageClient(props: {
 
               <div className="mt-3">
                 <FieldLabel icon="💵" label="Argent réel reçu" />
-                <input className="saas-input !h-10" type="number" min={0} value={processorRealReceived} onChange={(event) => setProcessorRealReceived(event.target.value)} />
+                <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
+                  <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => stepProcessorRealReceived(-100)}>-</button>
+                  <div className="flex h-10 items-center justify-center rounded-lg border border-white/10 bg-[#24160f] text-sm font-semibold text-[#ffe8ca]">{formatUsd(processorSaleTotalReal)}</div>
+                  <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => stepProcessorRealReceived(100)}>+</button>
+                </div>
                 <p className="mt-1 text-xs text-[#efcdab]">Ce montant est le seul ajouté à l’argent groupe.</p>
               </div>
 
@@ -540,10 +575,35 @@ export function TabletCigarettePageClient(props: {
             <article className="glass-card p-5">
               <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Processeur</h4>
               <div className="mt-2 grid gap-2 md:grid-cols-4">
-                <Stat label="Produits" value={String(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0))} icon="⚙️" />
-                <Stat label="Vendus" value={String(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0))} icon="📦" />
-                <Stat label="Argent généré" value={formatUsd(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0))} icon="💵" />
+                <Stat label="Processeurs produits" value={String(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0))} icon="⚙️" />
+                <Stat label="Processeurs vendus" value={String(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0))} icon="📦" />
+                <Stat label="Argent généré processeur" value={formatUsd(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0))} icon="💵" />
                 <Stat label="Bénéfice net" value={formatUsd(activeProcessorSessions.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0))} icon="📈" />
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full text-left text-xs text-[#efcdab]">
+                  <thead className="text-[#ffe8ca]">
+                    <tr>
+                      <th className="px-2 py-1">Membre</th>
+                      <th className="px-2 py-1">Processeurs vendus</th>
+                      <th className="px-2 py-1">Argent généré</th>
+                      <th className="px-2 py-1">Sessions processeur</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {processorStatsByMember.map((row) => (
+                      <tr key={row.label} className="border-t border-white/10">
+                        <td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td>
+                        <td className="px-2 py-1">{row.sold}</td>
+                        <td className="px-2 py-1">{formatUsd(row.revenue)}</td>
+                        <td className="px-2 py-1">{row.sessions}</td>
+                      </tr>
+                    ))}
+                    {processorStatsByMember.length === 0 ? (
+                      <tr className="border-t border-white/10"><td className="px-2 py-2" colSpan={4}>Aucune session processeur.</td></tr>
+                    ) : null}
+                  </tbody>
+                </table>
               </div>
             </article>
           ) : null}
