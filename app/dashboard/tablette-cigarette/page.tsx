@@ -31,9 +31,9 @@ export default async function TabletCigarettePage() {
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
     supabase.from('tablet_days').select('*').eq('business_day', tabletBusinessDay).maybeSingle(),
     supabase.from('cigarette_days').select('*').eq('business_day', cigaretteBusinessDay).maybeSingle(),
-    supabase.from('items').select('name, quantity').ilike('name', '%kit%').limit(1).maybeSingle(),
-    supabase.from('items').select('name, quantity').ilike('name', '%disqueuse%').limit(1).maybeSingle(),
-    supabase.from('items').select('id, quantity').eq('name', CIGARETTE_ITEM_NAME).maybeSingle(),
+    supabase.from('items').select('name, quantity, image_url').ilike('name', '%kit%').limit(1).maybeSingle(),
+    supabase.from('items').select('name, quantity, image_url').ilike('name', '%disqueuse%').limit(1).maybeSingle(),
+    supabase.from('items').select('id, quantity, image_url').eq('name', CIGARETTE_ITEM_NAME).maybeSingle(),
     supabase.from('items').select('id, quantity, image_url').eq('name', 'Processeur').maybeSingle()
   ]);
 
@@ -101,6 +101,9 @@ export default async function TabletCigarettePage() {
         kitsInStock={Number(kitItemRes.data?.quantity ?? 0)}
         cuttersInStock={Number(cutterItemRes.data?.quantity ?? 0)}
         packsInStock={Number(cigaretteItemRes.data?.quantity ?? 0)}
+        kitImageUrl={String(kitItemRes.data?.image_url ?? '')}
+        cutterImageUrl={String(cutterItemRes.data?.image_url ?? '')}
+        cigaretteImageUrl={String(cigaretteItemRes.data?.image_url ?? '')}
         processorInStock={Number(processorItemRes.data?.quantity ?? 0)}
         processorImageUrl={String(processorItemRes.data?.image_url ?? '')}
         canTabletAccess={canTabletAccess}

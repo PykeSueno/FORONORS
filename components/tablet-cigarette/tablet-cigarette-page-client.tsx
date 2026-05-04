@@ -12,7 +12,7 @@ type TabletPassage = { id: number; member_user_id?: string | null; member_label:
 type CigarettePassage = { id: number; member_user_id?: string | null; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; status?: string; created_at: string };
 
 type Tab = 'home' | 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
-type HistoryCard = { id: string; title: string; meta: string; lines: string[] };
+type HistoryCard = { id: string; title: string; meta: string; type: string; amount: string; status: string; lines: string[]; items: Array<{ label: string; imageUrl?: string; icon: string }> };
 
 export function TabletCigarettePageClient(props: {
   members: Array<{ id: string; name: string; username: string }>;
@@ -28,6 +28,9 @@ export function TabletCigarettePageClient(props: {
   kitsInStock: number;
   cuttersInStock: number;
   packsInStock: number;
+  kitImageUrl: string;
+  cutterImageUrl: string;
+  cigaretteImageUrl: string;
   processorInStock: number;
   processorImageUrl: string;
   canTabletAccess: boolean;
@@ -50,7 +53,7 @@ export function TabletCigarettePageClient(props: {
   defaultMemberLabel: string;
 }) {
   const {
-    members, tabletBusinessDay, cigaretteBusinessDay, tabletDay, cigaretteDay, tabletPassages, cigarettePassages, tabletStatsPassages, cigaretteStatsPassages, groupCash, kitsInStock, cuttersInStock, packsInStock, processorInStock, processorImageUrl,
+    members, tabletBusinessDay, cigaretteBusinessDay, tabletDay, cigaretteDay, tabletPassages, cigarettePassages, tabletStatsPassages, cigaretteStatsPassages, groupCash, kitsInStock, cuttersInStock, packsInStock, kitImageUrl, cutterImageUrl, cigaretteImageUrl, processorInStock, processorImageUrl,
     canTabletAccess, canCigaretteAccess, canTabletManageDaily, canTabletCreatePassage, canCigaretteCreatePassage, canCigaretteCreateForAny, canHistory, canStats,
     canProcessorView, canProcessorCreate, canProcessorProduction, canProcessorSale, canProcessorStats, canProcessorLogs, processorSessions, processorStatsSessions,
     defaultMemberId, defaultMemberLabel
@@ -206,20 +209,36 @@ export function TabletCigarettePageClient(props: {
   }), [activeProcessorStatsSessions]);
 
   const historyColumns = useMemo(() => {
-    const tabletRows: HistoryCard[] = tabletPassagesState.map((entry) => ({
-      id: `t-${entry.id}`,
-      title: entry.member_label,
-      meta: new Date(entry.created_at).toLocaleString('fr-FR'),
-      lines: [
-        `Cash ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`,
-        `Kits ${entry.before_kits} -> ${entry.after_kits} · Disqueuses ${entry.before_cutters} -> ${entry.after_cutters}`
-      ]
-    }));
+    const tabletRows: HistoryCard[] = tabletPassagesState.map((entry) => {
+      const kitsAdded = Math.max(0, Number(entry.after_kits ?? 0) - Number(entry.before_kits ?? 0));
+      const cuttersAdded = Math.max(0, Number(entry.after_cutters ?? 0) - Number(entry.before_cutters ?? 0));
+      const spent = Math.max(0, Number(entry.before_cash ?? 0) - Number(entry.after_cash ?? 0));
+      return {
+        id: `t-${entry.id}`,
+        title: entry.member_label,
+        type: 'Tablette',
+        amount: `Dépensé ${formatUsd(spent)}`,
+        status: `Kits +${kitsAdded} · Disqueuses +${cuttersAdded}`,
+        meta: new Date(entry.created_at).toLocaleString('fr-FR'),
+        items: [
+          ...(kitsAdded > 0 ? [{ label: 'Kits', imageUrl: kitImageUrl, icon: '🧰' }] : []),
+          ...(cuttersAdded > 0 ? [{ label: 'Disqueuses', imageUrl: cutterImageUrl, icon: '🪚' }] : [])
+        ],
+        lines: [
+          `Dépôt ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`,
+          `Kits ${entry.before_kits} -> ${entry.after_kits} · Disqueuses ${entry.before_cutters} -> ${entry.after_cutters}`
+        ]
+      };
+    });
 
     const cigaretteRows: HistoryCard[] = cigarettePassagesState.map((entry) => ({
       id: `c-${entry.id}`,
       title: entry.member_label,
+      type: 'Cigarette',
+      amount: formatUsd(entry.revenue_amount),
+      status: entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reçu' : 'Cash',
       meta: new Date(entry.created_at).toLocaleString('fr-FR'),
+      items: [{ label: 'Paquets cigarette', imageUrl: cigaretteImageUrl, icon: '🚬' }],
       lines: [
         `Paquets ${entry.before_packs} -> ${entry.after_packs} · ${formatUsd(entry.revenue_amount)}`,
         `${entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reçu' : 'Cash'} · Groupe ${formatUsd(entry.before_group_cash)} -> ${formatUsd(entry.after_group_cash)}`
@@ -238,7 +257,11 @@ export function TabletCigarettePageClient(props: {
       return {
         id: `p-${String(entry.id)}`,
         title: isSale ? 'Vente' : 'Production',
+        type: 'Processeur',
+        amount: isSale ? formatUsd(Number(entry.real_received ?? 0)) : `${Number(entry.processors_count ?? 0)} produits`,
+        status: isSale ? 'Vente validée' : 'Production validée',
         meta: new Date(String(entry.created_at)).toLocaleString('fr-FR'),
+        items: [{ label: 'Processeur', imageUrl: processorImageUrl, icon: '⚙️' }],
         lines: [
           `${participants || '-'} · Qté ${Number(entry.processors_count ?? 0)}`,
           `${isSale ? 'Reçu' : 'Coût'} ${formatUsd(isSale ? Number(entry.real_received ?? 0) : Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))} · Stock ${Number(entry.stock_after ?? 0)}`
@@ -247,7 +270,7 @@ export function TabletCigarettePageClient(props: {
     });
 
     return { tabletRows, cigaretteRows, processorRows };
-  }, [tabletPassagesState, cigarettePassagesState, processorSessionsState, membersById]);
+  }, [cigaretteImageUrl, cigarettePassagesState, cutterImageUrl, kitImageUrl, membersById, processorImageUrl, processorSessionsState, tabletPassagesState]);
 
   function selectMember(id: string) {
     setMemberId(id);
@@ -506,11 +529,13 @@ export function TabletCigarettePageClient(props: {
                 <h3 className="text-xl font-semibold text-[#ffe8ca]">Processeur — {tabletBusinessDay}</h3>
                 <p className="text-xs text-[#efcdab]">Vente processeurs</p>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <MiniStat label="Stock actuel" value={String(processorStockState)} />
-                <MiniStat label="Coût / bouteille" value={formatUsd(300)} />
-                <MiniStat label="Prix / processeur" value={formatUsd(100)} />
-                <MiniStat label="Bénéfice estimé" value={formatUsd(processorEstimate.profitAverage)} />
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+                <Stat label="Processeurs vendus" value={String(processorStatsQuick.sold)} icon="⚙️" />
+                <Stat label="Recette processeur" value={formatUsd(processorStatsQuick.revenue)} icon="💵" />
+                <Stat label="Stock processeurs" value={String(processorStockState)} icon="📦" />
+                <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="💰" />
+                <Stat label="Déjà vendu aujourd’hui" value={String(processorSoldToday)} icon="📊" />
+                <Stat label="Restant possible" value={`${processorRemainingToday}/50`} icon="🎯" />
               </div>
             </div>
           </article>
@@ -614,14 +639,14 @@ export function TabletCigarettePageClient(props: {
             <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Tablette</h4>
             <div className="mt-2 grid gap-2 md:grid-cols-5">
               <Stat label="Passages tablette" value={String(tabletStatsTotals.passages)} icon="📱" />
-              <Stat label="Argent généré" value={formatUsd(tabletStatsTotals.money)} icon="💵" />
+              <Stat label="Argent dépensé" value={formatUsd(tabletStatsTotals.money)} icon="💸" />
               <Stat label="Kits utilisés" value={String(tabletStatsTotals.kits)} icon="🧰" />
               <Stat label="Disqueuses utilisées" value={String(tabletStatsTotals.cutters)} icon="🪚" />
               <Stat label="Dernière activité" value={tabletStatsTotals.last ? new Date(tabletStatsTotals.last).toLocaleDateString('fr-FR') : '-'} icon="🕒" />
             </div>
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-left text-xs text-[#efcdab]">
-                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent généré</th><th className="px-2 py-1">Kits</th><th className="px-2 py-1">Disqueuses</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
+                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent dépensé</th><th className="px-2 py-1">Kits</th><th className="px-2 py-1">Disqueuses</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
                 <tbody>
                   {tabletStatsByMember.map((row) => (
                     <tr key={row.key} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{row.kits}</td><td className="px-2 py-1">{row.cutters}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
@@ -724,11 +749,29 @@ function HistoryColumn({ title, icon, rows, empty }: { title: string; icon: stri
       <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
         {rows.length ? rows.map((row) => (
           <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 p-2.5 text-xs text-[#efcdab]">
-            <div className="flex items-start justify-between gap-2">
-              <p className="font-semibold text-[#ffe8ca]">{row.title}</p>
-              <p className="shrink-0 text-[10px] text-[#d9b48f]">{row.meta}</p>
+            <div className="flex items-start gap-2">
+              <div className="flex shrink-0 -space-x-2">
+                {(row.items.length ? row.items : [{ label: row.type, icon }]).map((item) => (
+                  <div key={item.label} className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[#24160f] text-sm">
+                    {item.imageUrl ? <Image src={item.imageUrl} alt={item.label} width={36} height={36} className="h-full w-full object-cover" unoptimized /> : item.icon}
+                  </div>
+                ))}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#d9b48f]">{row.type}</p>
+                    <p className="truncate font-semibold text-[#ffe8ca]">{row.title}</p>
+                  </div>
+                  <p className="shrink-0 text-right text-[10px] text-[#d9b48f]">{row.meta}</p>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  <span className="rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-0.5 text-[10px] font-semibold text-[#ffe8ca]">{row.amount}</span>
+                  <span className="rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-0.5 text-[10px] text-[#efcdab]">{row.status}</span>
+                </div>
+                {row.lines.map((line) => <p key={line} className="mt-1 leading-relaxed">{line}</p>)}
+              </div>
             </div>
-            {row.lines.map((line) => <p key={line} className="mt-1 leading-relaxed">{line}</p>)}
           </article>
         )) : <p className="rounded-lg border border-white/10 bg-[#3f281b]/40 p-3 text-xs text-[#efcdab]">{empty}</p>}
       </div>

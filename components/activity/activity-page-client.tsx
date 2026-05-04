@@ -134,7 +134,11 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
 
   function stepEquipment(delta: number) {
     setError('');
-    setEquipmentUsed((current) => Math.max(0, current + delta));
+    setEquipmentUsed((current) => {
+      const next = Math.max(0, current + delta);
+      if (activityType === 'processor') setProcessorRecoveredQty(next * PROCESSOR_UNITS_PER_BOTTLE);
+      return next;
+    });
   }
 
   function setProcessorRecoveredQtySafe(value: number) {
