@@ -261,13 +261,13 @@ export async function POST(request: Request) {
       }))
     );
 
-    const membersRows = memberIds.length > 0
+    const membersRows: Array<{ activity_id: number; member_user_id: string | null; member_label: string }> = memberIds.length > 0
       ? memberIds.map((id, idx) => ({
-        activity_id: activity.id,
+        activity_id: Number(activity.id),
         member_user_id: id,
         member_label: memberLabels[idx] ?? memberLabels[0] ?? actorLabel
       }))
-      : [{ activity_id: activity.id, member_user_id: null, member_label: 'Groupe' }];
+      : [{ activity_id: Number(activity.id), member_user_id: null, member_label: 'Groupe' }];
 
     await supabase.from('activity_members').insert(membersRows);
   }
