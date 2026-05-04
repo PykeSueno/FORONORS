@@ -130,6 +130,63 @@ export function TabletCigarettePageClient(props: {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.sold - a.sold || b.sessions - a.sessions);
   }, [activeMemberIds, activeProcessorSessions, membersById]);
 
+  const tabletStatsByMember = useMemo(() => {
+    const map = new Map<string, { label: string; count: number; money: number; kits: number; cutters: number; last: string }>();
+    for (const row of tabletPassagesState) {
+      const current = map.get(row.member_label) ?? { label: row.member_label, count: 0, money: 0, kits: 0, cutters: 0, last: row.created_at };
+      current.count += 1;
+      current.money += Math.max(0, Number(row.after_cash ?? 0) - Number(row.before_cash ?? 0));
+      current.kits += Math.max(0, Number(row.after_kits ?? 0) - Number(row.before_kits ?? 0));
+      current.cutters += Math.max(0, Number(row.after_cutters ?? 0) - Number(row.before_cutters ?? 0));
+      if (new Date(row.created_at).getTime() > new Date(current.last).getTime()) current.last = row.created_at;
+      map.set(row.member_label, current);
+    }
+    return Array.from(map.values()).sort((a, b) => b.money - a.money || b.count - a.count);
+  }, [tabletPassagesState]);
+
+  const tabletStatsTotals = useMemo(() => ({
+    passages: tabletStatsByMember.reduce((sum, row) => sum + row.count, 0),
+    money: tabletStatsByMember.reduce((sum, row) => sum + row.money, 0),
+    kits: tabletStatsByMember.reduce((sum, row) => sum + row.kits, 0),
+    cutters: tabletStatsByMember.reduce((sum, row) => sum + row.cutters, 0),
+    last: tabletStatsByMember.reduce((last, row) => !last || new Date(row.last).getTime() > new Date(last).getTime() ? row.last : last, '')
+  }), [tabletStatsByMember]);
+
+  const cigaretteStatsByMember = useMemo(() => {
+    const map = new Map<string, { label: string; count: number; packs: number; revenue: number; cash: number; bankPending: number; bankReceived: number; last: string }>();
+    for (const row of cigarettePassagesState) {
+      const current = map.get(row.member_label) ?? { label: row.member_label, count: 0, packs: 0, revenue: 0, cash: 0, bankPending: 0, bankReceived: 0, last: row.created_at };
+      const revenue = Number(row.revenue_amount ?? 0);
+      current.count += 1;
+      current.packs += Number(row.quantity_sold ?? 0);
+      current.revenue += revenue;
+      if (row.status === 'pending_bank') current.bankPending += 1;
+      else if (row.status === 'received_bank') current.bankReceived += 1;
+      else current.cash += revenue;
+      if (new Date(row.created_at).getTime() > new Date(current.last).getTime()) current.last = row.created_at;
+      map.set(row.member_label, current);
+    }
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.count - a.count);
+  }, [cigarettePassagesState]);
+
+  const cigaretteStatsTotals = useMemo(() => ({
+    passages: cigaretteStatsByMember.reduce((sum, row) => sum + row.count, 0),
+    packs: cigaretteStatsByMember.reduce((sum, row) => sum + row.packs, 0),
+    revenue: cigaretteStatsByMember.reduce((sum, row) => sum + row.revenue, 0),
+    cash: cigaretteStatsByMember.reduce((sum, row) => sum + row.cash, 0),
+    bankPending: cigaretteStatsByMember.reduce((sum, row) => sum + row.bankPending, 0),
+    bankReceived: cigaretteStatsByMember.reduce((sum, row) => sum + row.bankReceived, 0),
+    last: cigaretteStatsByMember.reduce((last, row) => !last || new Date(row.last).getTime() > new Date(last).getTime() ? row.last : last, '')
+  }), [cigaretteStatsByMember]);
+
+  const processorStatsTotals = useMemo(() => ({
+    produced: activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0),
+    sold: activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0),
+    revenue: activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0),
+    net: activeProcessorSessions.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0),
+    sessions: activeProcessorSessions.filter((row) => row.status === 'validated').length
+  }), [activeProcessorSessions]);
+
   const historyColumns = useMemo(() => {
     const tabletRows: HistoryCard[] = tabletPassagesState.map((entry) => ({
       id: `t-${entry.id}`,
@@ -523,50 +580,44 @@ export function TabletCigarettePageClient(props: {
 
       {tab === 'stats' && canStats ? (
         <section className="space-y-3">
-          <div className="grid gap-2 md:grid-cols-4">
-            <Stat label="Passages tablette" value={String(tabletPassagesState.length)} icon="📱" />
-            <Stat label="Passages cigarette" value={String(cigarettePassagesState.length)} icon="🚬" />
-            <Stat label="Recette cigarette" value={formatUsd(cigarettePassagesState.reduce((sum, row) => sum + Number(row.revenue_amount ?? 0), 0))} icon="💵" />
-            <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="🏦" />
-          </div>
           <article className="glass-card p-5">
             <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Tablette</h4>
-            <div className="mt-2 overflow-x-auto">
+            <div className="mt-2 grid gap-2 md:grid-cols-5">
+              <Stat label="Passages tablette" value={String(tabletStatsTotals.passages)} icon="📱" />
+              <Stat label="Argent généré" value={formatUsd(tabletStatsTotals.money)} icon="💵" />
+              <Stat label="Kits utilisés" value={String(tabletStatsTotals.kits)} icon="🧰" />
+              <Stat label="Disqueuses utilisées" value={String(tabletStatsTotals.cutters)} icon="🪚" />
+              <Stat label="Dernière activité" value={tabletStatsTotals.last ? new Date(tabletStatsTotals.last).toLocaleDateString('fr-FR') : '-'} icon="🕒" />
+            </div>
+            <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-left text-xs text-[#efcdab]">
-                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent rapporté</th><th className="px-2 py-1">Argent restant</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
+                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent généré</th><th className="px-2 py-1">Kits</th><th className="px-2 py-1">Disqueuses</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
                 <tbody>
-                  {Array.from(tabletPassagesState.reduce((acc, row) => {
-                    const prev = acc.get(row.member_label) ?? { count: 0, money: 0, last: row.created_at, remaining: row.after_cash };
-                    prev.count += 1;
-                    prev.money += Number(row.after_cash) - Number(row.before_cash);
-                    prev.remaining = Number(row.after_cash);
-                    if (new Date(row.created_at).getTime() > new Date(prev.last).getTime()) prev.last = row.created_at;
-                    acc.set(row.member_label, prev);
-                    return acc;
-                  }, new Map<string, { count: number; money: number; remaining: number; last: string }>()).entries()).map(([name, row]) => (
-                    <tr key={name} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{name}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{formatUsd(row.remaining)}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
+                  {tabletStatsByMember.map((row) => (
+                    <tr key={row.label} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{row.kits}</td><td className="px-2 py-1">{row.cutters}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
                   ))}
+                  {tabletStatsByMember.length === 0 ? <tr className="border-t border-white/10"><td className="px-2 py-2" colSpan={6}>Aucune stat tablette.</td></tr> : null}
                 </tbody>
               </table>
             </div>
           </article>
           <article className="glass-card p-5">
             <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Cigarette</h4>
-            <div className="mt-2 overflow-x-auto">
+            <div className="mt-2 grid gap-2 md:grid-cols-5">
+              <Stat label="Passages cigarette" value={String(cigaretteStatsTotals.passages)} icon="🚬" />
+              <Stat label="Paquets vendus" value={String(cigaretteStatsTotals.packs)} icon="📦" />
+              <Stat label="Argent généré" value={formatUsd(cigaretteStatsTotals.revenue)} icon="💵" />
+              <Stat label="Cash reçu" value={formatUsd(cigaretteStatsTotals.cash)} icon="🏦" />
+              <Stat label="Bank attente / reçu" value={`${cigaretteStatsTotals.bankPending} / ${cigaretteStatsTotals.bankReceived}`} icon="🧾" />
+            </div>
+            <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-left text-xs text-[#efcdab]">
-                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent rapporté</th><th className="px-2 py-1">Qté vendue</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
+                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Paquets</th><th className="px-2 py-1">Argent généré</th><th className="px-2 py-1">Cash</th><th className="px-2 py-1">Bank attente / reçu</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
                 <tbody>
-                  {Array.from(cigarettePassagesState.reduce((acc, row) => {
-                    const prev = acc.get(row.member_label) ?? { count: 0, money: 0, qty: 0, last: row.created_at };
-                    prev.count += 1;
-                    prev.money += Number(row.revenue_amount ?? 0);
-                    prev.qty += Number(row.quantity_sold ?? 0);
-                    if (new Date(row.created_at).getTime() > new Date(prev.last).getTime()) prev.last = row.created_at;
-                    acc.set(row.member_label, prev);
-                    return acc;
-                  }, new Map<string, { count: number; money: number; qty: number; last: string }>()).entries()).map(([name, row]) => (
-                    <tr key={name} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{name}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{row.qty}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
+                  {cigaretteStatsByMember.map((row) => (
+                    <tr key={row.label} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{row.packs}</td><td className="px-2 py-1">{formatUsd(row.revenue)}</td><td className="px-2 py-1">{formatUsd(row.cash)}</td><td className="px-2 py-1">{row.bankPending} / {row.bankReceived}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
                   ))}
+                  {cigaretteStatsByMember.length === 0 ? <tr className="border-t border-white/10"><td className="px-2 py-2" colSpan={7}>Aucune stat cigarette.</td></tr> : null}
                 </tbody>
               </table>
             </div>
@@ -574,11 +625,12 @@ export function TabletCigarettePageClient(props: {
           {canProcessorStats ? (
             <article className="glass-card p-5">
               <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Processeur</h4>
-              <div className="mt-2 grid gap-2 md:grid-cols-4">
-                <Stat label="Processeurs produits" value={String(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0))} icon="⚙️" />
-                <Stat label="Processeurs vendus" value={String(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0))} icon="📦" />
-                <Stat label="Argent généré processeur" value={formatUsd(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0))} icon="💵" />
-                <Stat label="Bénéfice net" value={formatUsd(activeProcessorSessions.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0))} icon="📈" />
+              <div className="mt-2 grid gap-2 md:grid-cols-5">
+                <Stat label="Processeurs produits" value={String(processorStatsTotals.produced)} icon="⚙️" />
+                <Stat label="Processeurs vendus" value={String(processorStatsTotals.sold)} icon="📦" />
+                <Stat label="Argent généré" value={formatUsd(processorStatsTotals.revenue)} icon="💵" />
+                <Stat label="Bénéfice net" value={formatUsd(processorStatsTotals.net)} icon="📈" />
+                <Stat label="Sessions processeur" value={String(processorStatsTotals.sessions)} icon="🧾" />
               </div>
               <div className="mt-4 overflow-x-auto">
                 <table className="min-w-full text-left text-xs text-[#efcdab]">

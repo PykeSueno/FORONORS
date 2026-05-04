@@ -137,6 +137,10 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
     setEquipmentUsed((current) => Math.max(0, current + delta));
   }
 
+  function setProcessorRecoveredQtySafe(value: number) {
+    setProcessorRecoveredQty(Math.max(0, Number.isFinite(value) ? value : 0));
+  }
+
   async function uploadImage(file: File) {
     setUploading(true);
     const body = new FormData();
@@ -244,7 +248,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
               {activityType === 'processor' ? (
                 <>
                   <label className="mt-3 block text-xs text-[#efccaa]">Nombre de bouteilles utilisées</label>
-                  <input className="saas-input mt-1 w-full text-center" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} inputMode="numeric" />
+                  <StepperControl value={equipmentUsed} onMinus={() => stepEquipment(-1)} onPlus={() => stepEquipment(1)} />
                 </>
               ) : (
                 <>
@@ -317,12 +321,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
           {activityType === 'processor' ? (
             <div className="mt-3 rounded-xl border border-white/10 bg-[#2f1d14]/60 p-3">
               <label className="block text-xs text-[#efccaa]">Processeurs récupérés</label>
-              <input
-                className="saas-input mt-1 w-full text-center"
-                value={processorQuantity}
-                onChange={(e) => setProcessorRecoveredQty(Math.max(0, Number(e.target.value || 0)))}
-                inputMode="numeric"
-              />
+              <StepperControl value={processorQuantity} onMinus={() => setProcessorRecoveredQtySafe(processorQuantity - 1)} onPlus={() => setProcessorRecoveredQtySafe(processorQuantity + 1)} />
               <p className="mt-1 text-xs text-[#efcdab]">Calcul de base: {equipmentUsed} bouteille(s) × {PROCESSOR_UNITS_PER_BOTTLE} = {processorAutoQuantity}</p>
             </div>
           ) : null}
@@ -440,6 +439,16 @@ function EditActivityModal({ activity, onClose }: { activity: RecentActivity; on
           <button className="saas-primary-btn w-full" onClick={() => void save()}>Enregistrer</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StepperControl({ value, onMinus, onPlus }: { value: number; onMinus: () => void; onPlus: () => void }) {
+  return (
+    <div className="mt-1 grid grid-cols-[44px_1fr_44px] items-center gap-2">
+      <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={onMinus}>-</button>
+      <div className="flex h-10 items-center justify-center rounded-lg border border-white/10 bg-[#24160f] text-sm font-semibold text-[#ffe8ca]">{value}</div>
+      <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={onPlus}>+</button>
     </div>
   );
 }
