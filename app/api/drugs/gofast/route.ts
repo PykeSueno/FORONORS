@@ -4,6 +4,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type RunBody = {
   action?: 'success' | 'arrested';
@@ -42,11 +43,17 @@ export async function POST(request: Request) {
   if (participantIds.length === 0) return NextResponse.json({ message: 'Ajoute au moins un participant.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'drugs.gofast', action, memberIds: participantIds });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
   const [{ data: user }, { data: item }, { data: cash }, { data: participants }] = await Promise.all([
     supabase.from('users').select('name, username').eq('id', session.userId).maybeSingle(),
     supabase.from('items').select('id, name, image_url, quantity, category_key, type_key').eq('id', itemId).maybeSingle(),
     supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle(),
-    supabase.from('users').select('id, name, username').in('id', participantIds)
+    supabase.from('users').select('id, name, username').eq('is_active', true).in('id', participantIds)
   ]);
 
   if (!item || !isValidBag(item)) return NextResponse.json({ message: 'Pochon invalide.' }, { status: 400 });

@@ -4,6 +4,7 @@ import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type TxLineInput = {
   item_id: number;
@@ -78,6 +79,12 @@ export async function POST(request: Request) {
   if (!body.lines || body.lines.length === 0) return NextResponse.json({ message: 'Ajoutez au moins un item.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'transactions', action: 'create', memberIds: body.member_user_id ? [body.member_user_id] : [] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
   if (!cash) return NextResponse.json({ message: 'Caisse introuvable.' }, { status: 404 });
 

@@ -205,7 +205,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     { data: cigaretteRows },
     { data: processorRows }
   ] = await Promise.all([
-    supabase.from('users').select('id, name, username, is_active').order('username', { ascending: true }),
+    supabase.from('users').select('id, name, username, is_active').eq('is_active', true).order('username', { ascending: true }),
     supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle(),
     supabase.from('transactions').select('member_user_id, actor_user_id, member_label, total_money_in, total_money_out, reason, summary, transaction_type, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
     supabase.from('four_transactions').select('created_by, profit_loss, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
@@ -220,8 +220,10 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   ]);
 
   const memberIdByLabel = new Map<string, string>();
+  const activeMemberIds = new Set<string>();
   for (const member of members ?? []) {
     const id = member.id as string;
+    activeMemberIds.add(id);
     const keys = [normalizeLabel(member.name as string | null), normalizeLabel(member.username as string | null)];
     for (const key of keys) if (key) memberIdByLabel.set(key, id);
   }
@@ -237,15 +239,15 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   const participationByMember = new Map<string, number>();
 
   const addMoney = (memberId: string | null | undefined, amount: number) => {
-    if (!memberId || !Number.isFinite(amount) || amount <= 0) return;
+    if (!memberId || !activeMemberIds.has(memberId) || !Number.isFinite(amount) || amount <= 0) return;
     moneyByMember.set(memberId, (moneyByMember.get(memberId) ?? 0) + amount);
   };
   const addActivity = (memberId: string | null | undefined, amount = 1) => {
-    if (!memberId) return;
+    if (!memberId || !activeMemberIds.has(memberId)) return;
     activityByMember.set(memberId, (activityByMember.get(memberId) ?? 0) + amount);
   };
   const addParticipation = (memberId: string | null | undefined, amount = 1) => {
-    if (!memberId) return;
+    if (!memberId || !activeMemberIds.has(memberId)) return;
     participationByMember.set(memberId, (participationByMember.get(memberId) ?? 0) + amount);
   };
 

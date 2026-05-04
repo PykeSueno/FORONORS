@@ -9,6 +9,7 @@ type MemberStats = {
   mailbox: number;
   burglary: number;
   container: number;
+  processor: number;
   items: Record<string, VisualCount>;
   equipments: Record<string, VisualCount>;
 };

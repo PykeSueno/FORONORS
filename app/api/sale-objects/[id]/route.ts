@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { resolveItemRouting, type SaleObjectRouting } from '@/lib/sale-objects-rules';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type SaleLineInput = { item_id: number; quantity: number; unit_price?: number };
 
@@ -59,7 +60,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const sellerUserId = body.seller_user_id || existing.created_by || session.userId;
   const sellerLabel = (body.seller_label ?? '').trim() || session.username;
 
-  const { data: sellerExists } = await supabase.from('users').select('id').eq('id', sellerUserId).maybeSingle();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'sale_objects', action: 'edit', memberIds: [sellerUserId] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
+  const { data: sellerExists } = await supabase.from('users').select('id').eq('is_active', true).eq('id', sellerUserId).maybeSingle();
   if (!sellerExists) return NextResponse.json({ message: 'Vendeur invalide.' }, { status: 400 });
 
   const previousLines = (existing.sale_lines ?? []) as Array<{ itemId: number; itemName: string; quantity: number }>;

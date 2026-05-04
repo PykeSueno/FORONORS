@@ -5,6 +5,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, weekWindow, type PayrollConfig } from '@/lib/payroll';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type Action = 'pay' | 'adjust' | 'exclude';
 type Body = {
@@ -128,6 +129,12 @@ export async function POST(request: Request) {
   if (!allowed) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'activity_payroll', action, memberIds: [memberId] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
   if (action === 'adjust') {
     const key = periodSettingKey('adjustments', weekStartIso, weekEndIso);
     const adjustments = await readJsonSetting<Record<string, number>>(supabase, key, {});

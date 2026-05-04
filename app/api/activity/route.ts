@@ -4,17 +4,19 @@ import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
-type ActivityType = 'mailbox' | 'burglary' | 'container';
+type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor';
 const ACTIVITY_LABELS: Record<ActivityType, string> = {
   mailbox: 'Boîte aux lettres',
   burglary: 'Cambriolage',
-  container: 'Conteneur'
+  container: 'Conteneur',
+  processor: 'Processeur'
 };
 
 type EquipmentRow = { id: number; name: string; quantity: number };
 
-function pickBestEquipment(items: EquipmentRow[], keyword: 'kit' | 'disqueuse') {
+function pickBestEquipment(items: EquipmentRow[], keyword: 'kit' | 'disqueuse' | 'bouteille de plongee') {
   if (items.length === 0) return null;
   const normalizedKeyword = keyword.toLowerCase();
 
@@ -76,8 +78,12 @@ export async function POST(request: Request) {
     lines?: Array<{ item_id: number; quantity: number }>;
   };
 
-  if (!body.activity_type || !['mailbox', 'burglary', 'container'].includes(body.activity_type)) {
+  if (!body.activity_type || !['mailbox', 'burglary', 'container', 'processor'].includes(body.activity_type)) {
     return NextResponse.json({ message: 'Type activité invalide.' }, { status: 400 });
+  }
+  if (body.activity_type === 'processor') {
+    const canProcessorCreate = await hasUserPermission(session.userId, 'activity.processor.create');
+    if (!canProcessorCreate) return NextResponse.json({ message: 'Permission Processeur manquante.' }, { status: 403 });
   }
 
   const lines = body.lines ?? [];
@@ -94,11 +100,20 @@ export async function POST(request: Request) {
   const memberLabel = uniqueLabels.length > 0 ? uniqueLabels.join(' + ') : (body.member_label?.trim() || session.username);
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'activity', action: 'create', memberIds: [memberId, ...uniqueMemberIds] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
 
   let equipmentRow: EquipmentRow | null = null;
   if (body.activity_type !== 'mailbox') {
-    const keyword = body.activity_type === 'burglary' ? 'kit' : 'disqueuse';
-    const { data: matches } = await supabase.from('items').select('id, name, quantity').ilike('name', `%${keyword}%`).order('name', { ascending: true }).limit(20);
+    const keyword = body.activity_type === 'burglary' ? 'kit' : body.activity_type === 'container' ? 'disqueuse' : 'bouteille de plongee';
+    const itemQuery = body.activity_type === 'processor'
+      ? supabase.from('items').select('id, name, quantity').eq('name', 'Bouteille de Plong\u00e9e').limit(1)
+      : supabase.from('items').select('id, name, quantity').ilike('name', `%${keyword}%`).order('name', { ascending: true }).limit(20);
+    const { data: matches } = await itemQuery;
     equipmentRow = pickBestEquipment((matches ?? []) as EquipmentRow[], keyword);
     if (!equipmentRow) return NextResponse.json({ message: 'Équipement introuvable pour cette activité.' }, { status: 400 });
     if (equipmentUsed <= 0) return NextResponse.json({ message: 'Quantité d’équipement requise.' }, { status: 400 });
@@ -115,6 +130,9 @@ export async function POST(request: Request) {
   for (const [itemId, quantity] of mergedLines.entries()) {
     const { data: item } = await supabase.from('items').select('id, name, quantity, is_money_item').eq('id', itemId).maybeSingle();
     if (!item) return NextResponse.json({ message: `Item ${itemId} introuvable.` }, { status: 404 });
+    if (body.activity_type === 'processor' && item.name !== 'Processeur') {
+      return NextResponse.json({ message: "Le Processeur ne peut ajouter que l'item Processeur." }, { status: 400 });
+    }
 
     const before = Number(item.quantity);
     const after = before + quantity;
@@ -221,7 +239,7 @@ export async function POST(request: Request) {
 
   await createAuditLog({
     actorUserId: session.userId,
-    action: 'activity.create',
+    action: body.activity_type === 'processor' ? 'activity.processor.create' : 'activity.create',
     entityType: 'activity',
     entityId: activity.id,
     summary: `${memberLabel} — ${ACTIVITY_LABELS[body.activity_type]} | équipement ${equipmentRow?.name ?? 'Aucun'}: ${equipmentUsed} | items: ${resolvedItems.map((row) => `${row.item_name} +${row.quantity}`).join(', ')}`,

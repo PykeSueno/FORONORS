@@ -46,14 +46,16 @@ function otherRecent(row: RoleStats, role: RoleKey) { return role === 'braqueur'
 
 function buildRoleStats(runs: Run[], members: Array<{ id: string; label: string }>) {
   const rows = new Map<string, RoleStats>();
+  const activeMemberIds = new Set(members.map((member) => member.id));
   const emptyStats = (memberId: string, name: string): RoleStats => ({ memberId, name, total: 0, braqueur: 0, braqueurMoney: 0, braqueurLast: null, mule: 0, muleSuccess: 0, muleLast: null, hostage: 0, hostageLast: null, recentBraqueur: 0, recentMule: 0, recentHostage: 0 });
   for (const member of members) rows.set(member.id, emptyStats(member.id, member.label));
   for (const run of runs) {
-    const braqueurs = (run.participants ?? []).filter((entry) => entry.role === 'braqueur');
+    const activeParticipants = (run.participants ?? []).filter((entry) => entry.id && activeMemberIds.has(entry.id));
+    const braqueurs = activeParticipants.filter((entry) => entry.role === 'braqueur');
     const braqueurShare = braqueurs.length > 0 ? Number(run.money_amount ?? 0) / braqueurs.length : 0;
     const weight = recentWeight(run.created_at);
-    for (const participant of run.participants ?? []) {
-      const key = participant.id || participant.label;
+    for (const participant of activeParticipants) {
+      const key = participant.id as string;
       const row = rows.get(key) ?? emptyStats(key, participant.label);
       if (participant.role === 'braqueur') { row.braqueur += 1; row.recentBraqueur += weight; row.braqueurMoney += braqueurShare; if (!row.braqueurLast || run.created_at > row.braqueurLast) row.braqueurLast = run.created_at; }
       if (participant.role === 'plan_mule_recup') { row.mule += 1; row.recentMule += weight; if (isSuccess(run)) row.muleSuccess += 1; if (!row.muleLast || run.created_at > row.muleLast) row.muleLast = run.created_at; }
@@ -178,7 +180,7 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
 
         <article className="glass-card space-y-3 p-5">
           <h3 className="text-base font-semibold text-[#fff1dd]">Participants par rôle</h3>
-          {roleBlocks.map(({ title, values, setValues }) => <div key={title}><p className="mb-1 text-xs text-[#efcdab]">{title}</p><div className="max-h-32 space-y-1 overflow-auto rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">{members.map((member) => { const checked = values.includes(member.id); return <label key={`${title}-${member.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#4f3220]/55 px-2 py-1.5 text-sm text-[#f8e2c6]"><span className="truncate pr-2">{member.label}</span><input type="checkbox" className="h-4 w-4 accent-[#ffcf9a]" checked={checked} onChange={(event) => { if (event.target.checked) { setSelectedMembers((cur) => cur.includes(member.id) ? cur : [...cur, member.id]); setValues((cur) => cur.includes(member.id) ? cur : [...cur, member.id]); if (title !== 'Braqueurs') setBraqueurIds((cur) => cur.filter((id) => id !== member.id)); if (title !== 'Otages apportés') setHostageIds((cur) => cur.filter((id) => id !== member.id)); if (title !== 'Plan Mule / Récup') setMuleIds((cur) => cur.filter((id) => id !== member.id)); } else { setValues((cur) => cur.filter((id) => id !== member.id)); } }} /></label>; })}</div></div>)}
+          {roleBlocks.map(({ title, values, setValues }) => <div key={title}><p className="mb-1 text-xs text-[#efcdab]">{title}</p><div className="max-h-32 space-y-1 overflow-auto rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">{members.map((member) => { const checked = values.includes(member.id); return <label key={`${title}-${member.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#4f3220]/55 px-2 py-1.5 text-sm text-[#f8e2c6]"><span className="truncate pr-2">{member.label}</span><input type="checkbox" className="h-4 w-4 accent-[#ffcf9a]" checked={checked} onChange={(event) => { if (event.target.checked) { setSelectedMembers((cur) => cur.includes(member.id) ? cur : [...cur, member.id]); setValues((cur) => cur.includes(member.id) ? cur : [...cur, member.id]); } else { setValues((cur) => cur.filter((id) => id !== member.id)); } }} /></label>; })}</div></div>)}
           <p className="text-xs text-[#efcdab]">Récap: Braqueurs {braqueurIds.length} · Otages {hostageIds.length} · Plan Mule/Récup {muleIds.length}</p>
           <label className="text-xs text-[#efcdab]">Argent rapporté</label><input className="saas-input" value={moneyAmount} onChange={(event) => setMoneyAmount(Math.max(0, Number(event.target.value || 0)))} />
           <div className="grid grid-cols-2 gap-2">{canCreate ? <button type="button" className="saas-primary-btn" disabled={!canValidate} onClick={() => void submit('success')}>✅ Valider</button> : <p className="rounded-lg border border-white/10 bg-[#3f281b]/50 px-3 py-2 text-sm text-[#efcdab]">Permission manquante</p>}<button type="button" className="saas-ghost-btn" onClick={() => { setMoneyAmount(0); setSelectedMembers([]); setBraqueurIds([]); setHostageIds([]); setMuleIds([]); setError(''); }}>Annuler</button></div>

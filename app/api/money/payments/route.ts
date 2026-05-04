@@ -4,6 +4,7 @@ import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 export async function GET() {
   const session = await getSession();
@@ -46,8 +47,14 @@ export async function POST(request: Request) {
   }
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'money.pay', action: 'create', memberIds: [memberId] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
   const [{ data: member }, { data: cash }] = await Promise.all([
-    supabase.from('users').select('id, name, username').eq('id', memberId).maybeSingle(),
+    supabase.from('users').select('id, name, username').eq('is_active', true).eq('id', memberId).maybeSingle(),
     supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle()
   ]);
 

@@ -22,7 +22,7 @@ export default async function TabletCigarettePage() {
   const cigaretteBusinessDay = getCigaretteBusinessDate();
 
   const [membersRes, cashRes, tabletDayRes, cigaretteDayRes, kitItemRes, cutterItemRes, cigaretteItemRes, processorItemRes] = await Promise.all([
-    supabase.from('users').select('id, name, username').order('username', { ascending: true }),
+    supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true }),
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
     supabase.from('tablet_days').select('*').eq('business_day', tabletBusinessDay).maybeSingle(),
     supabase.from('cigarette_days').select('*').eq('business_day', cigaretteBusinessDay).maybeSingle(),
@@ -71,9 +71,9 @@ export default async function TabletCigarettePage() {
         canHistory={permissions.includes('tablet.access') || permissions.includes('cigarette.history.view')}
         canStats={permissions.includes('tablet.stats.view') || permissions.includes('cigarette.stats.view')}
         canProcessorView={canProcessorView}
-        canProcessorCreate={permissions.includes('tobacco.processor.create')}
-        canProcessorProduction={permissions.includes('tobacco.processor.production') || permissions.includes('tobacco.processor.create')}
-        canProcessorSale={permissions.includes('tobacco.processor.sale') || permissions.includes('tobacco.processor.create')}
+        canProcessorCreate={permissions.includes('tobacco.processor.create') || permissions.includes('tobacco.processor.sale.validate')}
+        canProcessorProduction={false}
+        canProcessorSale={permissions.includes('tobacco.processor.sale') || permissions.includes('tobacco.processor.sale.view') || permissions.includes('tobacco.processor.create')}
         canProcessorStats={permissions.includes('tobacco.processor.stats')}
         canProcessorLogs={permissions.includes('tobacco.processor.logs')}
         processorSessions={processorSessions as Array<Record<string, unknown>>}

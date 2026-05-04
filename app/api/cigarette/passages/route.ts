@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { CIGARETTE_DAILY_PACKS, CIGARETTE_ITEM_NAME, CIGARETTE_REVENUE, CIGARETTE_SALE_QTY, getCigaretteBusinessDate, isCigarettePassageHourAllowed } from '@/lib/cigarette';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -37,7 +38,13 @@ export async function POST(request: Request) {
   }
 
   const supabase = getSupabaseAdmin();
-  const { data: member } = await supabase.from('users').select('id, name, username').eq('id', requestedMemberId).maybeSingle();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'cigarette', action: 'passage.create', memberIds: [requestedMemberId] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
+  const { data: member } = await supabase.from('users').select('id, name, username').eq('is_active', true).eq('id', requestedMemberId).maybeSingle();
   if (!member) return NextResponse.json({ message: 'Membre introuvable.' }, { status: 404 });
   const memberLabel = body.member_label?.trim() || member.name || member.username || 'Membre';
 

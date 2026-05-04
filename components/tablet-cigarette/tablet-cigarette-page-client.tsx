@@ -76,30 +76,36 @@ export function TabletCigarettePageClient(props: {
   const [processorSaleMemberId, setProcessorSaleMemberId] = useState(defaultMemberId);
   const [processorSaleQty, setProcessorSaleQty] = useState(10);
   const [processorSoldQty, setProcessorSoldQty] = useState(5);
+  const [processorRealReceived, setProcessorRealReceived] = useState('500');
   const [processorStockState, setProcessorStockState] = useState(processorInStock);
   const [cigarettePaymentMode, setCigarettePaymentMode] = useState<'cash' | 'bank'>('cash');
 
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
+  const activeMemberIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
+  const activeProcessorSessions = useMemo(() => processorSessionsState.filter((row) => {
+    const participantIds = Array.isArray(row.participant_user_ids) ? row.participant_user_ids as string[] : [];
+    return participantIds.some((id) => activeMemberIds.has(id));
+  }), [activeMemberIds, processorSessionsState]);
   const processorEstimate = useMemo(() => computeProcessorEstimates(processorBottles, processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES), [processorBottles, processorBoatFee]);
   const processorSaleTotalEstimated = Math.max(0, Math.floor(processorSaleQty * 0.5) * 100);
-  const processorSaleTotalReal = Math.max(0, processorSoldQty * 100);
+  const processorSaleTotalReal = Math.max(0, Number(processorRealReceived || 0));
   const tabletGenerated = Math.max(0, Number(tabletDayState?.deposited_amount ?? 0) - Number(tabletDayState?.chest_amount ?? 0));
 
   const processorSoldToday = useMemo(() => processorSessionsState
     .filter((row) => row.operation_type === 'sale' && row.status === 'validated' && Array.isArray(row.participant_user_ids) && row.participant_user_ids.includes(processorSaleMemberId))
     .filter((row) => String(row.created_at ?? '').slice(0, 10) === new Date().toISOString().slice(0, 10))
-    .reduce((sum, row) => sum + Number(row.accepted_count ?? 0), 0), [processorSessionsState, processorSaleMemberId]);
+    .reduce((sum, row) => sum + Number(row.processors_count ?? 0), 0), [processorSessionsState, processorSaleMemberId]);
   const processorRemainingToday = Math.max(0, 50 - processorSoldToday);
 
   const processorStatsQuick = useMemo(() => {
-    const rows = processorSessionsState.filter((row) => row.status === 'validated');
+    const rows = activeProcessorSessions.filter((row) => row.status === 'validated');
     return {
       produced: rows.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0),
       sold: rows.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0),
       revenue: rows.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0),
       net: rows.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0)
     };
-  }, [processorSessionsState]);
+  }, [activeProcessorSessions]);
 
   const historyColumns = useMemo(() => {
     const tabletRows: HistoryCard[] = tabletPassagesState.map((entry) => ({
@@ -225,7 +231,8 @@ export function TabletCigarettePageClient(props: {
         operation_type: 'sale',
         seller_user_id: processorSaleMemberId,
         quantity: processorSaleQty,
-        sold_quantity: processorSoldQty
+        sold_quantity: processorSoldQty,
+        real_received: processorSaleTotalReal
       })
     });
     if (!response.ok) {
@@ -379,8 +386,8 @@ export function TabletCigarettePageClient(props: {
           <article className="glass-card p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h3 className="text-xl font-semibold text-[#ffe8ca]">Processeur</h3>
-                <p className="text-xs text-[#efcdab]">Production / Stock / Vente</p>
+                <h3 className="text-xl font-semibold text-[#ffe8ca]">Processeur — {tabletBusinessDay}</h3>
+                <p className="text-xs text-[#efcdab]">Vente processeurs</p>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <MiniStat label="Stock actuel" value={String(processorStockState)} />
@@ -433,12 +440,14 @@ export function TabletCigarettePageClient(props: {
                 <input className="saas-input !h-9" type="number" min={1} max={processorStockState} value={processorSaleQty} onChange={(event) => setProcessorSaleQty(Math.max(1, Number(event.target.value || 0)))} />
                 <input className="saas-input !h-9" type="number" min={0} max={Math.min(processorRemainingToday, processorSaleQty)} value={processorSoldQty} onChange={(event) => setProcessorSoldQty(Math.max(0, Math.min(processorRemainingToday, Number(event.target.value || 0))))} />
               </div>
+              <label className="mt-2 text-xs text-[#efcdab]">Argent réel récupéré</label>
+              <input className="saas-input !h-9" type="number" min={0} value={processorRealReceived} onChange={(event) => setProcessorRealReceived(event.target.value)} />
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <MiniStat label="Estimation (50%)" value={formatUsd(processorSaleTotalEstimated)} />
                 <MiniStat label="Total reçu réel" value={formatUsd(processorSaleTotalReal)} />
                 <MiniStat label="Stock après" value={String(Math.max(0, processorStockState - processorSaleQty))} />
               </div>
-              {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" disabled={processorSoldQty > processorRemainingToday} onClick={() => void createProcessorSale()}>Valider vente</button> : null}
+              {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" disabled={processorSaleQty > processorRemainingToday || processorSaleQty > processorStockState} onClick={() => void createProcessorSale()}>Valider vente</button> : null}
             </article> : null}
           </div>
         </section>
@@ -506,10 +515,10 @@ export function TabletCigarettePageClient(props: {
             <article className="glass-card p-5">
               <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Processeur</h4>
               <div className="mt-2 grid gap-2 md:grid-cols-4">
-                <Stat label="Produits" value={String(processorSessionsState.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0))} icon="⚙️" />
-                <Stat label="Vendus" value={String(processorSessionsState.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0))} icon="📦" />
-                <Stat label="Argent généré" value={formatUsd(processorSessionsState.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0))} icon="💵" />
-                <Stat label="Bénéfice net" value={formatUsd(processorSessionsState.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0))} icon="📈" />
+                <Stat label="Produits" value={String(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0))} icon="⚙️" />
+                <Stat label="Vendus" value={String(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0))} icon="📦" />
+                <Stat label="Argent généré" value={formatUsd(activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0))} icon="💵" />
+                <Stat label="Bénéfice net" value={formatUsd(activeProcessorSessions.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0))} icon="📈" />
               </div>
             </article>
           ) : null}

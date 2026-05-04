@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { SessionMemberSelector } from '@/components/shared/session-member-selector';
 import { RemoveLineButton } from '@/components/shared/line-controls';
 
-type ActivityType = 'mailbox' | 'burglary' | 'container';
+type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor';
 type ActivityDisplayType = ActivityType | 'drug_sale';
 type Item = { id: number; name: string; image_url: string | null; quantity: number; category_key: string; type_key: string | null };
 type RecentActivity = {
@@ -44,13 +44,14 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const ACTIVITY_META: Record<ActivityDisplayType, { label: string; icon: string; subtitle: string }> = {
+  processor: { label: 'Processeur', icon: '⚙️', subtitle: 'Bouteilles de Plongée -> Processeurs' },
   mailbox: { label: 'Boîte aux lettres', icon: '📬', subtitle: 'Aucun équipement requis' },
   burglary: { label: 'Cambriolage', icon: '🏠', subtitle: 'Consomme des Kits' },
   container: { label: 'Conteneur', icon: '📦', subtitle: 'Consomme des Disqueuses' },
   drug_sale: { label: 'Vente drogue', icon: '🧪', subtitle: 'Session de vente validée' }
 };
 
-const CREATE_ACTIVITY_TYPES: ActivityType[] = ['mailbox', 'burglary', 'container'];
+const CREATE_ACTIVITY_TYPES: ActivityType[] = ['mailbox', 'burglary', 'container', 'processor'];
 
 export function ActivityPageClient({ items, members, activities, defaultMemberId, canCreate, canViewRecent, canManageOwn, canManageAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; canCreate: boolean; canViewRecent: boolean; canManageOwn: boolean; canManageAny: boolean; currentUserId: string }) {
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
@@ -69,13 +70,16 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const availableTypes = useMemo(() => Array.from(new Set(items.filter((item) => !categoryFilter || item.category_key === categoryFilter).map((item) => item.type_key).filter(Boolean))) as string[], [items, categoryFilter]);
   const availableItems = useMemo(() => items.filter((item) => {
+    if (activityType === 'processor') return item.name === 'Processeur';
     const qOk = item.name.toLowerCase().includes(query.toLowerCase());
     const categoryOk = !categoryFilter || item.category_key === categoryFilter;
     const typeOk = !typeFilter || item.type_key === typeFilter;
     return qOk && categoryOk && typeOk;
-  }), [items, query, categoryFilter, typeFilter]);
+  }), [items, query, categoryFilter, typeFilter, activityType]);
   const kitItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('kit')), [items]);
   const cutterItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('disqueuse')), [items]);
+  const divingBottleItem = useMemo(() => items.find((item) => item.name === 'Bouteille de Plongée'), [items]);
+  const processorItem = useMemo(() => items.find((item) => item.name === 'Processeur'), [items]);
   const selectedMembers = useMemo(() => members.filter((entry) => selectedMemberIds.includes(entry.id)), [members, selectedMemberIds]);
 
   useEffect(() => {
@@ -87,6 +91,9 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
     setActivityType(type);
     setError('');
     if (type === 'mailbox') setEquipmentUsed(0);
+    if (type === 'processor' && processorItem) {
+      setLines((current) => current.length > 0 ? current.filter((line) => line.item_id === processorItem.id) : [{ item_id: processorItem.id, quantity: 1 }]);
+    }
   }
 
   function addItem(itemId: number) {
@@ -142,8 +149,18 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
     }
 
     if (activityType !== 'mailbox' && equipmentUsed <= 0) {
-      setError(activityType === 'burglary' ? 'Pour un cambriolage, indique le nombre de Kits pris.' : 'Pour un conteneur, indique le nombre de Disqueuses prises.');
+      setError(activityType === 'burglary' ? 'Pour un cambriolage, indique le nombre de Kits pris.' : activityType === 'container' ? 'Pour un conteneur, indique le nombre de Disqueuses prises.' : 'Pour un Processeur, indique le nombre de Bouteilles de Plongée prises.');
       return;
+    }
+    if (activityType === 'processor') {
+      if (!processorItem) {
+        setError('Item Processeur introuvable dans le stock.');
+        return;
+      }
+      if (lines.some((line) => line.item_id !== processorItem.id)) {
+        setError('Le Processeur ne peut récupérer que l’item Processeur.');
+        return;
+      }
     }
 
     const memberIds = groupMode ? [] : selectedMemberIds;
@@ -202,10 +219,10 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
 
           {activityType !== 'mailbox' ? (
             <>
-              <label className="mt-3 block text-xs text-[#efccaa]">{activityType === 'burglary' ? 'Kits pris' : 'Disqueuses prises'}</label>
+              <label className="mt-3 block text-xs text-[#efccaa]">{activityType === 'burglary' ? 'Kits pris' : activityType === 'container' ? 'Disqueuses prises' : 'Bouteilles de Plongée prises'}</label>
               <div className="mt-1 flex items-center gap-2">
                 <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
-                  {(activityType === 'burglary' ? kitItem?.image_url : cutterItem?.image_url) ? (
+                  {(activityType === 'burglary' ? kitItem?.image_url : activityType === 'container' ? cutterItem?.image_url : divingBottleItem?.image_url) ? (
                     <Image src={(activityType === 'burglary' ? kitItem?.image_url : cutterItem?.image_url) as string} alt="Équipement" width={40} height={40} className="h-full w-full object-cover" unoptimized />
                   ) : (
                     <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🧰</div>

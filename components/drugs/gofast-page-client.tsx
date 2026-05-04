@@ -56,6 +56,7 @@ export function GoFastPageClient({
 
   const selected = useMemo(() => items.find((item) => item.id === selectedItemId) ?? null, [items, selectedItemId]);
   const memberLabelById = useMemo(() => new Map(members.map((member) => [member.id, member.label])), [members]);
+  const activeMemberIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
   const selectedMembersLabel = useMemo(() => {
     const labels = selectedMemberIds.map((id) => memberLabelById.get(id)).filter((value): value is string => Boolean(value));
     return labels.length > 0 ? labels.join(', ') : '—';
@@ -64,8 +65,9 @@ export function GoFastPageClient({
     const rows = new Map<string, { name: string; count: number; money: number; qty: number; last: string }>();
     for (const run of runs) {
       const participants = Array.isArray(run.participants) && run.participants.length > 0
-        ? run.participants
-        : [{ id: `actor-${run.id}`, label: run.user_name || 'Groupe' }];
+        ? run.participants.filter((participant) => activeMemberIds.has(participant.id))
+        : [];
+      if (participants.length === 0) continue;
       for (const participant of participants) {
         const key = participant.id || participant.label || `unknown-${run.id}`;
         const previous = rows.get(key) ?? { name: participant.label || 'Membre', count: 0, money: 0, qty: 0, last: run.created_at };
@@ -79,7 +81,7 @@ export function GoFastPageClient({
     return Array.from(rows.entries())
       .map(([key, value]) => ({ key, ...value }))
       .sort((a, b) => b.count - a.count || b.money - a.money);
-  }, [runs]);
+  }, [activeMemberIds, runs]);
 
   async function submit(action: 'success' | 'arrested') {
     setError('');

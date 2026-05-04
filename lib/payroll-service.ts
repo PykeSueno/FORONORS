@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAuditLog } from './audit-log';
+import { assertActiveMemberIds } from './active-members';
 import { formatUsd } from './currency';
 import { syncMoneyItemToGroupCash } from './money-item';
 
@@ -64,6 +65,7 @@ export async function payMemberPayroll(supabase: SupabaseClient, args: {
 }) {
   const amount = Math.max(0, Math.round(Number(args.amount ?? 0)));
   if (!args.memberId || !args.weekStartIso || !args.weekEndIso || amount <= 0) throw new Error('Paramètres invalides.');
+  await assertActiveMemberIds(supabase, { actorUserId: args.actorUserId, module: 'payroll', action: 'pay_member', memberIds: [args.memberId] });
 
   const paidKey = payrollSettingKey('paid', args.weekStartIso, args.weekEndIso);
   const paid = await readJsonSetting<Record<string, number>>(supabase, paidKey, {});
@@ -105,6 +107,7 @@ export async function payMemberPayroll(supabase: SupabaseClient, args: {
 }
 
 export async function setMemberPayrollAdjustment(supabase: SupabaseClient, args: { actorUserId: string; weekStartIso: string; weekEndIso: string; memberId: string; memberLabel: string; amount: number }) {
+  await assertActiveMemberIds(supabase, { actorUserId: args.actorUserId, module: 'payroll', action: 'adjust_member', memberIds: [args.memberId] });
   const key = payrollSettingKey('adjustments', args.weekStartIso, args.weekEndIso);
   const adjustments = await readJsonSetting<Record<string, number>>(supabase, key, {});
   const amount = Math.max(0, Math.round(Number(args.amount ?? 0)));
@@ -155,7 +158,7 @@ function add(rows: MemberActivityRow[], row: MemberActivityRow) {
 export async function getMemberActivities(supabase: SupabaseClient, args: { startIso: string; endIso: string; limit?: number }) {
   const limit = args.limit ?? 1200;
   const [{ data: members }, { data: txRows }, { data: fourRows }, { data: saleRows }, { data: drugRows }, { data: gofastRows }, { data: robberyRows }, { data: activityRows }, { data: tabletRows }, { data: cigaretteRows }, { data: processorRows }] = await Promise.all([
-    supabase.from('users').select('id, name, username').limit(1000),
+    supabase.from('users').select('id, name, username, is_active').eq('is_active', true).limit(1000),
     supabase.from('transactions').select('id, member_user_id, actor_user_id, member_label, total_money_in, total_money_out, reason, summary, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
     supabase.from('four_transactions').select('id, created_by, total_sales, profit_loss, status, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
     supabase.from('sale_object_orders').select('id, created_by, total_amount, buyer_name, status, created_at').gte('created_at', args.startIso).lt('created_at', args.endIso).order('created_at', { ascending: false }).limit(limit),
@@ -169,32 +172,40 @@ export async function getMemberActivities(supabase: SupabaseClient, args: { star
   ]);
 
   const memberLookup: MemberLookup = new Map((members ?? []).map((member: { id: string; name?: string | null; username?: string | null }) => [member.id, { id: member.id, label: member.name || member.username || member.id }]));
+  const activeMemberIds = new Set(memberLookup.keys());
   const rows: MemberActivityRow[] = [];
   const split = (amount: number, ids: string[]) => ids.length ? amount / ids.length : amount;
+  const activeOnly = (ids: string[]) => Array.from(new Set(ids.filter((id) => activeMemberIds.has(id))));
 
   for (const row of txRows ?? []) {
     const id = String(row.member_user_id ?? row.actor_user_id ?? '');
-    const ids = id ? [id] : [];
+    const ids = activeOnly(id ? [id] : []);
+    if (ids.length === 0) continue;
     add(rows, { id: `tx-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((memberId) => labelFor(memberId, row.member_label, memberLookup)), module: 'Transactions', action: String(row.reason || 'Transaction'), moneyGenerated: Math.max(0, Number(row.total_money_in ?? 0) - Number(row.total_money_out ?? 0)), participation: 1, details: String(row.summary || row.reason || '') });
   }
   for (const row of fourRows ?? []) {
-    const ids = row.created_by ? [String(row.created_by)] : [];
+    const ids = activeOnly(row.created_by ? [String(row.created_by)] : []);
+    if (ids.length === 0) continue;
     add(rows, { id: `four-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, null, memberLookup)), module: 'FOUR', action: 'Transaction FOUR', moneyGenerated: Math.max(0, Number(row.profit_loss ?? row.total_sales ?? 0)), participation: 1, details: `Statut ${row.status ?? 'validé'}` });
   }
   for (const row of saleRows ?? []) {
-    const ids = row.created_by ? [String(row.created_by)] : [];
+    const ids = activeOnly(row.created_by ? [String(row.created_by)] : []);
+    if (ids.length === 0) continue;
     add(rows, { id: `sale-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, null, memberLookup)), module: 'Vente objets', action: 'Vente objet', moneyGenerated: Math.max(0, Number(row.total_amount ?? 0)), participation: 1, details: `${row.buyer_name ?? 'Acheteur'} · ${row.status ?? ''}` });
   }
   for (const row of drugRows ?? []) {
-    const ids = normalizeParticipantIds(row.member_user_ids, row.created_by);
+    const ids = activeOnly(normalizeParticipantIds(row.member_user_ids, row.created_by));
+    if (ids.length === 0) continue;
     add(rows, { id: `drug-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, null, memberLookup)), module: 'Drogues', action: `Vente ${row.drug_type ?? ''}`.trim(), moneyGenerated: Math.max(0, Number(row.actual_amount ?? 0)), participation: ids.length || 1, details: `Part par membre ${formatUsd(split(Math.max(0, Number(row.actual_amount ?? 0)), ids))}` });
   }
   for (const row of gofastRows ?? []) {
-    const ids = normalizeParticipantIds(row.participants, row.user_id);
+    const ids = activeOnly(normalizeParticipantIds(row.participants, row.user_id));
+    if (ids.length === 0) continue;
     add(rows, { id: `gofast-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.user_name, memberLookup)), module: 'GoFast', action: 'GoFast', moneyGenerated: Math.max(0, Number(row.money_amount ?? 0)), participation: ids.length || 1, details: `Statut ${row.status ?? 'success'}` });
   }
   for (const row of robberyRows ?? []) {
-    const ids = normalizeParticipantIds(row.participants, row.user_id);
+    const ids = activeOnly(normalizeParticipantIds(row.participants, row.user_id));
+    if (ids.length === 0) continue;
     add(rows, { id: `robbery-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.user_name, memberLookup)), module: 'Braquage', action: String(row.robbery_type || 'Braquage'), moneyGenerated: Math.max(0, Number(row.money_amount ?? 0)), participation: ids.length || 1, details: `Statut ${row.status ?? 'success'}` });
   }
 
@@ -205,26 +216,31 @@ export async function getMemberActivities(supabase: SupabaseClient, args: { star
     for (const row of data ?? []) {
       const activityId = Number(row.activity_id);
       const memberId = String(row.member_user_id ?? '');
+      if (!activeMemberIds.has(memberId)) continue;
       if (!activityId || !memberId) continue;
       activityMembers.set(activityId, Array.from(new Set([...(activityMembers.get(activityId) ?? []), memberId])));
     }
   }
   for (const row of activityRows ?? []) {
-    const ids = activityMembers.get(Number(row.id)) ?? normalizeParticipantIds([], row.member_user_id ?? row.created_by);
+    const ids = activeOnly(activityMembers.get(Number(row.id)) ?? normalizeParticipantIds([], row.member_user_id ?? row.created_by));
+    if (ids.length === 0) continue;
     const equipment = Number(row.equipment_used ?? 0) > 0 ? `${row.equipment_item_name ?? 'Équipement'} x${row.equipment_used}` : '';
     add(rows, { id: `activity-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Activités', action: String(row.activity_type || 'Activité'), moneyGenerated: 0, participation: ids.length || 1, details: equipment });
   }
   for (const row of tabletRows ?? []) {
-    const ids = row.member_user_id ? [String(row.member_user_id)] : [];
+    const ids = activeOnly(row.member_user_id ? [String(row.member_user_id)] : []);
+    if (ids.length === 0) continue;
     const money = Math.max(0, Number(row.after_cash ?? 0) - Number(row.before_cash ?? 0));
     add(rows, { id: `tablet-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Tablette', action: 'Passage tablette', moneyGenerated: money, participation: 1, details: `Cash ${formatUsd(Number(row.before_cash ?? 0))} -> ${formatUsd(Number(row.after_cash ?? 0))}` });
   }
   for (const row of cigaretteRows ?? []) {
-    const ids = row.member_user_id ? [String(row.member_user_id)] : [];
+    const ids = activeOnly(row.member_user_id ? [String(row.member_user_id)] : []);
+    if (ids.length === 0) continue;
     add(rows, { id: `cigarette-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Cigarette', action: 'Passage cigarette', moneyGenerated: Math.max(0, Number(row.revenue_amount ?? 0)), participation: 1, details: `Statut ${row.status ?? 'validé'}` });
   }
   for (const row of processorRows ?? []) {
-    const ids = normalizeParticipantIds(row.participant_user_ids, row.validated_by);
+    const ids = activeOnly(normalizeParticipantIds(row.participant_user_ids, row.validated_by));
+    if (ids.length === 0) continue;
     add(rows, { id: `processor-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, null, memberLookup)), module: 'Processeur', action: String(row.operation_type) === 'sale' ? 'Vente processeur' : 'Production processeur', moneyGenerated: Math.max(0, Number(row.real_received ?? 0)), participation: ids.length || 1, details: `${Number(row.processors_count ?? 0)} processeurs` });
   }
 

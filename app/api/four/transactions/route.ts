@@ -4,6 +4,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type TxLine = { item_id: number; movement_kind: 'buy' | 'sell'; quantity: number; unit_price: number };
 
@@ -110,8 +111,9 @@ export async function POST(request: Request) {
   const body = (await request.json()) as { counterparty?: string; lines?: TxLine[] };
 
   try {
-    const { resolved, totalPurchases, totalSales, profitLoss } = await parseResolvedLines(body.lines ?? []);
     const supabase = getSupabaseAdmin();
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'four', action: 'transaction.create', memberIds: [session.userId] });
+    const { resolved, totalPurchases, totalSales, profitLoss } = await parseResolvedLines(body.lines ?? []);
     const nowIso = new Date().toISOString();
     const { data: directSession, error: sessionError } = await supabase
       .from('four_sessions')
@@ -167,6 +169,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Validation impossible.' }, { status: 400 });
   }
 }
@@ -200,6 +203,7 @@ export async function PATCH(request: Request) {
   if (!isValidatedStatus(tx.status)) return NextResponse.json({ message: 'Transaction non modifiable.' }, { status: 400 });
 
   try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'four', action: 'transaction.edit', memberIds: [session.userId] });
     const previousLines = (tx.four_transaction_lines ?? []).map((line) => ({
       itemId: Number(line.item_id),
       itemName: String(line.item_name ?? ''),
@@ -240,6 +244,7 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Modification impossible.' }, { status: 400 });
   }
 }
@@ -272,6 +277,7 @@ export async function DELETE(request: Request) {
   if (!isValidatedStatus(tx.status)) return NextResponse.json({ message: 'Transaction déjà annulée.' }, { status: 400 });
 
   try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'four', action: 'transaction.cancel', memberIds: [session.userId] });
     const previousLines = (tx.four_transaction_lines ?? []).map((line) => ({
       itemId: Number(line.item_id),
       itemName: String(line.item_name ?? ''),
@@ -299,6 +305,7 @@ export async function DELETE(request: Request) {
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Annulation impossible.' }, { status: 400 });
   }
 }

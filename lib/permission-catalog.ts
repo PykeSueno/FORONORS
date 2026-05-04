@@ -35,6 +35,8 @@ const EXACT: Record<string, PermissionInfo> = {
   'roles.rename': { module: 'Roles', section: 'Gestion', label: 'Renommer un role', hint: 'Permet de modifier le nom d un role existant.' },
   'robberies.view': { module: 'Braquage', section: 'Vue', label: 'Voir le module Braquage', hint: 'Permet d afficher la page Braquage.' },
   'robberies.create': { module: 'Braquage', section: 'Creation', label: 'Creer un braquage', hint: 'Permet de valider un braquage.' },
+  'robberies.fleeca.multi_roles': { module: 'Braquage', section: 'Gestion', label: 'Gerer multi-roles Fleeca', hint: 'Permet de saisir plusieurs roles pour un meme participant Fleeca.' },
+  'robberies.fleeca.verify_no_consume': { module: 'Braquage', section: 'Creation', label: 'Verifier Petoire et balles', hint: 'Permet de valider Fleeca en verifiant Petoire et balles sans les consommer.' },
   'robberies.arrested': { module: 'Braquage', section: 'Creation', label: 'Declarer un braquage arrete', hint: 'Permet de valider un braquage arrete.' },
   'robberies.cancel': { module: 'Braquage', section: 'Modification / Annulation', label: 'Annuler un brouillon braquage', hint: 'Permet d annuler la saisie braquage.' },
   'robberies.stats': { module: 'Braquage', section: 'Stats', label: 'Voir les stats braquage', hint: 'Permet de consulter les statistiques Braquage.' },
@@ -42,6 +44,15 @@ const EXACT: Record<string, PermissionInfo> = {
   'logs.access': { module: 'Logs', section: 'Vue', label: 'Acceder a Logs', hint: 'Permet d ouvrir la page Logs.' },
   'logs.view': { module: 'Logs', section: 'Logs', label: 'Voir les logs', hint: 'Permet de consulter les logs applicatifs.' },
   'account.password.update': { module: 'Compte', section: 'Securite', label: 'Modifier son mot de passe', hint: 'Permet de modifier son mot de passe.' }
+  ,
+  'activity.processor.view': { module: 'Activite', section: 'Vue', label: 'Voir activite Processeur', hint: 'Permet de consulter les activites Processeur.' },
+  'activity.processor.create': { module: 'Activite', section: 'Creation', label: 'Creer activite Processeur', hint: 'Permet de creer une activite Processeur.' },
+  'activity.processor.edit': { module: 'Activite', section: 'Gestion', label: 'Modifier activite Processeur', hint: 'Permet de modifier une activite Processeur.' },
+  'activity.processor.cancel': { module: 'Activite', section: 'Modification / Annulation', label: 'Annuler activite Processeur', hint: 'Permet d annuler une activite Processeur.' },
+  'tobacco.processor.sale.view': { module: 'Travail', section: 'Vue', label: 'Voir vente Processeur', hint: 'Permet de consulter la vente Processeur.' },
+  'tobacco.processor.sale.validate': { module: 'Travail', section: 'Creation', label: 'Valider vente Processeur', hint: 'Permet de valider une vente Processeur.' },
+  'tobacco.processor.sale.edit': { module: 'Travail', section: 'Gestion', label: 'Modifier vente Processeur', hint: 'Permet de modifier une vente Processeur.' },
+  'tobacco.processor.sale.cancel': { module: 'Travail', section: 'Modification / Annulation', label: 'Annuler vente Processeur', hint: 'Permet d annuler une vente Processeur.' }
 };
 
 const PREFIX_MODULES: Array<[string, string]> = [

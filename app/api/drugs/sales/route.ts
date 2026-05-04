@@ -4,6 +4,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type SaleLineInput = {
   drug_type?: string;
@@ -77,6 +78,12 @@ export async function POST(request: Request) {
   const actorLabel = memberLabels.length > 0 ? memberLabels.join(' + ') : 'Groupe';
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'drugs.sales', action: 'create', memberIds: memberIds });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
 
   const resolved = [] as Array<{
     drugType: string;

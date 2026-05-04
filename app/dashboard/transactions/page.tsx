@@ -19,7 +19,7 @@ export default async function TransactionsPage() {
   const supabase = getSupabaseAdmin();
   const [{ data: items }, { data: members }] = await Promise.all([
     supabase.from('items').select('id, name, image_url, buy_price, sell_price, quantity, is_money_item, category_key, type_key').order('name', { ascending: true }),
-    supabase.from('users').select('id, name, username').order('username', { ascending: true })
+    supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true })
   ]);
 
   const currentMember = members?.find((member) => member.id === session.userId);

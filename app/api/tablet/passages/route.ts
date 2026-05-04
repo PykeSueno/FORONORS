@@ -5,6 +5,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getTabletBusinessDate } from '@/lib/tablet';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type EquipmentRow = { id: number; name: string; quantity: number };
 
@@ -45,6 +46,12 @@ export async function POST(request: Request) {
   const memberLabel = body.member_label?.trim() || session.username;
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'tablet', action: 'passage.create', memberIds: [memberId] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
   let { data: day } = await supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle();
 
   if (!day) {

@@ -103,6 +103,7 @@ values
   ('members.password.edit'),
   ('account.password.update'),
   ('roles.manage'),
+  ('roles.rename'),
   ('dashboard.preview'),
   ('dashboard.access'),
   ('dashboard.view'),
@@ -698,6 +699,10 @@ values
   ('activity.cancel.any'),
   ('activity.manage.own'),
   ('activity.manage.any'),
+  ('activity.processor.view'),
+  ('activity.processor.create'),
+  ('activity.processor.edit'),
+  ('activity.processor.cancel'),
   ('activity.preview')
 on conflict (name) do nothing;
 
@@ -1136,6 +1141,8 @@ values
   ('drugs.gofast.logs'),
   ('robberies.view'),
   ('robberies.create'),
+  ('robberies.fleeca.multi_roles'),
+  ('robberies.fleeca.verify_no_consume'),
   ('robberies.arrested'),
   ('robberies.cancel'),
   ('robberies.stats'),
@@ -1201,7 +1208,11 @@ alter table public.processor_sessions add column if not exists unit_price numeri
 insert into public.permissions (name)
 values
   ('tobacco.processor.production'),
-  ('tobacco.processor.sale')
+  ('tobacco.processor.sale'),
+  ('tobacco.processor.sale.view'),
+  ('tobacco.processor.sale.validate'),
+  ('tobacco.processor.sale.edit'),
+  ('tobacco.processor.sale.cancel')
 on conflict (name) do nothing;
 alter table public.processor_sessions add column if not exists accepted_count integer not null default 0;
 alter table public.processor_sessions add column if not exists rejected_count integer not null default 0;

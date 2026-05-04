@@ -4,6 +4,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type RobberyType = 'fleeca' | 'bijouterie' | 'morgue';
 type ActionType = 'success' | 'arrested';
@@ -21,15 +22,16 @@ type Body = {
   note?: string;
 };
 
-type StockReq = { name: string; qty: number };
+type StockReq = { name: string; qty: number; consume?: boolean };
+type StockEffect = { itemId: number; itemName: string; required: number; before: number; after: number; consumed: boolean };
 
 const STOCK_REQUIREMENTS: Record<RobberyType, StockReq[]> = {
   fleeca: [
-    { name: 'pétoire', qty: 1 },
+    { name: 'petoire', qty: 1 },
     { name: 'munition de pistolet', qty: 1 },
     { name: 'perceuse', qty: 1 },
     { name: 'foret', qty: 4 },
-    { name: 'clé usb', qty: 1 }
+    { name: 'cle usb', qty: 1 }
   ],
   bijouterie: [
     { name: 'gaz bz', qty: 1 },
@@ -39,7 +41,7 @@ const STOCK_REQUIREMENTS: Record<RobberyType, StockReq[]> = {
 };
 
 function normalize(value: string) {
-  return value.toLowerCase().replace(/[’']/g, '').trim();
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, '').trim();
 }
 
 export async function GET() {
@@ -76,9 +78,15 @@ export async function POST(request: Request) {
   if (action === 'success' && moneyAmount <= 0) return NextResponse.json({ message: 'Argent rapporté invalide.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'robberies', action, memberIds: participants });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
   const [itemsRes, usersRes, cashRes] = await Promise.all([
     supabase.from('items').select('id, name, quantity').order('name', { ascending: true }),
-    supabase.from('users').select('id, name, username').in('id', participants),
+    supabase.from('users').select('id, name, username').eq('is_active', true).in('id', participants),
     supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle()
   ]);
 
@@ -87,7 +95,7 @@ export async function POST(request: Request) {
   const cash = cashRes.data;
   if (!cash) return NextResponse.json({ message: 'Caisse groupe introuvable.' }, { status: 404 });
 
-  const consumed = [] as Array<{ itemId: number; itemName: string; required: number; before: number; after: number }>;
+  const consumed = [] as StockEffect[];
 
   if (action === 'success') {
     for (const req of STOCK_REQUIREMENTS[body.robbery_type]) {
@@ -95,7 +103,8 @@ export async function POST(request: Request) {
       if (!found) return NextResponse.json({ message: `Ressource manquante: ${req.name}.` }, { status: 400 });
       const before = Number(found.quantity ?? 0);
       if (before < req.qty) return NextResponse.json({ message: `Stock insuffisant: ${found.name}.` }, { status: 400 });
-      consumed.push({ itemId: found.id, itemName: found.name, required: req.qty, before, after: before - req.qty });
+      const consume = !(body.robbery_type === 'fleeca' && ['petoire', 'munition de pistolet'].includes(normalize(req.name)));
+      consumed.push({ itemId: found.id, itemName: found.name, required: req.qty, before, after: consume ? before - req.qty : before, consumed: consume });
     }
   } else {
     for (const seized of body.seized_resources ?? []) {
@@ -105,7 +114,7 @@ export async function POST(request: Request) {
       if (!found) continue;
       const before = Number(found.quantity ?? 0);
       if (before < qty) return NextResponse.json({ message: `Stock insuffisant: ${found.name}.` }, { status: 400 });
-      consumed.push({ itemId: found.id, itemName: found.name, required: qty, before, after: before - qty });
+      consumed.push({ itemId: found.id, itemName: found.name, required: qty, before, after: before - qty, consumed: true });
     }
   }
 
@@ -113,12 +122,23 @@ export async function POST(request: Request) {
   const moneyDelta = action === 'success' ? moneyAmount : -lostMoney;
   const moneyAfter = moneyBefore + moneyDelta;
   if (moneyAfter < 0) return NextResponse.json({ message: 'Solde groupe insuffisant.' }, { status: 400 });
+  const userById = new Map(users.map((entry) => [entry.id, entry]));
+  const participantRows = participants.flatMap((id) => {
+    const user = userById.get(id);
+    const label = user?.name || user?.username || 'Membre';
+    const roles = [
+      ...(braqueurs.includes(id) ? ['braqueur'] : []),
+      ...(hostages.includes(id) ? ['otage_apporte'] : []),
+      ...(muleRecup.includes(id) ? ['plan_mule_recup'] : [])
+    ];
+    return (roles.length > 0 ? roles : ['participant']).map((role) => ({ id, label, role }));
+  });
 
   await Promise.all([
-    ...consumed.map((entry) => supabase.from('items').update({ quantity: entry.after, updated_at: new Date().toISOString() }).eq('id', entry.itemId)),
+    ...consumed.filter((entry) => entry.consumed).map((entry) => supabase.from('items').update({ quantity: entry.after, updated_at: new Date().toISOString() }).eq('id', entry.itemId)),
     supabase.from('group_cash').update({ balance: moneyAfter, updated_at: new Date().toISOString() }).eq('id', cash.id),
-    consumed.length > 0
-      ? supabase.from('item_stock_movements').insert(consumed.map((entry) => ({
+    consumed.some((entry) => entry.consumed)
+      ? supabase.from('item_stock_movements').insert(consumed.filter((entry) => entry.consumed).map((entry) => ({
           item_id: entry.itemId,
           item_name: entry.itemName,
           quantity_delta: -entry.required,
@@ -144,11 +164,7 @@ export async function POST(request: Request) {
       money_before: moneyBefore,
       money_after: moneyAfter,
       consumed_items: consumed,
-      participants: users.map((entry) => ({
-        id: entry.id,
-        label: entry.name || entry.username || 'Membre',
-        role: braqueurs.includes(entry.id) ? 'braqueur' : hostages.includes(entry.id) ? 'otage_apporte' : muleRecup.includes(entry.id) ? 'plan_mule_recup' : 'participant'
-      })),
+      participants: participantRows,
       note: (body.note ?? '').trim() || null
     })
   ]);
@@ -158,7 +174,7 @@ export async function POST(request: Request) {
     actorUserId: session.userId,
     action: action === 'success' ? 'robberies.create' : 'robberies.arrested',
     entityType: 'robbery_run',
-    summary: `${action === 'success' ? 'Braquage validé' : 'Braquage arrêté'} ${body.robbery_type}`,
+    summary: `${action === 'success' ? 'Braquage validé' : 'Braquage arrêté'} ${body.robbery_type}${body.robbery_type === 'fleeca' && action === 'success' ? ' · Petoire/balles vérifiés non consommés' : ''}`,
     newValues: {
       robberyType: body.robbery_type,
       action,
@@ -167,6 +183,7 @@ export async function POST(request: Request) {
       moneyBefore,
       moneyAfter,
       consumed,
+      nonConsumedVerified: consumed.filter((entry) => !entry.consumed).map((entry) => entry.itemName),
       participants,
       braqueurs,
       hostages,

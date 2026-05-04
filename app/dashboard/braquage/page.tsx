@@ -41,12 +41,13 @@ export default async function RobberyPage() {
   const [{ data: runs }, { data: items }, { data: members }] = await Promise.all([
     supabase.from('robbery_runs').select('*').order('created_at', { ascending: false }).limit(300),
     supabase.from('items').select('id, name, quantity, image_url, category_key, type_key').order('name', { ascending: true }),
-    supabase.from('users').select('id, name, username').order('username', { ascending: true })
+    supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true })
   ]);
 
   const typedRuns = (runs ?? []) as Run[];
+  const activeMemberIds = new Set((members ?? []).map((member) => member.id));
   const weekIso = weekStartIso(new Date());
-  const weekRuns = typedRuns.filter((run) => run.created_at >= weekIso);
+  const weekRuns = typedRuns.filter((run) => run.created_at >= weekIso && (run.participants ?? []).some((participant) => participant.id && activeMemberIds.has(participant.id)));
 
   const resources = new Map<string, number>();
   for (const run of weekRuns) {
@@ -58,6 +59,7 @@ export default async function RobberyPage() {
   const playerMap = new Map<string, { name: string; total: number; fleeca: number; bijouterie: number; morgue: number; money: number; last: string }>();
   for (const run of weekRuns) {
     for (const participant of run.participants ?? []) {
+      if (!participant.id || !activeMemberIds.has(participant.id)) continue;
       const key = participant.id || participant.label;
       const prev = playerMap.get(key) ?? { name: participant.label, total: 0, fleeca: 0, bijouterie: 0, morgue: 0, money: 0, last: run.created_at };
       prev.total += 1;

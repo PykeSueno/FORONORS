@@ -18,7 +18,7 @@ export default async function TabletPage() {
   const supabase = getSupabaseAdmin();
   const [{ data: day }, { data: members }, { data: cash }, { data: kitItem }, { data: cutterItem }] = await Promise.all([
     supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle(),
-    supabase.from('users').select('id, name, username').order('username', { ascending: true }),
+    supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true }),
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
     supabase.from('items').select('name, quantity').ilike('name', '%kit%').limit(1).maybeSingle(),
     supabase.from('items').select('name, quantity').ilike('name', '%disqueuse%').limit(1).maybeSingle()

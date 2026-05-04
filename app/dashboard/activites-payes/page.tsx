@@ -76,7 +76,7 @@ export default async function ActivityPayrollPage() {
   activityStart.setUTCDate(activityStart.getUTCDate() - 70);
 
   const [{ data: membersData }, { data: cfgSetting }, currentState, previousState, customState, activities, historyRes, logsRes] = await Promise.all([
-    supabase.from('users').select('id, name, username, is_active').order('username', { ascending: true }),
+    supabase.from('users').select('id, name, username, is_active').eq('is_active', true).order('username', { ascending: true }),
     supabase.from('app_settings').select('value').eq('key', CONFIG_KEY).maybeSingle(),
     periodState(supabase, current.startIso, current.endIso),
     periodState(supabase, previous.startIso, previous.endIso),

@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type ProductionType = 'coke' | 'meth';
 
@@ -51,6 +52,12 @@ export async function POST(request: Request) {
   if (!(canCreateGlobal || canCreateType)) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'drugs.production', action: 'create', memberIds: [session.userId] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
   const { data: actor } = await supabase.from('users').select('id, name, username, role').eq('id', session.userId).maybeSingle();
 
   if (type === 'coke') {

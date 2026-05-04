@@ -4,6 +4,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type TransfoType = 'coke' | 'meth';
 
@@ -103,6 +104,12 @@ export async function POST(request: Request) {
   const sourceAfterSend = sourceBefore - quantitySent;
   const expected = expectedQty(type, quantitySent);
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'drugs.transfo', action: 'create', memberIds: [session.userId] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
 
   await supabase.from('items').update({ quantity: sourceAfterSend, updated_at: new Date().toISOString() }).eq('id', sourceItem.id);
   await supabase.from('item_stock_movements').insert({
@@ -186,6 +193,12 @@ export async function PATCH(request: Request) {
   if (!transfoId || !body.action) return NextResponse.json({ message: 'Requête invalide.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'drugs.transfo', action: body.action, memberIds: [session.userId] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
   const { data: transfo } = await supabase.from('drug_transfos').select('*').eq('id', transfoId).maybeSingle();
   if (!transfo) return NextResponse.json({ message: 'Transfo introuvable.' }, { status: 404 });
 

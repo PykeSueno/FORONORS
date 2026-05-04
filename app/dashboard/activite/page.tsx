@@ -8,7 +8,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 type ActivityRow = {
   id: number;
-  activity_type: 'mailbox' | 'burglary' | 'container' | 'drug_sale';
+  activity_type: 'mailbox' | 'burglary' | 'container' | 'processor' | 'drug_sale';
   member_user_id: string | null;
   member_label: string;
   proof_image_url: string | null;
@@ -53,7 +53,7 @@ export default async function ActivityPage() {
   const supabase = getSupabaseAdmin();
   const [{ data: items }, { data: members }, { data: activities }] = await Promise.all([
     supabase.from('items').select('id, name, image_url, quantity, category_key, type_key').order('name', { ascending: true }),
-    supabase.from('users').select('id, name, username').order('username', { ascending: true }),
+    supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true }),
     supabase
       .from('activities')
       .select('id, activity_type, member_user_id, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_id, item_name, quantity_added, before_quantity, after_quantity), activity_members(member_user_id, member_label)')
@@ -88,7 +88,7 @@ export default async function ActivityPage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Activité" subtitle="Boîte aux lettres, Cambriolage, Conteneur" />
+      <InternalPageHeader title="Activité" subtitle="Boîte aux lettres, Cambriolage, Conteneur, Processeur" />
       <ActivityTabs active="activity" canSeeStats={permissions.includes('activity.stats.view')} />
       <ActivityPageClient
         items={items ?? []}

@@ -19,7 +19,7 @@ export default async function CigarettePage() {
   const supabase = getSupabaseAdmin();
   const [{ data: day }, { data: members }, { data: cash }, { data: cigaretteItem }] = await Promise.all([
     supabase.from('cigarette_days').select('*').eq('business_day', businessDay).maybeSingle(),
-    supabase.from('users').select('id, name, username').order('username', { ascending: true }),
+    supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true }),
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
     supabase.from('items').select('id, quantity').eq('name', CIGARETTE_ITEM_NAME).maybeSingle()
   ]);

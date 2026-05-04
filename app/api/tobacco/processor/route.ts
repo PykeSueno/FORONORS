@@ -4,6 +4,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/audit-log';
 import { computeProcessorEstimates } from '@/lib/processor';
+import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type Body = {
   operation_type?: 'production' | 'sale';
@@ -32,18 +33,19 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
-  const [canView, canCreate, canProduction, canSale] = await Promise.all([
+  const [canView, canCreate, canProduction, canSale, canSaleValidate] = await Promise.all([
     hasUserPermission(session.userId, 'tobacco.processor.view'),
     hasUserPermission(session.userId, 'tobacco.processor.create'),
     hasUserPermission(session.userId, 'tobacco.processor.production'),
-    hasUserPermission(session.userId, 'tobacco.processor.sale')
+    hasUserPermission(session.userId, 'tobacco.processor.sale'),
+    hasUserPermission(session.userId, 'tobacco.processor.sale.validate')
   ]);
   if (!canView) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as Body;
   const operationType = body.operation_type === 'sale' ? 'sale' : 'production';
   if (operationType === 'production' && !(canCreate || canProduction)) return NextResponse.json({ message: 'Permission production manquante.' }, { status: 403 });
-  if (operationType === 'sale' && !(canCreate || canSale)) return NextResponse.json({ message: 'Permission vente manquante.' }, { status: 403 });
+  if (operationType === 'sale' && !(canCreate || canSale || canSaleValidate)) return NextResponse.json({ message: 'Permission vente manquante.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
   const { data: processorItem } = await supabase.from('items').select('id, name, quantity').eq('name', 'Processeur').maybeSingle();
@@ -60,6 +62,12 @@ export async function POST(request: Request) {
   const before = Number(cash.balance ?? 0);
   if (operationType === 'production') {
     const participants = Array.from(new Set((body.participant_user_ids ?? []).filter(Boolean)));
+    try {
+      await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'processor', action: 'production', memberIds: participants });
+    } catch (error) {
+      if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+      throw error;
+    }
     const bottles = Math.max(0, Number(body.bottles ?? 0));
     const boatApplied = Boolean(body.boat_fee_applied);
     const estimated = computeProcessorEstimates(bottles, boatApplied);
@@ -93,7 +101,7 @@ export async function POST(request: Request) {
 
     await Promise.all([
       supabase.from('items').update({ quantity: nextStock, updated_at: new Date().toISOString() }).eq('id', processorItemId),
-      supabase.from('stock_movements').insert({ item_id: processorItemId, item_name: 'Processeur', quantity_delta: estimated.processors, transaction_type: 'processor_production', user_id: session.userId }),
+      supabase.from('item_stock_movements').insert({ item_id: processorItemId, item_name: 'Processeur', quantity_delta: estimated.processors, transaction_type: 'processor_production', user_id: session.userId }),
       supabase.from('group_cash').update({ balance: after, updated_at: new Date().toISOString() }).eq('id', cash.id),
       supabase.from('cash_movements').insert({ type: 'processor_production', amount: -totalCostReal, label: `Production processeur ${estimated.bottles} bouteilles`, user_id: session.userId, before_amount: before, after_amount: after })
     ]);
@@ -104,8 +112,17 @@ export async function POST(request: Request) {
   const sellerId = String(body.seller_user_id ?? '');
   const quantity = Math.max(0, Number(body.quantity ?? 0));
   const unitPrice = 100;
-  const soldQuantity = Math.max(0, Math.min(quantity, Number(body.sold_quantity ?? Math.floor(quantity * 0.5))));
+  const realReceivedInput = body.real_received == null ? null : Math.max(0, Number(body.real_received));
+  const soldQuantity = realReceivedInput == null
+    ? Math.max(0, Math.min(quantity, Number(body.sold_quantity ?? Math.floor(quantity * 0.5))))
+    : Math.max(0, Math.min(quantity, Math.floor(realReceivedInput / unitPrice)));
   if (!sellerId || quantity <= 0) return NextResponse.json({ message: 'Vendeur / quantité invalides.' }, { status: 400 });
+  try {
+    await assertActiveMemberIds(supabase, { actorUserId: session.userId, module: 'processor', action: 'sale', memberIds: [sellerId] });
+  } catch (error) {
+    if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
+    throw error;
+  }
   if (processorStock < quantity) return NextResponse.json({ message: 'Stock processeur insuffisant.' }, { status: 400 });
   const dayStart = new Date();
   dayStart.setUTCHours(0, 0, 0, 0);
@@ -113,18 +130,18 @@ export async function POST(request: Request) {
   dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
   const { data: todayRows } = await supabase
     .from('processor_sessions')
-    .select('accepted_count')
+    .select('processors_count')
     .eq('operation_type', 'sale')
     .eq('status', 'validated')
     .contains('participant_user_ids', [sellerId])
     .gte('created_at', dayStart.toISOString())
     .lt('created_at', dayEnd.toISOString())
     .limit(500);
-  const soldToday = (todayRows ?? []).reduce((sum, row) => sum + Math.max(0, Number(row.accepted_count ?? 0)), 0);
+  const soldToday = (todayRows ?? []).reduce((sum, row) => sum + Math.max(0, Number(row.processors_count ?? 0)), 0);
   if (soldToday + soldQuantity > 50) return NextResponse.json({ message: 'Limite journalière atteinte (50 processeurs vendus max par membre).' }, { status: 400 });
   const accepted = soldQuantity;
   const rejected = Math.max(0, quantity - accepted);
-  const received = accepted * unitPrice;
+  const received = realReceivedInput ?? accepted * unitPrice;
   const after = before + received;
   const nextStock = processorStock - quantity;
 
@@ -137,9 +154,9 @@ export async function POST(request: Request) {
     vehicle_used: 'car',
     material_cost: 0,
     boat_fee: 0,
-    estimated_gain_avg: received,
+    estimated_gain_avg: Math.floor(quantity * 0.5) * unitPrice,
     estimated_gain_max: quantity * unitPrice,
-    estimated_profit_avg: received,
+    estimated_profit_avg: Math.floor(quantity * 0.5) * unitPrice,
     estimated_profit_max: quantity * unitPrice,
     real_received: received,
     real_profit: received,
@@ -156,7 +173,7 @@ export async function POST(request: Request) {
 
   await Promise.all([
     supabase.from('items').update({ quantity: nextStock, updated_at: new Date().toISOString() }).eq('id', processorItemId),
-    supabase.from('stock_movements').insert({ item_id: processorItemId, item_name: 'Processeur', quantity_delta: -quantity, transaction_type: 'processor_sale', user_id: sellerId }),
+    supabase.from('item_stock_movements').insert({ item_id: processorItemId, item_name: 'Processeur', quantity_delta: -quantity, transaction_type: 'processor_sale', user_id: sellerId }),
     supabase.from('group_cash').update({ balance: after, updated_at: new Date().toISOString() }).eq('id', cash.id),
     supabase.from('cash_movements').insert({ type: 'processor_sale', amount: received, label: `Vente processeur ${quantity} unités (${accepted} acceptés / ${rejected} refusés)`, user_id: sellerId, before_amount: before, after_amount: after }),
     supabase.from('transactions').insert({ actor_user_id: session.userId, member_user_id: sellerId, member_label: 'Vente Processeur', reason: 'Vente Processeur', total_money_in: received, total_money_out: 0, stock_in_count: 0, stock_out_count: quantity, profit_loss: received, summary: `Vente processeur x${quantity} (${accepted}/${quantity})` })

@@ -85,14 +85,15 @@ export async function buildFourStats(): Promise<FourStatsPayload> {
   const itemIds = Array.from(new Set([...itemIdsFromLines, ...itemIdsFromMovements]));
 
   const [{ data: creators }, { data: items }] = await Promise.all([
-    creatorIds.length > 0 ? supabase.from('users').select('id, name, username').in('id', creatorIds) : Promise.resolve({ data: [] }),
+    creatorIds.length > 0 ? supabase.from('users').select('id, name, username').eq('is_active', true).in('id', creatorIds) : Promise.resolve({ data: [] }),
     itemIds.length > 0 ? supabase.from('items').select('id, image_url').in('id', itemIds) : Promise.resolve({ data: [] })
   ]);
 
   const creatorById = new Map(((creators ?? []) as Array<{ id: string; name: string | null; username: string | null }>).map((entry) => [entry.id, entry]));
   const itemImageById = new Map(((items ?? []) as Array<{ id: number; image_url: string | null }>).map((entry) => [Number(entry.id), entry.image_url ?? null]));
+  const statsTransactions = transactions.filter((tx) => tx.created_by && creatorById.has(tx.created_by));
 
-  const totals = transactions.reduce((acc, row) => ({
+  const totals = statsTransactions.reduce((acc, row) => ({
     purchases: acc.purchases + Number(row.total_purchases ?? 0),
     sales: acc.sales + Number(row.total_sales ?? 0),
     profit: acc.profit + Number(row.profit_loss ?? 0),
@@ -103,7 +104,7 @@ export async function buildFourStats(): Promise<FourStatsPayload> {
   const byMemberMap = new Map<string, { key: string; count: number; purchases: number; sales: number; profit: number }>();
   const byItemMap = new Map<number, { itemId: number; itemName: string; imageUrl: string | null; buyQty: number; sellQty: number; buyAmount: number; sellAmount: number; frequency: number }>();
 
-  for (const tx of transactions) {
+  for (const tx of statsTransactions) {
     const clientKey = tx.counterparty?.trim() || 'Sans interlocuteur';
     const memberPayload = tx.created_by ? creatorById.get(tx.created_by) : null;
     const memberKey = memberPayload?.name || memberPayload?.username || 'Inconnu';

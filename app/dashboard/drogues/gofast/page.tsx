@@ -30,7 +30,7 @@ export default async function DrugsGoFastPage() {
   const [{ data: items }, { data: runs }, { data: members }] = await Promise.all([
     supabase.from('items').select('id, name, image_url, quantity, category_key, type_key').eq('category_key', 'drugs').eq('type_key', 'bag').order('name', { ascending: true }),
     supabase.from('gofast_runs').select('*').order('created_at', { ascending: false }).limit(250),
-    supabase.from('users').select('id, name, username').order('username', { ascending: true })
+    supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true })
   ]);
 
   const filteredItems = (items ?? []).filter((item) => {
@@ -38,8 +38,9 @@ export default async function DrugsGoFastPage() {
     return !name.includes('graine') && !name.includes('table');
   });
 
+  const activeMemberIds = new Set(((members ?? []) as MemberRow[]).map((member) => member.id));
   const since = weekStartIso(new Date());
-  const weekRuns = (runs ?? []).filter((run) => run.created_at >= since);
+  const weekRuns = (runs ?? []).filter((run) => run.created_at >= since && (run.participants ?? []).some((participant: { id?: string }) => participant.id && activeMemberIds.has(participant.id)));
   const stats = {
     successCount: weekRuns.filter((run) => run.status === 'success').length,
     arrestedCount: weekRuns.filter((run) => run.status === 'arrested').length,

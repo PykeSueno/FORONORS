@@ -187,6 +187,7 @@ export function DrugsPageClient({
   const defaultSaleMemberIds = useMemo(() => members.some((member) => member.id === currentUserId) ? [currentUserId] : [], [members, currentUserId]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>(defaultSaleMemberIds);
   const [groupSaleMode, setGroupSaleMode] = useState(defaultSaleMemberIds.length === 0);
+  const activeMemberIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
   const [detailSale, setDetailSale] = useState<Sale | null>(null);
   const [cokeSeeds, setCokeSeeds] = useState(9);
   const [cokeZones, setCokeZones] = useState(1);
@@ -292,7 +293,7 @@ export function DrugsPageClient({
     start.setHours(0, 0, 0, 0);
     start.setDate(start.getDate() - start.getDay());
     const startIso = start.toISOString();
-    const weekRows = gofastRuns.filter((entry) => entry.created_at >= startIso);
+    const weekRows = gofastRuns.filter((entry) => entry.created_at >= startIso && (entry.participants ?? []).some((participant) => activeMemberIds.has(participant.id)));
     return {
       successCount: weekRows.filter((entry) => entry.status === 'success').length,
       arrestedCount: weekRows.filter((entry) => entry.status === 'arrested').length,
@@ -301,7 +302,7 @@ export function DrugsPageClient({
       moneyIn: weekRows.reduce((sum, entry) => sum + Number(entry.money_amount ?? 0), 0),
       moneyLost: weekRows.reduce((sum, entry) => sum + Number(entry.lost_money ?? 0), 0)
     };
-  }, [gofastRuns]);
+  }, [activeMemberIds, gofastRuns]);
 
   function addOrIncrementSaleLine(itemId: number) {
     setSaleLines((current) => {
@@ -445,8 +446,8 @@ export function DrugsPageClient({
       setError('Sélectionne au moins un membre vendeur ou active Groupe.');
       return;
     }
-    const activeMemberIds = groupSaleMode ? [] : selectedMembers;
-    const selected = members.filter((member) => activeMemberIds.includes(member.id));
+    const selectedSaleMemberIds = groupSaleMode ? [] : selectedMembers.filter((id) => activeMemberIds.has(id));
+    const selected = members.filter((member) => selectedSaleMemberIds.includes(member.id));
     const labels = selected.map((member) => member.name || member.username);
 
     const response = await fetch('/api/drugs/sales', {
@@ -455,7 +456,7 @@ export function DrugsPageClient({
       body: JSON.stringify({
         lines: saleRows.map((row) => ({ item_id: row.item_id, quantity_sold: row.quantity_sold, actual_amount: row.actual_amount })),
         is_group_sale: groupSaleMode || labels.length === 0,
-        member_user_ids: activeMemberIds,
+        member_user_ids: selectedSaleMemberIds,
         member_labels: labels,
         actual_amount: saleTotals.actual
       })

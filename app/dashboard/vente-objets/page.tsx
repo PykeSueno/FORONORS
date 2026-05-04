@@ -40,7 +40,7 @@ export default async function SaleObjectsPage() {
     permissions.includes('sale.objects.history.view')
       ? supabase.from('sale_object_orders').select('id, buyer_name, buyer_type, status, total_amount, sale_lines, cash_before, cash_after, created_by, received_by, canceled_by, received_at, canceled_at, created_at, updated_at, creator:created_by(name, username), receiver:received_by(name, username), canceler:canceled_by(name, username)').order('created_at', { ascending: false }).limit(100)
       : Promise.resolve({ data: [] }),
-    supabase.from('users').select('id, name, username').order('username', { ascending: true })
+    supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true })
   ]);
   const currentMember = members?.find((member) => member.id === session.userId);
 

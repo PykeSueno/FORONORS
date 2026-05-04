@@ -17,7 +17,6 @@ export default async function MoneyPayPage() {
   const canPreview = permissions.includes('payroll.preview') || permissions.includes('money.pay.access');
   const canConfigure = permissions.includes('payroll.configure') || permissions.includes('money.pay.create');
   const canAdjust = permissions.includes('payroll.adjust') || permissions.includes('money.pay.create');
-  const canValidate = permissions.includes('payroll.validate') || permissions.includes('money.pay.create');
   const canHistory = permissions.includes('payroll.history') || permissions.includes('money.pay.history.view');
   const canLogs = permissions.includes('payroll.logs') || permissions.includes('money.pay.logs.view');
 
