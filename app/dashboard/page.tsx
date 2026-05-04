@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { DashboardShellClient } from '@/components/dashboard/dashboard-shell-client';
 import { buildPayrollPreview, payrollDisplayWindow, weekWindow, DEFAULT_PAYROLL_CONFIG } from '@/lib/payroll';
 
-const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'activity_payroll', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
+const DEFAULT_ORDER = ['money', 'expenses', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'activity_payroll', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -23,6 +23,8 @@ export default async function DashboardPage() {
   const canMembersPreview = canMembersAccess || has('members.preview');
   const canActivityPayrollAccess = has('activity_payroll.view');
   const canActivityPayrollPreview = canActivityPayrollAccess;
+  const canExpensesAccess = has('expenses.view');
+  const canExpensesPreview = canExpensesAccess;
   const canLogsAccess = has('logs.access');
   const canLogsPreview = canLogsAccess || has('logs.preview');
   const canTabletAccess = has('tablet.access');
@@ -97,6 +99,7 @@ export default async function DashboardPage() {
         canTransactionsRecentAccess, canTransactionsRecentPreview,
         canMembersAccess, canMembersPreview,
         canActivityPayrollAccess, canActivityPayrollPreview,
+        canExpensesAccess, canExpensesPreview,
         canLogsAccess, canLogsPreview,
         canTabletCigaretteAccess, canTabletCigarettePreview,
         canActivityAccess, canActivityPreview,

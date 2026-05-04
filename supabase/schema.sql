@@ -1214,5 +1214,48 @@ values
   ('tobacco.processor.sale.edit'),
   ('tobacco.processor.sale.cancel')
 on conflict (name) do nothing;
+
+create table if not exists public.expenses (
+  id bigint generated always as identity primary key,
+  member_id uuid references public.users(id) on delete set null,
+  member_name text not null,
+  label text not null,
+  amount numeric(12,2) not null check (amount >= 0),
+  category text not null default 'Autre',
+  note text,
+  proof_url text,
+  status text not null default 'pending' check (status in ('pending', 'reimbursed', 'cancelled')),
+  created_by uuid references public.users(id) on delete set null,
+  reimbursed_by uuid references public.users(id) on delete set null,
+  reimbursed_at timestamptz,
+  money_before numeric(12,2),
+  money_after numeric(12,2),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_expenses_status_created_at on public.expenses(status, created_at desc);
+create index if not exists idx_expenses_member on public.expenses(member_id);
+create index if not exists idx_expenses_reimbursed_at on public.expenses(reimbursed_at desc);
+
+alter table public.expenses enable row level security;
+
+drop policy if exists "allow_service_role_all_expenses" on public.expenses;
+create policy "allow_service_role_all_expenses"
+on public.expenses
+for all
+using (true)
+with check (true);
+
+insert into public.permissions (name)
+values
+  ('expenses.view'),
+  ('expenses.create'),
+  ('expenses.reimburse'),
+  ('expenses.history.view'),
+  ('expenses.stats.view'),
+  ('expenses.logs.view'),
+  ('expenses.delete')
+on conflict (name) do nothing;
 alter table public.processor_sessions add column if not exists accepted_count integer not null default 0;
 alter table public.processor_sessions add column if not exists rejected_count integer not null default 0;

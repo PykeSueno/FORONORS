@@ -31,6 +31,7 @@ type HistoryRunMember = {
 };
 
 type LogRow = { id: number; action: string; summary: string; created_at: string; actor_name: string | null };
+type ExpenseSummary = { memberId: string; memberName: string; pendingTotal: number; reimbursedTotal: number };
 
 export function MoneyPayPageClient({
   canConfigure,
@@ -43,6 +44,7 @@ export function MoneyPayPageClient({
   customDefaultStart,
   customDefaultEnd,
   initialExcludedIds,
+  expenseSummaries,
   history,
   historyMembers,
   logs
@@ -57,6 +59,7 @@ export function MoneyPayPageClient({
   customDefaultStart: string;
   customDefaultEnd: string;
   initialExcludedIds: string[];
+  expenseSummaries: ExpenseSummary[];
   history: HistoryRun[];
   historyMembers: HistoryRunMember[];
   logs: LogRow[];
@@ -174,6 +177,11 @@ export function MoneyPayPageClient({
     return map;
   }, [historyMembers]);
 
+  const expenseTotals = useMemo(() => ({
+    pending: expenseSummaries.reduce((sum, row) => sum + Number(row.pendingTotal ?? 0), 0),
+    reimbursed: expenseSummaries.reduce((sum, row) => sum + Number(row.reimbursedTotal ?? 0), 0)
+  }), [expenseSummaries]);
+
 
   async function saveConfig() {
     setError('');
@@ -207,6 +215,29 @@ export function MoneyPayPageClient({
         <Card label="✅ Total payes calculées" value={formatUsd(effectivePreview.totalProposed)} />
         <Card label="🏦 Solde après paye" value={formatUsd(effectivePreview.balance - Object.values(paidMembers).reduce((s, v) => s + Number(v || 0), 0))} />
         <Card label="✅ Total payé" value={formatUsd(Object.values(paidMembers).reduce((s, v) => s + Number(v || 0), 0))} />
+      </section>
+
+      <section className="glass-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-[#fff1dd]">Dépenses membres</h3>
+            <p className="text-xs text-[#efcdab]">Remboursements séparés de la paye. Ils ne modifient pas le salaire calculé.</p>
+          </div>
+          <div className="flex gap-2 text-xs">
+            <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-3 py-1 text-[#ffe8ca]">En attente {formatUsd(expenseTotals.pending)}</span>
+            <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-3 py-1 text-[#ffe8ca]">Remboursé {formatUsd(expenseTotals.reimbursed)}</span>
+          </div>
+        </div>
+        {expenseSummaries.filter((row) => row.pendingTotal > 0 || row.reimbursedTotal > 0).length > 0 ? (
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {expenseSummaries.filter((row) => row.pendingTotal > 0 || row.reimbursedTotal > 0).slice(0, 9).map((row) => (
+              <div key={row.memberId} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
+                <b className="text-[#ffe8ca]">{row.memberName}</b>
+                <p>En attente {formatUsd(row.pendingTotal)} · Remboursé {formatUsd(row.reimbursedTotal)}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="glass-card p-4">

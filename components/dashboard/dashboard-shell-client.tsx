@@ -16,6 +16,7 @@ type DashboardFlags = {
   canTransactionsRecentAccess: boolean; canTransactionsRecentPreview: boolean;
   canMembersAccess: boolean; canMembersPreview: boolean;
   canActivityPayrollAccess: boolean; canActivityPayrollPreview: boolean;
+  canExpensesAccess: boolean; canExpensesPreview: boolean;
   canLogsAccess: boolean; canLogsPreview: boolean;
   canTabletCigaretteAccess: boolean; canTabletCigarettePreview: boolean;
   canActivityAccess: boolean; canActivityPreview: boolean;
@@ -30,7 +31,7 @@ type SummaryPayload = {
   canShowMoneyMovements: boolean;
   canShowStockMovements: boolean;
   moneyItemImageUrl: string | null;
-  values: { cashBalance: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; saleObjectsToday: number; tabletPassagesToday: number; processorOperationsToday: number; activitiesToday: number; cigarettePassagesToday: number; cigaretteRevenueToday: number; fourPurchasesToday: number; fourSalesToday: number; fourProfitToday: number };
+  values: { cashBalance: number; expensesPendingTotal: number; itemsCount: number; txCount: number; membersCount: number; logsCount: number; saleObjectsToday: number; tabletPassagesToday: number; processorOperationsToday: number; activitiesToday: number; cigarettePassagesToday: number; cigaretteRevenueToday: number; fourPurchasesToday: number; fourSalesToday: number; fourProfitToday: number };
   recentCash: Array<{ type: string; amount: number; label: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null }>;
   recentStock: Array<{ item_id?: number | null; item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null; items?: { image_url: string | null; quantity?: number | null } | { image_url: string | null; quantity?: number | null }[] | null }>;
 };
@@ -63,6 +64,11 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
     flags.canDrugsPreview ? { id: 'drugs', href: '/dashboard/drogues', enabled: flags.canDrugsAccess, icon: '🧪', title: 'Drogues', value: 'Module', subtitle: 'Transfo / Vente / Production / GoFast' } : null
     , flags.canRobberiesPreview ? { id: 'robberies', href: '/dashboard/braquage', enabled: flags.canRobberiesAccess, icon: '🥷', title: 'Braquage', value: 'Module', subtitle: 'Fleeca / Bijouterie / Morgue' } : null
   ].filter(Boolean) as Card[], [flags, summary]);
+
+  const expenseCard: Card | null = flags.canExpensesPreview
+    ? { id: 'expenses', href: '/dashboard/depenses', enabled: flags.canExpensesAccess, icon: 'ðŸ§¾', title: 'DÃ©penses', value: summary ? formatUsd(summary.values.expensesPendingTotal) : 'â€¦', subtitle: 'Frais / Remboursements / Logs' }
+    : null;
+  const hubCards = expenseCard ? [...cards, expenseCard] : cards;
 
   const stockRows = useMemo(() => {
     const runningAfterByItem = new Map<number, number>();
@@ -121,7 +127,7 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
         </div>
       </section>
 
-      <DashboardHubGrid cards={cards} initialOrder={initialOrder} />
+      <DashboardHubGrid cards={hubCards} initialOrder={initialOrder} />
 
       <section className="grid gap-4 lg:grid-cols-2">
         {summary?.canShowMoneyMovements ? <article className="glass-card p-6">

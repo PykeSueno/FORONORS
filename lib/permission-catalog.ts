@@ -1,4 +1,4 @@
-export const MODULE_ORDER = ['Dashboard', 'Argent', 'Vente objets', 'Items', 'Transactions', 'Transactions recentes', 'Activite', 'Activites & Payes', 'FOUR', 'Drogues', 'Braquage', 'Travail', 'Membres', 'Roles', 'Logs', 'Compte', 'Autres'] as const;
+export const MODULE_ORDER = ['Dashboard', 'Argent', 'Dépenses', 'Vente objets', 'Items', 'Transactions', 'Transactions recentes', 'Activite', 'Activites & Payes', 'FOUR', 'Drogues', 'Braquage', 'Travail', 'Membres', 'Roles', 'Logs', 'Compte', 'Autres'] as const;
 
 export const SECTION_ORDER = ['Vue', 'Historique', 'Mouvements', 'Vente objets', 'Creation', 'Passages', 'Modification / Annulation', 'Sessions', 'Transactions', 'Messages', 'Stats', 'Logs', 'Securite', 'Gestion', 'Technique'] as const;
 
@@ -15,6 +15,14 @@ const EXACT: Record<string, PermissionInfo> = {
   'activity_payroll.payroll.exclude': { module: 'Activites & Payes', section: 'Gestion', label: 'Exclure un membre', hint: 'Permet d exclure ou reinclure un membre de la paye.' },
   'activity_payroll.history.view': { module: 'Activites & Payes', section: 'Historique', label: 'Voir historique', hint: 'Permet de consulter l historique des payes du module.' },
   'activity_payroll.logs.view': { module: 'Activites & Payes', section: 'Logs', label: 'Voir logs', hint: 'Permet de consulter les logs Activites & Payes.' },
+
+  'expenses.view': { module: 'Dépenses', section: 'Vue', label: 'Voir le module', hint: 'Permet d afficher la bulle et d ouvrir Dépenses.' },
+  'expenses.create': { module: 'Dépenses', section: 'Creation', label: 'Ajouter une dépense', hint: 'Permet de créer une dépense en attente pour un membre.' },
+  'expenses.reimburse': { module: 'Dépenses', section: 'Creation', label: 'Rembourser une dépense', hint: 'Permet de sortir l argent du groupe et passer une dépense en remboursée.' },
+  'expenses.history.view': { module: 'Dépenses', section: 'Historique', label: 'Voir remboursées', hint: 'Permet de consulter les dépenses remboursées.' },
+  'expenses.stats.view': { module: 'Dépenses', section: 'Stats', label: 'Voir stats', hint: 'Permet de consulter les statistiques Dépenses.' },
+  'expenses.logs.view': { module: 'Dépenses', section: 'Logs', label: 'Voir logs', hint: 'Permet de consulter les logs Dépenses.' },
+  'expenses.delete': { module: 'Dépenses', section: 'Modification / Annulation', label: 'Annuler une dépense', hint: 'Permet d annuler une dépense non remboursée.' },
 
   'dashboard.preview': { module: 'Dashboard', section: 'Vue', label: 'Voir la bulle Dashboard', hint: 'Permet d afficher la bulle Dashboard.' },
   'dashboard.access': { module: 'Dashboard', section: 'Vue', label: 'Acceder au dashboard', hint: 'Permet d ouvrir le dashboard.' },
@@ -56,7 +64,7 @@ const EXACT: Record<string, PermissionInfo> = {
 };
 
 const PREFIX_MODULES: Array<[string, string]> = [
-  ['dashboard.', 'Dashboard'], ['money.', 'Argent'], ['payroll.', 'Argent'], ['sale.objects.', 'Vente objets'], ['sale_objects.', 'Vente objets'], ['items.', 'Items'], ['transactions.recent.', 'Transactions recentes'], ['transactions.', 'Transactions'], ['activity_payroll.', 'Activites & Payes'], ['activity.', 'Activite'], ['four.', 'FOUR'], ['drugs.', 'Drogues'], ['robberies.', 'Braquage'], ['tablet.', 'Travail'], ['cigarette.', 'Travail'], ['tobacco.processor.', 'Travail'], ['members.', 'Membres'], ['roles.', 'Roles'], ['logs.', 'Logs'], ['account.', 'Compte']
+  ['dashboard.', 'Dashboard'], ['money.', 'Argent'], ['payroll.', 'Argent'], ['expenses.', 'Dépenses'], ['sale.objects.', 'Vente objets'], ['sale_objects.', 'Vente objets'], ['items.', 'Items'], ['transactions.recent.', 'Transactions recentes'], ['transactions.', 'Transactions'], ['activity_payroll.', 'Activites & Payes'], ['activity.', 'Activite'], ['four.', 'FOUR'], ['drugs.', 'Drogues'], ['robberies.', 'Braquage'], ['tablet.', 'Travail'], ['cigarette.', 'Travail'], ['tobacco.processor.', 'Travail'], ['members.', 'Membres'], ['roles.', 'Roles'], ['logs.', 'Logs'], ['account.', 'Compte']
 ];
 
 function humanize(name: string) {

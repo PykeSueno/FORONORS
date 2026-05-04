@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { describePermission, MODULE_ORDER, SECTION_ORDER } from '@/lib/permission-catalog';
 import { toCanonicalPermission } from '@/lib/permission-normalization';
 import { sortMembersByGrade } from '@/lib/members';
+import { formatUsd } from '@/lib/currency';
 import { RemoveLineButton } from '@/components/shared/line-controls';
 
 type Permission = { id: number; name: string };
@@ -23,6 +24,7 @@ type MembersPageClientProps = {
   initialRoles: Role[];
   initialPermissions: Permission[];
   userPermissions: string[];
+  expenseSummaries: Record<string, { pendingTotal: number; reimbursedTotal: number }>;
 };
 
 function buildCredentialsMessage(username: string, password: string) {
@@ -56,7 +58,7 @@ async function tryCopyText(text: string) {
   }
 }
 
-export function MembersPageClient({ initialMembers, initialRoles, initialPermissions, userPermissions }: MembersPageClientProps) {
+export function MembersPageClient({ initialMembers, initialRoles, initialPermissions, userPermissions, expenseSummaries }: MembersPageClientProps) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [roles, setRoles] = useState<Role[]>(initialRoles);
   const [permissions, setPermissions] = useState<Permission[]>(initialPermissions);
@@ -78,6 +80,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const canCopyCredentials = userPermissions.includes('members.credentials.copy');
   const canEditMemberPassword = userPermissions.includes('members.password.edit');
   const canRenameRole = userPermissions.includes('roles.rename');
+  const canViewExpenses = userPermissions.includes('expenses.view');
 
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
   const sortedMembers = useMemo(() => sortMembersByGrade(members), [members]);
@@ -192,6 +195,13 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
                 <div><p className="text-[#ffe2c1]/80">User</p><p className="font-medium text-[#fff3df]">{member.username}</p></div>
                 <div><p className="text-[#ffe2c1]/80">Rôle</p><p className="font-medium text-[#fff3df]">{member.role_name || 'Sans rôle'}</p></div>
               </div>
+              {canViewExpenses ? (
+                <div className="min-w-[180px] rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
+                  <p className="font-semibold text-[#ffe8ca]">Dépenses</p>
+                  <p>En attente {formatUsd(expenseSummaries[member.id]?.pendingTotal ?? 0)}</p>
+                  <p>Remboursé {formatUsd(expenseSummaries[member.id]?.reimbursedTotal ?? 0)}</p>
+                </div>
+              ) : null}
               <div className="flex items-center gap-2">
                 {canCopyCredentials ? <button className="saas-ghost-btn" onClick={() => void copyMemberCredentials(member)}>Copier</button> : null}
                 {canViewActivities ? <Link href={`/dashboard/membres/${member.id}/activites`} className="saas-ghost-btn">Activités</Link> : null}

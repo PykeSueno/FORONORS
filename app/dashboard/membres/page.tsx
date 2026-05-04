@@ -33,13 +33,24 @@ export default async function MembersPage() {
 
   const supabase = getSupabaseAdmin();
 
-  const [{ data: members }, { data: roles }, permsResult] = await Promise.all([
+  const [{ data: members }, { data: roles }, permsResult, { data: expenseRows }] = await Promise.all([
     supabase.from('users').select('id, name, username, role_id, is_active, roles(name)').order('username', { ascending: true }),
     supabase.from('roles').select('id, name, display_order, role_permissions(permission_id)').order('display_order', { ascending: true }),
     userPermissions.includes('roles.manage')
       ? supabase.from('permissions').select('id, name').order('name', { ascending: true })
-      : Promise.resolve({ data: [] as { id: number; name: string }[] })
+      : Promise.resolve({ data: [] as { id: number; name: string }[] }),
+    userPermissions.includes('expenses.view')
+      ? supabase.from('expenses').select('member_id, amount, status').in('status', ['pending', 'reimbursed']).limit(3000)
+      : Promise.resolve({ data: [] })
   ]);
+
+  const expenseSummaries = ((expenseRows ?? []) as Array<{ member_id: string | null; amount: number | null; status: string }>).reduce<Record<string, { pendingTotal: number; reimbursedTotal: number }>>((acc, row) => {
+    if (!row.member_id) return acc;
+    if (!acc[row.member_id]) acc[row.member_id] = { pendingTotal: 0, reimbursedTotal: 0 };
+    if (row.status === 'pending') acc[row.member_id].pendingTotal += Number(row.amount ?? 0);
+    if (row.status === 'reimbursed') acc[row.member_id].reimbursedTotal += Number(row.amount ?? 0);
+    return acc;
+  }, {});
 
   const initialMembers = sortMembersByGrade(
     ((members ?? []) as MemberRow[]).map((member) => ({
@@ -67,6 +78,7 @@ export default async function MembersPage() {
         initialRoles={initialRoles}
         initialPermissions={permsResult.data ?? []}
         userPermissions={userPermissions}
+        expenseSummaries={expenseSummaries}
       />
     </>
   );

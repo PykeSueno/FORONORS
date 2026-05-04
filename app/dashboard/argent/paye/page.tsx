@@ -72,6 +72,15 @@ export default async function MoneyPayPage() {
       .eq('week_start', current.startIso)
       .eq('week_end', current.endIso)
   ]);
+  const { data: expenseRows } = await supabase.from('expenses').select('member_id, member_name, amount, status').in('status', ['pending', 'reimbursed']).limit(3000);
+  const expensesByMember = Array.from(((expenseRows ?? []) as Array<{ member_id: string | null; member_name: string; amount: number | null; status: string }>).reduce((map, row) => {
+    if (!row.member_id) return map;
+    const currentRow = map.get(row.member_id) ?? { memberId: row.member_id, memberName: row.member_name, pendingTotal: 0, reimbursedTotal: 0 };
+    if (row.status === 'pending') currentRow.pendingTotal += Number(row.amount ?? 0);
+    if (row.status === 'reimbursed') currentRow.reimbursedTotal += Number(row.amount ?? 0);
+    map.set(row.member_id, currentRow);
+    return map;
+  }, new Map<string, { memberId: string; memberName: string; pendingTotal: number; reimbursedTotal: number }>()).values());
   const payrollStatus = paidRunRes.data?.id
     ? 'Payée'
     : now.getUTCDay() <= 1
@@ -92,6 +101,7 @@ export default async function MoneyPayPage() {
         customDefaultStart={customDefaultStart}
         customDefaultEnd={customDefaultEnd}
         initialExcludedIds={(exclusionsRes.data ?? []).map((row) => String(row.member_user_id))}
+        expenseSummaries={expensesByMember}
         history={historyRes.data ?? []}
         historyMembers={detailsRes.data ?? []}
         logs={logsRes.data ?? []}

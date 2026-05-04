@@ -23,6 +23,7 @@ export async function GET() {
 
   const canMembersAccess = has('members.access');
   const canMembersPreview = canMembersAccess || has('members.preview');
+  const canExpensesPreview = has('expenses.view');
 
   const canLogsAccess = has('logs.access');
   const canLogsPreview = canLogsAccess || has('logs.preview');
@@ -53,7 +54,7 @@ export async function GET() {
   dayStart.setHours(0, 0, 0, 0);
   const dayStartIso = dayStart.toISOString();
 
-  const [{ data: cash }, { data: itemQuantities }, { data: txRows }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { data: saleObjectsTodayRows }, { data: cigaretteToday }, { data: tabletToday }, { data: processorTodayRows }, { data: activitiesTodayRows }, { data: activeMembersForCounts }, { data: fourTodayRows }] = await Promise.all([
+  const [{ data: cash }, { data: itemQuantities }, { data: txRows }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { data: saleObjectsTodayRows }, { data: cigaretteToday }, { data: tabletToday }, { data: processorTodayRows }, { data: activitiesTodayRows }, { data: activeMembersForCounts }, { data: fourTodayRows }, { data: pendingExpensesRows }] = await Promise.all([
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItemsPreview ? supabase.from('items').select('quantity') : Promise.resolve({ data: [] }),
     canTransactionsPreview ? supabase.from('transactions').select('id, actor_user_id, member_user_id').limit(5000) : Promise.resolve({ data: [] }),
@@ -82,6 +83,9 @@ export async function GET() {
       : Promise.resolve({ data: [] }),
     canFourPreview
       ? supabase.from('four_transactions').select('total_purchases, total_sales, created_by').or('status.eq.validated,status.is.null').gte('created_at', dayStartIso)
+      : Promise.resolve({ data: [] }),
+    canExpensesPreview
+      ? supabase.from('expenses').select('amount, member_id').eq('status', 'pending')
       : Promise.resolve({ data: [] })
 
   ]);
@@ -104,12 +108,14 @@ export async function GET() {
   }).length;
   const cigaretteTodayRows = ((cigaretteToday ?? []) as Array<{ member_user_id?: string | null; revenue_amount?: number | null }>).filter((row) => row.member_user_id && activeIds.has(row.member_user_id));
   const tabletPassagesToday = (((tabletToday as { tablet_passages?: Array<{ member_user_id?: string | null }> } | null)?.tablet_passages ?? [])).filter((row) => row.member_user_id && activeIds.has(row.member_user_id)).length;
+  const expensesPendingTotal = ((pendingExpensesRows ?? []) as Array<{ amount?: number | null; member_id?: string | null }>).filter((row) => row.member_id && activeIds.has(row.member_id)).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
 
   return NextResponse.json({
     canShowMoneyMovements,
     canShowStockMovements,
     values: {
       cashBalance: Number(cash?.balance ?? 0),
+      expensesPendingTotal,
       itemsCount: itemsStockTotal,
       txCount: txCount,
       membersCount: membersCount ?? 0,
