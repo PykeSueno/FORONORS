@@ -1,15 +1,15 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { computeProcessorEstimates, PROCESSOR_BOAT_FROM_BOTTLES } from '@/lib/processor';
 
 type TabletDay = { id: number; business_day: string; deposited_amount: number; chest_amount: number; passages_count: number; kits_added: number; cutters_added: number } | null;
 type CigaretteDay = { id: number; business_day: string; chest_amount: number; passages_count: number; total_revenue: number; packs_sold: number; packs_deposit_remaining?: number } | null;
 
-type TabletPassage = { id: number; member_label: string; before_cash: number; after_cash: number; before_kits: number; after_kits: number; before_cutters: number; after_cutters: number; created_at: string };
-type CigarettePassage = { id: number; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; status?: string; created_at: string };
+type TabletPassage = { id: number; member_user_id?: string | null; member_label: string; before_cash: number; after_cash: number; before_kits: number; after_kits: number; before_cutters: number; after_cutters: number; created_at: string };
+type CigarettePassage = { id: number; member_user_id?: string | null; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; status?: string; created_at: string };
 
 type Tab = 'home' | 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
 type HistoryCard = { id: string; title: string; meta: string; lines: string[] };
@@ -22,6 +22,8 @@ export function TabletCigarettePageClient(props: {
   cigaretteDay: CigaretteDay;
   tabletPassages: TabletPassage[];
   cigarettePassages: CigarettePassage[];
+  tabletStatsPassages: TabletPassage[];
+  cigaretteStatsPassages: CigarettePassage[];
   groupCash: number;
   kitsInStock: number;
   cuttersInStock: number;
@@ -43,13 +45,14 @@ export function TabletCigarettePageClient(props: {
   canProcessorStats: boolean;
   canProcessorLogs: boolean;
   processorSessions: Array<Record<string, unknown>>;
+  processorStatsSessions: Array<Record<string, unknown>>;
   defaultMemberId: string;
   defaultMemberLabel: string;
 }) {
   const {
-    members, tabletBusinessDay, cigaretteBusinessDay, tabletDay, cigaretteDay, tabletPassages, cigarettePassages, groupCash, kitsInStock, cuttersInStock, packsInStock, processorInStock, processorImageUrl,
+    members, tabletBusinessDay, cigaretteBusinessDay, tabletDay, cigaretteDay, tabletPassages, cigarettePassages, tabletStatsPassages, cigaretteStatsPassages, groupCash, kitsInStock, cuttersInStock, packsInStock, processorInStock, processorImageUrl,
     canTabletAccess, canCigaretteAccess, canTabletManageDaily, canTabletCreatePassage, canCigaretteCreatePassage, canCigaretteCreateForAny, canHistory, canStats,
-    canProcessorView, canProcessorCreate, canProcessorProduction, canProcessorSale, canProcessorStats, canProcessorLogs, processorSessions,
+    canProcessorView, canProcessorCreate, canProcessorProduction, canProcessorSale, canProcessorStats, canProcessorLogs, processorSessions, processorStatsSessions,
     defaultMemberId, defaultMemberLabel
   } = props;
 
@@ -65,11 +68,14 @@ export function TabletCigarettePageClient(props: {
   const [cigaretteDayState, setCigaretteDayState] = useState(cigaretteDay);
   const [tabletPassagesState, setTabletPassagesState] = useState(tabletPassages);
   const [cigarettePassagesState, setCigarettePassagesState] = useState(cigarettePassages);
+  const [tabletStatsPassagesState, setTabletStatsPassagesState] = useState(tabletStatsPassages);
+  const [cigaretteStatsPassagesState, setCigaretteStatsPassagesState] = useState(cigaretteStatsPassages);
   const [groupCashState, setGroupCashState] = useState(groupCash);
   const [kitsState, setKitsState] = useState(kitsInStock);
   const [cuttersState, setCuttersState] = useState(cuttersInStock);
   const [packsState, setPacksState] = useState(packsInStock);
   const [processorSessionsState, setProcessorSessionsState] = useState(processorSessions);
+  const [processorStatsSessionsState, setProcessorStatsSessionsState] = useState(processorStatsSessions);
   const [processorParticipants, setProcessorParticipants] = useState<string[]>([defaultMemberId]);
   const [processorBottles, setProcessorBottles] = useState(2);
   const [processorBoatFee, setProcessorBoatFee] = useState(false);
@@ -82,10 +88,20 @@ export function TabletCigarettePageClient(props: {
 
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const activeMemberIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
-  const activeProcessorSessions = useMemo(() => processorSessionsState.filter((row) => {
+  const memberStatsKey = useCallback((userId?: string | null, label?: string | null) => userId ? `id:${userId}` : `label:${String(label ?? 'Inconnu').trim().toLowerCase()}`, []);
+  const memberStatsLabel = useCallback((userId?: string | null, label?: string | null) => {
+    const member = userId ? membersById.get(userId) : null;
+    return member ? (member.name || member.username) : String(label || 'Inconnu');
+  }, [membersById]);
+  const processorParticipantIds = useCallback((row: Record<string, unknown>) => {
     const participantIds = Array.isArray(row.participant_user_ids) ? row.participant_user_ids as string[] : [];
+    if (participantIds.length > 0) return participantIds;
+    return typeof row.validated_by === 'string' ? [row.validated_by] : [];
+  }, []);
+  const activeProcessorStatsSessions = useMemo(() => processorStatsSessionsState.filter((row) => {
+    const participantIds = processorParticipantIds(row);
     return participantIds.some((id) => activeMemberIds.has(id));
-  }), [activeMemberIds, processorSessionsState]);
+  }), [activeMemberIds, processorParticipantIds, processorStatsSessionsState]);
   const processorEstimate = useMemo(() => computeProcessorEstimates(processorBottles, processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES), [processorBottles, processorBoatFee]);
   const processorSaleTotalEstimated = Math.max(0, Math.round(processorSaleQty * 0.5 * 100));
   const processorSaleTotalReal = Math.max(0, Number(processorRealReceived || 0));
@@ -103,19 +119,19 @@ export function TabletCigarettePageClient(props: {
   }, [processorSaleMax]);
 
   const processorStatsQuick = useMemo(() => {
-    const rows = activeProcessorSessions.filter((row) => row.status === 'validated');
+    const rows = activeProcessorStatsSessions.filter((row) => row.status === 'validated');
     return {
       produced: rows.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0),
       sold: rows.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0),
       revenue: rows.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0),
       net: rows.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0)
     };
-  }, [activeProcessorSessions]);
+  }, [activeProcessorStatsSessions]);
 
   const processorStatsByMember = useMemo(() => {
     const map = new Map<string, { label: string; sold: number; revenue: number; sessions: number }>();
-    for (const row of activeProcessorSessions.filter((entry) => entry.status === 'validated')) {
-      const participantIds = Array.isArray(row.participant_user_ids) ? row.participant_user_ids as string[] : [];
+    for (const row of activeProcessorStatsSessions.filter((entry) => entry.status === 'validated')) {
+      const participantIds = processorParticipantIds(row);
       for (const id of participantIds.filter((entry) => activeMemberIds.has(entry))) {
         const member = membersById.get(id);
         const current = map.get(id) ?? { label: member ? (member.name || member.username) : id, sold: 0, revenue: 0, sessions: 0 };
@@ -128,21 +144,22 @@ export function TabletCigarettePageClient(props: {
       }
     }
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.sold - a.sold || b.sessions - a.sessions);
-  }, [activeMemberIds, activeProcessorSessions, membersById]);
+  }, [activeMemberIds, activeProcessorStatsSessions, membersById, processorParticipantIds]);
 
   const tabletStatsByMember = useMemo(() => {
-    const map = new Map<string, { label: string; count: number; money: number; kits: number; cutters: number; last: string }>();
-    for (const row of tabletPassagesState) {
-      const current = map.get(row.member_label) ?? { label: row.member_label, count: 0, money: 0, kits: 0, cutters: 0, last: row.created_at };
+    const map = new Map<string, { key: string; label: string; count: number; money: number; kits: number; cutters: number; last: string }>();
+    for (const row of tabletStatsPassagesState) {
+      const key = memberStatsKey(row.member_user_id, row.member_label);
+      const current = map.get(key) ?? { key, label: memberStatsLabel(row.member_user_id, row.member_label), count: 0, money: 0, kits: 0, cutters: 0, last: row.created_at };
       current.count += 1;
-      current.money += Math.max(0, Number(row.after_cash ?? 0) - Number(row.before_cash ?? 0));
+      current.money += Math.max(0, Number(row.before_cash ?? 0) - Number(row.after_cash ?? 0));
       current.kits += Math.max(0, Number(row.after_kits ?? 0) - Number(row.before_kits ?? 0));
       current.cutters += Math.max(0, Number(row.after_cutters ?? 0) - Number(row.before_cutters ?? 0));
       if (new Date(row.created_at).getTime() > new Date(current.last).getTime()) current.last = row.created_at;
-      map.set(row.member_label, current);
+      map.set(key, current);
     }
     return Array.from(map.values()).sort((a, b) => b.money - a.money || b.count - a.count);
-  }, [tabletPassagesState]);
+  }, [memberStatsKey, memberStatsLabel, tabletStatsPassagesState]);
 
   const tabletStatsTotals = useMemo(() => ({
     passages: tabletStatsByMember.reduce((sum, row) => sum + row.count, 0),
@@ -153,21 +170,22 @@ export function TabletCigarettePageClient(props: {
   }), [tabletStatsByMember]);
 
   const cigaretteStatsByMember = useMemo(() => {
-    const map = new Map<string, { label: string; count: number; packs: number; revenue: number; cash: number; bankPending: number; bankReceived: number; last: string }>();
-    for (const row of cigarettePassagesState) {
-      const current = map.get(row.member_label) ?? { label: row.member_label, count: 0, packs: 0, revenue: 0, cash: 0, bankPending: 0, bankReceived: 0, last: row.created_at };
+    const map = new Map<string, { key: string; label: string; count: number; packs: number; revenue: number; cash: number; bankPending: number; bankReceived: number; last: string }>();
+    for (const row of cigaretteStatsPassagesState) {
+      const key = memberStatsKey(row.member_user_id, row.member_label);
+      const current = map.get(key) ?? { key, label: memberStatsLabel(row.member_user_id, row.member_label), count: 0, packs: 0, revenue: 0, cash: 0, bankPending: 0, bankReceived: 0, last: row.created_at };
       const revenue = Number(row.revenue_amount ?? 0);
       current.count += 1;
       current.packs += Number(row.quantity_sold ?? 0);
       current.revenue += revenue;
-      if (row.status === 'pending_bank') current.bankPending += 1;
-      else if (row.status === 'received_bank') current.bankReceived += 1;
+      if (row.status === 'pending_bank') current.bankPending += revenue;
+      else if (row.status === 'received_bank') current.bankReceived += revenue;
       else current.cash += revenue;
       if (new Date(row.created_at).getTime() > new Date(current.last).getTime()) current.last = row.created_at;
-      map.set(row.member_label, current);
+      map.set(key, current);
     }
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.count - a.count);
-  }, [cigarettePassagesState]);
+  }, [cigaretteStatsPassagesState, memberStatsKey, memberStatsLabel]);
 
   const cigaretteStatsTotals = useMemo(() => ({
     passages: cigaretteStatsByMember.reduce((sum, row) => sum + row.count, 0),
@@ -180,12 +198,12 @@ export function TabletCigarettePageClient(props: {
   }), [cigaretteStatsByMember]);
 
   const processorStatsTotals = useMemo(() => ({
-    produced: activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0),
-    sold: activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0),
-    revenue: activeProcessorSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0),
-    net: activeProcessorSessions.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0),
-    sessions: activeProcessorSessions.filter((row) => row.status === 'validated').length
-  }), [activeProcessorSessions]);
+    produced: activeProcessorStatsSessions.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0),
+    sold: activeProcessorStatsSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0),
+    revenue: activeProcessorStatsSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.real_received : 0), 0),
+    net: activeProcessorStatsSessions.reduce((sum, row) => sum + Number(row.real_profit ?? 0), 0),
+    sessions: activeProcessorStatsSessions.filter((row) => row.status === 'validated').length
+  }), [activeProcessorStatsSessions]);
 
   const historyColumns = useMemo(() => {
     const tabletRows: HistoryCard[] = tabletPassagesState.map((entry) => ({
@@ -262,7 +280,10 @@ export function TabletCigarettePageClient(props: {
       return setError(data.message ?? 'Passage tablette impossible.');
     }
     const payload = await response.json() as { passage?: TabletPassage; day?: TabletDay; groupCash?: number; kitsInStock?: number; cuttersInStock?: number };
-    if (payload.passage) setTabletPassagesState((cur) => [payload.passage as TabletPassage, ...cur]);
+    if (payload.passage) {
+      setTabletPassagesState((cur) => [payload.passage as TabletPassage, ...cur]);
+      setTabletStatsPassagesState((cur) => [payload.passage as TabletPassage, ...cur]);
+    }
     if (payload.day) setTabletDayState(payload.day);
     if (typeof payload.groupCash === 'number') setGroupCashState(payload.groupCash);
     if (typeof payload.kitsInStock === 'number') setKitsState(payload.kitsInStock);
@@ -278,7 +299,10 @@ export function TabletCigarettePageClient(props: {
       return setError(data.message ?? 'Passage cigarette impossible.');
     }
     const payload = await response.json() as { passage?: CigarettePassage; day?: CigaretteDay; packsInStock?: number; groupCash?: number };
-    if (payload.passage) setCigarettePassagesState((cur) => [payload.passage as CigarettePassage, ...cur]);
+    if (payload.passage) {
+      setCigarettePassagesState((cur) => [payload.passage as CigarettePassage, ...cur]);
+      setCigaretteStatsPassagesState((cur) => [payload.passage as CigarettePassage, ...cur]);
+    }
     if (payload.day) setCigaretteDayState(payload.day);
     if (typeof payload.groupCash === 'number') setGroupCashState(payload.groupCash);
     if (typeof payload.packsInStock === 'number') setPacksState(payload.packsInStock);
@@ -304,7 +328,10 @@ export function TabletCigarettePageClient(props: {
       return setError(payload.message ?? 'Session processeur impossible.');
     }
     const payload = await response.json() as { session?: Record<string, unknown>; cashAfter?: number; processorStock?: number };
-    if (payload.session) setProcessorSessionsState((cur) => [payload.session as Record<string, unknown>, ...cur]);
+    if (payload.session) {
+      setProcessorSessionsState((cur) => [payload.session as Record<string, unknown>, ...cur]);
+      setProcessorStatsSessionsState((cur) => [payload.session as Record<string, unknown>, ...cur]);
+    }
     if (typeof payload.cashAfter === 'number') setGroupCashState(payload.cashAfter);
     if (typeof payload.processorStock === 'number') setProcessorStockState(payload.processorStock);
     setStatus('Production processeur validée.');
@@ -327,7 +354,10 @@ export function TabletCigarettePageClient(props: {
       return setError(payload.message ?? 'Vente processeur impossible.');
     }
     const payload = await response.json() as { session?: Record<string, unknown>; cashAfter?: number; processorStock?: number };
-    if (payload.session) setProcessorSessionsState((cur) => [payload.session as Record<string, unknown>, ...cur]);
+    if (payload.session) {
+      setProcessorSessionsState((cur) => [payload.session as Record<string, unknown>, ...cur]);
+      setProcessorStatsSessionsState((cur) => [payload.session as Record<string, unknown>, ...cur]);
+    }
     if (typeof payload.cashAfter === 'number') setGroupCashState(payload.cashAfter);
     if (typeof payload.processorStock === 'number') setProcessorStockState(payload.processorStock);
     setStatus('Vente processeur validée.');
@@ -594,7 +624,7 @@ export function TabletCigarettePageClient(props: {
                 <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent généré</th><th className="px-2 py-1">Kits</th><th className="px-2 py-1">Disqueuses</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
                 <tbody>
                   {tabletStatsByMember.map((row) => (
-                    <tr key={row.label} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{row.kits}</td><td className="px-2 py-1">{row.cutters}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
+                    <tr key={row.key} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{row.kits}</td><td className="px-2 py-1">{row.cutters}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
                   ))}
                   {tabletStatsByMember.length === 0 ? <tr className="border-t border-white/10"><td className="px-2 py-2" colSpan={6}>Aucune stat tablette.</td></tr> : null}
                 </tbody>
@@ -608,14 +638,14 @@ export function TabletCigarettePageClient(props: {
               <Stat label="Paquets vendus" value={String(cigaretteStatsTotals.packs)} icon="📦" />
               <Stat label="Argent généré" value={formatUsd(cigaretteStatsTotals.revenue)} icon="💵" />
               <Stat label="Cash reçu" value={formatUsd(cigaretteStatsTotals.cash)} icon="🏦" />
-              <Stat label="Bank attente / reçu" value={`${cigaretteStatsTotals.bankPending} / ${cigaretteStatsTotals.bankReceived}`} icon="🧾" />
+              <Stat label="Bank attente / reçu" value={`${formatUsd(cigaretteStatsTotals.bankPending)} / ${formatUsd(cigaretteStatsTotals.bankReceived)}`} icon="🧾" />
             </div>
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-left text-xs text-[#efcdab]">
                 <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Paquets</th><th className="px-2 py-1">Argent généré</th><th className="px-2 py-1">Cash</th><th className="px-2 py-1">Bank attente / reçu</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
                 <tbody>
                   {cigaretteStatsByMember.map((row) => (
-                    <tr key={row.label} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{row.packs}</td><td className="px-2 py-1">{formatUsd(row.revenue)}</td><td className="px-2 py-1">{formatUsd(row.cash)}</td><td className="px-2 py-1">{row.bankPending} / {row.bankReceived}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
+                    <tr key={row.key} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{row.packs}</td><td className="px-2 py-1">{formatUsd(row.revenue)}</td><td className="px-2 py-1">{formatUsd(row.cash)}</td><td className="px-2 py-1">{formatUsd(row.bankPending)} / {formatUsd(row.bankReceived)}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
                   ))}
                   {cigaretteStatsByMember.length === 0 ? <tr className="border-t border-white/10"><td className="px-2 py-2" colSpan={7}>Aucune stat cigarette.</td></tr> : null}
                 </tbody>
