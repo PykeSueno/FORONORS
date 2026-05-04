@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { SessionMemberSelector } from '@/components/shared/session-member-selector';
 import { RemoveLineButton } from '@/components/shared/line-controls';
+import { PROCESSOR_UNITS_PER_BOTTLE } from '@/lib/processor';
 
 type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor';
 type ActivityDisplayType = ActivityType | 'drug_sale';
@@ -80,6 +81,8 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const cutterItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('disqueuse')), [items]);
   const divingBottleItem = useMemo(() => items.find((item) => item.name === 'Bouteille de Plongée'), [items]);
   const processorItem = useMemo(() => items.find((item) => item.name === 'Processeur'), [items]);
+  const currentEquipment = activityType === 'burglary' ? kitItem : activityType === 'container' ? cutterItem : divingBottleItem;
+  const processorQuantity = activityType === 'processor' ? equipmentUsed * PROCESSOR_UNITS_PER_BOTTLE : 0;
   const selectedMembers = useMemo(() => members.filter((entry) => selectedMemberIds.includes(entry.id)), [members, selectedMemberIds]);
 
   useEffect(() => {
@@ -91,12 +94,22 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
     setActivityType(type);
     setError('');
     if (type === 'mailbox') setEquipmentUsed(0);
+    if (type === 'processor') setEquipmentUsed((current) => Math.max(1, current));
     if (type === 'processor' && processorItem) {
-      setLines((current) => current.length > 0 ? current.filter((line) => line.item_id === processorItem.id) : [{ item_id: processorItem.id, quantity: 1 }]);
+      setLines([{ item_id: processorItem.id, quantity: Math.max(1, equipmentUsed) * PROCESSOR_UNITS_PER_BOTTLE }]);
     }
   }
 
+  useEffect(() => {
+    if (activityType !== 'processor' || !processorItem) return;
+    setLines([{ item_id: processorItem.id, quantity: Math.max(0, equipmentUsed) * PROCESSOR_UNITS_PER_BOTTLE }]);
+  }, [activityType, equipmentUsed, processorItem]);
+
   function addItem(itemId: number) {
+    if (activityType === 'processor' && processorItem) {
+      setLines([{ item_id: processorItem.id, quantity: processorQuantity }]);
+      return;
+    }
     setLines((current) => {
       const existingIndex = current.findIndex((line) => line.item_id === itemId);
       if (existingIndex >= 0) {
@@ -222,16 +235,21 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
               <label className="mt-3 block text-xs text-[#efccaa]">{activityType === 'burglary' ? 'Kits pris' : activityType === 'container' ? 'Disqueuses prises' : 'Bouteilles de Plongée prises'}</label>
               <div className="mt-1 flex items-center gap-2">
                 <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#22140e]">
-                  {(activityType === 'burglary' ? kitItem?.image_url : activityType === 'container' ? cutterItem?.image_url : divingBottleItem?.image_url) ? (
-                    <Image src={(activityType === 'burglary' ? kitItem?.image_url : cutterItem?.image_url) as string} alt="Équipement" width={40} height={40} className="h-full w-full object-cover" unoptimized />
+                  {currentEquipment?.image_url ? (
+                    <Image src={currentEquipment.image_url} alt={currentEquipment.name} width={40} height={40} className="h-full w-full object-cover" unoptimized />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">🧰</div>
+                    <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">{activityType === 'processor' ? '🫧' : '🧰'}</div>
                   )}
                 </div>
                 <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(-1)}>-</button>
                 <input className="saas-input w-20 text-center" value={equipmentUsed} onChange={(e) => setEquipmentUsed(Math.max(0, Number(e.target.value || 0)))} inputMode="numeric" />
                 <button className="saas-ghost-btn !px-3" onClick={() => stepEquipment(1)}>+</button>
               </div>
+              {activityType === 'processor' ? (
+                <p className="mt-2 rounded-lg border border-white/10 bg-[#2f1d14]/60 px-3 py-2 text-xs text-[#efcdab]">
+                  1 bouteille = {PROCESSOR_UNITS_PER_BOTTLE} processeurs · Total récupéré: <b className="text-[#ffe8ca]">{processorQuantity}</b>
+                </p>
+              ) : null}
             </>
           ) : null}
 
@@ -298,12 +316,16 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                       <p className="text-xs text-[#efcdab]">Qté: +{line.quantity} · Avant/Après: {item.quantity} → {item.quantity + line.quantity}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, line.quantity - 1)}>-</button>
-                    <input className="saas-input w-16 text-center" value={line.quantity} onChange={(e) => updateLine(idx, Number(e.target.value || 1))} />
-                    <button className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, line.quantity + 1)}>+</button>
-                    <button className="saas-ghost-btn !px-2" onClick={() => removeLine(idx)}>🗑️</button>
-                  </div>
+                  {activityType === 'processor' ? (
+                    <span className="rounded-full border border-white/10 bg-[#2f1d14]/70 px-3 py-1 text-xs text-[#efcdab]">Auto</span>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <button className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, line.quantity - 1)}>-</button>
+                      <input className="saas-input w-16 text-center" value={line.quantity} onChange={(e) => updateLine(idx, Number(e.target.value || 1))} />
+                      <button className="saas-ghost-btn !px-2" onClick={() => updateLine(idx, line.quantity + 1)}>+</button>
+                      <button className="saas-ghost-btn !px-2" onClick={() => removeLine(idx)}>🗑️</button>
+                    </div>
+                  )}
                 </div>
               );
             })}

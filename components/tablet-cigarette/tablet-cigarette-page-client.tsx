@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { computeProcessorEstimates, PROCESSOR_BOAT_FROM_BOTTLES } from '@/lib/processor';
@@ -75,7 +76,6 @@ export function TabletCigarettePageClient(props: {
   const [processorRealFee, setProcessorRealFee] = useState('');
   const [processorSaleMemberId, setProcessorSaleMemberId] = useState(defaultMemberId);
   const [processorSaleQty, setProcessorSaleQty] = useState(10);
-  const [processorSoldQty, setProcessorSoldQty] = useState(5);
   const [processorRealReceived, setProcessorRealReceived] = useState('500');
   const [processorStockState, setProcessorStockState] = useState(processorInStock);
   const [cigarettePaymentMode, setCigarettePaymentMode] = useState<'cash' | 'bank'>('cash');
@@ -87,7 +87,7 @@ export function TabletCigarettePageClient(props: {
     return participantIds.some((id) => activeMemberIds.has(id));
   }), [activeMemberIds, processorSessionsState]);
   const processorEstimate = useMemo(() => computeProcessorEstimates(processorBottles, processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES), [processorBottles, processorBoatFee]);
-  const processorSaleTotalEstimated = Math.max(0, Math.floor(processorSaleQty * 0.5) * 100);
+  const processorSaleTotalEstimated = Math.max(0, Math.round(processorSaleQty * 0.5 * 100));
   const processorSaleTotalReal = Math.max(0, Number(processorRealReceived || 0));
   const tabletGenerated = Math.max(0, Number(tabletDayState?.deposited_amount ?? 0) - Number(tabletDayState?.chest_amount ?? 0));
 
@@ -231,7 +231,6 @@ export function TabletCigarettePageClient(props: {
         operation_type: 'sale',
         seller_user_id: processorSaleMemberId,
         quantity: processorSaleQty,
-        sold_quantity: processorSoldQty,
         real_received: processorSaleTotalReal
       })
     });
@@ -425,29 +424,55 @@ export function TabletCigarettePageClient(props: {
             {canProcessorSale ? <article className="glass-card flex h-full flex-col p-4">
               <h4 className="text-base font-semibold text-[#fff1dd]">💰 Vente processeurs</h4>
               <div className="mt-2 flex items-center gap-3 rounded-xl border border-white/10 bg-[#2f1d14]/55 p-2">
-                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[#4a2f20]/60 text-lg">{processorImageUrl ? '🧠' : '⚙️'}</div>
+                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[#4a2f20]/60 text-lg">
+                  {processorImageUrl ? <Image src={processorImageUrl} alt="Processeur" width={48} height={48} className="h-full w-full object-cover" unoptimized /> : '⚙️'}
+                </div>
                 <div>
                   <p className="text-sm text-[#ffe8ca]">Item Processeur</p>
                   <p className="text-xs text-[#efcdab]">Stock actuel: <span className="font-semibold">{processorStockState}</span></p>
                 </div>
               </div>
-              <label className="mt-2 text-xs text-[#efcdab]">Vendeur</label>
-              <select className="saas-input !h-9" value={processorSaleMemberId} onChange={(event) => setProcessorSaleMemberId(event.target.value)}>
-                {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
-              </select>
-              <p className="text-xs text-[#efcdab]">Déjà vendu aujourd’hui: <b>{processorSoldToday}</b> · Restant possible: <b>{processorRemainingToday}</b>/50</p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <input className="saas-input !h-9" type="number" min={1} max={processorStockState} value={processorSaleQty} onChange={(event) => setProcessorSaleQty(Math.max(1, Number(event.target.value || 0)))} />
-                <input className="saas-input !h-9" type="number" min={0} max={Math.min(processorRemainingToday, processorSaleQty)} value={processorSoldQty} onChange={(event) => setProcessorSoldQty(Math.max(0, Math.min(processorRemainingToday, Number(event.target.value || 0))))} />
+
+              <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_180px]">
+                <div>
+                  <FieldLabel icon="👤" label="Vendeur" />
+                  <select className="saas-input !h-10" value={processorSaleMemberId} onChange={(event) => setProcessorSaleMemberId(event.target.value)}>
+                    {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
+                  </select>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#2f1d14]/60 px-3 py-2 text-xs text-[#efcdab]">
+                  <p>Déjà vendu aujourd’hui: <b className="text-[#ffe8ca]">{processorSoldToday}</b></p>
+                  <p>Restant possible: <b className="text-[#ffe8ca]">{processorRemainingToday}</b>/50</p>
+                </div>
               </div>
-              <label className="mt-2 text-xs text-[#efcdab]">Argent réel récupéré</label>
-              <input className="saas-input !h-9" type="number" min={0} value={processorRealReceived} onChange={(event) => setProcessorRealReceived(event.target.value)} />
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <MiniStat label="Estimation (50%)" value={formatUsd(processorSaleTotalEstimated)} />
-                <MiniStat label="Total reçu réel" value={formatUsd(processorSaleTotalReal)} />
+
+              <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_180px]">
+                <div>
+                  <FieldLabel icon="📦" label="Quantité mise en vente" />
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="saas-ghost-btn !h-10 !px-3" onClick={() => setProcessorSaleQty((cur) => Math.max(0, cur - 1))}>-</button>
+                    <input className="saas-input !h-10 text-center" type="number" min={0} max={Math.min(processorRemainingToday, processorStockState)} value={processorSaleQty} onChange={(event) => setProcessorSaleQty(Math.max(0, Math.min(processorRemainingToday, processorStockState, Number(event.target.value || 0))))} />
+                    <button type="button" className="saas-ghost-btn !h-10 !px-3" onClick={() => setProcessorSaleQty((cur) => Math.min(processorRemainingToday, processorStockState, cur + 1))}>+</button>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-amber-200/20 bg-[#3a2418]/70 px-3 py-2">
+                  <p className="text-[11px] uppercase text-[#efcdab]">Estimation récupérée</p>
+                  <p className="text-lg font-semibold text-[#ffe8ca]">{formatUsd(processorSaleTotalEstimated)}</p>
+                  <p className="text-[11px] text-[#efcdab]">50% · 100$ / processeur</p>
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <FieldLabel icon="💵" label="Argent réel reçu" />
+                <input className="saas-input !h-10" type="number" min={0} value={processorRealReceived} onChange={(event) => setProcessorRealReceived(event.target.value)} />
+                <p className="mt-1 text-xs text-[#efcdab]">Ce montant est le seul ajouté à l’argent groupe.</p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <MiniStat label="Argent groupe ajouté" value={formatUsd(processorSaleTotalReal)} />
                 <MiniStat label="Stock après" value={String(Math.max(0, processorStockState - processorSaleQty))} />
               </div>
-              {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" disabled={processorSaleQty > processorRemainingToday || processorSaleQty > processorStockState} onClick={() => void createProcessorSale()}>Valider vente</button> : null}
+              {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" disabled={processorSaleQty <= 0 || processorSaleQty > processorRemainingToday || processorSaleQty > processorStockState} onClick={() => void createProcessorSale()}>Valider vente</button> : null}
             </article> : null}
           </div>
         </section>

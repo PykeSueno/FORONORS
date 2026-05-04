@@ -5,6 +5,7 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
+import { PROCESSOR_UNITS_PER_BOTTLE } from '@/lib/processor';
 
 type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor';
 const ACTIVITY_LABELS: Record<ActivityType, string> = {
@@ -124,6 +125,12 @@ export async function POST(request: Request) {
   for (const line of lines) {
     const quantity = Math.max(1, Number(line.quantity));
     mergedLines.set(line.item_id, (mergedLines.get(line.item_id) ?? 0) + quantity);
+  }
+  if (body.activity_type === 'processor') {
+    const processorLine = lines.find((line) => Number.isFinite(Number(line.item_id)) && Number(line.item_id) > 0);
+    if (!processorLine) return NextResponse.json({ message: 'Item Processeur requis.' }, { status: 400 });
+    mergedLines.clear();
+    mergedLines.set(processorLine.item_id, equipmentUsed * PROCESSOR_UNITS_PER_BOTTLE);
   }
 
   const resolvedItems: Array<{ item_id: number; item_name: string; quantity: number; before: number; after: number; isMoneyItem: boolean }> = [];

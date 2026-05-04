@@ -138,7 +138,7 @@ export async function POST(request: Request) {
     .lt('created_at', dayEnd.toISOString())
     .limit(500);
   const soldToday = (todayRows ?? []).reduce((sum, row) => sum + Math.max(0, Number(row.processors_count ?? 0)), 0);
-  if (soldToday + soldQuantity > 50) return NextResponse.json({ message: 'Limite journalière atteinte (50 processeurs vendus max par membre).' }, { status: 400 });
+  if (soldToday + quantity > 50) return NextResponse.json({ message: 'Limite journalière atteinte (50 processeurs mis en vente max par membre).' }, { status: 400 });
   const accepted = soldQuantity;
   const rejected = Math.max(0, quantity - accepted);
   const received = realReceivedInput ?? accepted * unitPrice;
@@ -154,9 +154,9 @@ export async function POST(request: Request) {
     vehicle_used: 'car',
     material_cost: 0,
     boat_fee: 0,
-    estimated_gain_avg: Math.floor(quantity * 0.5) * unitPrice,
+    estimated_gain_avg: Math.round(quantity * 0.5 * unitPrice),
     estimated_gain_max: quantity * unitPrice,
-    estimated_profit_avg: Math.floor(quantity * 0.5) * unitPrice,
+    estimated_profit_avg: Math.round(quantity * 0.5 * unitPrice),
     estimated_profit_max: quantity * unitPrice,
     real_received: received,
     real_profit: received,
