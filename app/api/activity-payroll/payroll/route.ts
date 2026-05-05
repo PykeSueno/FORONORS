@@ -99,7 +99,7 @@ export async function GET(request: Request) {
     periodState(supabase, previousWindow.startIso, previousWindow.endIso),
     periodState(supabase, selectedWindow.startIso, selectedWindow.endIso),
     supabase.from('activity_payroll_payments').select('id, week_start, week_end, member_user_id, member_label, amount, paid_by, group_balance_before, group_balance_after, created_at').order('created_at', { ascending: false }).limit(120),
-    supabase.from('audit_logs').select('id, action, summary, actor_name, entity_id, old_values, new_values, created_at').in('action', ['activity_payroll_config_updated', 'activity_payroll_member_paid', 'activity_payroll_member_adjusted', 'activity_payroll_member_excluded', 'activity_payroll_member_reported', 'expense_created', 'expense_reimbursed', 'expense_cancelled', 'expense_updated']).order('created_at', { ascending: false }).limit(160)
+    supabase.from('audit_logs').select('id, action, summary, actor_name, entity_id, old_values, new_values, created_at').in('action', ['activity.create', 'activity.processor.create', 'activity.edit', 'activity.cancel', 'activity_payroll_config_updated', 'activity_payroll_member_paid', 'activity_payroll_member_adjusted', 'activity_payroll_member_excluded', 'activity_payroll_member_reported', 'expense_created', 'expense_reimbursed', 'expense_cancelled', 'expense_updated', 'member_payroll_paid', 'member_payroll_adjusted', 'member_payroll_excluded', 'member_payroll_reported']).order('created_at', { ascending: false }).limit(160)
   ]);
 
   const [current, previous, selected] = await Promise.all([

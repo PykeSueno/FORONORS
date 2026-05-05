@@ -25,6 +25,7 @@ export type PayrollMemberRow = {
   memberLabel: string;
   isActive: boolean;
   moneyContribution: number;
+  usefulExpenseContribution: number;
   activityCount: number;
   participationCount: number;
   moneyScore: number;
@@ -60,7 +61,7 @@ function normalizeLabel(value: string | null | undefined) {
 export function weekWindow(now: Date, shiftWeeks = 0) {
   const start = new Date(now);
   start.setUTCHours(0, 0, 0, 0);
-  const day = start.getUTCDay();
+  const day = (start.getUTCDay() + 6) % 7;
   start.setUTCDate(start.getUTCDate() - day + (shiftWeeks * 7));
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 7);
@@ -69,8 +70,8 @@ export function weekWindow(now: Date, shiftWeeks = 0) {
 
 export function payrollDisplayWindow(now: Date) {
   const base = weekWindow(now, 0);
-  const day = now.getUTCDay(); // 0 sunday, 1 monday
-  if (day === 0 || day === 1) {
+  const day = now.getUTCDay(); // 1 monday, 2 tuesday
+  if (day === 1) {
     const previous = weekWindow(now, -1);
     const deadline = new Date(previous.endIso);
     deadline.setUTCDate(deadline.getUTCDate() + 1);
@@ -237,12 +238,17 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   };
 
   const moneyByMember = new Map<string, number>();
+  const usefulExpensesByMember = new Map<string, number>();
   const activityByMember = new Map<string, number>();
   const participationByMember = new Map<string, number>();
 
   const addMoney = (memberId: string | null | undefined, amount: number) => {
     if (!memberId || !activeMemberIds.has(memberId) || !Number.isFinite(amount) || amount <= 0) return;
     moneyByMember.set(memberId, (moneyByMember.get(memberId) ?? 0) + amount);
+  };
+  const addUsefulExpense = (memberId: string | null | undefined, amount: number) => {
+    if (!memberId || !activeMemberIds.has(memberId) || !Number.isFinite(amount) || amount <= 0) return;
+    usefulExpensesByMember.set(memberId, (usefulExpensesByMember.get(memberId) ?? 0) + amount);
   };
   const addActivity = (memberId: string | null | undefined, amount = 1) => {
     if (!memberId || !activeMemberIds.has(memberId)) return;
@@ -376,6 +382,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     const memberId = resolveMemberId(row.member_id, row.member_name);
     const amount = Math.max(0, Number(row.amount ?? 0));
     addMoney(memberId, amount);
+    addUsefulExpense(memberId, amount);
     addActivity(memberId, 1);
     addParticipation(memberId, 0.5);
   }
@@ -387,6 +394,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
   const rows: PayrollMemberRow[] = (members ?? []).map((member: { id: string; name?: string | null; username?: string | null; is_active?: boolean | null }) => {
     const memberId = member.id as string;
     const moneyContribution = Number(moneyByMember.get(memberId) ?? 0);
+    const usefulExpenseContribution = Number(usefulExpensesByMember.get(memberId) ?? 0);
     const activityCount = Number(activityByMember.get(memberId) ?? 0);
     const participationCount = Number(participationByMember.get(memberId) ?? 0);
     const moneyScore = moneyContribution / maxMoney;
@@ -408,6 +416,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
       memberLabel: (member.name as string | null) || (member.username as string | null) || memberId,
       isActive: active,
       moneyContribution,
+      usefulExpenseContribution,
       activityCount,
       participationCount,
       moneyScore,

@@ -89,7 +89,7 @@ export default async function ActivityPayrollPage() {
   const canExpenseCreate = has('member_ops.expenses.create');
   const canExpenseReimburse = has('member_ops.expenses.reimburse');
   const canExpenseCancel = has('member_ops.expenses.cancel');
-  const canHistory = has('member_ops.history.view');
+  const canHistory = canSummary || has('member_ops.history.view');
   const canLogs = has('member_ops.activities.logs') || has('member_ops.payroll.logs') || has('member_ops.expenses.logs') || has('member_ops.logs.view');
 
   const supabase = getSupabaseAdmin();
@@ -114,7 +114,7 @@ export default async function ActivityPayrollPage() {
     canExpenses || canSummary || canHistory ? supabase.from('expenses').select('*').eq('status', 'pending').order('created_at', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
     canExpenses || canSummary || canHistory ? supabase.from('expenses').select('*').eq('status', 'reimbursed').order('reimbursed_at', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
     canExpenses || canSummary || canHistory ? supabase.from('expenses').select('*').order('created_at', { ascending: false }).limit(2000) : Promise.resolve({ data: [] }),
-    canLogs ? supabase.from('audit_logs').select('id, action, summary, actor_name, entity_id, old_values, new_values, created_at').in('action', ['activity_payroll_config_updated', 'activity_payroll_member_paid', 'activity_payroll_member_adjusted', 'activity_payroll_member_excluded', 'activity_payroll_member_reported', 'expense_created', 'expense_reimbursed', 'expense_cancelled', 'expense_updated', 'member_payroll_paid', 'member_payroll_adjusted', 'member_payroll_excluded', 'member_payroll_reported']).order('created_at', { ascending: false }).limit(240) : Promise.resolve({ data: [] })
+    canLogs ? supabase.from('audit_logs').select('id, action, summary, actor_name, entity_id, old_values, new_values, created_at').in('action', ['activity.create', 'activity.processor.create', 'activity.edit', 'activity.cancel', 'activity_payroll_config_updated', 'activity_payroll_member_paid', 'activity_payroll_member_adjusted', 'activity_payroll_member_excluded', 'activity_payroll_member_reported', 'expense_created', 'expense_reimbursed', 'expense_cancelled', 'expense_updated', 'member_payroll_paid', 'member_payroll_adjusted', 'member_payroll_excluded', 'member_payroll_reported']).order('created_at', { ascending: false }).limit(240) : Promise.resolve({ data: [] })
   ]);
 
   const config = readPayrollConfig(cfgSetting?.value ?? null);

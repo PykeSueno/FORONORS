@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { formatUsd } from '@/lib/currency';
 import type { PayrollConfig, PayrollMemberRow, PayrollPreview } from '@/lib/payroll';
 import type { MemberActivityRow } from '@/lib/payroll-service';
 
-type Page = 'activities' | 'payroll' | 'expenses';
+type Page = 'activities' | 'payroll' | 'expenses' | 'history' | 'logs';
 type PeriodMode = 'current' | 'previous' | 'custom';
 
 type MemberSummary = {
@@ -131,11 +131,15 @@ const MODULE_FILTERS = [
   { value: 'GoFast', label: 'GoFast' }
 ];
 
-function firstPage(props: Pick<Props, 'canActivities' | 'canPayroll' | 'canExpenses'>): Page {
+function firstPage(props: Pick<Props, 'canActivities' | 'canPayroll' | 'canExpenses' | 'canHistory' | 'canLogs'>): Page {
   if (props.canActivities) return 'activities';
   if (props.canPayroll) return 'payroll';
-  return 'expenses';
+  if (props.canExpenses) return 'expenses';
+  if (props.canHistory) return 'history';
+  return props.canLogs ? 'logs' : 'activities';
 }
+
+type GlobalHistoryRow = { id: string; date: string; type: string; title: string; details: string; amount?: number };
 
 export function ActivityPayrollHubClient(props: Props) {
   const [page, setPage] = useState<Page>(() => firstPage(props));
@@ -220,7 +224,36 @@ export function ActivityPayrollHubClient(props: Props) {
     return Array.from(byMember.values()).filter((row) => row.actions > 0).sort((a, b) => b.money - a.money || b.actions - a.actions);
   }, [filteredActivities, memberFilter, props.members]);
 
-  async function loadPeriod(nextMode: PeriodMode, start = customStart, end = customEnd) {
+  const globalHistory = useMemo<GlobalHistoryRow[]>(() => [
+    ...history.map((row) => ({
+      id: `pay-${row.id}`,
+      date: row.created_at,
+      type: 'Paye',
+      title: row.member_label,
+      details: `Période ${formatPeriod(row.week_start, row.week_end)} · ${formatUsd(row.group_balance_before)} vers ${formatUsd(row.group_balance_after)}`,
+      amount: Number(row.amount ?? 0)
+    })),
+    ...props.activities.slice(0, 180).map((row) => ({
+      id: `activity-${row.id}`,
+      date: row.date,
+      type: 'Activité',
+      title: `${row.memberLabels.join(' + ') || '-'} · ${row.module}`,
+      details: `${row.action}${row.details ? ` · ${row.details}` : ''}`,
+      amount: Number(row.moneyGenerated ?? 0)
+    })),
+    ...expenseStatsRows.slice(0, 240).map((row) => ({
+      id: `expense-${row.id}`,
+      date: row.reimbursed_at || row.created_at,
+      type: row.status === 'reimbursed' ? 'Remboursement' : row.status === 'pending' ? 'Dépense' : 'Dépense annulée',
+      title: `${row.member_name} · ${row.category}`,
+      details: row.status === 'reimbursed'
+        ? `Remboursée le ${row.reimbursed_at ? new Date(row.reimbursed_at).toLocaleString('fr-FR') : '-'}`
+        : `Créée le ${new Date(row.created_at).toLocaleString('fr-FR')}`,
+      amount: Number(row.amount ?? 0)
+    }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [expenseStatsRows, history, props.activities]);
+
+  const loadPeriod = useCallback(async (nextMode: PeriodMode, start = customStart, end = customEnd) => {
     setError('');
     setMessage('');
     const query = nextMode === 'custom'
@@ -243,9 +276,9 @@ export function ActivityPayrollHubClient(props: Props) {
     if (payload.logs) setLogs(payload.logs);
     setGroupCash(payload.selected.balance);
     setPayrollConfig(payload.selected.config);
-  }
+  }, [customEnd, customStart]);
 
-  async function savePayrollConfig(config: PayrollConfig) {
+  const savePayrollConfig = useCallback(async (config: PayrollConfig) => {
     setError('');
     setMessage('');
     const response = await fetch('/api/activity-payroll/payroll', {
@@ -261,7 +294,7 @@ export function ActivityPayrollHubClient(props: Props) {
     setPayrollConfig(payload.config ?? config);
     await loadPeriod(periodMode, customStart, customEnd);
     setMessage('Réglages paye enregistrés. Payes recalculées.');
-  }
+  }, [customEnd, customStart, loadPeriod, periodMode]);
 
   async function payrollAction(action: 'pay' | 'adjust' | 'exclude' | 'report', row: PayrollMemberRow, enabled = true) {
     setError('');
@@ -354,6 +387,8 @@ export function ActivityPayrollHubClient(props: Props) {
           {props.canActivities ? <PageButton active={page === 'activities'} onClick={() => setPage('activities')}><SmallIcon name="activity" />Activités</PageButton> : null}
           {props.canPayroll ? <PageButton active={page === 'payroll'} onClick={() => setPage('payroll')}><SmallIcon name="payroll" />Payes</PageButton> : null}
           {props.canExpenses ? <PageButton active={page === 'expenses'} onClick={() => setPage('expenses')}><SmallIcon name="expense" />Dépenses</PageButton> : null}
+          {props.canHistory ? <PageButton active={page === 'history'} onClick={() => setPage('history')}><SmallIcon name="history" />Historique</PageButton> : null}
+          {props.canLogs ? <PageButton active={page === 'logs'} onClick={() => setPage('logs')}><SmallIcon name="logs" />Logs</PageButton> : null}
         </div>
       </section>
 
@@ -422,6 +457,10 @@ export function ActivityPayrollHubClient(props: Props) {
           onCancel={cancelExpense}
         />
       ) : null}
+
+      {page === 'history' && props.canHistory ? <GlobalHistoryPage rows={globalHistory} /> : null}
+
+      {page === 'logs' && props.canLogs ? <GlobalLogsPage rows={logs} /> : null}
     </div>
   );
 }
@@ -493,17 +532,6 @@ function ActivitiesPage(props: {
         {props.cards.length === 0 ? <article className="glass-card p-4 text-sm text-[#efcdab]">Aucune activité sur ces filtres.</article> : null}
       </section>
 
-      <section className="glass-card p-4">
-        <h3 className="text-sm font-semibold text-[#fff1dd]">Historique activités</h3>
-        <div className="mt-2 max-h-[420px] space-y-2 overflow-auto pr-1">
-          {props.activities.slice(0, 80).map((row) => (
-            <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
-              <div className="flex flex-wrap justify-between gap-2"><b className="text-[#ffe8ca]">{row.memberLabels.join(' + ') || '-'}</b><span>{new Date(row.date).toLocaleString('fr-FR')}</span></div>
-              <p className="inline-flex items-center gap-2"><SmallIcon name={moduleIcon(row.module)} className="h-4 w-4" />{row.module} - {row.action} - {formatUsd(row.moneyGenerated)} - {row.details}</p>
-            </article>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
@@ -535,6 +563,7 @@ function PayrollPage(props: {
   savePayrollConfig: (config: PayrollConfig) => Promise<void>;
   payrollAction: (action: 'pay' | 'adjust' | 'exclude' | 'report', row: PayrollMemberRow, enabled?: boolean) => Promise<void>;
 }) {
+  const [openCalculation, setOpenCalculation] = useState<string | null>(null);
   const lastPayments = useMemo(() => {
     const map = new Map<string, HistoryPayment>();
     for (const row of props.history) {
@@ -544,6 +573,24 @@ function PayrollPage(props: {
     }
     return map;
   }, [props.history]);
+  const periodPayments = useMemo(() => {
+    const map = new Map<string, HistoryPayment>();
+    for (const row of props.history) {
+      if (!row.member_user_id || row.week_start !== props.selectedPreview.weekStartIso || row.week_end !== props.selectedPreview.weekEndIso) continue;
+      map.set(row.member_user_id, row);
+    }
+    return map;
+  }, [props.history, props.selectedPreview.weekEndIso, props.selectedPreview.weekStartIso]);
+  const payrollRows = useMemo(() => props.selectedPreview.members.map((member) => {
+    const payment = periodPayments.get(member.memberId);
+    const isPaid = Boolean(payment ?? props.paidMembers[member.memberId]);
+    const isExcluded = props.excludedIds.includes(member.memberId);
+    const isReported = props.reportedIds.includes(member.memberId);
+    const status = isPaid ? 'Payé' : isExcluded ? 'Exclu' : isReported ? 'Reporté' : member.eligible ? 'À payer' : 'Exclu';
+    return { member, payment, status, isPaid, isExcluded, isReported };
+  }), [periodPayments, props.excludedIds, props.paidMembers, props.reportedIds, props.selectedPreview.members]);
+  const payrollToDo = useMemo(() => payrollRows.filter((row) => !row.isPaid), [payrollRows]);
+  const payrollDone = useMemo(() => payrollRows.filter((row) => row.isPaid), [payrollRows]);
 
   return (
     <div className="space-y-4">
@@ -553,14 +600,14 @@ function PayrollPage(props: {
         <Metric label="Déjà payé" value={formatUsd(props.paidTotal)} icon="paid" />
         <Metric label="Restant" value={formatUsd(props.remainingPayroll)} icon="pending" />
         <Metric label="Solde après payes" value={formatUsd(props.groupCash - props.remainingPayroll)} icon="money" />
-        <Metric label="Période" value={`${props.selectedPreview.weekStartIso.slice(5, 10)} / ${props.selectedPreview.weekEndIso.slice(5, 10)}`} />
+        <Metric label="Période travaillée" value={formatPeriod(props.selectedPreview.weekStartIso, props.selectedPreview.weekEndIso)} />
       </section>
 
       <section className="glass-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-[#fff1dd]">Période & comparaison</h3>
-            <p className="mt-1 text-xs text-[#efcdab]">Active: {props.selectedPreview.weekStartIso.slice(0, 10)} - {props.selectedPreview.weekEndIso.slice(0, 10)}</p>
+            <p className="mt-1 text-xs text-[#efcdab]">Période travaillée : {formatPeriod(props.selectedPreview.weekStartIso, props.selectedPreview.weekEndIso)}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <PageButton active={props.periodMode === 'current'} onClick={() => void props.loadPeriod('current')}>Active</PageButton>
@@ -584,43 +631,98 @@ function PayrollPage(props: {
       <PayrollSettings config={props.config} canSave={props.canConfigure} onSave={props.savePayrollConfig} />
 
       <section className="space-y-2">
-        {props.selectedPreview.members.map((member) => {
-          const isPaid = Boolean(props.paidMembers[member.memberId]);
-          const isExcluded = props.excludedIds.includes(member.memberId);
-          const isReported = props.reportedIds.includes(member.memberId);
-          const status = isPaid ? 'Payé' : isExcluded ? 'Exclu' : isReported ? 'Reporté' : member.eligible ? 'À payer' : 'Exclu';
-          const lastPayment = lastPayments.get(member.memberId);
-          return (
-            <article key={member.memberId} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]">
-              <div className="grid gap-3 xl:grid-cols-[1.2fr_140px_repeat(5,minmax(0,1fr))_300px] xl:items-center">
-                <div>
-                  <p className="text-base font-semibold text-[#fff1dd]">{member.memberLabel}</p>
-                  <p>{member.reason}</p>
-                  <p className="mt-1 inline-flex items-center gap-1 text-[#f3d0aa]"><SmallIcon name="payroll" className="h-3.5 w-3.5" />Dernière paye : {lastPayment ? `${new Date(lastPayment.created_at).toLocaleDateString('fr-FR')} — ${formatUsd(lastPayment.amount)}` : 'aucune'}</p>
-                </div>
-                <StatusBadge status={status} />
-                <Mini label="Argent" value={formatUsd(member.moneyContribution)} icon="money" />
-                <Mini label="Actions" value={String(member.activityCount)} icon="actions" />
-                <Mini label="Implication" value={String(member.participationCount)} />
-                <Mini label="Score" value={member.totalScore.toFixed(2)} icon="score" />
-                <Mini label="Paye proposée" value={formatUsd(member.proposedPay)} />
-                <div className="flex flex-wrap justify-end gap-2">
-                  {props.canPay ? <button className="saas-primary-btn !h-9 px-3" disabled={isPaid || isExcluded || isReported || !member.eligible || member.proposedPay <= 0} onClick={() => void props.payrollAction('pay', member)}>Payer</button> : null}
-                  {props.canAdjust ? <button className="saas-ghost-btn !h-9 px-3" onClick={() => void props.payrollAction('adjust', member)}>Ajuster</button> : null}
-                  {props.canReport ? <button className="saas-ghost-btn !h-9 px-3" onClick={() => void props.payrollAction('report', member, !isReported)}>{isReported ? 'Reprendre' : 'Reporter'}</button> : null}
-                  {props.canExclude ? <button className="saas-ghost-btn !h-9 px-3" onClick={() => void props.payrollAction('exclude', member, !isExcluded)}>{isExcluded ? 'Réintégrer' : 'Exclure'}</button> : null}
-                </div>
-              </div>
-            </article>
-          );
-        })}
+        <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]"><SmallIcon name="pending" />Payes à faire</h3>
+        {payrollToDo.map(({ member, status, isExcluded, isReported }) => (
+          <PayrollMemberCard
+            key={member.memberId}
+            member={member}
+            status={status}
+            period={formatPeriod(props.selectedPreview.weekStartIso, props.selectedPreview.weekEndIso)}
+            payment={null}
+            lastPayment={lastPayments.get(member.memberId)}
+            calculationOpen={openCalculation === member.memberId}
+            onToggleCalculation={() => setOpenCalculation((current) => current === member.memberId ? null : member.memberId)}
+            actions={(
+              <>
+                {props.canPay ? <button className="saas-primary-btn !h-9 px-3" disabled={isExcluded || isReported || !member.eligible || member.proposedPay <= 0} onClick={() => void props.payrollAction('pay', member)}>Payer</button> : null}
+                {props.canAdjust ? <button className="saas-ghost-btn !h-9 px-3" onClick={() => void props.payrollAction('adjust', member)}>Ajuster</button> : null}
+                {props.canReport ? <button className="saas-ghost-btn !h-9 px-3" onClick={() => void props.payrollAction('report', member, !isReported)}>{isReported ? 'Reprendre' : 'Reporter'}</button> : null}
+                {props.canExclude ? <button className="saas-ghost-btn !h-9 px-3" onClick={() => void props.payrollAction('exclude', member, !isExcluded)}>{isExcluded ? 'Réintégrer' : 'Exclure'}</button> : null}
+              </>
+            )}
+          />
+        ))}
+        {payrollToDo.length === 0 ? <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-sm text-[#efcdab]">Aucune paye à faire sur cette période.</article> : null}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        <History title="Historique payes" rows={props.history.map((row) => ({ id: `pay-${row.id}`, date: row.created_at, text: `${row.member_label} - ${formatUsd(row.amount)} - ${formatUsd(row.group_balance_before)} -> ${formatUsd(row.group_balance_after)}` }))} />
-        {props.canLogs ? <LogList title="Logs payes" rows={props.logs.filter((row) => row.action.includes('payroll')).slice(0, 40)} /> : null}
+      <section className="space-y-2">
+        <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]"><SmallIcon name="paid" />Payes déjà faites</h3>
+        {payrollDone.map(({ member, status, payment }) => (
+          <PayrollMemberCard
+            key={member.memberId}
+            member={member}
+            status={status}
+            period={formatPeriod(payment?.week_start ?? props.selectedPreview.weekStartIso, payment?.week_end ?? props.selectedPreview.weekEndIso)}
+            payment={payment ?? null}
+            lastPayment={lastPayments.get(member.memberId)}
+            calculationOpen={openCalculation === member.memberId}
+            onToggleCalculation={() => setOpenCalculation((current) => current === member.memberId ? null : member.memberId)}
+          />
+        ))}
+        {payrollDone.length === 0 ? <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-sm text-[#efcdab]">Aucune paye déjà faite sur cette période.</article> : null}
       </section>
     </div>
+  );
+}
+
+function PayrollMemberCard({ member, status, period, payment, lastPayment, calculationOpen, onToggleCalculation, actions }: {
+  member: PayrollMemberRow;
+  status: string;
+  period: string;
+  payment: HistoryPayment | null;
+  lastPayment?: HistoryPayment;
+  calculationOpen: boolean;
+  onToggleCalculation: () => void;
+  actions?: ReactNode;
+}) {
+  const paidAt = payment?.created_at ? new Date(payment.created_at).toLocaleDateString('fr-FR') : 'aucune';
+  const amount = payment?.amount ?? member.proposedPay;
+  const implicationBonus = Math.max(0, safeNumber(member.participationScore) * 100);
+
+  return (
+    <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]">
+      <div className="grid gap-3 xl:grid-cols-[1.25fr_150px_repeat(5,minmax(0,1fr))_270px] xl:items-center">
+        <div>
+          <p className="text-base font-semibold text-[#fff1dd]">{member.memberLabel}</p>
+          <p>Période : {period}</p>
+          <p>Payé le : {paidAt}</p>
+          <p className="mt-1 inline-flex items-center gap-1 text-[#f3d0aa]"><SmallIcon name="payroll" className="h-3.5 w-3.5" />Dernière paye : {lastPayment ? `${new Date(lastPayment.created_at).toLocaleDateString('fr-FR')} — ${formatUsd(lastPayment.amount)}` : 'aucune'}</p>
+        </div>
+        <StatusBadge status={status} />
+        <Mini label="Argent apporté" value={formatUsd(member.moneyContribution)} icon="money" />
+        <Mini label="Activités réalisées" value={String(safeNumber(member.activityCount))} icon="actions" />
+        <Mini label="Participations utiles" value={String(safeNumber(member.participationCount))} icon="activity" />
+        <Mini label="Bonus implication" value={`${implicationBonus.toFixed(0)}%`} icon="score" />
+        <Mini label={payment ? 'Montant payé' : 'Paye proposée'} value={formatUsd(amount)} icon="payroll" />
+        <div className="flex flex-wrap justify-end gap-2">
+          <button className="saas-ghost-btn !h-9 px-3" onClick={onToggleCalculation}>{calculationOpen ? 'Masquer calcul' : 'Voir calcul'}</button>
+          {actions}
+        </div>
+      </div>
+      {calculationOpen ? (
+        <div className="mt-3 grid gap-2 rounded-lg border border-white/10 bg-[#2f1d14]/65 p-3 md:grid-cols-3">
+          <Mini label="Argent pris en compte" value={formatUsd(member.moneyContribution)} icon="money" />
+          <Mini label="Dépenses utiles avancées" value={formatUsd(member.usefulExpenseContribution ?? 0)} icon="expense" />
+          <Mini label="Nombre activités" value={String(safeNumber(member.activityCount))} icon="actions" />
+          <Mini label="Participations" value={String(safeNumber(member.participationCount))} icon="activity" />
+          <Mini label="Score final" value={safeNumber(member.totalScore).toFixed(3)} icon="score" />
+          <Mini label="Paye calculée" value={formatUsd(member.proposedPay)} icon="payroll" />
+          <p className="md:col-span-3 text-[#f3d0aa]">
+            Raison : {member.reason}. Le montant vient de l&apos;enveloppe disponible, répartie selon l&apos;argent apporté, les activités réalisées et les participations utiles. Les dépenses utiles avancées sont ajoutées comme contribution, elles ne pénalisent pas le membre.
+          </p>
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -766,6 +868,44 @@ function ExpensesPage(props: {
   );
 }
 
+function GlobalHistoryPage({ rows }: { rows: GlobalHistoryRow[] }) {
+  return (
+    <section className="glass-card p-4">
+      <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]"><SmallIcon name="history" />Historique global</h3>
+      <div className="mt-3 max-h-[620px] space-y-2 overflow-auto pr-1">
+        {rows.slice(0, 220).map((row) => (
+          <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <b className="inline-flex items-center gap-2 text-[#ffe8ca]"><SmallIcon name={historyIcon(row.type)} />{row.type} · {row.title}</b>
+              <span>{new Date(row.date).toLocaleString('fr-FR')}</span>
+            </div>
+            <p>{row.details}{row.amount != null && row.amount > 0 ? ` · ${formatUsd(row.amount)}` : ''}</p>
+          </article>
+        ))}
+        {rows.length === 0 ? <p className="text-sm text-[#efcdab]">Aucun historique.</p> : null}
+      </div>
+    </section>
+  );
+}
+
+function GlobalLogsPage({ rows }: { rows: LogRow[] }) {
+  return (
+    <section className="glass-card p-4">
+      <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]"><SmallIcon name="logs" />Logs globaux</h3>
+      <div className="mt-3 max-h-[620px] space-y-2 overflow-auto pr-1">
+        {rows.slice(0, 240).map((row) => (
+          <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
+            <div className="flex flex-wrap justify-between gap-2"><b className="text-[#ffe8ca]">{row.action}</b><span>{new Date(row.created_at).toLocaleString('fr-FR')}</span></div>
+            <p>{row.summary}</p>
+            <p>Utilisateur: {row.actor_name || '-'}</p>
+          </article>
+        ))}
+        {rows.length === 0 ? <p className="text-sm text-[#efcdab]">Aucun log.</p> : null}
+      </div>
+    </section>
+  );
+}
+
 function recomputePreview(preview: PayrollPreview, excludedIds: string[], adjustments: Record<string, number>) {
   const excluded = new Set(excludedIds);
   const members = preview.members.map((row) => {
@@ -775,6 +915,21 @@ function recomputePreview(preview: PayrollPreview, excludedIds: string[], adjust
   });
   const totalProposed = members.reduce((sum, row) => sum + (row.eligible ? Number(row.proposedPay ?? 0) : 0), 0);
   return { ...preview, members, totalProposed, balanceAfter: preview.balance - totalProposed, eligibleCount: members.filter((row) => row.eligible).length, ineligibleCount: members.filter((row) => !row.eligible).length };
+}
+
+function safeNumber(value: unknown) {
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatShortDate(value: string) {
+  return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+}
+
+function formatPeriod(startIso: string, endIso: string) {
+  const inclusiveEnd = new Date(endIso);
+  inclusiveEnd.setUTCDate(inclusiveEnd.getUTCDate() - 1);
+  return `${formatShortDate(startIso)} → ${formatShortDate(inclusiveEnd.toISOString())}`;
 }
 
 function groupExpenses(rows: Expense[], key: (row: Expense) => string) {
@@ -791,7 +946,7 @@ function groupExpenses(rows: Expense[], key: (row: Expense) => string) {
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
-type IconName = 'activity' | 'payroll' | 'expense' | 'transactions' | 'tablet' | 'cigarette' | 'processor' | 'drugs' | 'robbery' | 'four' | 'sale' | 'cargo' | 'gofast' | 'money' | 'actions' | 'score' | 'pending' | 'paid' | 'reported' | 'excluded' | 'category' | 'member' | 'amount' | 'jobs' | 'garage' | 'fuel' | 'fine' | 'purchase' | 'other';
+type IconName = 'activity' | 'payroll' | 'expense' | 'transactions' | 'tablet' | 'cigarette' | 'processor' | 'drugs' | 'robbery' | 'four' | 'sale' | 'cargo' | 'gofast' | 'money' | 'actions' | 'score' | 'pending' | 'paid' | 'reported' | 'excluded' | 'category' | 'member' | 'amount' | 'jobs' | 'garage' | 'fuel' | 'fine' | 'purchase' | 'other' | 'history' | 'logs';
 
 function SmallIcon({ name, className = 'h-4 w-4' }: { name: IconName; className?: string }) {
   return (
@@ -818,6 +973,8 @@ function iconColor(name: IconName) {
   if (name === 'sale' || name === 'purchase') return 'text-fuchsia-300';
   if (name === 'cargo' || name === 'garage') return 'text-amber-200';
   if (name === 'gofast' || name === 'fuel') return 'text-teal-300';
+  if (name === 'history') return 'text-indigo-300';
+  if (name === 'logs') return 'text-slate-200';
   return 'text-[#f6d6b3]';
 }
 
@@ -852,6 +1009,8 @@ function iconShape(name: IconName) {
     case 'fine': return <><path d="M12 3 3 21h18z" /><path d="M12 9v4" /><path d="M12 17h.01" /></>;
     case 'purchase': return <><circle cx="9" cy="20" r="1" /><circle cx="17" cy="20" r="1" /><path d="M3 4h2l2.5 11h10L20 7H7" /></>;
     case 'other': return <><circle cx="12" cy="12" r="8" /><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4" /><path d="M12 17h.01" /></>;
+    case 'history': return <><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 7v5l3 2" /></>;
+    case 'logs': return <><path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" /><path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" /></>;
   }
 }
 
@@ -876,6 +1035,14 @@ function categoryIcon(category: string): IconName {
   if (category === 'Amende') return 'fine';
   if (category === 'Achat') return 'purchase';
   return 'other';
+}
+
+function historyIcon(type: string): IconName {
+  if (type === 'Paye') return 'payroll';
+  if (type === 'Activité') return 'activity';
+  if (type === 'Remboursement') return 'paid';
+  if (type.includes('Dépense')) return 'expense';
+  return 'history';
 }
 
 function statusIcon(status: string): IconName {
@@ -910,10 +1077,6 @@ function StatusBadge({ status }: { status: string }) {
 
 function Compare({ title, preview, paid, remaining }: { title: string; preview: PayrollPreview; paid: number; remaining: number }) {
   return <article className="rounded-lg border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]"><p className="font-semibold text-[#ffe8ca]">{title}</p><p>{preview.weekStartIso.slice(0, 10)} - {preview.weekEndIso.slice(0, 10)}</p><p>Éligibles: {preview.eligibleCount} · Enveloppe: {formatUsd(preview.envelope)} · Payé: {formatUsd(paid)} · Restant: {formatUsd(remaining)}</p></article>;
-}
-
-function History({ title, rows }: { title: string; rows: Array<{ id: string; date: string; text: string }> }) {
-  return <section className="glass-card p-4"><h3 className="text-sm font-semibold text-[#fff1dd]">{title}</h3><div className="mt-2 max-h-[360px] space-y-2 overflow-auto pr-1">{rows.map((row) => <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]"><p className="text-[#ffe8ca]">{row.text}</p><p>{new Date(row.date).toLocaleString('fr-FR')}</p></article>)}{rows.length === 0 ? <p className="text-sm text-[#efcdab]">Aucun historique.</p> : null}</div></section>;
 }
 
 function LogList({ title, rows }: { title: string; rows: LogRow[] }) {
