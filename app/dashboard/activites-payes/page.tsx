@@ -80,7 +80,7 @@ export default async function ActivityPayrollPage() {
   const canSummary = has('member_ops.view');
   const canActivities = has('member_ops.activities.view');
   const canPayroll = has('member_ops.payroll.view');
-  const canConfigure = has('activity_payroll.payroll.configure');
+  const canConfigure = has('activity_payroll.payroll.configure') || has('member_ops.payroll.adjust');
   const canPay = has('member_ops.payroll.pay');
   const canAdjust = has('member_ops.payroll.adjust');
   const canReport = has('member_ops.payroll.report') || has('member_ops.payroll.adjust');

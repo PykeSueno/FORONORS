@@ -9,15 +9,13 @@ async function canAny(userId: string, permissions: string[]) {
   return results.some(Boolean);
 }
 
-const CATEGORIES = ['Achat stock', 'Matériel', 'Véhicule', 'Braquage', 'Drogue', 'Jobs', 'Autre'];
+const CATEGORIES = ['Garage', 'Essence', 'Amende', 'Achat', 'Autres'];
 
 type Body = {
   member_id?: string;
-  label?: string;
   amount?: number;
   category?: string;
   note?: string | null;
-  proof_url?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -29,14 +27,12 @@ export async function POST(request: Request) {
 
   const body = await request.json() as Body;
   const memberId = String(body.member_id ?? '');
-  const label = String(body.label ?? '').trim();
   const amount = Math.round(Number(body.amount ?? 0) * 100) / 100;
-  const category = CATEGORIES.includes(String(body.category ?? '')) ? String(body.category) : 'Autre';
+  const category = CATEGORIES.includes(String(body.category ?? '')) ? String(body.category) : 'Autres';
   const note = String(body.note ?? '').trim() || null;
-  const proofUrl = String(body.proof_url ?? '').trim() || null;
+  const label = note || category;
 
   if (!memberId) return NextResponse.json({ message: 'Membre requis.' }, { status: 400 });
-  if (!label) return NextResponse.json({ message: 'Libellé requis.' }, { status: 400 });
   if (!Number.isFinite(amount) || amount <= 0) return NextResponse.json({ message: 'Montant invalide.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
@@ -53,7 +49,7 @@ export async function POST(request: Request) {
       amount,
       category,
       note,
-      proof_url: proofUrl,
+      proof_url: null,
       status: 'pending',
       created_by: session.userId
     })
@@ -67,9 +63,9 @@ export async function POST(request: Request) {
     action: 'expense_created',
     entityType: 'expense',
     entityId: expense.id,
-    summary: `Dépense créée pour ${memberName} — ${label} — ${amount}$`,
+    summary: `Dépense créée pour ${memberName} — ${category} — ${amount}$`,
     oldValues: { status: null },
-    newValues: { status: 'pending', memberId: member.id, memberName, label, amount, category, note, proofUrl }
+    newValues: { status: 'pending', memberId: member.id, memberName, label, amount, category, note }
   });
 
   return NextResponse.json({ expense });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { formatUsd } from '@/lib/currency';
 import type { PayrollConfig, PayrollMemberRow, PayrollPreview } from '@/lib/payroll';
 import type { MemberActivityRow } from '@/lib/payroll-service';
@@ -113,10 +113,11 @@ type Props = {
   canLogs: boolean;
 };
 
-const CATEGORIES = ['Achat stock', 'Matériel', 'Véhicule', 'Braquage', 'Drogue', 'Jobs', 'Autre'];
+const CATEGORIES = ['Garage', 'Essence', 'Amende', 'Achat', 'Autres'];
 const JOB_MODULES = ['Jobs Tablette', 'Jobs Cigarette', 'Jobs Processeur'];
-const MODULE_ORDER = [...JOB_MODULES, 'Drogues', 'Braquage', 'FOUR', 'Vente objets', 'Activité', 'Cargo', 'GoFast'];
+const MODULE_ORDER = ['Transactions', ...JOB_MODULES, 'Drogues', 'Braquage', 'FOUR', 'Vente objets', 'Activité', 'Cargo', 'GoFast'];
 const MODULE_FILTERS = [
+  { value: 'Transactions', label: 'Transactions' },
   { value: 'Jobs', label: 'Jobs' },
   { value: 'Jobs Tablette', label: 'Tablette' },
   { value: 'Jobs Cigarette', label: 'Cigarette' },
@@ -158,6 +159,7 @@ export function ActivityPayrollHubClient(props: Props) {
   const [moduleFilter, setModuleFilter] = useState('all');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>(props.currentPreview.config);
 
   const paidTotal = useMemo(() => Object.values(paidMembers).reduce((sum, amount) => sum + Number(amount || 0), 0), [paidMembers]);
   const effectivePreview = useMemo(() => recomputePreview(selectedPreview, excludedIds, adjustments), [adjustments, excludedIds, selectedPreview]);
@@ -240,6 +242,25 @@ export function ActivityPayrollHubClient(props: Props) {
     if (payload.history) setHistory(payload.history);
     if (payload.logs) setLogs(payload.logs);
     setGroupCash(payload.selected.balance);
+    setPayrollConfig(payload.selected.config);
+  }
+
+  async function savePayrollConfig(config: PayrollConfig) {
+    setError('');
+    setMessage('');
+    const response = await fetch('/api/activity-payroll/payroll', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config })
+    });
+    const payload = await response.json().catch(() => ({} as ApiPayload));
+    if (!response.ok) {
+      setError(payload.message ?? 'Sauvegarde des réglages impossible.');
+      return;
+    }
+    setPayrollConfig(payload.config ?? config);
+    await loadPeriod(periodMode, customStart, customEnd);
+    setMessage('Réglages paye enregistrés. Payes recalculées.');
   }
 
   async function payrollAction(action: 'pay' | 'adjust' | 'exclude' | 'report', row: PayrollMemberRow, enabled = true) {
@@ -283,7 +304,7 @@ export function ActivityPayrollHubClient(props: Props) {
     const response = await fetch('/api/expenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: form.memberId, label: form.label, amount: Number(form.amount), category: form.category, note: form.note, proof_url: form.proofUrl })
+      body: JSON.stringify({ member_id: form.memberId, amount: Number(form.amount), category: form.category, note: form.note })
     });
     const payload = await response.json().catch(() => ({} as ExpensePayload));
     if (!response.ok || !payload.expense) {
@@ -371,12 +392,15 @@ export function ActivityPayrollHubClient(props: Props) {
           logs={logs}
           canPay={props.canPay}
           canAdjust={props.canAdjust}
+          canConfigure={props.canConfigure}
           canReport={props.canReport}
           canExclude={props.canExclude}
+          config={payrollConfig}
           canLogs={props.canLogs}
           setCustomStart={setCustomStart}
           setCustomEnd={setCustomEnd}
           loadPeriod={loadPeriod}
+          savePayrollConfig={savePayrollConfig}
           payrollAction={payrollAction}
         />
       ) : null}
@@ -500,12 +524,15 @@ function PayrollPage(props: {
   logs: LogRow[];
   canPay: boolean;
   canAdjust: boolean;
+  canConfigure: boolean;
   canReport: boolean;
   canExclude: boolean;
   canLogs: boolean;
+  config: PayrollConfig;
   setCustomStart: (value: string) => void;
   setCustomEnd: (value: string) => void;
   loadPeriod: (mode: PeriodMode, start?: string, end?: string) => Promise<void>;
+  savePayrollConfig: (config: PayrollConfig) => Promise<void>;
   payrollAction: (action: 'pay' | 'adjust' | 'exclude' | 'report', row: PayrollMemberRow, enabled?: boolean) => Promise<void>;
 }) {
   const lastPayments = useMemo(() => {
@@ -554,6 +581,8 @@ function PayrollPage(props: {
         </div>
       </section>
 
+      <PayrollSettings config={props.config} canSave={props.canConfigure} onSave={props.savePayrollConfig} />
+
       <section className="space-y-2">
         {props.selectedPreview.members.map((member) => {
           const isPaid = Boolean(props.paidMembers[member.memberId]);
@@ -595,7 +624,80 @@ function PayrollPage(props: {
   );
 }
 
-type ExpenseFormState = { memberId: string; label: string; amount: string; category: string; note: string; proofUrl: string };
+function PayrollSettings({ config, canSave, onSave }: { config: PayrollConfig; canSave: boolean; onSave: (config: PayrollConfig) => Promise<void> }) {
+  const [draft, setDraft] = useState({
+    reserveMinimum: String(config.reserveMinimum),
+    distributablePercent: String(Math.round(config.distributablePercent * 100)),
+    memberCap: String(config.memberCap),
+    memberMinimum: String(config.memberMinimum),
+    moneyWeight: String(Math.round(config.weights.money * 100)),
+    activityWeight: String(Math.round(config.weights.activity * 100)),
+    participationWeight: String(Math.round(config.weights.participation * 100)),
+    minActions: String(config.minActions),
+    minMoney: String(config.minMoney)
+  });
+
+  useEffect(() => {
+    setDraft({
+      reserveMinimum: String(config.reserveMinimum),
+      distributablePercent: String(Math.round(config.distributablePercent * 100)),
+      memberCap: String(config.memberCap),
+      memberMinimum: String(config.memberMinimum),
+      moneyWeight: String(Math.round(config.weights.money * 100)),
+      activityWeight: String(Math.round(config.weights.activity * 100)),
+      participationWeight: String(Math.round(config.weights.participation * 100)),
+      minActions: String(config.minActions),
+      minMoney: String(config.minMoney)
+    });
+  }, [config]);
+
+  const numberValue = (value: string, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+  };
+
+  function update(key: keyof typeof draft, value: string) {
+    setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  async function save() {
+    await onSave({
+      reserveMinimum: Math.round(numberValue(draft.reserveMinimum)),
+      distributablePercent: Math.min(100, numberValue(draft.distributablePercent)) / 100,
+      memberCap: Math.round(numberValue(draft.memberCap)),
+      memberMinimum: Math.round(numberValue(draft.memberMinimum)),
+      minActions: Math.round(numberValue(draft.minActions)),
+      minMoney: Math.round(numberValue(draft.minMoney)),
+      weights: {
+        money: Math.min(100, numberValue(draft.moneyWeight)) / 100,
+        activity: Math.min(100, numberValue(draft.activityWeight)) / 100,
+        participation: Math.min(100, numberValue(draft.participationWeight)) / 100
+      }
+    });
+  }
+
+  return (
+    <section className="glass-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]"><SmallIcon name="payroll" />Réglages paye</h3>
+        <button className="saas-primary-btn !h-9 px-3" disabled={!canSave} onClick={() => void save()}>Enregistrer les réglages</button>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <Field label="Réserve minimale" icon="money"><input className="saas-input" value={draft.reserveMinimum} onChange={(event) => update('reserveMinimum', event.target.value)} inputMode="numeric" /></Field>
+        <Field label="% distribuable" icon="payroll"><input className="saas-input" value={draft.distributablePercent} onChange={(event) => update('distributablePercent', event.target.value)} inputMode="numeric" /></Field>
+        <Field label="Plafond max membre" icon="amount"><input className="saas-input" value={draft.memberCap} onChange={(event) => update('memberCap', event.target.value)} inputMode="numeric" /></Field>
+        <Field label="Minimum membre" icon="amount"><input className="saas-input" value={draft.memberMinimum} onChange={(event) => update('memberMinimum', event.target.value)} inputMode="numeric" /></Field>
+        <Field label="Seuil actions" icon="actions"><input className="saas-input" value={draft.minActions} onChange={(event) => update('minActions', event.target.value)} inputMode="numeric" /></Field>
+        <Field label="Seuil argent" icon="money"><input className="saas-input" value={draft.minMoney} onChange={(event) => update('minMoney', event.target.value)} inputMode="numeric" /></Field>
+        <Field label="Poids argent %" icon="money"><input className="saas-input" value={draft.moneyWeight} onChange={(event) => update('moneyWeight', event.target.value)} inputMode="numeric" /></Field>
+        <Field label="Poids activité %" icon="activity"><input className="saas-input" value={draft.activityWeight} onChange={(event) => update('activityWeight', event.target.value)} inputMode="numeric" /></Field>
+        <Field label="Poids implication %" icon="score"><input className="saas-input" value={draft.participationWeight} onChange={(event) => update('participationWeight', event.target.value)} inputMode="numeric" /></Field>
+      </div>
+    </section>
+  );
+}
+
+type ExpenseFormState = { memberId: string; amount: string; category: string; note: string };
 
 function ExpensesPage(props: {
   members: MemberSummary[];
@@ -612,7 +714,7 @@ function ExpensesPage(props: {
   onReimburse: (row: Expense) => Promise<void>;
   onCancel: (row: Expense) => Promise<void>;
 }) {
-  const [form, setForm] = useState<ExpenseFormState>({ memberId: props.members[0]?.id ?? '', label: '', amount: '', category: 'Achat stock', note: '', proofUrl: '' });
+  const [form, setForm] = useState<ExpenseFormState>({ memberId: props.members[0]?.id ?? '', amount: '', category: 'Garage', note: '' });
   const allRows = useMemo(() => props.statsRows.length ? props.statsRows : [...props.pending, ...props.reimbursed], [props.pending, props.reimbursed, props.statsRows]);
   const totals = useMemo(() => ({
     pending: props.pending.reduce((sum, row) => sum + Number(row.amount ?? 0), 0),
@@ -620,7 +722,7 @@ function ExpensesPage(props: {
   }), [props.pending, props.reimbursed]);
   const byCategory = useMemo(() => groupExpenses(allRows, (row) => row.category), [allRows]);
   const byMember = useMemo(() => groupExpenses(allRows, (row) => row.member_name), [allRows]);
-  const reset = () => setForm({ memberId: props.members[0]?.id ?? '', label: '', amount: '', category: 'Achat stock', note: '', proofUrl: '' });
+  const reset = () => setForm({ memberId: props.members[0]?.id ?? '', amount: '', category: 'Garage', note: '' });
 
   return (
     <div className="space-y-4">
@@ -637,12 +739,10 @@ function ExpensesPage(props: {
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <Field label="Membre" icon="member"><select className="saas-input" value={form.memberId} onChange={(event) => setForm((cur) => ({ ...cur, memberId: event.target.value }))}>{props.members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select></Field>
             <Field label="Catégorie" icon="category"><select className="saas-input" value={form.category} onChange={(event) => setForm((cur) => ({ ...cur, category: event.target.value }))}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>
-            <Field label="Libellé"><input className="saas-input" value={form.label} onChange={(event) => setForm((cur) => ({ ...cur, label: event.target.value }))} /></Field>
             <Field label="Montant" icon="amount"><input className="saas-input" value={form.amount} onChange={(event) => setForm((cur) => ({ ...cur, amount: event.target.value }))} inputMode="decimal" /></Field>
-            <Field label="Preuve optionnelle"><input className="saas-input" value={form.proofUrl} onChange={(event) => setForm((cur) => ({ ...cur, proofUrl: event.target.value }))} /></Field>
             <Field label="Note optionnelle"><input className="saas-input" value={form.note} onChange={(event) => setForm((cur) => ({ ...cur, note: event.target.value }))} /></Field>
           </div>
-          <button className="saas-primary-btn mt-4" disabled={!form.memberId || !form.label.trim() || Number(form.amount) <= 0} onClick={() => void props.onCreate(form, reset)}>Créer la dépense</button>
+          <button className="saas-primary-btn mt-4" disabled={!form.memberId || Number(form.amount) <= 0} onClick={() => void props.onCreate(form, reset)}>Créer la dépense</button>
         </section>
       ) : null}
 
@@ -680,7 +780,7 @@ function recomputePreview(preview: PayrollPreview, excludedIds: string[], adjust
 function groupExpenses(rows: Expense[], key: (row: Expense) => string) {
   const map = new Map<string, { label: string; count: number; pending: number; reimbursed: number; total: number }>();
   for (const row of rows) {
-    const label = key(row) || 'Autre';
+    const label = key(row) || 'Autres';
     const current = map.get(label) ?? { label, count: 0, pending: 0, reimbursed: 0, total: 0 };
     current.count += 1;
     current.total += Number(row.amount ?? 0);
@@ -691,14 +791,34 @@ function groupExpenses(rows: Expense[], key: (row: Expense) => string) {
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
-type IconName = 'activity' | 'payroll' | 'expense' | 'tablet' | 'cigarette' | 'processor' | 'drugs' | 'robbery' | 'four' | 'sale' | 'cargo' | 'gofast' | 'money' | 'actions' | 'score' | 'pending' | 'paid' | 'reported' | 'excluded' | 'category' | 'member' | 'amount' | 'jobs';
+type IconName = 'activity' | 'payroll' | 'expense' | 'transactions' | 'tablet' | 'cigarette' | 'processor' | 'drugs' | 'robbery' | 'four' | 'sale' | 'cargo' | 'gofast' | 'money' | 'actions' | 'score' | 'pending' | 'paid' | 'reported' | 'excluded' | 'category' | 'member' | 'amount' | 'jobs' | 'garage' | 'fuel' | 'fine' | 'purchase' | 'other';
 
 function SmallIcon({ name, className = 'h-4 w-4' }: { name: IconName; className?: string }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={`${className} ${iconColor(name)}`} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       {iconShape(name)}
     </svg>
   );
+}
+
+function iconColor(name: IconName) {
+  if (name === 'paid') return 'text-emerald-300';
+  if (name === 'pending') return 'text-amber-300';
+  if (name === 'reported') return 'text-sky-300';
+  if (name === 'excluded' || name === 'fine') return 'text-red-300';
+  if (name === 'money' || name === 'payroll' || name === 'amount') return 'text-yellow-300';
+  if (name === 'expense' || name === 'category') return 'text-orange-300';
+  if (name === 'transactions' || name === 'actions') return 'text-cyan-300';
+  if (name === 'tablet' || name === 'jobs') return 'text-blue-300';
+  if (name === 'cigarette') return 'text-stone-200';
+  if (name === 'processor') return 'text-violet-300';
+  if (name === 'drugs') return 'text-lime-300';
+  if (name === 'robbery') return 'text-rose-300';
+  if (name === 'four') return 'text-orange-400';
+  if (name === 'sale' || name === 'purchase') return 'text-fuchsia-300';
+  if (name === 'cargo' || name === 'garage') return 'text-amber-200';
+  if (name === 'gofast' || name === 'fuel') return 'text-teal-300';
+  return 'text-[#f6d6b3]';
 }
 
 function iconShape(name: IconName) {
@@ -706,6 +826,7 @@ function iconShape(name: IconName) {
     case 'activity': return <><path d="M4 12h4l2-5 4 10 2-5h4" /><path d="M4 19h16" /></>;
     case 'payroll': return <><path d="M4 7h16v10H4z" /><path d="M8 11h.01" /><path d="M16 13h.01" /><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /></>;
     case 'expense': return <><path d="M7 3h10v18l-2-1-2 1-2-1-2 1-2-1z" /><path d="M9 8h6" /><path d="M9 12h6" /><path d="M9 16h3" /></>;
+    case 'transactions': return <><path d="M7 7h13" /><path d="m16 3 4 4-4 4" /><path d="M17 17H4" /><path d="m8 13-4 4 4 4" /></>;
     case 'tablet': return <><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M11 17h2" /></>;
     case 'cigarette': return <><path d="M4 15h10" /><path d="M16 15h4" /><path d="M8 11c1-1 1-2 0-3" /><path d="M12 11c1-1 1-2 0-3" /></>;
     case 'processor': return <><circle cx="12" cy="12" r="3" /><path d="M12 3v3" /><path d="M12 18v3" /><path d="M3 12h3" /><path d="M18 12h3" /><path d="m5.6 5.6 2.1 2.1" /><path d="m16.3 16.3 2.1 2.1" /><path d="m18.4 5.6-2.1 2.1" /><path d="m7.7 16.3-2.1 2.1" /></>;
@@ -726,10 +847,16 @@ function iconShape(name: IconName) {
     case 'member': return <><circle cx="12" cy="8" r="3" /><path d="M5 20a7 7 0 0 1 14 0" /></>;
     case 'amount': return <><path d="M12 3v18" /><path d="M17 7.5A4 4 0 0 0 12 6c-3 0-5 1.2-5 3s2 2.7 5 3 5 1.2 5 3-2 3-5 3a5 5 0 0 1-5-2" /></>;
     case 'jobs': return <><path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" /><path d="M4 7h16v12H4z" /><path d="M9 12h6" /></>;
+    case 'garage': return <><path d="M4 20V9l8-5 8 5v11" /><path d="M8 20v-6h8v6" /><path d="M10 10h4" /></>;
+    case 'fuel': return <><path d="M6 3h8v18H6z" /><path d="M14 7h2l2 2v8a2 2 0 0 0 4 0v-5l-3-3" /><path d="M8 7h4" /></>;
+    case 'fine': return <><path d="M12 3 3 21h18z" /><path d="M12 9v4" /><path d="M12 17h.01" /></>;
+    case 'purchase': return <><circle cx="9" cy="20" r="1" /><circle cx="17" cy="20" r="1" /><path d="M3 4h2l2.5 11h10L20 7H7" /></>;
+    case 'other': return <><circle cx="12" cy="12" r="8" /><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4" /><path d="M12 17h.01" /></>;
   }
 }
 
 function moduleIcon(module: string): IconName {
+  if (module === 'Transactions') return 'transactions';
   if (module === 'Jobs') return 'jobs';
   if (module === 'Jobs Tablette') return 'tablet';
   if (module === 'Jobs Cigarette') return 'cigarette';
@@ -741,6 +868,14 @@ function moduleIcon(module: string): IconName {
   if (module === 'Cargo') return 'cargo';
   if (module === 'GoFast') return 'gofast';
   return 'activity';
+}
+
+function categoryIcon(category: string): IconName {
+  if (category === 'Garage') return 'garage';
+  if (category === 'Essence') return 'fuel';
+  if (category === 'Amende') return 'fine';
+  if (category === 'Achat') return 'purchase';
+  return 'other';
 }
 
 function statusIcon(status: string): IconName {
@@ -795,9 +930,9 @@ function ExpenseList({ title, icon, rows, empty, actions }: { title: string; ico
 
 function CompactExpense({ row }: { row: Expense }) {
   const statusLabel = row.status === 'pending' ? 'En attente' : row.status === 'reimbursed' ? 'Remboursée' : 'Annulée';
-  return <div className="min-w-0 flex-1"><div className="flex flex-wrap gap-2"><span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-1"><SmallIcon name="category" className="h-3.5 w-3.5" />{row.category}</span><span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-1"><SmallIcon name={row.status === 'pending' ? 'pending' : row.status === 'reimbursed' ? 'paid' : 'excluded'} className="h-3.5 w-3.5" />{statusLabel}</span></div><p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[#ffe8ca]"><SmallIcon name="member" className="h-4 w-4" />{row.member_name} - {row.label}</p><p className="inline-flex items-center gap-2 text-base font-semibold text-[#fff1dd]"><SmallIcon name="amount" className="h-4 w-4" />{formatUsd(row.amount)}</p><p>Créée le {new Date(row.created_at).toLocaleString('fr-FR')}{row.reimbursed_at ? ` · Remboursée le ${new Date(row.reimbursed_at).toLocaleString('fr-FR')}` : ''}</p>{row.reimbursed_by_name ? <p>Remboursé par {row.reimbursed_by_name}</p> : null}{row.money_before != null && row.money_after != null ? <p>Argent groupe: {formatUsd(row.money_before)} vers {formatUsd(row.money_after)}</p> : null}{row.note ? <p className="mt-1 text-[#d9b48f]">{row.note}</p> : null}{row.proof_url ? <a className="mt-1 inline-block underline" href={row.proof_url} target="_blank" rel="noreferrer">Voir preuve</a> : null}</div>;
+  return <div className="min-w-0 flex-1"><div className="flex flex-wrap gap-2"><span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-1"><SmallIcon name={categoryIcon(row.category)} className="h-3.5 w-3.5" />{row.category}</span><span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-1"><SmallIcon name={row.status === 'pending' ? 'pending' : row.status === 'reimbursed' ? 'paid' : 'excluded'} className="h-3.5 w-3.5" />{statusLabel}</span></div><p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[#ffe8ca]"><SmallIcon name="member" className="h-4 w-4" />{row.member_name} - {row.label}</p><p className="inline-flex items-center gap-2 text-base font-semibold text-[#fff1dd]"><SmallIcon name="amount" className="h-4 w-4" />{formatUsd(row.amount)}</p><p>Créée le {new Date(row.created_at).toLocaleString('fr-FR')}{row.reimbursed_at ? ` · Remboursée le ${new Date(row.reimbursed_at).toLocaleString('fr-FR')}` : ''}</p>{row.reimbursed_by_name ? <p>Remboursé par {row.reimbursed_by_name}</p> : null}{row.money_before != null && row.money_after != null ? <p>Argent groupe: {formatUsd(row.money_before)} vers {formatUsd(row.money_after)}</p> : null}{row.note ? <p className="mt-1 text-[#d9b48f]">{row.note}</p> : null}</div>;
 }
 
 function StatsBlock({ title, icon, rows }: { title: string; icon?: IconName; rows: Array<{ label: string; count: number; pending: number; reimbursed: number; total: number }> }) {
-  return <article className="glass-card p-4"><h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]">{icon ? <SmallIcon name={icon} /> : null}{title}</h3><div className="mt-2 space-y-2">{rows.map((row) => <div key={row.label} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]"><div className="flex justify-between gap-2"><b className="text-[#ffe8ca]">{row.label}</b><span>{row.count}</span></div><p>En attente {formatUsd(row.pending)} · Remboursé {formatUsd(row.reimbursed)}</p></div>)}{rows.length === 0 ? <p className="text-sm text-[#efcdab]">Aucune donnée.</p> : null}</div></article>;
+  return <article className="glass-card p-4"><h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]">{icon ? <SmallIcon name={icon} /> : null}{title}</h3><div className="mt-2 space-y-2">{rows.map((row) => <div key={row.label} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]"><div className="flex justify-between gap-2"><b className="inline-flex items-center gap-2 text-[#ffe8ca]"><SmallIcon name={icon === 'category' ? categoryIcon(row.label) : 'member'} className="h-3.5 w-3.5" />{row.label}</b><span>{row.count}</span></div><p>En attente {formatUsd(row.pending)} · Remboursé {formatUsd(row.reimbursed)}</p></div>)}{rows.length === 0 ? <p className="text-sm text-[#efcdab]">Aucune donnée.</p> : null}</div></article>;
 }

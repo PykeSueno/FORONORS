@@ -39,14 +39,14 @@ type SummaryPayload = {
 
 function OpsDashboardIcon() {
   return (
-    <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#d6a66f]/35 bg-[#5a3926]/70 text-[#f6d6b3] shadow-inner shadow-black/20">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 7.5h16v9H4z" />
-        <path d="M7 7.5V5.75A1.75 1.75 0 0 1 8.75 4h6.5A1.75 1.75 0 0 1 17 5.75V7.5" />
-        <path d="M8 12h3" />
-        <path d="M15 11.5h1.5" />
-        <path d="M15 14.5h1.5" />
-        <path d="M6.5 19h11" />
+    <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-amber-300/35 bg-gradient-to-br from-[#6c4026] via-[#4b2c1d] to-[#2a170f] shadow-inner shadow-black/20">
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 7.5h16v9H4z" fill="#3b2418" stroke="#f4c56f" />
+        <path d="M7 7.5V5.75A1.75 1.75 0 0 1 8.75 4h6.5A1.75 1.75 0 0 1 17 5.75V7.5" stroke="#f7dfaa" />
+        <path d="M8 12h3" stroke="#67e8f9" />
+        <path d="M15 11.5h1.5" stroke="#86efac" />
+        <path d="M15 14.5h1.5" stroke="#fca5a5" />
+        <path d="M6.5 19h11" stroke="#f7dfaa" />
       </svg>
     </span>
   );

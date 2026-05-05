@@ -194,7 +194,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
-  if (!await canAny(session.userId, ['activity_payroll.payroll.configure'])) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!await canAny(session.userId, ['activity_payroll.payroll.configure', 'member_ops.payroll.adjust'])) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = await request.json() as ConfigBody;
   const config = normalizeConfig(body.config);
