@@ -68,9 +68,18 @@ async function periodState(supabase: Supabase, start: string, end: string) {
     readJsonSetting<Record<string, number>>(supabase, periodSettingKey('adjustments', start, end), {}),
     readJsonSetting<string[]>(supabase, periodSettingKey('excluded', start, end), []),
     readJsonSetting<string[]>(supabase, periodSettingKey('reported', start, end), []),
-    supabase.from('activity_payroll_payments').select('member_user_id, amount').eq('week_start', start).eq('week_end', end)
+    supabase.from('activity_payroll_payments')
+      .select('member_user_id, amount, created_at')
+      .lt('week_start', end)
+      .gt('week_end', start)
+      .order('created_at', { ascending: false })
   ]);
-  const paid = Object.fromEntries((payments.data ?? []).map((row) => [String(row.member_user_id), Number(row.amount ?? 0)]));
+  const paid: Record<string, number> = {};
+  for (const row of payments.data ?? []) {
+    const memberId = String(row.member_user_id ?? '');
+    if (!memberId || paid[memberId] !== undefined) continue;
+    paid[memberId] = Number(row.amount ?? 0);
+  }
   return { adjustments, excluded, reported, paid };
 }
 
@@ -168,7 +177,13 @@ export async function POST(request: Request) {
 
   const amount = Math.max(0, Math.round(Number(body.amount ?? 0)));
   if (amount <= 0) return NextResponse.json({ message: 'Montant invalide.' }, { status: 400 });
-  const { data: existing } = await supabase.from('activity_payroll_payments').select('id').eq('week_start', weekStartIso).eq('week_end', weekEndIso).eq('member_user_id', memberId).maybeSingle();
+  const { data: existing } = await supabase.from('activity_payroll_payments')
+    .select('id')
+    .eq('member_user_id', memberId)
+    .lt('week_start', weekEndIso)
+    .gt('week_end', weekStartIso)
+    .limit(1)
+    .maybeSingle();
   if (existing) return NextResponse.json({ message: 'Membre déjà payé sur cette période.' }, { status: 409 });
   const flags = await periodState(supabase, weekStartIso, weekEndIso);
   if (flags.excluded.includes(memberId)) return NextResponse.json({ message: 'Membre exclu de la paye sur cette période.' }, { status: 409 });

@@ -59,13 +59,23 @@ async function periodState(supabase: Supabase, start: string, end: string) {
     readJsonSetting<Record<string, number>>(supabase, periodSettingKey('adjustments', start, end), {}),
     readJsonSetting<string[]>(supabase, periodSettingKey('excluded', start, end), []),
     readJsonSetting<string[]>(supabase, periodSettingKey('reported', start, end), []),
-    supabase.from('activity_payroll_payments').select('member_user_id, amount').eq('week_start', start).eq('week_end', end)
+    supabase.from('activity_payroll_payments')
+      .select('member_user_id, amount, created_at')
+      .lt('week_start', end)
+      .gt('week_end', start)
+      .order('created_at', { ascending: false })
   ]);
+  const paid: Record<string, number> = {};
+  for (const row of payments.data ?? []) {
+    const memberId = String(row.member_user_id ?? '');
+    if (!memberId || paid[memberId] !== undefined) continue;
+    paid[memberId] = Number(row.amount ?? 0);
+  }
   return {
     adjustments,
     excluded,
     reported,
-    paid: Object.fromEntries((payments.data ?? []).map((row) => [String(row.member_user_id), Number(row.amount ?? 0)]))
+    paid
   };
 }
 

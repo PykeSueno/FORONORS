@@ -54,7 +54,7 @@ export default async function DashboardPage() {
     ? await supabase.from('users').select('name, role, dashboard_layout').eq('id', session.userId).maybeSingle()
     : { data: null };
 
-  const myPayEstimate = session
+  const myPayEstimate = session && canActivityPayrollPreview
     ? await (async () => {
         const now = new Date();
         const displayWindow = payrollDisplayWindow(now);

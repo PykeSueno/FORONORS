@@ -78,6 +78,7 @@ type ApiPayload = {
 };
 
 type ExpensePayload = { message?: string; expense?: Expense; cashAfter?: number };
+type HistoryKind = 'activities' | 'payroll' | 'expenses';
 
 type Props = {
   members: MemberSummary[];
@@ -139,7 +140,7 @@ function firstPage(props: Pick<Props, 'canActivities' | 'canPayroll' | 'canExpen
   return props.canLogs ? 'logs' : 'activities';
 }
 
-type GlobalHistoryRow = { id: string; date: string; type: string; title: string; details: string; amount?: number };
+type GlobalHistoryRow = { id: string; kind: HistoryKind; date: string; type: string; title: string; details: string; amount?: number };
 
 export function ActivityPayrollHubClient(props: Props) {
   const [page, setPage] = useState<Page>(() => firstPage(props));
@@ -227,6 +228,7 @@ export function ActivityPayrollHubClient(props: Props) {
   const globalHistory = useMemo<GlobalHistoryRow[]>(() => [
     ...history.map((row) => ({
       id: `pay-${row.id}`,
+      kind: 'payroll' as const,
       date: row.created_at,
       type: 'Paye',
       title: row.member_label,
@@ -235,6 +237,7 @@ export function ActivityPayrollHubClient(props: Props) {
     })),
     ...props.activities.slice(0, 180).map((row) => ({
       id: `activity-${row.id}`,
+      kind: 'activities' as const,
       date: row.date,
       type: 'Activité',
       title: `${row.memberLabels.join(' + ') || '-'} · ${row.module}`,
@@ -243,6 +246,7 @@ export function ActivityPayrollHubClient(props: Props) {
     })),
     ...expenseStatsRows.slice(0, 240).map((row) => ({
       id: `expense-${row.id}`,
+      kind: 'expenses' as const,
       date: row.reimbursed_at || row.created_at,
       type: row.status === 'reimbursed' ? 'Remboursement' : row.status === 'pending' ? 'Dépense' : 'Dépense annulée',
       title: `${row.member_name} · ${row.category}`,
@@ -576,8 +580,9 @@ function PayrollPage(props: {
   const periodPayments = useMemo(() => {
     const map = new Map<string, HistoryPayment>();
     for (const row of props.history) {
-      if (!row.member_user_id || row.week_start !== props.selectedPreview.weekStartIso || row.week_end !== props.selectedPreview.weekEndIso) continue;
-      map.set(row.member_user_id, row);
+      if (!row.member_user_id || !periodsOverlap(row.week_start, row.week_end, props.selectedPreview.weekStartIso, props.selectedPreview.weekEndIso)) continue;
+      const current = map.get(row.member_user_id);
+      if (!current || new Date(row.created_at).getTime() > new Date(current.created_at).getTime()) map.set(row.member_user_id, row);
     }
     return map;
   }, [props.history, props.selectedPreview.weekEndIso, props.selectedPreview.weekStartIso]);
@@ -836,15 +841,15 @@ function ExpensesPage(props: {
       </section>
 
       {props.canCreate ? (
-        <section className="glass-card p-4">
+        <section className="glass-card p-5">
           <h3 className="text-sm font-semibold text-[#fff1dd]">Nouvelle dépense</h3>
-          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Field label="Membre" icon="member"><select className="saas-input" value={form.memberId} onChange={(event) => setForm((cur) => ({ ...cur, memberId: event.target.value }))}>{props.members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select></Field>
             <Field label="Catégorie" icon="category"><select className="saas-input" value={form.category} onChange={(event) => setForm((cur) => ({ ...cur, category: event.target.value }))}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>
             <Field label="Montant" icon="amount"><input className="saas-input" value={form.amount} onChange={(event) => setForm((cur) => ({ ...cur, amount: event.target.value }))} inputMode="decimal" /></Field>
             <Field label="Note optionnelle"><input className="saas-input" value={form.note} onChange={(event) => setForm((cur) => ({ ...cur, note: event.target.value }))} /></Field>
           </div>
-          <button className="saas-primary-btn mt-4" disabled={!form.memberId || Number(form.amount) <= 0} onClick={() => void props.onCreate(form, reset)}>Créer la dépense</button>
+          <button className="saas-primary-btn mt-5" disabled={!form.memberId || Number(form.amount) <= 0} onClick={() => void props.onCreate(form, reset)}>Créer la dépense</button>
         </section>
       ) : null}
 
@@ -869,22 +874,46 @@ function ExpensesPage(props: {
 }
 
 function GlobalHistoryPage({ rows }: { rows: GlobalHistoryRow[] }) {
+  const columns = [
+    { kind: 'activities' as const, title: 'Historique Activites', icon: 'activity' as IconName, tone: 'border-amber-300/30 bg-amber-500/10 text-amber-100' },
+    { kind: 'payroll' as const, title: 'Historique Payes', icon: 'payroll' as IconName, tone: 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100' },
+    { kind: 'expenses' as const, title: 'Historique Depenses', icon: 'expense' as IconName, tone: 'border-orange-300/30 bg-orange-500/10 text-orange-100' }
+  ];
+
   return (
     <section className="glass-card p-4">
       <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]"><SmallIcon name="history" />Historique global</h3>
-      <div className="mt-3 max-h-[620px] space-y-2 overflow-auto pr-1">
-        {rows.slice(0, 220).map((row) => (
-          <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <b className="inline-flex items-center gap-2 text-[#ffe8ca]"><SmallIcon name={historyIcon(row.type)} />{row.type} · {row.title}</b>
-              <span>{new Date(row.date).toLocaleString('fr-FR')}</span>
-            </div>
-            <p>{row.details}{row.amount != null && row.amount > 0 ? ` · ${formatUsd(row.amount)}` : ''}</p>
-          </article>
-        ))}
-        {rows.length === 0 ? <p className="text-sm text-[#efcdab]">Aucun historique.</p> : null}
+      <div className="mt-3 grid gap-3 xl:grid-cols-3">
+        {columns.map((column) => {
+          const columnRows = rows.filter((row) => row.kind === column.kind).slice(0, 120);
+          return (
+            <article key={column.kind} className="rounded-xl border border-white/10 bg-[#2f1d14]/50 p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h4 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]"><SmallIcon name={column.icon} />{column.title}</h4>
+                <span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${column.tone}`}>{columnRows.length}</span>
+              </div>
+              <div className="max-h-[620px] space-y-2 overflow-auto pr-1">
+                {columnRows.map((row) => <HistoryColumnCard key={row.id} row={row} tone={column.tone} />)}
+                {columnRows.length === 0 ? <p className="rounded-lg border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]">Aucun historique.</p> : null}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
+  );
+}
+
+function HistoryColumnCard({ row, tone }: { row: GlobalHistoryRow; tone: string }) {
+  return (
+    <article className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
+      <div className="flex items-start justify-between gap-2">
+        <b className="min-w-0 truncate text-[#ffe8ca]">{row.title}</b>
+        <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] ${tone}`}>{row.type}</span>
+      </div>
+      <p className="mt-1 text-[#d9b48f]">{new Date(row.date).toLocaleString('fr-FR')}</p>
+      <p>{row.details}{row.amount != null && row.amount > 0 ? ` · ${formatUsd(row.amount)}` : ''}</p>
+    </article>
   );
 }
 
@@ -930,6 +959,10 @@ function formatPeriod(startIso: string, endIso: string) {
   const inclusiveEnd = new Date(endIso);
   inclusiveEnd.setUTCDate(inclusiveEnd.getUTCDate() - 1);
   return `${formatShortDate(startIso)} → ${formatShortDate(inclusiveEnd.toISOString())}`;
+}
+
+function periodsOverlap(startA: string, endA: string, startB: string, endB: string) {
+  return new Date(startA).getTime() < new Date(endB).getTime() && new Date(endA).getTime() > new Date(startB).getTime();
 }
 
 function groupExpenses(rows: Expense[], key: (row: Expense) => string) {
@@ -1037,14 +1070,6 @@ function categoryIcon(category: string): IconName {
   return 'other';
 }
 
-function historyIcon(type: string): IconName {
-  if (type === 'Paye') return 'payroll';
-  if (type === 'Activité') return 'activity';
-  if (type === 'Remboursement') return 'paid';
-  if (type.includes('Dépense')) return 'expense';
-  return 'history';
-}
-
 function statusIcon(status: string): IconName {
   if (status === 'Payé') return 'paid';
   if (status === 'À payer') return 'pending';
@@ -1084,7 +1109,7 @@ function LogList({ title, rows }: { title: string; rows: LogRow[] }) {
 }
 
 function Field({ label, children, icon }: { label: string; children: ReactNode; icon?: IconName }) {
-  return <label className="block text-xs text-[#efcdab]"><span className="mb-1 inline-flex items-center gap-1">{icon ? <SmallIcon name={icon} className="h-3.5 w-3.5" /> : null}{label}</span>{children}</label>;
+  return <label className="block rounded-xl border border-white/10 bg-[#3f281b]/45 p-3 text-xs text-[#efcdab]"><span className="mb-2 inline-flex items-center gap-1 font-medium text-[#ffe8ca]">{icon ? <SmallIcon name={icon} className="h-3.5 w-3.5" /> : null}{label}</span>{children}</label>;
 }
 
 function ExpenseList({ title, icon, rows, empty, actions }: { title: string; icon?: IconName; rows: Expense[]; empty: string; actions?: (row: Expense) => ReactNode }) {
