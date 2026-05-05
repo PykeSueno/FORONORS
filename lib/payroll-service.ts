@@ -225,18 +225,18 @@ export async function getMemberActivities(supabase: SupabaseClient, args: { star
     const ids = activeOnly(activityMembers.get(Number(row.id)) ?? normalizeParticipantIds([], row.member_user_id ?? row.created_by));
     if (ids.length === 0) continue;
     const equipment = Number(row.equipment_used ?? 0) > 0 ? `${row.equipment_item_name ?? 'Équipement'} x${row.equipment_used}` : '';
-    add(rows, { id: `activity-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Activités', action: String(row.activity_type || 'Activité'), moneyGenerated: 0, participation: ids.length || 1, details: equipment });
+    add(rows, { id: `activity-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: String(row.activity_type) === 'cargo' ? 'Cargo' : 'Activité', action: String(row.activity_type || 'Activité'), moneyGenerated: 0, participation: ids.length || 1, details: equipment });
   }
   for (const row of tabletRows ?? []) {
     const ids = activeOnly(row.member_user_id ? [String(row.member_user_id)] : []);
     if (ids.length === 0) continue;
     const money = Math.max(0, Number(row.after_cash ?? 0) - Number(row.before_cash ?? 0));
-    add(rows, { id: `tablet-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Tablette', action: 'Passage tablette', moneyGenerated: money, participation: 1, details: `Cash ${formatUsd(Number(row.before_cash ?? 0))} -> ${formatUsd(Number(row.after_cash ?? 0))}` });
+    add(rows, { id: `tablet-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Jobs', action: 'Passage tablette', moneyGenerated: money, participation: 1, details: `Cash ${formatUsd(Number(row.before_cash ?? 0))} -> ${formatUsd(Number(row.after_cash ?? 0))}` });
   }
   for (const row of cigaretteRows ?? []) {
     const ids = activeOnly(row.member_user_id ? [String(row.member_user_id)] : []);
     if (ids.length === 0) continue;
-    add(rows, { id: `cigarette-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Cigarette', action: 'Passage cigarette', moneyGenerated: Math.max(0, Number(row.revenue_amount ?? 0)), participation: 1, details: `Statut ${row.status ?? 'validé'}` });
+    add(rows, { id: `cigarette-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Jobs', action: 'Passage cigarette', moneyGenerated: Math.max(0, Number(row.revenue_amount ?? 0)), participation: 1, details: `Statut ${row.status ?? 'validé'}` });
   }
   for (const row of processorRows ?? []) {
     const ids = activeOnly(normalizeParticipantIds(row.participant_user_ids, row.validated_by));

@@ -58,9 +58,23 @@ create index if not exists idx_activity_payroll_payments_period on public.activi
 create index if not exists idx_activity_payroll_payments_member on public.activity_payroll_payments(member_user_id, created_at desc);
 create index if not exists idx_activity_payroll_payments_paid_by on public.activity_payroll_payments(paid_by, created_at desc);
 
--- Permissions propres du module separe Activites & Payes.
+-- Permissions propres du module Activites & Payes & Depenses.
 insert into public.permissions (name)
 values
+  ('member_ops.view'),
+  ('member_ops.activities.view'),
+  ('member_ops.activities.logs'),
+  ('member_ops.payroll.view'),
+  ('member_ops.payroll.pay'),
+  ('member_ops.payroll.adjust'),
+  ('member_ops.payroll.report'),
+  ('member_ops.payroll.exclude'),
+  ('member_ops.payroll.logs'),
+  ('member_ops.expenses.view'),
+  ('member_ops.expenses.create'),
+  ('member_ops.expenses.reimburse'),
+  ('member_ops.expenses.cancel'),
+  ('member_ops.expenses.logs'),
   ('activity_payroll.view'),
   ('activity_payroll.global.view'),
   ('activity_payroll.activities.view'),
@@ -78,6 +92,20 @@ insert into public.role_permissions (role_id, permission_id)
 select r.id, p.id
 from public.roles r
 join public.permissions p on p.name in (
+  'member_ops.view',
+  'member_ops.activities.view',
+  'member_ops.activities.logs',
+  'member_ops.payroll.view',
+  'member_ops.payroll.pay',
+  'member_ops.payroll.adjust',
+  'member_ops.payroll.report',
+  'member_ops.payroll.exclude',
+  'member_ops.payroll.logs',
+  'member_ops.expenses.view',
+  'member_ops.expenses.create',
+  'member_ops.expenses.reimburse',
+  'member_ops.expenses.cancel',
+  'member_ops.expenses.logs',
   'activity_payroll.view',
   'activity_payroll.global.view',
   'activity_payroll.activities.view',

@@ -6,17 +6,20 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
-type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor';
+type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo';
 const ACTIVITY_LABELS: Record<ActivityType, string> = {
   mailbox: 'Boîte aux lettres',
   burglary: 'Cambriolage',
   container: 'Conteneur',
-  processor: 'Processeur'
+  processor: 'Processeur',
+  cargo: 'Cargo'
 };
+
+const CARGO_LOOT_NAMES = new Set(['Argent', 'Tableau & Peinture', 'Pochon de Cocaïne', 'Marteau', 'Pied de biche']);
 
 type EquipmentRow = { id: number; name: string; quantity: number };
 
-function pickBestEquipment(items: EquipmentRow[], keyword: 'kit' | 'disqueuse' | 'bouteille de plongee') {
+function pickBestEquipment(items: EquipmentRow[], keyword: 'kit' | 'disqueuse' | 'bouteille de plongee' | 'perceuse laser') {
   if (items.length === 0) return null;
   const normalizedKeyword = keyword.toLowerCase();
 
@@ -78,7 +81,7 @@ export async function POST(request: Request) {
     lines?: Array<{ item_id: number; quantity: number }>;
   };
 
-  if (!body.activity_type || !['mailbox', 'burglary', 'container', 'processor'].includes(body.activity_type)) {
+  if (!body.activity_type || !['mailbox', 'burglary', 'container', 'processor', 'cargo'].includes(body.activity_type)) {
     return NextResponse.json({ message: 'Type activité invalide.' }, { status: 400 });
   }
   if (body.activity_type === 'processor') {
@@ -108,16 +111,27 @@ export async function POST(request: Request) {
   }
 
   let equipmentRow: EquipmentRow | null = null;
+  let shouldConsumeEquipment = false;
   if (body.activity_type !== 'mailbox') {
-    const keyword = body.activity_type === 'burglary' ? 'kit' : body.activity_type === 'container' ? 'disqueuse' : 'bouteille de plongee';
+    const keyword = body.activity_type === 'burglary'
+      ? 'kit'
+      : body.activity_type === 'container'
+        ? 'disqueuse'
+        : body.activity_type === 'cargo'
+          ? 'perceuse laser'
+          : 'bouteille de plongee';
     const itemQuery = body.activity_type === 'processor'
       ? supabase.from('items').select('id, name, quantity').eq('name', 'Bouteille de Plong\u00e9e').limit(1)
+      : body.activity_type === 'cargo'
+        ? supabase.from('items').select('id, name, quantity').eq('name', 'Perceuse Laser').limit(1)
       : supabase.from('items').select('id, name, quantity').ilike('name', `%${keyword}%`).order('name', { ascending: true }).limit(20);
     const { data: matches } = await itemQuery;
     equipmentRow = pickBestEquipment((matches ?? []) as EquipmentRow[], keyword);
     if (!equipmentRow) return NextResponse.json({ message: 'Équipement introuvable pour cette activité.' }, { status: 400 });
-    if (equipmentUsed <= 0) return NextResponse.json({ message: 'Quantité d’équipement requise.' }, { status: 400 });
-    if (Number(equipmentRow.quantity) < equipmentUsed) return NextResponse.json({ message: `Stock insuffisant pour ${equipmentRow.name}.` }, { status: 400 });
+    const requiredEquipment = body.activity_type === 'cargo' ? 1 : equipmentUsed;
+    if (requiredEquipment <= 0) return NextResponse.json({ message: 'Quantité d’équipement requise.' }, { status: 400 });
+    if (Number(equipmentRow.quantity) < requiredEquipment) return NextResponse.json({ message: `Stock insuffisant pour ${equipmentRow.name}.` }, { status: 400 });
+    shouldConsumeEquipment = body.activity_type !== 'cargo';
   }
 
   const mergedLines = new Map<number, number>();
@@ -133,6 +147,9 @@ export async function POST(request: Request) {
     if (body.activity_type === 'processor' && item.name !== 'Processeur') {
       return NextResponse.json({ message: "Le Processeur ne peut ajouter que l'item Processeur." }, { status: 400 });
     }
+    if (body.activity_type === 'cargo' && !CARGO_LOOT_NAMES.has(item.name)) {
+      return NextResponse.json({ message: `Item non autorisé pour Cargo: ${item.name}.` }, { status: 400 });
+    }
 
     const before = Number(item.quantity);
     const after = before + quantity;
@@ -140,7 +157,8 @@ export async function POST(request: Request) {
   }
 
   const equipmentBefore = Number(equipmentRow?.quantity ?? 0);
-  const equipmentAfter = equipmentBefore - equipmentUsed;
+  const equipmentAfter = shouldConsumeEquipment ? equipmentBefore - equipmentUsed : equipmentBefore;
+  const loggedEquipmentUsed = shouldConsumeEquipment ? equipmentUsed : Number(Boolean(equipmentRow));
 
   const { data: activity, error: activityError } = await supabase
     .from('activities')
@@ -151,7 +169,7 @@ export async function POST(request: Request) {
       proof_image_url: body.proof_image_url?.trim() || null,
       equipment_item_id: equipmentRow?.id ?? null,
       equipment_item_name: equipmentRow?.name ?? null,
-      equipment_used: equipmentUsed,
+      equipment_used: loggedEquipmentUsed,
       equipment_before: equipmentBefore,
       equipment_after: equipmentAfter,
       created_by: session.userId
@@ -161,7 +179,7 @@ export async function POST(request: Request) {
 
   if (activityError || !activity) return NextResponse.json({ message: 'Création activité impossible.' }, { status: 400 });
 
-  if (equipmentRow && equipmentUsed > 0) {
+  if (equipmentRow && shouldConsumeEquipment && equipmentUsed > 0) {
     await supabase.from('items').update({ quantity: equipmentAfter, updated_at: new Date().toISOString() }).eq('id', equipmentRow.id);
     await supabase.from('item_stock_movements').insert({
       item_id: equipmentRow.id,
@@ -242,14 +260,14 @@ export async function POST(request: Request) {
     action: body.activity_type === 'processor' ? 'activity.processor.create' : 'activity.create',
     entityType: 'activity',
     entityId: activity.id,
-    summary: `${memberLabel} — ${ACTIVITY_LABELS[body.activity_type]} | équipement ${equipmentRow?.name ?? 'Aucun'}: ${equipmentUsed} | items: ${resolvedItems.map((row) => `${row.item_name} +${row.quantity}`).join(', ')}`,
+    summary: `${memberLabel} — ${ACTIVITY_LABELS[body.activity_type]} | équipement ${equipmentRow?.name ?? 'Aucun'}: ${loggedEquipmentUsed}${shouldConsumeEquipment ? '' : ' requis non consommé'} | items: ${resolvedItems.map((row) => `${row.item_name} +${row.quantity}`).join(', ')}`,
     newValues: {
       activityType: body.activity_type,
       memberLabel,
       memberIds: uniqueMemberIds,
       memberLabels: uniqueLabels,
       proofImageUrl: body.proof_image_url ?? null,
-      equipment: equipmentRow ? { name: equipmentRow.name, used: equipmentUsed, before: equipmentBefore, after: equipmentAfter } : null,
+      equipment: equipmentRow ? { name: equipmentRow.name, used: loggedEquipmentUsed, consumed: shouldConsumeEquipment, before: equipmentBefore, after: equipmentAfter } : null,
       items: resolvedItems.map((row) => ({ name: row.item_name, before: row.before, added: row.quantity, after: row.after }))
     }
   });

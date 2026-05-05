@@ -4,11 +4,16 @@ import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+async function canAny(userId: string, permissions: string[]) {
+  const results = await Promise.all(permissions.map((permission) => hasUserPermission(userId, permission)));
+  return results.some(Boolean);
+}
+
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const canDelete = await hasUserPermission(session.userId, 'expenses.delete');
+  const canDelete = await canAny(session.userId, ['member_ops.expenses.cancel', 'expenses.delete']);
   if (!canDelete) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;

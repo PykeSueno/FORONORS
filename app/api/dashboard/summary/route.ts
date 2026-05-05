@@ -36,7 +36,7 @@ export async function GET() {
   const canTabletPreview = canTabletAccess || has('tablet.preview');
   const canProcessorPreview = has('tobacco.processor.view');
   const canActivityAccess = has('activity.access');
-  const canActivityPreview = canActivityAccess || has('activity.preview');
+  const canActivityPreview = canActivityAccess || has('activity.preview') || has('member_ops.activities.view');
   const canFourAccess = has('four.access');
   const canFourPreview = canFourAccess || has('four.preview');
 

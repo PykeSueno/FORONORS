@@ -56,7 +56,7 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
     flags.canTransactionsPreview ? { id: 'transactions', href: '/dashboard/transactions', enabled: flags.canTransactionsAccess, icon: '🔄', title: 'Transactions', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Entrées / Sorties / Historique' } : null,
     flags.canTransactionsRecentPreview ? { id: 'transactions_recent', href: '/dashboard/transactions-recentes', enabled: flags.canTransactionsRecentAccess, icon: '🕒', title: 'Transactions récentes', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Historique' } : null,
     flags.canMembersPreview ? { id: 'members', href: '/dashboard/membres', enabled: flags.canMembersAccess, icon: '👥', title: 'Membres', value: summary ? String(summary.values.membersCount) : '…', subtitle: 'Gestion équipe' } : null,
-    flags.canActivityPayrollPreview ? { id: 'activity_payroll', href: '/dashboard/activites-payes', enabled: flags.canActivityPayrollAccess, icon: '💸', title: 'Activités & Payes', value: summary ? String(summary.values.activitiesToday) : '…', subtitle: 'Activités / Payes / Logs' } : null,
+    flags.canActivityPayrollPreview ? { id: 'activity_payroll', href: '/dashboard/activites-payes', enabled: flags.canActivityPayrollAccess, icon: 'OPS', title: 'Activités & Payes & Dépenses', value: summary ? String(summary.values.activitiesToday) : '...', subtitle: 'Activités / Payes / Dépenses / Logs' } : null,
     flags.canLogsPreview ? { id: 'logs', href: '/dashboard/logs', enabled: flags.canLogsAccess, icon: '🧾', title: 'Logs', value: summary ? String(summary.values.logsCount) : '…', subtitle: 'Traçabilité' } : null,
     flags.canTabletCigarettePreview ? { id: 'tablet_cigarette', href: '/dashboard/travail', enabled: flags.canTabletCigaretteAccess, icon: '🛠️', title: 'Jobs', value: summary ? String(summary.values.tabletPassagesToday + summary.values.cigarettePassagesToday + summary.values.processorOperationsToday) : '…', subtitle: summary ? 'Tablette / Cigarette / Processeur' : 'Tablette / Cigarette / Processeur' } : null,
     flags.canActivityPreview ? { id: 'activity', href: '/dashboard/activite', enabled: flags.canActivityAccess, icon: '🎯', title: 'Activité', value: summary ? String(summary.values.activitiesToday) : '0', subtitle: 'Boîte / Cambriolage / Conteneur / Processeur' } : null,
@@ -65,9 +65,7 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
     , flags.canRobberiesPreview ? { id: 'robberies', href: '/dashboard/braquage', enabled: flags.canRobberiesAccess, icon: '🥷', title: 'Braquage', value: 'Module', subtitle: 'Fleeca / Bijouterie / Morgue' } : null
   ].filter(Boolean) as Card[], [flags, summary]);
 
-  const expenseCard: Card | null = flags.canExpensesPreview
-    ? { id: 'expenses', href: '/dashboard/depenses', enabled: flags.canExpensesAccess, icon: 'ðŸ§¾', title: 'DÃ©penses', value: summary ? formatUsd(summary.values.expensesPendingTotal) : 'â€¦', subtitle: 'Frais / Remboursements / Logs' }
-    : null;
+  const expenseCard: Card | null = null;
   const hubCards = expenseCard ? [...cards, expenseCard] : cards;
 
   const stockRows = useMemo(() => {

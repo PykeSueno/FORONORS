@@ -4,6 +4,11 @@ import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+async function canAny(userId: string, permissions: string[]) {
+  const results = await Promise.all(permissions.map((permission) => hasUserPermission(userId, permission)));
+  return results.some(Boolean);
+}
+
 const CATEGORIES = ['Achat stock', 'Matériel', 'Véhicule', 'Braquage', 'Drogue', 'Jobs', 'Autre'];
 
 type Body = {
@@ -19,7 +24,7 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const canCreate = await hasUserPermission(session.userId, 'expenses.create');
+  const canCreate = await canAny(session.userId, ['member_ops.expenses.create', 'expenses.create']);
   if (!canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = await request.json() as Body;

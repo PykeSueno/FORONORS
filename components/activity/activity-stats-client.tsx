@@ -9,6 +9,7 @@ type MemberStats = {
   mailbox: number;
   burglary: number;
   container: number;
+  cargo: number;
   processor: number;
   items: Record<string, VisualCount>;
   equipments: Record<string, VisualCount>;
@@ -29,7 +30,7 @@ export function ActivityStatsClient({ byMember, total }: { byMember: Record<stri
           {rows.map(([member, stats]) => (
             <article key={member} className="rounded-xl border border-white/10 bg-[#4f3220]/55 p-3 text-sm text-[#f3d4b0]">
               <p className="font-medium">👤 {member}</p>
-              <p className="mt-1">Total: {stats.total} · 📬 {stats.mailbox} · 🏠 {stats.burglary} · 📦 {stats.container}</p>
+              <p className="mt-1">Total: {stats.total} · Boîte {stats.mailbox} · Cambriolage {stats.burglary} · Conteneur {stats.container} · Cargo {stats.cargo ?? 0}</p>
 
               <div className="mt-2 grid gap-2 md:grid-cols-2">
                 <div className="rounded-lg border border-white/10 bg-[#3d2619]/60 p-2">

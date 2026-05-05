@@ -8,7 +8,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 type ActivityRow = {
   id: number;
-  activity_type: 'mailbox' | 'burglary' | 'container' | 'processor' | 'drug_sale';
+  activity_type: 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'drug_sale';
   member_user_id: string | null;
   member_label: string;
   proof_image_url: string | null;
@@ -88,7 +88,7 @@ export default async function ActivityPage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Activité" subtitle="Boîte aux lettres, Cambriolage, Conteneur, Processeur" />
+      <InternalPageHeader title="Activité" subtitle="Boîte aux lettres, Cambriolage, Conteneur, Cargo, Processeur" />
       <ActivityTabs active="activity" canSeeStats={permissions.includes('activity.stats.view')} />
       <ActivityPageClient
         items={items ?? []}

@@ -10,7 +10,7 @@ type StatsRow = {
   member_user_id: string | null;
   member_label: string | null;
   activity_members?: Array<{ member_user_id: string | null; member_label: string }>;
-  activity_type: 'mailbox' | 'burglary' | 'container' | 'processor' | 'drug_sale';
+  activity_type: 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'drug_sale';
   equipment_item_id: number | null;
   equipment_item_name: string | null;
   equipment_used: number | null;
@@ -38,7 +38,7 @@ export default async function ActivityStatsPage() {
   const imageByItemId = new Map((itemImages ?? []).map((entry) => [entry.id, entry.image_url]));
   const activeIds = new Set((activeMembers ?? []).map((entry) => entry.id));
 
-  const byMember: Record<string, { total: number; mailbox: number; burglary: number; container: number; processor: number; items: Record<string, { quantity: number; imageUrl: string | null }>; equipments: Record<string, { quantity: number; imageUrl: string | null }> }> = {};
+  const byMember: Record<string, { total: number; mailbox: number; burglary: number; container: number; cargo: number; processor: number; items: Record<string, { quantity: number; imageUrl: string | null }>; equipments: Record<string, { quantity: number; imageUrl: string | null }> }> = {};
   let countedTotal = 0;
 
   for (const row of (data ?? []) as StatsRow[]) {
@@ -50,13 +50,14 @@ export default async function ActivityStatsPage() {
 
     for (const member of members) {
       if (!byMember[member]) {
-        byMember[member] = { total: 0, mailbox: 0, burglary: 0, container: 0, processor: 0, items: {}, equipments: {} };
+        byMember[member] = { total: 0, mailbox: 0, burglary: 0, container: 0, cargo: 0, processor: 0, items: {}, equipments: {} };
       }
 
       byMember[member].total += 1;
       if (row.activity_type === 'mailbox') byMember[member].mailbox += 1;
       if (row.activity_type === 'burglary') byMember[member].burglary += 1;
       if (row.activity_type === 'container') byMember[member].container += 1;
+      if (row.activity_type === 'cargo') byMember[member].cargo += 1;
       if (row.activity_type === 'processor') byMember[member].processor += 1;
 
       for (const item of row.activity_items ?? []) {

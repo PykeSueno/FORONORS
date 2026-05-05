@@ -126,7 +126,9 @@ export async function POST(request: Request) {
     ? await canAny(session.userId, ['member_ops.payroll.pay', 'activity_payroll.payroll.pay'])
     : action === 'adjust'
       ? await canAny(session.userId, ['member_ops.payroll.adjust', 'activity_payroll.payroll.adjust'])
-      : await canAny(session.userId, ['member_ops.payroll.adjust', 'activity_payroll.payroll.adjust', 'activity_payroll.payroll.exclude']);
+      : action === 'exclude'
+        ? await canAny(session.userId, ['member_ops.payroll.exclude', 'activity_payroll.payroll.exclude', 'member_ops.payroll.adjust', 'activity_payroll.payroll.adjust'])
+        : await canAny(session.userId, ['member_ops.payroll.report', 'member_ops.payroll.adjust', 'activity_payroll.payroll.adjust']);
   if (!allowed) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();

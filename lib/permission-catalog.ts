@@ -1,20 +1,26 @@
-export const MODULE_ORDER = ['Dashboard', 'Argent', 'Dépenses', 'Vente objets', 'Items', 'Transactions', 'Transactions recentes', 'Activite', 'Activites & Payes', 'FOUR', 'Drogues', 'Braquage', 'Travail', 'Membres', 'Roles', 'Logs', 'Compte', 'Autres'] as const;
+export const MODULE_ORDER = ['Dashboard', 'Argent', 'Vente objets', 'Items', 'Transactions', 'Transactions recentes', 'Activite', 'ACTIVITÉS & PAYES & DÉPENSES', 'FOUR', 'Drogues', 'Braquage', 'Travail', 'Membres', 'Roles', 'Logs', 'Compte', 'Autres'] as const;
 
 export const SECTION_ORDER = ['Vue', 'Historique', 'Mouvements', 'Vente objets', 'Creation', 'Passages', 'Modification / Annulation', 'Sessions', 'Transactions', 'Messages', 'Stats', 'Logs', 'Securite', 'Gestion', 'Technique'] as const;
 
 type PermissionInfo = { module: string; section: string; label: string; hint: string };
 
 const EXACT: Record<string, PermissionInfo> = {
-  'member_ops.view': { module: 'Activites & Payes', section: 'Vue', label: 'Voir le module', hint: 'Permet d afficher la bulle et d ouvrir Activites & Payes.' },
-  'member_ops.activities.view': { module: 'Activites & Payes', section: 'Vue', label: 'Voir activites membres', hint: 'Permet d afficher l onglet Activites membres.' },
-  'member_ops.payroll.view': { module: 'Activites & Payes', section: 'Vue', label: 'Voir payes', hint: 'Permet d afficher l onglet Payes.' },
-  'member_ops.payroll.pay': { module: 'Activites & Payes', section: 'Creation', label: 'Payer un membre', hint: 'Permet de payer un membre depuis Activites & Payes.' },
-  'member_ops.payroll.adjust': { module: 'Activites & Payes', section: 'Gestion', label: 'Ajuster, reporter ou exclure une paye', hint: 'Permet d ajuster, reporter ou exclure une paye membre.' },
-  'member_ops.expenses.view': { module: 'Activites & Payes', section: 'Vue', label: 'Voir depenses', hint: 'Permet d afficher les depenses dans Activites & Payes.' },
-  'member_ops.expenses.create': { module: 'Activites & Payes', section: 'Creation', label: 'Ajouter une depense', hint: 'Permet de creer une depense en attente pour un membre.' },
-  'member_ops.expenses.reimburse': { module: 'Activites & Payes', section: 'Creation', label: 'Rembourser une depense', hint: 'Permet de sortir l argent du groupe et passer une depense en remboursee.' },
-  'member_ops.history.view': { module: 'Activites & Payes', section: 'Historique', label: 'Voir historique', hint: 'Permet de consulter l historique unifie Activites & Payes.' },
-  'member_ops.logs.view': { module: 'Activites & Payes', section: 'Logs', label: 'Voir logs', hint: 'Permet de consulter les logs Activites & Payes.' },
+  'member_ops.view': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Vue', label: 'Voir le module', hint: 'Rend le module visible.' },
+  'member_ops.activities.view': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Vue', label: 'Voir Activités', hint: 'Affiche la page Activités.' },
+  'member_ops.activities.logs': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Logs', label: 'Voir logs activités', hint: 'Affiche les logs liés aux activités membres.' },
+  'member_ops.payroll.view': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Vue', label: 'Voir Payes', hint: 'Affiche la page Payes.' },
+  'member_ops.payroll.pay': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Creation', label: 'Payer un membre', hint: 'Permet de payer un membre.' },
+  'member_ops.payroll.adjust': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Gestion', label: 'Ajuster une paye', hint: 'Permet d ajuster une paye.' },
+  'member_ops.payroll.report': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Gestion', label: 'Reporter une paye', hint: 'Permet de reporter une paye.' },
+  'member_ops.payroll.exclude': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Gestion', label: 'Exclure une paye', hint: 'Permet d exclure un membre de la période.' },
+  'member_ops.payroll.logs': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Logs', label: 'Voir logs payes', hint: 'Affiche les logs de payes.' },
+  'member_ops.expenses.view': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Vue', label: 'Voir Dépenses', hint: 'Affiche la page Dépenses.' },
+  'member_ops.expenses.create': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Creation', label: 'Créer une dépense', hint: 'Permet de créer une dépense en attente.' },
+  'member_ops.expenses.reimburse': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Creation', label: 'Rembourser une dépense', hint: 'Permet de rembourser une dépense.' },
+  'member_ops.expenses.cancel': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Modification / Annulation', label: 'Annuler une dépense', hint: 'Permet d annuler une dépense en attente.' },
+  'member_ops.expenses.logs': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Logs', label: 'Voir logs dépenses', hint: 'Affiche les logs de dépenses.' },
+  'member_ops.history.view': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Historique', label: 'Voir historique', hint: 'Compatibilité historique.' },
+  'member_ops.logs.view': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Logs', label: 'Voir logs', hint: 'Compatibilité logs.' },
 
   'activity_payroll.view': { module: 'Activites & Payes', section: 'Vue', label: 'Voir le module', hint: 'Permet d afficher la bulle et d ouvrir Activites & Payes.' },
   'activity_payroll.global.view': { module: 'Activites & Payes', section: 'Vue', label: 'Voir vue globale', hint: 'Permet d afficher l onglet Vue globale.' },
@@ -75,7 +81,7 @@ const EXACT: Record<string, PermissionInfo> = {
 };
 
 const PREFIX_MODULES: Array<[string, string]> = [
-  ['dashboard.', 'Dashboard'], ['money.', 'Argent'], ['payroll.', 'Argent'], ['expenses.', 'Dépenses'], ['sale.objects.', 'Vente objets'], ['sale_objects.', 'Vente objets'], ['items.', 'Items'], ['transactions.recent.', 'Transactions recentes'], ['transactions.', 'Transactions'], ['member_ops.', 'Activites & Payes'], ['activity_payroll.', 'Activites & Payes'], ['activity.', 'Activite'], ['four.', 'FOUR'], ['drugs.', 'Drogues'], ['robberies.', 'Braquage'], ['tablet.', 'Travail'], ['cigarette.', 'Travail'], ['tobacco.processor.', 'Travail'], ['members.', 'Membres'], ['roles.', 'Roles'], ['logs.', 'Logs'], ['account.', 'Compte']
+  ['dashboard.', 'Dashboard'], ['money.', 'Argent'], ['payroll.', 'Argent'], ['expenses.', 'ACTIVITÉS & PAYES & DÉPENSES'], ['sale.objects.', 'Vente objets'], ['sale_objects.', 'Vente objets'], ['items.', 'Items'], ['transactions.recent.', 'Transactions recentes'], ['transactions.', 'Transactions'], ['member_ops.', 'ACTIVITÉS & PAYES & DÉPENSES'], ['activity_payroll.', 'ACTIVITÉS & PAYES & DÉPENSES'], ['activity.', 'Activite'], ['four.', 'FOUR'], ['drugs.', 'Drogues'], ['robberies.', 'Braquage'], ['tablet.', 'Travail'], ['cigarette.', 'Travail'], ['tobacco.processor.', 'Travail'], ['members.', 'Membres'], ['roles.', 'Roles'], ['logs.', 'Logs'], ['account.', 'Compte']
 ];
 
 function humanize(name: string) {

@@ -10,6 +10,7 @@ type ActivityLine = {
   item_name: string;
   quantity_added: number;
 };
+const CARGO_LOOT_NAMES = new Set(['Argent', 'Tableau & Peinture', 'Pochon de Cocaïne', 'Marteau', 'Pied de biche']);
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -71,7 +72,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
-  if (activity.equipment_item_id && Number(activity.equipment_used) > 0) {
+  if (activity.activity_type !== 'cargo' && activity.equipment_item_id && Number(activity.equipment_used) > 0) {
     const { data: equipment } = await supabase.from('items').select('id, quantity').eq('id', activity.equipment_item_id).maybeSingle();
     if (equipment) {
       await supabase.from('items').update({ quantity: Number(equipment.quantity) + Number(activity.equipment_used), updated_at: new Date().toISOString() }).eq('id', equipment.id);
@@ -88,6 +89,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   for (const [itemId, qty] of mergedLines.entries()) {
     const { data: item } = await supabase.from('items').select('id, name, quantity, is_money_item').eq('id', itemId).maybeSingle();
     if (!item) return NextResponse.json({ message: `Item ${itemId} introuvable.` }, { status: 404 });
+    if (activity.activity_type === 'cargo' && !CARGO_LOOT_NAMES.has(item.name)) {
+      return NextResponse.json({ message: `Item non autorisé pour Cargo: ${item.name}.` }, { status: 400 });
+    }
     const before = Number(item.quantity);
     const after = before + qty;
 
@@ -100,7 +104,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     inserts.push({ activity_id: activityId, item_id: item.id, item_name: item.name, quantity_added: qty, before_quantity: before, after_quantity: after });
   }
 
-  if (activity.equipment_item_id) {
+  if (activity.activity_type !== 'cargo' && activity.equipment_item_id) {
     const { data: equipment } = await supabase.from('items').select('id, quantity').eq('id', activity.equipment_item_id).maybeSingle();
     const newEquipmentUsed = Math.max(0, Number(body.equipment_used ?? activity.equipment_used));
     if (equipment) {
@@ -125,7 +129,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   await supabase.from('activities').update({
     member_label: body.member_label?.trim() || activity.member_label,
     proof_image_url: body.proof_image_url ?? activity.proof_image_url,
-    equipment_used: Math.max(0, Number(body.equipment_used ?? activity.equipment_used))
+    equipment_used: activity.activity_type === 'cargo' ? activity.equipment_used : Math.max(0, Number(body.equipment_used ?? activity.equipment_used))
   }).eq('id', activityId);
 
   await createAuditLog({
@@ -163,7 +167,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const supabase = getSupabaseAdmin();
   const { data: activity } = await supabase
     .from('activities')
-    .select('id, member_user_id, equipment_item_id, equipment_used, activity_items(item_id, item_name, quantity_added)')
+    .select('id, activity_type, member_user_id, equipment_item_id, equipment_used, activity_items(item_id, item_name, quantity_added)')
     .eq('id', activityId)
     .maybeSingle();
 
@@ -187,7 +191,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  if (activity.equipment_item_id && Number(activity.equipment_used) > 0) {
+  if (activity.activity_type !== 'cargo' && activity.equipment_item_id && Number(activity.equipment_used) > 0) {
     const { data: equipment } = await supabase.from('items').select('id, quantity').eq('id', activity.equipment_item_id).maybeSingle();
     if (equipment) {
       await supabase.from('items').update({ quantity: Number(equipment.quantity) + Number(activity.equipment_used), updated_at: new Date().toISOString() }).eq('id', equipment.id);

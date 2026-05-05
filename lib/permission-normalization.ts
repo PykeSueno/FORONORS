@@ -25,13 +25,17 @@ const LEGACY_TO_CANONICAL: Record<string, string> = {
   'money.quick_sale.details.view': 'sale.objects.history.view',
   'money.quick_sale.logs.view': 'sale.objects.history.view',
 
-  'payroll.view': 'money.pay.access',
-  'payroll.preview': 'money.pay.access',
-  'payroll.configure': 'money.pay.create',
-  'payroll.adjust': 'money.pay.create',
-  'payroll.validate': 'money.pay.create',
-  'payroll.history': 'money.pay.history.view',
-  'payroll.logs': 'money.pay.logs.view',
+  'money.pay.access': 'member_ops.payroll.view',
+  'money.pay.create': 'member_ops.payroll.pay',
+  'money.pay.history.view': 'member_ops.payroll.logs',
+  'money.pay.logs.view': 'member_ops.payroll.logs',
+  'payroll.view': 'member_ops.payroll.view',
+  'payroll.preview': 'member_ops.payroll.view',
+  'payroll.configure': 'member_ops.payroll.adjust',
+  'payroll.adjust': 'member_ops.payroll.adjust',
+  'payroll.validate': 'member_ops.payroll.pay',
+  'payroll.history': 'member_ops.payroll.logs',
+  'payroll.logs': 'member_ops.payroll.logs',
 
   'activity_payroll.view': 'member_ops.view',
   'activity_payroll.global.view': 'member_ops.view',
@@ -39,15 +43,18 @@ const LEGACY_TO_CANONICAL: Record<string, string> = {
   'activity_payroll.payroll.view': 'member_ops.payroll.view',
   'activity_payroll.payroll.pay': 'member_ops.payroll.pay',
   'activity_payroll.payroll.adjust': 'member_ops.payroll.adjust',
-  'activity_payroll.payroll.exclude': 'member_ops.payroll.adjust',
-  'activity_payroll.history.view': 'member_ops.history.view',
-  'activity_payroll.logs.view': 'member_ops.logs.view',
+  'activity_payroll.payroll.exclude': 'member_ops.payroll.exclude',
+  'activity_payroll.history.view': 'member_ops.payroll.logs',
+  'activity_payroll.logs.view': 'member_ops.payroll.logs',
 
   'expenses.view': 'member_ops.expenses.view',
   'expenses.create': 'member_ops.expenses.create',
   'expenses.reimburse': 'member_ops.expenses.reimburse',
-  'expenses.history.view': 'member_ops.history.view',
-  'expenses.logs.view': 'member_ops.logs.view'
+  'expenses.history.view': 'member_ops.expenses.logs',
+  'expenses.logs.view': 'member_ops.expenses.logs',
+  'expenses.delete': 'member_ops.expenses.cancel',
+  'member_ops.history.view': 'member_ops.payroll.logs',
+  'member_ops.logs.view': 'member_ops.payroll.logs'
 };
 
 const CANONICAL_TO_ALIASES = Object.entries(LEGACY_TO_CANONICAL).reduce<Record<string, string[]>>((acc, [legacy, canonical]) => {

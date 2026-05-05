@@ -6,7 +6,7 @@ import { SessionMemberSelector } from '@/components/shared/session-member-select
 import { RemoveLineButton } from '@/components/shared/line-controls';
 import { PROCESSOR_UNITS_PER_BOTTLE } from '@/lib/processor';
 
-type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor';
+type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo';
 type ActivityDisplayType = ActivityType | 'drug_sale';
 type Item = { id: number; name: string; image_url: string | null; quantity: number; category_key: string; type_key: string | null };
 type RecentActivity = {
@@ -49,10 +49,12 @@ const ACTIVITY_META: Record<ActivityDisplayType, { label: string; icon: string; 
   mailbox: { label: 'Boîte aux lettres', icon: '📬', subtitle: 'Aucun équipement requis' },
   burglary: { label: 'Cambriolage', icon: '🏠', subtitle: 'Consomme des Kits' },
   container: { label: 'Conteneur', icon: '📦', subtitle: 'Consomme des Disqueuses' },
+  cargo: { label: 'Cargo', icon: 'CRG', subtitle: 'Perceuse Laser requise, non consommee' },
   drug_sale: { label: 'Vente drogue', icon: '🧪', subtitle: 'Session de vente validée' }
 };
 
-const CREATE_ACTIVITY_TYPES: ActivityType[] = ['mailbox', 'burglary', 'container', 'processor'];
+const CREATE_ACTIVITY_TYPES: ActivityType[] = ['mailbox', 'burglary', 'container', 'cargo', 'processor'];
+const CARGO_LOOT_NAMES = new Set(['Argent', 'Tableau & Peinture', 'Pochon de Cocaïne', 'Marteau', 'Pied de biche']);
 
 export function ActivityPageClient({ items, members, activities, defaultMemberId, canCreate, canViewRecent, canManageOwn, canManageAny, currentUserId }: { items: Item[]; members: Array<{ id: string; name: string; username: string }>; activities: RecentActivity[]; defaultMemberId: string; canCreate: boolean; canViewRecent: boolean; canManageOwn: boolean; canManageAny: boolean; currentUserId: string }) {
   const [activityType, setActivityType] = useState<ActivityType>('mailbox');
@@ -73,6 +75,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const availableTypes = useMemo(() => Array.from(new Set(items.filter((item) => !categoryFilter || item.category_key === categoryFilter).map((item) => item.type_key).filter(Boolean))) as string[], [items, categoryFilter]);
   const availableItems = useMemo(() => items.filter((item) => {
     if (activityType === 'processor') return item.name === 'Processeur';
+    if (activityType === 'cargo') return CARGO_LOOT_NAMES.has(item.name);
     const qOk = item.name.toLowerCase().includes(query.toLowerCase());
     const categoryOk = !categoryFilter || item.category_key === categoryFilter;
     const typeOk = !typeFilter || item.type_key === typeFilter;
@@ -80,9 +83,10 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   }), [items, query, categoryFilter, typeFilter, activityType]);
   const kitItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('kit')), [items]);
   const cutterItem = useMemo(() => items.find((item) => item.name.toLowerCase().includes('disqueuse')), [items]);
+  const laserDrillItem = useMemo(() => items.find((item) => item.name === 'Perceuse Laser'), [items]);
   const divingBottleItem = useMemo(() => items.find((item) => item.name === 'Bouteille de Plongée'), [items]);
   const processorItem = useMemo(() => items.find((item) => item.name === 'Processeur'), [items]);
-  const currentEquipment = activityType === 'burglary' ? kitItem : activityType === 'container' ? cutterItem : divingBottleItem;
+  const currentEquipment = activityType === 'burglary' ? kitItem : activityType === 'container' ? cutterItem : activityType === 'cargo' ? laserDrillItem : divingBottleItem;
   const processorAutoQuantity = activityType === 'processor' ? equipmentUsed * PROCESSOR_UNITS_PER_BOTTLE : 0;
   const processorQuantity = activityType === 'processor' ? (processorRecoveredQty ?? processorAutoQuantity) : 0;
   const selectedMembers = useMemo(() => members.filter((entry) => selectedMemberIds.includes(entry.id)), [members, selectedMemberIds]);
@@ -95,7 +99,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   function setType(type: ActivityType) {
     setActivityType(type);
     setError('');
-    if (type === 'mailbox') setEquipmentUsed(0);
+    if (type === 'mailbox' || type === 'cargo') setEquipmentUsed(0);
     if (type === 'processor') {
       setEquipmentUsed((current) => Math.max(1, current));
       setProcessorRecoveredQty(null);
@@ -174,8 +178,19 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
       return;
     }
 
-    if (activityType !== 'mailbox' && equipmentUsed <= 0) {
+    if (activityType !== 'mailbox' && activityType !== 'cargo' && equipmentUsed <= 0) {
       setError(activityType === 'burglary' ? 'Pour un cambriolage, indique le nombre de Kits pris.' : activityType === 'container' ? 'Pour un conteneur, indique le nombre de Disqueuses prises.' : 'Pour un Processeur, indique le nombre de Bouteilles de Plongée prises.');
+      return;
+    }
+    if (activityType === 'cargo' && (!laserDrillItem || Number(laserDrillItem.quantity) < 1)) {
+      setError('Cargo demande une Perceuse Laser en stock. Elle ne sera pas consommée.');
+      return;
+    }
+    if (activityType === 'cargo' && lines.some((line) => {
+      const item = itemMap.get(line.item_id);
+      return !item || !CARGO_LOOT_NAMES.has(item.name);
+    })) {
+      setError('Cargo accepte uniquement Argent, Tableau & Peinture, Pochon de Cocaïne, Marteau et Pied de biche.');
       return;
     }
     if (activityType === 'processor') {
@@ -202,7 +217,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
         member_user_ids: memberIds,
         member_labels: memberLabels,
         member_label: mergedLabel,
-        equipment_used: activityType === 'mailbox' ? 0 : equipmentUsed,
+        equipment_used: activityType === 'mailbox' || activityType === 'cargo' ? 0 : equipmentUsed,
         proof_image_url: proofImageUrl || null,
         lines
       })
@@ -219,7 +234,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="grid gap-3 md:grid-cols-5">
         {CREATE_ACTIVITY_TYPES.map((key) => (
           <button key={key} className={`glass-card p-4 text-left ${activityType === key ? 'activity-card-active' : ''}`} onClick={() => setType(key)}>
             <p className="text-2xl">{ACTIVITY_META[key].icon}</p>
@@ -254,6 +269,25 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
                   <label className="mt-3 block text-xs text-[#efccaa]">Nombre de bouteilles utilisées</label>
                   <StepperControl value={equipmentUsed} onMinus={() => stepEquipment(-1)} onPlus={() => stepEquipment(1)} />
                 </>
+              ) : activityType === 'cargo' ? (
+                <div className="mt-3 rounded-xl border border-[#f1cfaa]/30 bg-[#2e1d14]/50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#efccaa]">Prérequis</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="h-12 w-12 overflow-hidden rounded-lg bg-[#22140e]">
+                      {laserDrillItem?.image_url ? (
+                        <Image src={laserDrillItem.image_url} alt={laserDrillItem.name} width={48} height={48} className="h-full w-full object-cover" unoptimized />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-[#f0d0ab]">LAS</div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-[#ffe9cd]">Perceuse Laser</p>
+                      <p className={Number(laserDrillItem?.quantity ?? 0) >= 1 ? 'text-xs text-[#c9f0bd]' : 'text-xs text-red-100'}>
+                        Stock: {Number(laserDrillItem?.quantity ?? 0)} / 1 requis. Non consommée.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <>
                   <label className="mt-3 block text-xs text-[#efccaa]">{activityType === 'burglary' ? 'Kits pris' : 'Disqueuses prises'}</label>
@@ -370,7 +404,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
           {activities.map((activity) => (
             <article key={activity.id} className="rounded-xl border border-white/10 bg-[#4f3220]/55 p-3 text-sm text-[#f3d4b0]">
               <p className="font-medium">👤 {(activity.activity_members ?? []).length > 0 ? activity.activity_members?.map((entry) => entry.member_label).join(' + ') : activity.member_label} — {ACTIVITY_META[activity.activity_type].label} — {new Date(activity.created_at).toLocaleString('fr-FR')}</p>
-              {activity.equipment_item_name ? <p>🧰 {activity.equipment_item_name}: {activity.equipment_before} → {activity.equipment_after} (utilisé {activity.equipment_used})</p> : <p>🧰 Aucun équipement requis</p>}
+              {activity.equipment_item_name ? <p>🧰 {activity.equipment_item_name}: {activity.equipment_before} → {activity.equipment_after} ({activity.activity_type === 'cargo' ? 'requis non consommé' : `utilisé ${activity.equipment_used}`})</p> : <p>🧰 Aucun équipement requis</p>}
               <div className="mt-2 space-y-1 text-xs text-[#f1cfaa]">
                 {activity.activity_items.map((line, index) => (
                   <div key={`${activity.id}-${index}`} className="flex items-center gap-2">

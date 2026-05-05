@@ -5,11 +5,16 @@ import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 
+async function canAny(userId: string, permissions: string[]) {
+  const results = await Promise.all(permissions.map((permission) => hasUserPermission(userId, permission)));
+  return results.some(Boolean);
+}
+
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const canReimburse = await hasUserPermission(session.userId, 'expenses.reimburse');
+  const canReimburse = await canAny(session.userId, ['member_ops.expenses.reimburse', 'expenses.reimburse']);
   if (!canReimburse) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const { id } = await params;

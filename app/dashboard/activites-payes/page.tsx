@@ -83,12 +83,14 @@ export default async function ActivityPayrollPage() {
   const canConfigure = has('activity_payroll.payroll.configure');
   const canPay = has('member_ops.payroll.pay');
   const canAdjust = has('member_ops.payroll.adjust');
-  const canExclude = has('member_ops.payroll.adjust');
+  const canReport = has('member_ops.payroll.report') || has('member_ops.payroll.adjust');
+  const canExclude = has('member_ops.payroll.exclude') || has('member_ops.payroll.adjust');
   const canExpenses = has('member_ops.expenses.view');
   const canExpenseCreate = has('member_ops.expenses.create');
   const canExpenseReimburse = has('member_ops.expenses.reimburse');
+  const canExpenseCancel = has('member_ops.expenses.cancel');
   const canHistory = has('member_ops.history.view');
-  const canLogs = has('member_ops.logs.view');
+  const canLogs = has('member_ops.activities.logs') || has('member_ops.payroll.logs') || has('member_ops.expenses.logs') || has('member_ops.logs.view');
 
   const supabase = getSupabaseAdmin();
   const now = new Date();
@@ -165,7 +167,7 @@ export default async function ActivityPayrollPage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Activites & Payes" subtitle="Suivi business, activite membre et paiement" />
+      <InternalPageHeader title="Activités & Payes & Dépenses" subtitle="Activités / Payes / Dépenses / Logs" />
       <ActivityPayrollHubClient
         members={members}
         activities={activities}
@@ -190,10 +192,12 @@ export default async function ActivityPayrollPage() {
         canConfigure={canConfigure}
         canPay={canPay}
         canAdjust={canAdjust}
+        canReport={canReport}
         canExclude={canExclude}
         canExpenses={canExpenses}
         canExpenseCreate={canExpenseCreate}
         canExpenseReimburse={canExpenseReimburse}
+        canExpenseCancel={canExpenseCancel}
         canHistory={canHistory}
         canLogs={canLogs}
       />

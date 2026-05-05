@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { describePermission, MODULE_ORDER, SECTION_ORDER } from '@/lib/permission-catalog';
 import { toCanonicalPermission } from '@/lib/permission-normalization';
@@ -74,7 +73,6 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const canEditMembers = userPermissions.includes('members.edit');
   const canDeleteMembers = userPermissions.includes('members.delete');
   const canManageRoles = userPermissions.includes('roles.manage');
-  const canViewActivities = userPermissions.includes('members.activities.view');
   const canViewMemberPassword = userPermissions.includes('members.password.view');
   const canCopyMemberPassword = userPermissions.includes('members.password.copy');
   const canCopyCredentials = userPermissions.includes('members.credentials.copy');
@@ -204,7 +202,6 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
               ) : null}
               <div className="flex items-center gap-2">
                 {canCopyCredentials ? <button className="saas-ghost-btn" onClick={() => void copyMemberCredentials(member)}>Copier</button> : null}
-                {canViewActivities ? <Link href={`/dashboard/membres/${member.id}/activites`} className="saas-ghost-btn">Activités</Link> : null}
                 {(canEditMembers || canDeleteMembers) ? <button className="saas-ghost-btn" onClick={() => setSelectedMember(member)}>Gérer</button> : null}
               </div>
             </div>
