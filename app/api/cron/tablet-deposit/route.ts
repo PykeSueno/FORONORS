@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   }
 
   const parisHour = getTabletParisHour(new Date());
-  if (parisHour !== 8) return NextResponse.json({ ok: true, skipped: true, reason: 'not_8h_paris', parisHour });
+  if (parisHour < 8) return NextResponse.json({ ok: true, skipped: true, reason: 'before_8h_paris', parisHour });
 
   const result = await ensureTabletMorningDeposit(getSupabaseAdmin(), { onlyAfterCutoff: true });
   return NextResponse.json({ ok: true, ...result, parisHour });
