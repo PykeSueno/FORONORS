@@ -68,7 +68,10 @@ export function ExpensesPageClient({
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
 
-  const allStatsRows = useMemo(() => statsState.length > 0 ? statsState : [...pendingRows, ...reimbursedRows], [pendingRows, reimbursedRows, statsState]);
+  const allStatsRows = useMemo(() => {
+    const source = statsState.length > 0 ? statsState : [...pendingRows, ...reimbursedRows];
+    return source.filter((row) => row.status === 'pending' || row.status === 'reimbursed');
+  }, [pendingRows, reimbursedRows, statsState]);
   const totals = useMemo(() => {
     const source = allStatsRows;
     const pendingTotal = source.filter((row) => row.status === 'pending').reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
@@ -210,6 +213,7 @@ export function ExpensesPageClient({
 function groupRows(rows: Expense[], key: (row: Expense) => string) {
   const map = new Map<string, { label: string; count: number; pending: number; reimbursed: number; total: number }>();
   for (const row of rows) {
+    if (row.status !== 'pending' && row.status !== 'reimbursed') continue;
     const label = key(row) || 'Autre';
     const current = map.get(label) ?? { label, count: 0, pending: 0, reimbursed: 0, total: 0 };
     current.count += 1;

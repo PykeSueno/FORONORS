@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getTabletBusinessDate } from '@/lib/tablet';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
+import { ensureTabletMorningDeposit } from '@/lib/tablet-deposit';
 
 type EquipmentRow = { id: number; name: string; quantity: number };
 
@@ -52,16 +53,10 @@ export async function POST(request: Request) {
     if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     throw error;
   }
-  let { data: day } = await supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle();
-
-  if (!day) {
-    const { data: created } = await supabase
-      .from('tablet_days')
-      .insert({ business_day: businessDay, deposited_amount: 4000, chest_amount: 4000, created_by: session.userId })
-      .select('*')
-      .maybeSingle();
-    day = created;
-  }
+  const ensured = await ensureTabletMorningDeposit(supabase, { actorUserId: session.userId });
+  const { data: day } = ensured.day
+    ? { data: ensured.day }
+    : await supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle();
 
   if (!day) return NextResponse.json({ message: 'Impossible de préparer la journée tablette.' }, { status: 500 });
 
@@ -97,7 +92,7 @@ export async function POST(request: Request) {
   const afterKits = beforeKits + 2;
   const afterCutters = beforeCutters + 2;
 
-  await supabase.from('tablet_passages').insert({
+  const { data: passage } = await supabase.from('tablet_passages').insert({
     tablet_day_id: day.id,
     member_user_id: memberId,
     member_label: memberLabel,
@@ -108,9 +103,9 @@ export async function POST(request: Request) {
     before_cutters: beforeCutters,
     after_cutters: afterCutters,
     created_by: session.userId
-  });
+  }).select('id, member_user_id, member_label, before_cash, after_cash, before_kits, after_kits, before_cutters, after_cutters, created_at').maybeSingle();
 
-  await supabase
+  const { data: updatedDay } = await supabase
     .from('tablet_days')
     .update({
       chest_amount: afterCash,
@@ -119,7 +114,9 @@ export async function POST(request: Request) {
       cutters_added: Number(freshDay?.cutters_added ?? day.cutters_added ?? 0) + 2,
       updated_at: new Date().toISOString()
     })
-    .eq('id', day.id);
+    .eq('id', day.id)
+    .select('*')
+    .maybeSingle();
 
   await supabase
     .from('group_cash')
@@ -154,5 +151,5 @@ export async function POST(request: Request) {
     newValues: { memberLabel, afterCash, afterGroupBalance, afterKits, afterCutters, businessDay }
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, passage, day: updatedDay, groupCash: afterGroupBalance, kitsInStock: afterKits, cuttersInStock: afterCutters });
 }

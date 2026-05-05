@@ -507,6 +507,11 @@ create table if not exists public.tablet_days (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table public.tablet_days add column if not exists initial_chest_amount numeric(12,2) not null default 0;
+alter table public.tablet_days add column if not exists initial_kits integer not null default 0;
+alter table public.tablet_days add column if not exists initial_cutters integer not null default 0;
+alter table public.tablet_days add column if not exists auto_deposit_at timestamptz;
+
 create table if not exists public.tablet_passages (
   id bigint generated always as identity primary key,
   tablet_day_id bigint not null references public.tablet_days(id) on delete cascade,

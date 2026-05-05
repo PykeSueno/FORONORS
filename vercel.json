@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/tablet-deposit",
+      "schedule": "0 6,7 * * *"
+    }
+  ]
+}

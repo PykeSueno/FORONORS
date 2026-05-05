@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { TabletCigarettePageClient } from '@/components/tablet-cigarette/tablet-cigarette-page-client';
 import { getTabletBusinessDate } from '@/lib/tablet';
+import { ensureTabletMorningDeposit } from '@/lib/tablet-deposit';
 import { CIGARETTE_ITEM_NAME, getCigaretteBusinessDate } from '@/lib/cigarette';
 import { weekWindow } from '@/lib/payroll';
 
@@ -25,6 +26,10 @@ export default async function TabletCigarettePage() {
   const tabletBusinessDay = getTabletBusinessDate();
   const cigaretteBusinessDay = getCigaretteBusinessDate();
   const statsWeek = weekWindow(new Date(), 0);
+
+  if (canTabletAccess) {
+    await ensureTabletMorningDeposit(supabase, { actorUserId: session.userId, onlyAfterCutoff: true });
+  }
 
   const [membersRes, cashRes, tabletDayRes, cigaretteDayRes, kitItemRes, cutterItemRes, cigaretteItemRes, processorItemRes] = await Promise.all([
     supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true }),

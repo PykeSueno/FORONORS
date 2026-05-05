@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getTabletBusinessDate } from '@/lib/tablet';
+import { ensureTabletMorningDeposit } from '@/lib/tablet-deposit';
 
 export default async function TabletPage() {
   const session = await getSession();
@@ -16,6 +17,8 @@ export default async function TabletPage() {
 
   const businessDay = getTabletBusinessDate();
   const supabase = getSupabaseAdmin();
+  await ensureTabletMorningDeposit(supabase, { actorUserId: session.userId, onlyAfterCutoff: true });
+
   const [{ data: day }, { data: members }, { data: cash }, { data: kitItem }, { data: cutterItem }] = await Promise.all([
     supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle(),
     supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true }),

@@ -5,7 +5,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { computeProcessorEstimates, PROCESSOR_BOAT_FROM_BOTTLES } from '@/lib/processor';
 
-type TabletDay = { id: number; business_day: string; deposited_amount: number; chest_amount: number; passages_count: number; kits_added: number; cutters_added: number } | null;
+type TabletDay = {
+  id: number;
+  business_day: string;
+  deposited_amount: number;
+  chest_amount: number;
+  passages_count: number;
+  kits_added: number;
+  cutters_added: number;
+  initial_chest_amount?: number | null;
+  initial_kits?: number | null;
+  initial_cutters?: number | null;
+  auto_deposit_at?: string | null;
+} | null;
 type CigaretteDay = { id: number; business_day: string; chest_amount: number; passages_count: number; total_revenue: number; packs_sold: number; packs_deposit_remaining?: number } | null;
 
 type TabletPassage = { id: number; member_user_id?: string | null; member_label: string; before_cash: number; after_cash: number; before_kits: number; after_kits: number; before_cutters: number; after_cutters: number; created_at: string };
@@ -108,7 +120,12 @@ export function TabletCigarettePageClient(props: {
   const processorEstimate = useMemo(() => computeProcessorEstimates(processorBottles, processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES), [processorBottles, processorBoatFee]);
   const processorSaleTotalEstimated = Math.max(0, Math.round(processorSaleQty * 0.5 * 100));
   const processorSaleTotalReal = Math.max(0, Number(processorRealReceived || 0));
-  const tabletGenerated = Math.max(0, Number(tabletDayState?.deposited_amount ?? 0) - Number(tabletDayState?.chest_amount ?? 0));
+  const tabletDeposit = Math.max(0, Number(tabletDayState?.deposited_amount ?? 0));
+  const tabletChest = Math.max(0, Number(tabletDayState?.chest_amount ?? 0));
+  const tabletSpent = Math.max(0, tabletDeposit - tabletChest);
+  const tabletInitialCash = Math.max(0, Number(tabletDayState?.initial_chest_amount ?? tabletDeposit));
+  const tabletInitialKits = Math.max(0, Number(tabletDayState?.initial_kits ?? (kitsState - Number(tabletDayState?.kits_added ?? 0))));
+  const tabletInitialCutters = Math.max(0, Number(tabletDayState?.initial_cutters ?? (cuttersState - Number(tabletDayState?.cutters_added ?? 0))));
 
   const processorSoldToday = useMemo(() => processorSessionsState
     .filter((row) => row.operation_type === 'sale' && row.status === 'validated' && Array.isArray(row.participant_user_ids) && row.participant_user_ids.includes(processorSaleMemberId))
@@ -406,7 +423,7 @@ export function TabletCigarettePageClient(props: {
             <MiniStat label="Passages jour" value={String(tabletDayState?.passages_count ?? 0)} />
             <MiniStat label="Stock kits" value={String(kitsState)} />
             <MiniStat label="Stock disqueuses" value={String(cuttersState)} />
-            <MiniStat label="Argent généré" value={formatUsd(tabletGenerated)} />
+            <MiniStat label="Argent dépensé" value={formatUsd(tabletSpent)} />
             {canTabletAccess ? <button className="saas-primary-btn w-full" onClick={() => setTab('tablet')}>Ouvrir Tablette</button> : null}
           </article>
           <article className="glass-card p-4 space-y-2">
@@ -431,11 +448,33 @@ export function TabletCigarettePageClient(props: {
           <article className="glass-card p-5">
             <h3 className="text-base font-semibold text-[#fff1dd]">Tablette — {tabletBusinessDay}</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              <Stat label="Dépôt restant" value={`${tabletDayState?.chest_amount ?? 0}$`} icon="💰" />
-              <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="🏦" />
-              <Stat label="Kits" value={String(kitsState)} icon="🧰" />
-              <Stat label="Disqueuses" value={String(cuttersState)} icon="🪚" />
-              <Stat label="Passages" value={String(tabletDayState?.passages_count ?? 0)} icon="🧾" />
+              <Stat label="Dépôt matin" value={formatUsd(tabletDeposit)} icon="💵" />
+              <Stat label="Coffre départ" value={formatUsd(tabletInitialCash)} icon="🏦" />
+              <Stat label="Argent dépensé" value={formatUsd(tabletSpent)} icon="💸" />
+              <Stat label="Argent restant attendu" value={formatUsd(tabletChest)} icon="💰" />
+              <Stat label="Argent coffre actuel" value={formatUsd(groupCashState)} icon="🏦" />
+              <Stat label="Kits avant / après" value={`${tabletInitialKits} -> ${kitsState}`} icon="🧰" />
+              <Stat label="Disqueuses avant / après" value={`${tabletInitialCutters} -> ${cuttersState}`} icon="🪚" />
+              <Stat label="Passages validés" value={String(tabletDayState?.passages_count ?? 0)} icon="🧾" />
+            </div>
+            <div className="mt-4 rounded-xl border border-white/10 bg-[#2f1d14]/50 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-[#ffe8ca]">Historique Tablette du jour</h4>
+                <span className="text-xs text-[#efcdab]">{tabletPassagesState.length} passage(s)</span>
+              </div>
+              <div className="mt-2 max-h-64 space-y-2 overflow-auto pr-1">
+                {tabletPassagesState.slice(0, 10).map((entry) => (
+                  <article key={entry.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <b className="text-[#ffe8ca]">{entry.member_label}</b>
+                      <span>{new Date(entry.created_at).toLocaleString('fr-FR')}</span>
+                    </div>
+                    <p>{`Argent ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`}</p>
+                    <p>{`Kits ${entry.before_kits} -> ${entry.after_kits} · Disqueuses ${entry.before_cutters} -> ${entry.after_cutters}`}</p>
+                  </article>
+                ))}
+                {tabletPassagesState.length === 0 ? <p className="text-xs text-[#efcdab]">Aucun passage tablette aujourd&apos;hui.</p> : null}
+              </div>
             </div>
           </article>
 
@@ -461,10 +500,11 @@ export function TabletCigarettePageClient(props: {
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <MiniStat label="Kits" value={String(kitsState)} />
                 <MiniStat label="Disqueuses" value={String(cuttersState)} />
-                <MiniStat label="Argent" value={formatUsd(tabletGenerated)} />
+                <MiniStat label="Coût passage" value={formatUsd(400)} />
+                <MiniStat label="Restant après" value={formatUsd(Math.max(0, tabletChest - 400))} />
               </div>
 
               {canTabletCreatePassage ? <button className="saas-primary-btn w-full" onClick={() => void createTabletPassage()}>Valider</button> : null}
@@ -640,8 +680,8 @@ export function TabletCigarettePageClient(props: {
             <div className="mt-2 grid gap-2 md:grid-cols-5">
               <Stat label="Passages tablette" value={String(tabletStatsTotals.passages)} icon="📱" />
               <Stat label="Argent dépensé" value={formatUsd(tabletStatsTotals.money)} icon="💸" />
-              <Stat label="Kits utilisés" value={String(tabletStatsTotals.kits)} icon="🧰" />
-              <Stat label="Disqueuses utilisées" value={String(tabletStatsTotals.cutters)} icon="🪚" />
+              <Stat label="Kits récupérés" value={String(tabletStatsTotals.kits)} icon="🧰" />
+              <Stat label="Disqueuses récupérées" value={String(tabletStatsTotals.cutters)} icon="🪚" />
               <Stat label="Dernière activité" value={tabletStatsTotals.last ? new Date(tabletStatsTotals.last).toLocaleDateString('fr-FR') : '-'} icon="🕒" />
             </div>
             <div className="mt-4 overflow-x-auto">

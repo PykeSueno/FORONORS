@@ -822,7 +822,10 @@ function ExpensesPage(props: {
   onCancel: (row: Expense) => Promise<void>;
 }) {
   const [form, setForm] = useState<ExpenseFormState>({ memberId: props.members[0]?.id ?? '', amount: '', category: 'Garage', note: '' });
-  const allRows = useMemo(() => props.statsRows.length ? props.statsRows : [...props.pending, ...props.reimbursed], [props.pending, props.reimbursed, props.statsRows]);
+  const allRows = useMemo(() => {
+    const source = props.statsRows.length ? props.statsRows : [...props.pending, ...props.reimbursed];
+    return source.filter((row) => row.status === 'pending' || row.status === 'reimbursed');
+  }, [props.pending, props.reimbursed, props.statsRows]);
   const totals = useMemo(() => ({
     pending: props.pending.reduce((sum, row) => sum + Number(row.amount ?? 0), 0),
     reimbursed: props.reimbursed.reduce((sum, row) => sum + Number(row.amount ?? 0), 0)
@@ -968,6 +971,7 @@ function periodsOverlap(startA: string, endA: string, startB: string, endB: stri
 function groupExpenses(rows: Expense[], key: (row: Expense) => string) {
   const map = new Map<string, { label: string; count: number; pending: number; reimbursed: number; total: number }>();
   for (const row of rows) {
+    if (row.status !== 'pending' && row.status !== 'reimbursed') continue;
     const label = key(row) || 'Autres';
     const current = map.get(label) ?? { label, count: 0, pending: 0, reimbursed: 0, total: 0 };
     current.count += 1;

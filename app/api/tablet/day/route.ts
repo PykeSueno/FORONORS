@@ -4,6 +4,7 @@ import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getTabletBusinessDate } from '@/lib/tablet';
+import { ensureTabletMorningDeposit } from '@/lib/tablet-deposit';
 
 export async function GET() {
   const session = await getSession();
@@ -15,6 +16,7 @@ export async function GET() {
   const businessDay = getTabletBusinessDate();
   const supabase = getSupabaseAdmin();
 
+  await ensureTabletMorningDeposit(supabase, { actorUserId: session.userId, onlyAfterCutoff: true });
   const { data } = await supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle();
   return NextResponse.json({ day: data, businessDay });
 }
@@ -36,23 +38,23 @@ export async function PATCH(request: Request) {
   const deposit = Math.max(0, Number(body.deposited_amount));
 
   const supabase = getSupabaseAdmin();
-  const { data: day } = await supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle();
+  const ensured = await ensureTabletMorningDeposit(supabase, { actorUserId: session.userId });
+  const { data: day } = ensured.day
+    ? { data: ensured.day }
+    : await supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle();
+  if (!day) return NextResponse.json({ message: 'Impossible de préparer la journée tablette.' }, { status: 500 });
 
   const previousDeposit = Number(day?.deposited_amount ?? 0);
   const previousChest = Number(day?.chest_amount ?? 0);
   const consumed = Math.max(0, previousDeposit - previousChest);
   const nextChest = Math.max(0, deposit - consumed);
 
-  if (!day) {
-    await supabase.from('tablet_days').insert({
-      business_day: businessDay,
-      deposited_amount: deposit,
-      chest_amount: deposit,
-      created_by: session.userId
-    });
-  } else {
-    await supabase.from('tablet_days').update({ deposited_amount: deposit, chest_amount: nextChest, updated_at: new Date().toISOString() }).eq('id', day.id);
-  }
+  const { data: updatedDay } = await supabase
+    .from('tablet_days')
+    .update({ deposited_amount: deposit, chest_amount: nextChest, updated_at: new Date().toISOString() })
+    .eq('id', day.id)
+    .select('*')
+    .maybeSingle();
 
   await createAuditLog({
     actorUserId: session.userId,
@@ -64,5 +66,5 @@ export async function PATCH(request: Request) {
     newValues: { businessDay, deposit, nextChest, consumed }
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, day: updatedDay });
 }
