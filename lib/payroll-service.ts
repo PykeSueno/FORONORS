@@ -231,17 +231,17 @@ export async function getMemberActivities(supabase: SupabaseClient, args: { star
     const ids = activeOnly(row.member_user_id ? [String(row.member_user_id)] : []);
     if (ids.length === 0) continue;
     const money = Math.max(0, Number(row.after_cash ?? 0) - Number(row.before_cash ?? 0));
-    add(rows, { id: `tablet-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Jobs', action: 'Passage tablette', moneyGenerated: money, participation: 1, details: `Cash ${formatUsd(Number(row.before_cash ?? 0))} -> ${formatUsd(Number(row.after_cash ?? 0))}` });
+    add(rows, { id: `tablet-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Jobs Tablette', action: 'Passage tablette', moneyGenerated: money, participation: 1, details: `Cash ${formatUsd(Number(row.before_cash ?? 0))} -> ${formatUsd(Number(row.after_cash ?? 0))}` });
   }
   for (const row of cigaretteRows ?? []) {
     const ids = activeOnly(row.member_user_id ? [String(row.member_user_id)] : []);
     if (ids.length === 0) continue;
-    add(rows, { id: `cigarette-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Jobs', action: 'Passage cigarette', moneyGenerated: Math.max(0, Number(row.revenue_amount ?? 0)), participation: 1, details: `Statut ${row.status ?? 'validé'}` });
+    add(rows, { id: `cigarette-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, row.member_label, memberLookup)), module: 'Jobs Cigarette', action: 'Passage cigarette', moneyGenerated: Math.max(0, Number(row.revenue_amount ?? 0)), participation: 1, details: `Statut ${row.status ?? 'validé'}` });
   }
   for (const row of processorRows ?? []) {
     const ids = activeOnly(normalizeParticipantIds(row.participant_user_ids, row.validated_by));
     if (ids.length === 0) continue;
-    add(rows, { id: `processor-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, null, memberLookup)), module: 'Processeur', action: String(row.operation_type) === 'sale' ? 'Vente processeur' : 'Production processeur', moneyGenerated: Math.max(0, Number(row.real_received ?? 0)), participation: ids.length || 1, details: `${Number(row.processors_count ?? 0)} processeurs` });
+    add(rows, { id: `processor-${row.id}`, date: String(row.created_at), memberIds: ids, memberLabels: ids.map((id) => labelFor(id, null, memberLookup)), module: 'Jobs Processeur', action: String(row.operation_type) === 'sale' ? 'Vente processeur' : 'Production processeur', moneyGenerated: Math.max(0, Number(row.real_received ?? 0)), participation: ids.length || 1, details: `${Number(row.processors_count ?? 0)} processeurs` });
   }
 
   return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

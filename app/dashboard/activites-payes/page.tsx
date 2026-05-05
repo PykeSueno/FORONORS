@@ -110,7 +110,7 @@ export default async function ActivityPayrollPage() {
     periodState(supabase, previous.startIso, previous.endIso),
     periodState(supabase, customStart, customEnd),
     canActivities || canSummary || canHistory ? getMemberActivities(supabase, { startIso: activityStart.toISOString(), endIso: now.toISOString(), limit: 1500 }) : Promise.resolve([]),
-    canHistory ? supabase.from('activity_payroll_payments').select('id, week_start, week_end, member_user_id, member_label, amount, paid_by, group_balance_before, group_balance_after, created_at').order('created_at', { ascending: false }).limit(120) : Promise.resolve({ data: [] }),
+    canPayroll || canHistory ? supabase.from('activity_payroll_payments').select('id, week_start, week_end, member_user_id, member_label, amount, paid_by, group_balance_before, group_balance_after, created_at').order('created_at', { ascending: false }).limit(120) : Promise.resolve({ data: [] }),
     canExpenses || canSummary || canHistory ? supabase.from('expenses').select('*').eq('status', 'pending').order('created_at', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
     canExpenses || canSummary || canHistory ? supabase.from('expenses').select('*').eq('status', 'reimbursed').order('reimbursed_at', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
     canExpenses || canSummary || canHistory ? supabase.from('expenses').select('*').order('created_at', { ascending: false }).limit(2000) : Promise.resolve({ data: [] }),

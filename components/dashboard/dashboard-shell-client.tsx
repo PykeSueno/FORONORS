@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import type { ReactNode } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { humanMoneyMovementLabel, humanStockMovementLabel, moneyMovementIcon, stockMovementIcon } from '@/lib/labels';
 import { WelcomeCardActions } from '@/components/dashboard/welcome-card-actions';
 import { DashboardHubGrid } from '@/components/dashboard/dashboard-hub-grid';
 
-type Card = { id: string; href: string; enabled: boolean; icon: string; title: string; value: string; subtitle: string };
+type Card = { id: string; href: string; enabled: boolean; icon: ReactNode; title: string; value: string; subtitle: string };
 type DashboardFlags = {
   canMoneyAccess: boolean; canMoneyPreview: boolean;
   canItemsAccess: boolean; canItemsPreview: boolean;
@@ -36,6 +37,21 @@ type SummaryPayload = {
   recentStock: Array<{ item_id?: number | null; item_name: string; quantity_delta: number; transaction_type: string; created_at: string; users: { name: string | null; username: string | null } | { name: string | null; username: string | null }[] | null; items?: { image_url: string | null; quantity?: number | null } | { image_url: string | null; quantity?: number | null }[] | null }>;
 };
 
+function OpsDashboardIcon() {
+  return (
+    <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#d6a66f]/35 bg-[#5a3926]/70 text-[#f6d6b3] shadow-inner shadow-black/20">
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 7.5h16v9H4z" />
+        <path d="M7 7.5V5.75A1.75 1.75 0 0 1 8.75 4h6.5A1.75 1.75 0 0 1 17 5.75V7.5" />
+        <path d="M8 12h3" />
+        <path d="M15 11.5h1.5" />
+        <path d="M15 14.5h1.5" />
+        <path d="M6.5 19h11" />
+      </svg>
+    </span>
+  );
+}
+
 
 export function DashboardShellClient({ name, role, payEstimateCurrent, payEstimatePrevious, canUpdatePassword, initialOrder, flags }: { name: string; role: string; payEstimateCurrent: number; payEstimatePrevious: number; canUpdatePassword: boolean; initialOrder: string[]; flags: DashboardFlags }) {
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
@@ -56,7 +72,7 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
     flags.canTransactionsPreview ? { id: 'transactions', href: '/dashboard/transactions', enabled: flags.canTransactionsAccess, icon: '🔄', title: 'Transactions', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Entrées / Sorties / Historique' } : null,
     flags.canTransactionsRecentPreview ? { id: 'transactions_recent', href: '/dashboard/transactions-recentes', enabled: flags.canTransactionsRecentAccess, icon: '🕒', title: 'Transactions récentes', value: summary ? String(summary.values.txCount) : '…', subtitle: 'Historique' } : null,
     flags.canMembersPreview ? { id: 'members', href: '/dashboard/membres', enabled: flags.canMembersAccess, icon: '👥', title: 'Membres', value: summary ? String(summary.values.membersCount) : '…', subtitle: 'Gestion équipe' } : null,
-    flags.canActivityPayrollPreview ? { id: 'activity_payroll', href: '/dashboard/activites-payes', enabled: flags.canActivityPayrollAccess, icon: 'OPS', title: 'Activités & Payes & Dépenses', value: summary ? String(summary.values.activitiesToday) : '...', subtitle: 'Activités / Payes / Dépenses / Logs' } : null,
+    flags.canActivityPayrollPreview ? { id: 'activity_payroll', href: '/dashboard/activites-payes', enabled: flags.canActivityPayrollAccess, icon: <OpsDashboardIcon />, title: 'Activités & Payes & Dépenses', value: summary ? String(summary.values.activitiesToday) : '...', subtitle: 'Activités / Payes / Dépenses / Logs' } : null,
     flags.canLogsPreview ? { id: 'logs', href: '/dashboard/logs', enabled: flags.canLogsAccess, icon: '🧾', title: 'Logs', value: summary ? String(summary.values.logsCount) : '…', subtitle: 'Traçabilité' } : null,
     flags.canTabletCigarettePreview ? { id: 'tablet_cigarette', href: '/dashboard/travail', enabled: flags.canTabletCigaretteAccess, icon: '🛠️', title: 'Jobs', value: summary ? String(summary.values.tabletPassagesToday + summary.values.cigarettePassagesToday + summary.values.processorOperationsToday) : '…', subtitle: summary ? 'Tablette / Cigarette / Processeur' : 'Tablette / Cigarette / Processeur' } : null,
     flags.canActivityPreview ? { id: 'activity', href: '/dashboard/activite', enabled: flags.canActivityAccess, icon: '🎯', title: 'Activité', value: summary ? String(summary.values.activitiesToday) : '0', subtitle: 'Boîte / Cambriolage / Conteneur / Processeur' } : null,

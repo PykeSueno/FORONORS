@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 
 type HubCardItem = {
   id: string;
   href: string;
   enabled: boolean;
-  icon: string;
+  icon: ReactNode;
   title: string;
   value: string;
   subtitle: string;
@@ -161,7 +162,7 @@ function HubCard({ href, enabled, icon, title, value, subtitle }: Omit<HubCardIt
       <div className="flex items-center justify-between gap-2">
         <p
           data-drag-handle={enabled ? 'true' : undefined}
-          className={`text-3xl ${enabled ? 'inline-flex select-none rounded-md p-1 cursor-grab active:cursor-grabbing' : ''}`}
+          className={`text-3xl ${enabled ? 'inline-flex select-none items-center justify-center rounded-md p-1 cursor-grab active:cursor-grabbing' : ''}`}
           title={enabled ? 'Maintenir cette icône pour réorganiser le dashboard' : undefined}
         >
           {icon}

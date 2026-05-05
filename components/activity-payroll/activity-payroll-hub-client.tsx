@@ -114,7 +114,21 @@ type Props = {
 };
 
 const CATEGORIES = ['Achat stock', 'Matériel', 'Véhicule', 'Braquage', 'Drogue', 'Jobs', 'Autre'];
-const MODULE_ORDER = ['Jobs', 'Drogues', 'Braquage', 'FOUR', 'Vente objets', 'Activité', 'Cargo', 'GoFast', 'Processeur'];
+const JOB_MODULES = ['Jobs Tablette', 'Jobs Cigarette', 'Jobs Processeur'];
+const MODULE_ORDER = [...JOB_MODULES, 'Drogues', 'Braquage', 'FOUR', 'Vente objets', 'Activité', 'Cargo', 'GoFast'];
+const MODULE_FILTERS = [
+  { value: 'Jobs', label: 'Jobs' },
+  { value: 'Jobs Tablette', label: 'Tablette' },
+  { value: 'Jobs Cigarette', label: 'Cigarette' },
+  { value: 'Jobs Processeur', label: 'Processeur' },
+  { value: 'Drogues', label: 'Drogues' },
+  { value: 'Braquage', label: 'Braquage' },
+  { value: 'FOUR', label: 'FOUR' },
+  { value: 'Vente objets', label: 'Vente objets' },
+  { value: 'Activité', label: 'Activité' },
+  { value: 'Cargo', label: 'Cargo' },
+  { value: 'GoFast', label: 'GoFast' }
+];
 
 function firstPage(props: Pick<Props, 'canActivities' | 'canPayroll' | 'canExpenses'>): Page {
   if (props.canActivities) return 'activities';
@@ -154,12 +168,18 @@ export function ActivityPayrollHubClient(props: Props) {
 
   const modules = useMemo(() => {
     const existing = new Set(props.activities.map((row) => row.module));
-    return MODULE_ORDER.filter((entry) => existing.has(entry)).concat(Array.from(existing).filter((entry) => !MODULE_ORDER.includes(entry)).sort((a, b) => a.localeCompare(b, 'fr')));
+    const known = MODULE_FILTERS.filter((entry) => entry.value === 'Jobs' ? JOB_MODULES.some((module) => existing.has(module)) : existing.has(entry.value));
+    const custom = Array.from(existing)
+      .filter((entry) => !MODULE_ORDER.includes(entry))
+      .map((entry) => ({ value: entry, label: entry }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+    return known.concat(custom);
   }, [props.activities]);
 
   const filteredActivities = useMemo(() => props.activities.filter((row) => {
     if (memberFilter !== 'all' && !row.memberIds.includes(memberFilter)) return false;
-    if (moduleFilter !== 'all' && row.module !== moduleFilter) return false;
+    if (moduleFilter === 'Jobs' && !JOB_MODULES.includes(row.module)) return false;
+    if (moduleFilter !== 'all' && moduleFilter !== 'Jobs' && row.module !== moduleFilter) return false;
     if (periodFilter === 'current' && !(row.date >= selectedPreview.weekStartIso && row.date < selectedPreview.weekEndIso)) return false;
     if (periodFilter === 'previous' && !(row.date >= previousPreview.weekStartIso && row.date < previousPreview.weekEndIso)) return false;
     return true;
@@ -175,7 +195,8 @@ export function ActivityPayrollHubClient(props: Props) {
       modules: Record<string, { count: number; money: number }>;
       recent: MemberActivityRow[];
     }>();
-    for (const member of props.members) {
+    const visibleMembers = props.members.filter((member) => memberFilter === 'all' || member.id === memberFilter);
+    for (const member of visibleMembers) {
       byMember.set(member.id, { member, money: 0, actions: 0, participation: 0, last: null, modules: {}, recent: [] });
     }
     for (const row of filteredActivities) {
@@ -194,7 +215,7 @@ export function ActivityPayrollHubClient(props: Props) {
         if (target.recent.length < 4) target.recent.push(row);
       }
     }
-    return Array.from(byMember.values()).filter((row) => row.actions > 0 || memberFilter !== 'all').sort((a, b) => b.money - a.money || b.actions - a.actions);
+    return Array.from(byMember.values()).filter((row) => row.actions > 0).sort((a, b) => b.money - a.money || b.actions - a.actions);
   }, [filteredActivities, memberFilter, props.members]);
 
   async function loadPeriod(nextMode: PeriodMode, start = customStart, end = customEnd) {
@@ -309,9 +330,9 @@ export function ActivityPayrollHubClient(props: Props) {
     <div className="space-y-4">
       <section className="glass-card p-3">
         <div className="flex flex-wrap gap-2">
-          {props.canActivities ? <PageButton active={page === 'activities'} onClick={() => setPage('activities')}>Activités</PageButton> : null}
-          {props.canPayroll ? <PageButton active={page === 'payroll'} onClick={() => setPage('payroll')}>Payes</PageButton> : null}
-          {props.canExpenses ? <PageButton active={page === 'expenses'} onClick={() => setPage('expenses')}>Dépenses</PageButton> : null}
+          {props.canActivities ? <PageButton active={page === 'activities'} onClick={() => setPage('activities')}><SmallIcon name="activity" />Activités</PageButton> : null}
+          {props.canPayroll ? <PageButton active={page === 'payroll'} onClick={() => setPage('payroll')}><SmallIcon name="payroll" />Payes</PageButton> : null}
+          {props.canExpenses ? <PageButton active={page === 'expenses'} onClick={() => setPage('expenses')}><SmallIcon name="expense" />Dépenses</PageButton> : null}
         </div>
       </section>
 
@@ -385,7 +406,7 @@ function ActivitiesPage(props: {
   cards: Array<{ member: MemberSummary; money: number; actions: number; participation: number; last: string | null; modules: Record<string, { count: number; money: number }>; recent: MemberActivityRow[] }>;
   activities: MemberActivityRow[];
   members: MemberSummary[];
-  modules: string[];
+  modules: Array<{ value: string; label: string }>;
   memberFilter: string;
   moduleFilter: string;
   periodFilter: 'all' | 'current' | 'previous';
@@ -393,6 +414,7 @@ function ActivitiesPage(props: {
   setModuleFilter: (value: string) => void;
   setPeriodFilter: (value: 'all' | 'current' | 'previous') => void;
 }) {
+  const cardModules = props.moduleFilter === 'Jobs' ? JOB_MODULES : props.moduleFilter !== 'all' ? [props.moduleFilter] : MODULE_ORDER;
   return (
     <div className="space-y-4">
       <section className="glass-card p-4">
@@ -408,7 +430,7 @@ function ActivitiesPage(props: {
           </select>
           <select className="saas-input !h-10" value={props.moduleFilter} onChange={(event) => props.setModuleFilter(event.target.value)}>
             <option value="all">Tous les modules</option>
-            {props.modules.map((module) => <option key={module} value={module}>{module}</option>)}
+            {props.modules.map((module) => <option key={module.value} value={module.value}>{module.label}</option>)}
           </select>
         </div>
       </section>
@@ -422,17 +444,17 @@ function ActivitiesPage(props: {
                 <p className="text-xs text-[#efcdab]">Dernière activité: {card.last ? new Date(card.last).toLocaleString('fr-FR') : '-'}</p>
               </div>
               <div className="grid grid-cols-3 gap-2 text-right text-xs">
-                <Mini label="Argent" value={formatUsd(card.money)} />
-                <Mini label="Actions" value={String(card.actions)} />
-                <Mini label="Participations" value={card.participation.toFixed(1)} />
+                <Mini label="Argent" value={formatUsd(card.money)} icon="money" />
+                <Mini label="Actions" value={String(card.actions)} icon="actions" />
+                <Mini label="Participations" value={card.participation.toFixed(1)} icon="activity" />
               </div>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              {MODULE_ORDER.map((module) => {
+              {cardModules.map((module) => {
                 const row = card.modules[module];
                 return (
                   <div key={module} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
-                    <p className="font-semibold text-[#ffe8ca]">{module}</p>
+                    <p className="inline-flex items-center gap-2 font-semibold text-[#ffe8ca]"><SmallIcon name={moduleIcon(module)} className="h-4 w-4" />{module}</p>
                     <p>{row?.count ?? 0} action(s)</p>
                     <p>{formatUsd(row?.money ?? 0)}</p>
                   </div>
@@ -440,7 +462,7 @@ function ActivitiesPage(props: {
               })}
             </div>
             <div className="mt-3 space-y-1">
-              {card.recent.map((row) => <p key={row.id} className="truncate text-xs text-[#d9b48f]">{new Date(row.date).toLocaleString('fr-FR')} - {row.module} - {row.action} - {row.details}</p>)}
+              {card.recent.map((row) => <p key={row.id} className="flex items-center gap-2 truncate text-xs text-[#d9b48f]"><SmallIcon name={moduleIcon(row.module)} className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{new Date(row.date).toLocaleString('fr-FR')} - {row.module} - {row.action} - {row.details}</span></p>)}
             </div>
           </article>
         ))}
@@ -453,7 +475,7 @@ function ActivitiesPage(props: {
           {props.activities.slice(0, 80).map((row) => (
             <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]">
               <div className="flex flex-wrap justify-between gap-2"><b className="text-[#ffe8ca]">{row.memberLabels.join(' + ') || '-'}</b><span>{new Date(row.date).toLocaleString('fr-FR')}</span></div>
-              <p>{row.module} - {row.action} - {formatUsd(row.moneyGenerated)} - {row.details}</p>
+              <p className="inline-flex items-center gap-2"><SmallIcon name={moduleIcon(row.module)} className="h-4 w-4" />{row.module} - {row.action} - {formatUsd(row.moneyGenerated)} - {row.details}</p>
             </article>
           ))}
         </div>
@@ -486,14 +508,24 @@ function PayrollPage(props: {
   loadPeriod: (mode: PeriodMode, start?: string, end?: string) => Promise<void>;
   payrollAction: (action: 'pay' | 'adjust' | 'exclude' | 'report', row: PayrollMemberRow, enabled?: boolean) => Promise<void>;
 }) {
+  const lastPayments = useMemo(() => {
+    const map = new Map<string, HistoryPayment>();
+    for (const row of props.history) {
+      if (!row.member_user_id) continue;
+      const current = map.get(row.member_user_id);
+      if (!current || new Date(row.created_at).getTime() > new Date(current.created_at).getTime()) map.set(row.member_user_id, row);
+    }
+    return map;
+  }, [props.history]);
+
   return (
     <div className="space-y-4">
       <section className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
-        <Metric label="Argent groupe" value={formatUsd(props.groupCash)} />
-        <Metric label="Total à payer" value={formatUsd(props.selectedPreview.totalProposed)} />
-        <Metric label="Déjà payé" value={formatUsd(props.paidTotal)} />
-        <Metric label="Restant" value={formatUsd(props.remainingPayroll)} />
-        <Metric label="Solde après payes" value={formatUsd(props.groupCash - props.remainingPayroll)} />
+        <Metric label="Argent groupe" value={formatUsd(props.groupCash)} icon="money" />
+        <Metric label="Total à payer" value={formatUsd(props.selectedPreview.totalProposed)} icon="payroll" />
+        <Metric label="Déjà payé" value={formatUsd(props.paidTotal)} icon="paid" />
+        <Metric label="Restant" value={formatUsd(props.remainingPayroll)} icon="pending" />
+        <Metric label="Solde après payes" value={formatUsd(props.groupCash - props.remainingPayroll)} icon="money" />
         <Metric label="Période" value={`${props.selectedPreview.weekStartIso.slice(5, 10)} / ${props.selectedPreview.weekEndIso.slice(5, 10)}`} />
       </section>
 
@@ -528,15 +560,20 @@ function PayrollPage(props: {
           const isExcluded = props.excludedIds.includes(member.memberId);
           const isReported = props.reportedIds.includes(member.memberId);
           const status = isPaid ? 'Payé' : isExcluded ? 'Exclu' : isReported ? 'Reporté' : member.eligible ? 'À payer' : 'Exclu';
+          const lastPayment = lastPayments.get(member.memberId);
           return (
             <article key={member.memberId} className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]">
               <div className="grid gap-3 xl:grid-cols-[1.2fr_140px_repeat(5,minmax(0,1fr))_300px] xl:items-center">
-                <div><p className="text-base font-semibold text-[#fff1dd]">{member.memberLabel}</p><p>{member.reason}</p></div>
+                <div>
+                  <p className="text-base font-semibold text-[#fff1dd]">{member.memberLabel}</p>
+                  <p>{member.reason}</p>
+                  <p className="mt-1 inline-flex items-center gap-1 text-[#f3d0aa]"><SmallIcon name="payroll" className="h-3.5 w-3.5" />Dernière paye : {lastPayment ? `${new Date(lastPayment.created_at).toLocaleDateString('fr-FR')} — ${formatUsd(lastPayment.amount)}` : 'aucune'}</p>
+                </div>
                 <StatusBadge status={status} />
-                <Mini label="Argent" value={formatUsd(member.moneyContribution)} />
-                <Mini label="Actions" value={String(member.activityCount)} />
+                <Mini label="Argent" value={formatUsd(member.moneyContribution)} icon="money" />
+                <Mini label="Actions" value={String(member.activityCount)} icon="actions" />
                 <Mini label="Implication" value={String(member.participationCount)} />
-                <Mini label="Score" value={member.totalScore.toFixed(2)} />
+                <Mini label="Score" value={member.totalScore.toFixed(2)} icon="score" />
                 <Mini label="Paye proposée" value={formatUsd(member.proposedPay)} />
                 <div className="flex flex-wrap justify-end gap-2">
                   {props.canPay ? <button className="saas-primary-btn !h-9 px-3" disabled={isPaid || isExcluded || isReported || !member.eligible || member.proposedPay <= 0} onClick={() => void props.payrollAction('pay', member)}>Payer</button> : null}
@@ -588,20 +625,20 @@ function ExpensesPage(props: {
   return (
     <div className="space-y-4">
       <section className="grid gap-2 md:grid-cols-4">
-        <Metric label="Total en attente" value={formatUsd(totals.pending)} />
-        <Metric label="Total remboursé" value={formatUsd(totals.reimbursed)} />
-        <Metric label="Argent groupe" value={formatUsd(props.groupCash)} />
-        <Metric label="Dépenses" value={String(allRows.length)} />
+        <Metric label="Total en attente" value={formatUsd(totals.pending)} icon="pending" />
+        <Metric label="Total remboursé" value={formatUsd(totals.reimbursed)} icon="paid" />
+        <Metric label="Argent groupe" value={formatUsd(props.groupCash)} icon="money" />
+        <Metric label="Dépenses" value={String(allRows.length)} icon="expense" />
       </section>
 
       {props.canCreate ? (
         <section className="glass-card p-4">
           <h3 className="text-sm font-semibold text-[#fff1dd]">Nouvelle dépense</h3>
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <Field label="Membre"><select className="saas-input" value={form.memberId} onChange={(event) => setForm((cur) => ({ ...cur, memberId: event.target.value }))}>{props.members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select></Field>
-            <Field label="Catégorie"><select className="saas-input" value={form.category} onChange={(event) => setForm((cur) => ({ ...cur, category: event.target.value }))}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>
+            <Field label="Membre" icon="member"><select className="saas-input" value={form.memberId} onChange={(event) => setForm((cur) => ({ ...cur, memberId: event.target.value }))}>{props.members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select></Field>
+            <Field label="Catégorie" icon="category"><select className="saas-input" value={form.category} onChange={(event) => setForm((cur) => ({ ...cur, category: event.target.value }))}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>
             <Field label="Libellé"><input className="saas-input" value={form.label} onChange={(event) => setForm((cur) => ({ ...cur, label: event.target.value }))} /></Field>
-            <Field label="Montant"><input className="saas-input" value={form.amount} onChange={(event) => setForm((cur) => ({ ...cur, amount: event.target.value }))} inputMode="decimal" /></Field>
+            <Field label="Montant" icon="amount"><input className="saas-input" value={form.amount} onChange={(event) => setForm((cur) => ({ ...cur, amount: event.target.value }))} inputMode="decimal" /></Field>
             <Field label="Preuve optionnelle"><input className="saas-input" value={form.proofUrl} onChange={(event) => setForm((cur) => ({ ...cur, proofUrl: event.target.value }))} /></Field>
             <Field label="Note optionnelle"><input className="saas-input" value={form.note} onChange={(event) => setForm((cur) => ({ ...cur, note: event.target.value }))} /></Field>
           </div>
@@ -610,18 +647,18 @@ function ExpensesPage(props: {
       ) : null}
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <ExpenseList title="Dépenses en attente" rows={props.pending} empty="Aucune dépense en attente." actions={(row) => (
+        <ExpenseList title="Dépenses en attente" icon="pending" rows={props.pending} empty="Aucune dépense en attente." actions={(row) => (
           <>
             {props.canReimburse ? <button className="saas-primary-btn !h-9 px-3 text-xs" onClick={() => void props.onReimburse(row)}>Rembourser</button> : null}
             {props.canCancel ? <button className="saas-ghost-btn !h-9 px-3 text-xs" onClick={() => void props.onCancel(row)}>Annuler</button> : null}
           </>
         )} />
-        <ExpenseList title="Dépenses remboursées" rows={props.reimbursed} empty="Aucune dépense remboursée." />
+        <ExpenseList title="Dépenses remboursées" icon="paid" rows={props.reimbursed} empty="Aucune dépense remboursée." />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <StatsBlock title="Dépenses par membre" rows={byMember} />
-        <StatsBlock title="Dépenses par catégorie" rows={byCategory} />
+        <StatsBlock title="Dépenses par membre" icon="member" rows={byMember} />
+        <StatsBlock title="Dépenses par catégorie" icon="category" rows={byCategory} />
       </section>
 
       {props.canLogs ? <LogList title="Logs récents" rows={props.logs.filter((row) => row.action.includes('expense')).slice(0, 60)} /> : null}
@@ -654,16 +691,75 @@ function groupExpenses(rows: Expense[], key: (row: Expense) => string) {
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
+type IconName = 'activity' | 'payroll' | 'expense' | 'tablet' | 'cigarette' | 'processor' | 'drugs' | 'robbery' | 'four' | 'sale' | 'cargo' | 'gofast' | 'money' | 'actions' | 'score' | 'pending' | 'paid' | 'reported' | 'excluded' | 'category' | 'member' | 'amount' | 'jobs';
+
+function SmallIcon({ name, className = 'h-4 w-4' }: { name: IconName; className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {iconShape(name)}
+    </svg>
+  );
+}
+
+function iconShape(name: IconName) {
+  switch (name) {
+    case 'activity': return <><path d="M4 12h4l2-5 4 10 2-5h4" /><path d="M4 19h16" /></>;
+    case 'payroll': return <><path d="M4 7h16v10H4z" /><path d="M8 11h.01" /><path d="M16 13h.01" /><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /></>;
+    case 'expense': return <><path d="M7 3h10v18l-2-1-2 1-2-1-2 1-2-1z" /><path d="M9 8h6" /><path d="M9 12h6" /><path d="M9 16h3" /></>;
+    case 'tablet': return <><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M11 17h2" /></>;
+    case 'cigarette': return <><path d="M4 15h10" /><path d="M16 15h4" /><path d="M8 11c1-1 1-2 0-3" /><path d="M12 11c1-1 1-2 0-3" /></>;
+    case 'processor': return <><circle cx="12" cy="12" r="3" /><path d="M12 3v3" /><path d="M12 18v3" /><path d="M3 12h3" /><path d="M18 12h3" /><path d="m5.6 5.6 2.1 2.1" /><path d="m16.3 16.3 2.1 2.1" /><path d="m18.4 5.6-2.1 2.1" /><path d="m7.7 16.3-2.1 2.1" /></>;
+    case 'drugs': return <><path d="M10 3v5l-5 9a3 3 0 0 0 2.6 4.5h8.8A3 3 0 0 0 19 17l-5-9V3" /><path d="M8 3h8" /><path d="M8 15h8" /></>;
+    case 'robbery': return <><path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6z" /><path d="M9 12h6" /></>;
+    case 'four': return <><path d="M12 21c4-2 6-5 6-8 0-3-2-5-4-7 0 3-2 4-2 4s-2-2-1-6c-3 2-5 5-5 9 0 3 2 6 6 8z" /></>;
+    case 'sale': return <><path d="M20 12 12 20 4 12V4h8z" /><path d="M8 8h.01" /></>;
+    case 'cargo': return <><path d="M3 7h11v9H3z" /><path d="M14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.5" /><circle cx="17" cy="18" r="1.5" /></>;
+    case 'gofast': return <><path d="M5 16h14l-2-5H7z" /><path d="M7 11l2-3h6l2 3" /><circle cx="8" cy="18" r="1.5" /><circle cx="16" cy="18" r="1.5" /></>;
+    case 'money': return <><path d="M4 7h16v10H4z" /><path d="M8 12h.01" /><path d="M16 12h.01" /><circle cx="12" cy="12" r="2.5" /></>;
+    case 'actions': return <><path d="M8 6h12" /><path d="M8 12h12" /><path d="M8 18h12" /><path d="M4 6h.01" /><path d="M4 12h.01" /><path d="M4 18h.01" /></>;
+    case 'score': return <><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6-5.4-2.9-5.4 2.9 1-6-4.4-4.3 6.1-.9z" /></>;
+    case 'pending': return <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></>;
+    case 'paid': return <><circle cx="12" cy="12" r="8" /><path d="m8.5 12.5 2.2 2.2 4.8-5" /></>;
+    case 'reported': return <><path d="M9 5v14" /><path d="M15 5v14" /></>;
+    case 'excluded': return <><circle cx="12" cy="12" r="8" /><path d="m8 8 8 8" /></>;
+    case 'category': return <><path d="M20 12 12 20 4 12V4h8z" /><path d="M8 8h.01" /></>;
+    case 'member': return <><circle cx="12" cy="8" r="3" /><path d="M5 20a7 7 0 0 1 14 0" /></>;
+    case 'amount': return <><path d="M12 3v18" /><path d="M17 7.5A4 4 0 0 0 12 6c-3 0-5 1.2-5 3s2 2.7 5 3 5 1.2 5 3-2 3-5 3a5 5 0 0 1-5-2" /></>;
+    case 'jobs': return <><path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" /><path d="M4 7h16v12H4z" /><path d="M9 12h6" /></>;
+  }
+}
+
+function moduleIcon(module: string): IconName {
+  if (module === 'Jobs') return 'jobs';
+  if (module === 'Jobs Tablette') return 'tablet';
+  if (module === 'Jobs Cigarette') return 'cigarette';
+  if (module === 'Jobs Processeur' || module === 'Processeur') return 'processor';
+  if (module === 'Drogues') return 'drugs';
+  if (module === 'Braquage') return 'robbery';
+  if (module === 'FOUR') return 'four';
+  if (module === 'Vente objets') return 'sale';
+  if (module === 'Cargo') return 'cargo';
+  if (module === 'GoFast') return 'gofast';
+  return 'activity';
+}
+
+function statusIcon(status: string): IconName {
+  if (status === 'Payé') return 'paid';
+  if (status === 'À payer') return 'pending';
+  if (status === 'Reporté') return 'reported';
+  return 'excluded';
+}
+
 function PageButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return <button type="button" className={`filter-pill ${active ? 'filter-pill-active' : ''}`} onClick={onClick}>{children}</button>;
+  return <button type="button" className={`filter-pill inline-flex items-center gap-2 ${active ? 'filter-pill-active' : ''}`} onClick={onClick}>{children}</button>;
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3"><p className="text-xs text-[#efcdab]">{label}</p><p className="mt-1 text-lg font-semibold text-[#ffe8ca]">{value}</p></article>;
+function Metric({ label, value, icon }: { label: string; value: string; icon?: IconName }) {
+  return <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3">{icon ? <p className="inline-flex items-center gap-2 text-xs text-[#efcdab]"><SmallIcon name={icon} className="h-4 w-4" />{label}</p> : <p className="text-xs text-[#efcdab]">{label}</p>}<p className="mt-1 text-lg font-semibold text-[#ffe8ca]">{value}</p></article>;
 }
 
-function Mini({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-[11px] text-[#efcdab]">{label}</p><p className="font-semibold text-[#ffe8ca]">{value}</p></div>;
+function Mini({ label, value, icon }: { label: string; value: string; icon?: IconName }) {
+  return <div>{icon ? <p className="mb-1 inline-flex items-center gap-1 text-[11px] text-[#efcdab]"><SmallIcon name={icon} className="h-3.5 w-3.5" />{label}</p> : <p className="text-[11px] text-[#efcdab]">{label}</p>}<p className="font-semibold text-[#ffe8ca]">{value}</p></div>;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -674,7 +770,7 @@ function StatusBadge({ status }: { status: string }) {
       : status === 'Reporté'
         ? 'border-sky-300/35 bg-sky-500/15 text-sky-100'
         : 'border-red-300/30 bg-red-500/10 text-red-100';
-  return <div className={`inline-flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-semibold ${style}`}>{status}</div>;
+  return <div className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold ${style}`}><SmallIcon name={statusIcon(status)} />{status}</div>;
 }
 
 function Compare({ title, preview, paid, remaining }: { title: string; preview: PayrollPreview; paid: number; remaining: number }) {
@@ -689,18 +785,19 @@ function LogList({ title, rows }: { title: string; rows: LogRow[] }) {
   return <section className="glass-card p-4"><h3 className="text-sm font-semibold text-[#fff1dd]">{title}</h3><div className="mt-2 max-h-[360px] space-y-2 overflow-auto pr-1">{rows.map((row) => <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]"><div className="flex flex-wrap justify-between gap-2"><b className="text-[#ffe8ca]">{row.action}</b><span>{new Date(row.created_at).toLocaleString('fr-FR')}</span></div><p>{row.summary}</p><p>Utilisateur: {row.actor_name || '-'}</p></article>)}{rows.length === 0 ? <p className="text-sm text-[#efcdab]">Aucun log.</p> : null}</div></section>;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block text-xs text-[#efcdab]"><span className="mb-1 block">{label}</span>{children}</label>;
+function Field({ label, children, icon }: { label: string; children: ReactNode; icon?: IconName }) {
+  return <label className="block text-xs text-[#efcdab]"><span className="mb-1 inline-flex items-center gap-1">{icon ? <SmallIcon name={icon} className="h-3.5 w-3.5" /> : null}{label}</span>{children}</label>;
 }
 
-function ExpenseList({ title, rows, empty, actions }: { title: string; rows: Expense[]; empty: string; actions?: (row: Expense) => ReactNode }) {
-  return <section className="glass-card p-4"><h3 className="text-sm font-semibold text-[#fff1dd]">{title}</h3><div className="mt-2 space-y-2">{rows.map((row) => <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]"><div className="flex flex-wrap items-start justify-between gap-3"><CompactExpense row={row} />{actions ? <div className="flex flex-wrap gap-2">{actions(row)}</div> : null}</div></article>)}{rows.length === 0 ? <p className="text-sm text-[#efcdab]">{empty}</p> : null}</div></section>;
+function ExpenseList({ title, icon, rows, empty, actions }: { title: string; icon?: IconName; rows: Expense[]; empty: string; actions?: (row: Expense) => ReactNode }) {
+  return <section className="glass-card p-4"><h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]">{icon ? <SmallIcon name={icon} /> : null}{title}</h3><div className="mt-2 space-y-2">{rows.map((row) => <article key={row.id} className="rounded-lg border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]"><div className="flex flex-wrap items-start justify-between gap-3"><CompactExpense row={row} />{actions ? <div className="flex flex-wrap gap-2">{actions(row)}</div> : null}</div></article>)}{rows.length === 0 ? <p className="text-sm text-[#efcdab]">{empty}</p> : null}</div></section>;
 }
 
 function CompactExpense({ row }: { row: Expense }) {
-  return <div className="min-w-0 flex-1"><div className="flex flex-wrap gap-2"><span className="rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-1">{row.category}</span><span className="rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-1">{row.status === 'pending' ? 'En attente' : row.status === 'reimbursed' ? 'Remboursée' : 'Annulée'}</span></div><p className="mt-2 text-sm font-semibold text-[#ffe8ca]">{row.member_name} - {row.label}</p><p className="text-base font-semibold text-[#fff1dd]">{formatUsd(row.amount)}</p><p>Créée le {new Date(row.created_at).toLocaleString('fr-FR')}{row.reimbursed_at ? ` · Remboursée le ${new Date(row.reimbursed_at).toLocaleString('fr-FR')}` : ''}</p>{row.reimbursed_by_name ? <p>Remboursé par {row.reimbursed_by_name}</p> : null}{row.money_before != null && row.money_after != null ? <p>Argent groupe: {formatUsd(row.money_before)} vers {formatUsd(row.money_after)}</p> : null}{row.note ? <p className="mt-1 text-[#d9b48f]">{row.note}</p> : null}{row.proof_url ? <a className="mt-1 inline-block underline" href={row.proof_url} target="_blank" rel="noreferrer">Voir preuve</a> : null}</div>;
+  const statusLabel = row.status === 'pending' ? 'En attente' : row.status === 'reimbursed' ? 'Remboursée' : 'Annulée';
+  return <div className="min-w-0 flex-1"><div className="flex flex-wrap gap-2"><span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-1"><SmallIcon name="category" className="h-3.5 w-3.5" />{row.category}</span><span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-1"><SmallIcon name={row.status === 'pending' ? 'pending' : row.status === 'reimbursed' ? 'paid' : 'excluded'} className="h-3.5 w-3.5" />{statusLabel}</span></div><p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[#ffe8ca]"><SmallIcon name="member" className="h-4 w-4" />{row.member_name} - {row.label}</p><p className="inline-flex items-center gap-2 text-base font-semibold text-[#fff1dd]"><SmallIcon name="amount" className="h-4 w-4" />{formatUsd(row.amount)}</p><p>Créée le {new Date(row.created_at).toLocaleString('fr-FR')}{row.reimbursed_at ? ` · Remboursée le ${new Date(row.reimbursed_at).toLocaleString('fr-FR')}` : ''}</p>{row.reimbursed_by_name ? <p>Remboursé par {row.reimbursed_by_name}</p> : null}{row.money_before != null && row.money_after != null ? <p>Argent groupe: {formatUsd(row.money_before)} vers {formatUsd(row.money_after)}</p> : null}{row.note ? <p className="mt-1 text-[#d9b48f]">{row.note}</p> : null}{row.proof_url ? <a className="mt-1 inline-block underline" href={row.proof_url} target="_blank" rel="noreferrer">Voir preuve</a> : null}</div>;
 }
 
-function StatsBlock({ title, rows }: { title: string; rows: Array<{ label: string; count: number; pending: number; reimbursed: number; total: number }> }) {
-  return <article className="glass-card p-4"><h3 className="text-sm font-semibold text-[#fff1dd]">{title}</h3><div className="mt-2 space-y-2">{rows.map((row) => <div key={row.label} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]"><div className="flex justify-between gap-2"><b className="text-[#ffe8ca]">{row.label}</b><span>{row.count}</span></div><p>En attente {formatUsd(row.pending)} · Remboursé {formatUsd(row.reimbursed)}</p></div>)}{rows.length === 0 ? <p className="text-sm text-[#efcdab]">Aucune donnée.</p> : null}</div></article>;
+function StatsBlock({ title, icon, rows }: { title: string; icon?: IconName; rows: Array<{ label: string; count: number; pending: number; reimbursed: number; total: number }> }) {
+  return <article className="glass-card p-4"><h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[#fff1dd]">{icon ? <SmallIcon name={icon} /> : null}{title}</h3><div className="mt-2 space-y-2">{rows.map((row) => <div key={row.label} className="rounded-lg border border-white/10 bg-[#3f281b]/55 px-3 py-2 text-xs text-[#efcdab]"><div className="flex justify-between gap-2"><b className="text-[#ffe8ca]">{row.label}</b><span>{row.count}</span></div><p>En attente {formatUsd(row.pending)} · Remboursé {formatUsd(row.reimbursed)}</p></div>)}{rows.length === 0 ? <p className="text-sm text-[#efcdab]">Aucune donnée.</p> : null}</div></article>;
 }

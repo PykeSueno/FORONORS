@@ -49,7 +49,7 @@ const ACTIVITY_META: Record<ActivityDisplayType, { label: string; icon: string; 
   mailbox: { label: 'Boîte aux lettres', icon: '📬', subtitle: 'Aucun équipement requis' },
   burglary: { label: 'Cambriolage', icon: '🏠', subtitle: 'Consomme des Kits' },
   container: { label: 'Conteneur', icon: '📦', subtitle: 'Consomme des Disqueuses' },
-  cargo: { label: 'Cargo', icon: 'CRG', subtitle: 'Perceuse Laser requise, non consommee' },
+  cargo: { label: 'Cargo', icon: '🚚', subtitle: 'Perceuse Laser requise, non consommee' },
   drug_sale: { label: 'Vente drogue', icon: '🧪', subtitle: 'Session de vente validée' }
 };
 
