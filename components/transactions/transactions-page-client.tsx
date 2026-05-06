@@ -236,9 +236,10 @@ export function TransactionsPageClient({
                       <CompactField label="Quantité">
                         <QuantityStepper
                           value={line.quantity}
-                          onDecrease={() => updateLine(idx, { quantity: Math.max(1, line.quantity - 1) })}
+                          min={0}
+                          onDecrease={() => updateLine(idx, { quantity: Math.max(0, line.quantity - 1) })}
                           onIncrease={() => updateLine(idx, { quantity: line.quantity + 1 })}
-                          onChange={(next) => updateLine(idx, { quantity: Math.max(1, Number(next || 1)) })}
+                          onChange={(next) => updateLine(idx, { quantity: Math.max(0, Number(next || 0)) })}
                         />
                       </CompactField>
 
@@ -248,15 +249,23 @@ export function TransactionsPageClient({
 
                       <CompactField label="Total ligne">
                         <div className="space-y-1">
+                          {isManualTotal ? <p className="text-[10px] leading-none text-[#ffe8ca]">Total modifié</p> : null}
+                          <div className="flex h-9 items-center gap-1">
                           <input
-                            className="saas-input !h-9 !min-h-9 w-full text-sm"
+                            className="saas-input !h-9 !min-h-9 min-w-0 flex-1 text-sm"
                             value={String(lineTotal)}
                             onChange={(e) => updateLine(idx, { manual_total: Math.max(0, Number(e.target.value || 0)) })}
                             inputMode="decimal"
                           />
-                          <div className="flex items-center justify-between gap-2">
-                            {isManualTotal ? <span className="rounded-full border border-amber-200/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-[#ffe8ca]">Total modifié</span> : <span className="text-[10px] text-[#efcdab]">Auto {formatUsd(autoTotal)}</span>}
-                            <button type="button" className="text-[10px] font-semibold text-[#ffe8ca] underline-offset-2 hover:underline" onClick={() => updateLine(idx, { manual_total: null })}>Recalculer</button>
+                            {isManualTotal ? (
+                              <button
+                                type="button"
+                                className="h-9 shrink-0 rounded-lg border border-amber-200/30 bg-[#2f1d14]/70 px-2 text-[10px] font-semibold text-[#ffe8ca] hover:bg-[#563622]"
+                                onClick={() => updateLine(idx, { manual_total: null })}
+                              >
+                                Recalculer
+                              </button>
+                            ) : null}
                           </div>
                         </div>
                       </CompactField>

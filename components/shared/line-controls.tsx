@@ -1,12 +1,13 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 
 type QuantityStepperProps = {
   value: number;
   onDecrease: () => void;
   onIncrease: () => void;
   onChange: (next: number) => void;
+  min?: number;
 };
 
 export function RemoveLineButton({ onClick, title = 'Supprimer la ligne' }: { onClick: () => void; title?: string }) {
@@ -28,14 +29,33 @@ export function RemoveLineButton({ onClick, title = 'Supprimer la ligne' }: { on
   );
 }
 
-export function QuantityStepper({ value, onDecrease, onIncrease, onChange }: QuantityStepperProps) {
+export function QuantityStepper({ value, onDecrease, onIncrease, onChange, min = 1 }: QuantityStepperProps) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  function commit(raw: string) {
+    const parsed = Number(raw);
+    const next = Number.isFinite(parsed) ? Math.max(min, parsed) : min;
+    setDraft(String(next));
+    onChange(next);
+  }
+
   return (
     <div className="grid h-9 grid-cols-[1.75rem_5.25rem_1.75rem] items-center gap-1 overflow-hidden">
       <button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-0 !py-0" onClick={onDecrease}>−</button>
       <input
         className="saas-input !h-9 !min-h-9 w-[5.25rem] px-1 text-center text-sm"
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value || 0))}
+        value={draft}
+        inputMode="numeric"
+        onBlur={(event) => commit(event.target.value)}
+        onChange={(event) => {
+          const next = event.target.value;
+          setDraft(next);
+          if (next.trim() !== '') commit(next);
+        }}
       />
       <button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-0 !py-0" onClick={onIncrease}>+</button>
     </div>
@@ -45,7 +65,7 @@ export function QuantityStepper({ value, onDecrease, onIncrease, onChange }: Qua
 export function CompactLineGrid({ type, children }: { type: 'transaction' | 'four' | 'sale'; children: ReactNode }) {
   const config = type === 'transaction'
     ? {
-      cols: 'grid-cols-[8.75rem_10.5rem_6.875rem_8.75rem_1.75rem]',
+      cols: 'grid-cols-[8.75rem_10.5rem_6.875rem_7.5rem_1.75rem]',
       gap: 'gap-x-1.5',
     }
     : type === 'four'

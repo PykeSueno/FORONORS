@@ -728,7 +728,7 @@ function PayrollMemberCard({ member, status, period, payment, lastPayment, calcu
 
   return (
     <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]">
-      <div className="grid gap-3 xl:grid-cols-[1.2fr_150px_190px_repeat(4,minmax(0,1fr))_270px] xl:items-center">
+      <div className="grid gap-3 xl:grid-cols-[1.2fr_150px_150px_repeat(4,minmax(0,1fr))_270px] xl:items-center">
         <div>
           <p className="text-base font-semibold text-[#fff1dd]">{member.memberLabel}</p>
           <p>Période : {period}</p>
@@ -765,9 +765,9 @@ function PayrollMemberCard({ member, status, period, payment, lastPayment, calcu
 
 function PayAmountBadge({ amount, paid }: { amount: number; paid: boolean }) {
   return (
-    <div className="rounded-xl border border-amber-200/35 bg-[#f3d6ae]/15 px-4 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.18)]">
-      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#f6d6b3]">{paid ? 'Payé' : 'Paye'}</p>
-      <p className="mt-1 text-2xl font-black leading-none text-[#fff1dd]">{formatUsd(amount)}</p>
+    <div className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-amber-200/35 bg-[#f3d6ae]/15 px-3 shadow-[0_8px_20px_rgba(0,0,0,0.14)]">
+      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#f6d6b3]">{paid ? 'Payé' : 'Paye'}</span>
+      <span className="text-base font-black leading-none text-[#fff1dd]">{formatUsd(amount)}</span>
     </div>
   );
 }
