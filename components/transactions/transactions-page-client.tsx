@@ -21,7 +21,7 @@ type Item = {
 
 type Member = { id: string; name: string; username: string };
 type MovementType = 'purchase' | 'sale' | 'stock_in' | 'stock_out';
-type Line = { item_id: number; movement_type: MovementType; quantity: number; unit_price: number };
+type Line = { item_id: number; movement_type: MovementType; quantity: number; unit_price: number; manual_total: number | null };
 
 const MOVEMENT_META: Record<MovementType, { label: string; icon: string; tone: string }> = {
   purchase: { label: 'Achat', icon: '🛒', tone: 'text-[#f3b0b0]' },
@@ -72,7 +72,7 @@ export function TransactionsPageClient({
     let stockOut = 0;
 
     for (const line of lines) {
-      const total = line.quantity * line.unit_price;
+      const total = line.manual_total ?? line.quantity * line.unit_price;
       const item = items.find((entry) => entry.id === line.item_id);
       const isMoneyItem = Boolean(item?.is_money_item);
 
@@ -100,7 +100,7 @@ export function TransactionsPageClient({
 
   function addItem(item: Item) {
     const defaultPrice = defaultMovementType === 'purchase' ? Number(item.buy_price || 0) : Number(item.sell_price || 0);
-    setLines((current) => [...current, { item_id: item.id, movement_type: defaultMovementType, quantity: 1, unit_price: defaultPrice }]);
+    setLines((current) => [...current, { item_id: item.id, movement_type: defaultMovementType, quantity: 1, unit_price: defaultPrice, manual_total: null }]);
   }
 
   function updateLine(index: number, patch: Partial<Line>) {
@@ -204,7 +204,9 @@ export function TransactionsPageClient({
                 const item = items.find((entry) => entry.id === line.item_id);
                 if (!item) return null;
                 const meta = MOVEMENT_META[line.movement_type];
-                const lineTotal = line.quantity * line.unit_price;
+                const autoTotal = line.quantity * line.unit_price;
+                const lineTotal = line.manual_total ?? autoTotal;
+                const isManualTotal = line.manual_total !== null;
 
                 return (
                   <article key={`${line.item_id}-${idx}`} className="rounded-xl border border-white/10 bg-[#4e311f]/60 p-3">
@@ -245,7 +247,18 @@ export function TransactionsPageClient({
                       </CompactField>
 
                       <CompactField label="Total ligne">
-                        <p className="saas-input !h-9 !min-h-9 flex items-center px-2 text-sm">{formatUsd(lineTotal)}</p>
+                        <div className="space-y-1">
+                          <input
+                            className="saas-input !h-9 !min-h-9 w-full text-sm"
+                            value={String(lineTotal)}
+                            onChange={(e) => updateLine(idx, { manual_total: Math.max(0, Number(e.target.value || 0)) })}
+                            inputMode="decimal"
+                          />
+                          <div className="flex items-center justify-between gap-2">
+                            {isManualTotal ? <span className="rounded-full border border-amber-200/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-[#ffe8ca]">Total modifié</span> : <span className="text-[10px] text-[#efcdab]">Auto {formatUsd(autoTotal)}</span>}
+                            <button type="button" className="text-[10px] font-semibold text-[#ffe8ca] underline-offset-2 hover:underline" onClick={() => updateLine(idx, { manual_total: null })}>Recalculer</button>
+                          </div>
+                        </div>
                       </CompactField>
 
                       <CompactActionField>

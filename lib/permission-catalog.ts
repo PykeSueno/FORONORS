@@ -16,6 +16,7 @@ const EXACT: Record<string, PermissionInfo> = {
   'member_ops.payroll.logs': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Logs', label: 'Voir logs payes', hint: 'Affiche les logs de payes.' },
   'member_ops.expenses.view': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Vue', label: 'Voir Dépenses', hint: 'Affiche la page Dépenses.' },
   'member_ops.expenses.create': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Creation', label: 'Créer une dépense', hint: 'Permet de créer une dépense en attente.' },
+  'member_ops.expenses.edit': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Modification / Annulation', label: 'Modifier une dépense', hint: 'Permet de modifier une dépense en attente.' },
   'member_ops.expenses.reimburse': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Creation', label: 'Rembourser une dépense', hint: 'Permet de rembourser une dépense.' },
   'member_ops.expenses.cancel': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Modification / Annulation', label: 'Annuler une dépense', hint: 'Permet d annuler une dépense en attente.' },
   'member_ops.expenses.logs': { module: 'ACTIVITÉS & PAYES & DÉPENSES', section: 'Logs', label: 'Voir logs dépenses', hint: 'Affiche les logs de dépenses.' },
@@ -35,6 +36,7 @@ const EXACT: Record<string, PermissionInfo> = {
 
   'expenses.view': { module: 'Dépenses', section: 'Vue', label: 'Voir le module', hint: 'Permet d afficher la bulle et d ouvrir Dépenses.' },
   'expenses.create': { module: 'Dépenses', section: 'Creation', label: 'Ajouter une dépense', hint: 'Permet de créer une dépense en attente pour un membre.' },
+  'expenses.edit': { module: 'Dépenses', section: 'Modification / Annulation', label: 'Modifier une dépense', hint: 'Permet de modifier une dépense en attente.' },
   'expenses.reimburse': { module: 'Dépenses', section: 'Creation', label: 'Rembourser une dépense', hint: 'Permet de sortir l argent du groupe et passer une dépense en remboursée.' },
   'expenses.history.view': { module: 'Dépenses', section: 'Historique', label: 'Voir remboursées', hint: 'Permet de consulter les dépenses remboursées.' },
   'expenses.stats.view': { module: 'Dépenses', section: 'Stats', label: 'Voir stats', hint: 'Permet de consulter les statistiques Dépenses.' },

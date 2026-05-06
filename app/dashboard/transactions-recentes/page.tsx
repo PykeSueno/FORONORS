@@ -21,6 +21,7 @@ type RecentTransaction = {
     movement_type: 'purchase' | 'sale' | 'stock_in' | 'stock_out';
     item_id?: number;
     unit_price?: number;
+    total_amount?: number;
     items: { image_url: string | null; category_key?: string | null; type_key?: string | null } | Array<{ image_url: string | null; category_key?: string | null; type_key?: string | null }> | null;
   }>;
 };
@@ -37,7 +38,7 @@ export default async function RecentTransactionsPage() {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from('transactions')
-    .select('id, actor_user_id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, item_id, unit_price, items(image_url, category_key, type_key))')
+    .select('id, actor_user_id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, item_id, unit_price, total_amount, items(image_url, category_key, type_key))')
     .order('created_at', { ascending: false })
     .limit(200);
   const transactions = (data ?? []) as RecentTransaction[];

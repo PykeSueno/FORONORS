@@ -9,7 +9,7 @@ async function canAny(userId: string, permissions: string[]) {
   return results.some(Boolean);
 }
 
-const CATEGORIES = ['Garage', 'Essence', 'Amende', 'Achat', 'Autres'];
+const CATEGORIES = ['Garage', 'Essence', 'Amende', 'Achat', 'Opération', 'Nourriture', 'Soins', 'Autres'];
 
 type Body = {
   member_id?: string;

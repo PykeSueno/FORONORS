@@ -30,10 +30,10 @@ export function RemoveLineButton({ onClick, title = 'Supprimer la ligne' }: { on
 
 export function QuantityStepper({ value, onDecrease, onIncrease, onChange }: QuantityStepperProps) {
   return (
-    <div className="grid h-9 grid-cols-[1.75rem_3rem_1.75rem] items-center gap-1 overflow-hidden">
+    <div className="grid h-9 grid-cols-[1.75rem_5.25rem_1.75rem] items-center gap-1 overflow-hidden">
       <button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-0 !py-0" onClick={onDecrease}>−</button>
       <input
-        className="saas-input !h-9 !min-h-9 w-12 px-1 text-center text-sm"
+        className="saas-input !h-9 !min-h-9 w-[5.25rem] px-1 text-center text-sm"
         value={value}
         onChange={(event) => onChange(Number(event.target.value || 0))}
       />
@@ -45,7 +45,7 @@ export function QuantityStepper({ value, onDecrease, onIncrease, onChange }: Qua
 export function CompactLineGrid({ type, children }: { type: 'transaction' | 'four' | 'sale'; children: ReactNode }) {
   const config = type === 'transaction'
     ? {
-      cols: 'grid-cols-[8.75rem_8.25rem_6.875rem_6.875rem_1.75rem]',
+      cols: 'grid-cols-[8.75rem_10.5rem_6.875rem_8.75rem_1.75rem]',
       gap: 'gap-x-1.5',
     }
     : type === 'four'

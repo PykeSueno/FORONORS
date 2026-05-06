@@ -25,7 +25,7 @@ type Expense = {
 type LogRow = { id: number; action: string; summary: string; actor_name: string | null; old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null; created_at: string };
 type Tab = 'new' | 'pending' | 'reimbursed' | 'stats' | 'logs';
 
-const CATEGORIES = ['Achat stock', 'Matériel', 'Véhicule', 'Braquage', 'Drogue', 'Jobs', 'Autre'];
+const CATEGORIES = ['Garage', 'Essence', 'Amende', 'Achat', 'Opération', 'Nourriture', 'Soins', 'Autres'];
 
 export function ExpensesPageClient({
   members,
@@ -62,7 +62,7 @@ export function ExpensesPageClient({
   const [memberId, setMemberId] = useState(members[0]?.id ?? '');
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Achat stock');
+  const [category, setCategory] = useState('Garage');
   const [note, setNote] = useState('');
   const [proofUrl, setProofUrl] = useState('');
   const [error, setError] = useState('');

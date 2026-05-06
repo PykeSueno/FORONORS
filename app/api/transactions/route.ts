@@ -11,6 +11,7 @@ type TxLineInput = {
   movement_type: 'purchase' | 'sale' | 'stock_in' | 'stock_out';
   quantity: number;
   unit_price: number;
+  manual_total?: number | null;
 };
 
 function computeEffects(line: TxLineInput, isMoneyItem: boolean) {
@@ -20,7 +21,9 @@ function computeEffects(line: TxLineInput, isMoneyItem: boolean) {
     return { stockEffect: 0, moneyEffect: money, total };
   }
 
-  const total = Number(line.quantity) * Number(line.unit_price);
+  const computedTotal = Number(line.quantity) * Number(line.unit_price);
+  const manualTotal = line.manual_total === null || line.manual_total === undefined ? NaN : Number(line.manual_total);
+  const total = Number.isFinite(manualTotal) && manualTotal >= 0 ? manualTotal : computedTotal;
 
   if (line.movement_type === 'purchase') return { stockEffect: Number(line.quantity), moneyEffect: -total, total };
   if (line.movement_type === 'sale') return { stockEffect: -Number(line.quantity), moneyEffect: total, total };

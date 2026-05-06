@@ -97,6 +97,7 @@ export default async function ActivityPayrollPage() {
   const canExclude = has('member_ops.payroll.exclude') || has('member_ops.payroll.adjust');
   const canExpenses = has('member_ops.expenses.view');
   const canExpenseCreate = has('member_ops.expenses.create');
+  const canExpenseEdit = has('member_ops.expenses.edit') || has('expenses.edit');
   const canExpenseReimburse = has('member_ops.expenses.reimburse');
   const canExpenseCancel = has('member_ops.expenses.cancel');
   const canHistory = canSummary || has('member_ops.history.view');
@@ -206,6 +207,7 @@ export default async function ActivityPayrollPage() {
         canExclude={canExclude}
         canExpenses={canExpenses}
         canExpenseCreate={canExpenseCreate}
+        canExpenseEdit={canExpenseEdit}
         canExpenseReimburse={canExpenseReimburse}
         canExpenseCancel={canExpenseCancel}
         canHistory={canHistory}

@@ -52,7 +52,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const txId = Number(id);
-  const body = (await request.json()) as { reason?: string; member_label?: string; lines?: Array<{ item_id: number; movement_type: 'purchase' | 'sale' | 'stock_in' | 'stock_out'; quantity: number; unit_price: number }> };
+  const body = (await request.json()) as { reason?: string; member_label?: string; lines?: Array<{ item_id: number; movement_type: 'purchase' | 'sale' | 'stock_in' | 'stock_out'; quantity: number; unit_price: number; manual_total?: number | null }> };
   if (!body.reason?.trim() || !body.lines?.length) return NextResponse.json({ message: 'Motif et lignes requis.' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
@@ -89,7 +89,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const qty = Math.max(1, Number(line.quantity));
     const unitPrice = Math.max(0, Number(line.unit_price));
     const isMoney = Boolean(item.is_money_item);
-    const total = isMoney ? qty : qty * unitPrice;
+    const computedTotal = qty * unitPrice;
+    const manualTotal = line.manual_total === null || line.manual_total === undefined ? NaN : Number(line.manual_total);
+    const total = isMoney ? qty : Number.isFinite(manualTotal) && manualTotal >= 0 ? manualTotal : computedTotal;
 
     let stockEffect = 0;
     let moneyEffect = 0;

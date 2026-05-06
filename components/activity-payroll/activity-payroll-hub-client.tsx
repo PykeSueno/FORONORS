@@ -108,13 +108,14 @@ type Props = {
   canExclude: boolean;
   canExpenses: boolean;
   canExpenseCreate: boolean;
+  canExpenseEdit: boolean;
   canExpenseReimburse: boolean;
   canExpenseCancel: boolean;
   canHistory: boolean;
   canLogs: boolean;
 };
 
-const CATEGORIES = ['Garage', 'Essence', 'Amende', 'Achat', 'Autres'];
+const CATEGORIES = ['Garage', 'Essence', 'Amende', 'Achat', 'Opération', 'Nourriture', 'Soins', 'Autres'];
 const JOB_MODULES = ['Jobs Tablette', 'Jobs Cigarette', 'Jobs Processeur'];
 const MODULE_ORDER = ['Transactions', ...JOB_MODULES, 'Drogues', 'Braquage', 'FOUR', 'Vente objets', 'Activité', 'Cargo', 'GoFast'];
 const MODULE_FILTERS = [
@@ -354,6 +355,35 @@ export function ActivityPayrollHubClient(props: Props) {
     setMessage('Dépense ajoutée en attente. Argent groupe inchangé.');
   }
 
+  async function updateExpense(row: Expense, form: ExpenseFormState, close: () => void) {
+    setError('');
+    setMessage('');
+    const response = await fetch(`/api/expenses/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id: form.memberId, amount: Number(form.amount), category: form.category, note: form.note })
+    });
+    const payload = await response.json().catch(() => ({} as ExpensePayload));
+    if (!response.ok || !payload.expense) {
+      setError(payload.message ?? 'Modification dépense impossible.');
+      return;
+    }
+    setPendingExpenses((rows) => rows.map((entry) => entry.id === row.id ? payload.expense as Expense : entry));
+    setExpenseStatsRows((rows) => rows.map((entry) => entry.id === row.id ? payload.expense as Expense : entry));
+    setLogs((rows) => [{
+      id: Date.now(),
+      action: 'expense_updated',
+      summary: `Dépense modifiée — ${(payload.expense as Expense).member_name} — ${(payload.expense as Expense).category} — ${formatUsd((payload.expense as Expense).amount)}`,
+      actor_name: null,
+      entity_id: String(row.id),
+      old_values: null,
+      new_values: null,
+      created_at: new Date().toISOString()
+    }, ...rows]);
+    close();
+    setMessage('Dépense modifiée. Stats mises à jour.');
+  }
+
   async function reimburseExpense(row: Expense) {
     setError('');
     setMessage('');
@@ -453,10 +483,12 @@ export function ActivityPayrollHubClient(props: Props) {
           statsRows={expenseStatsRows}
           logs={logs}
           canCreate={props.canExpenseCreate}
+          canEdit={props.canExpenseEdit}
           canReimburse={props.canExpenseReimburse}
           canCancel={props.canExpenseCancel}
           canLogs={props.canLogs}
           onCreate={createExpense}
+          onUpdate={updateExpense}
           onReimburse={reimburseExpense}
           onCancel={cancelExpense}
         />
@@ -696,7 +728,7 @@ function PayrollMemberCard({ member, status, period, payment, lastPayment, calcu
 
   return (
     <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-xs text-[#efcdab]">
-      <div className="grid gap-3 xl:grid-cols-[1.25fr_150px_repeat(5,minmax(0,1fr))_270px] xl:items-center">
+      <div className="grid gap-3 xl:grid-cols-[1.2fr_150px_190px_repeat(4,minmax(0,1fr))_270px] xl:items-center">
         <div>
           <p className="text-base font-semibold text-[#fff1dd]">{member.memberLabel}</p>
           <p>Période : {period}</p>
@@ -704,11 +736,11 @@ function PayrollMemberCard({ member, status, period, payment, lastPayment, calcu
           <p className="mt-1 inline-flex items-center gap-1 text-[#f3d0aa]"><SmallIcon name="payroll" className="h-3.5 w-3.5" />Dernière paye : {lastPayment ? `${new Date(lastPayment.created_at).toLocaleDateString('fr-FR')} — ${formatUsd(lastPayment.amount)}` : 'aucune'}</p>
         </div>
         <StatusBadge status={status} />
+        <PayAmountBadge amount={amount} paid={Boolean(payment)} />
         <Mini label="Argent apporté" value={formatUsd(member.moneyContribution)} icon="money" />
         <Mini label="Activités réalisées" value={String(safeNumber(member.activityCount))} icon="actions" />
         <Mini label="Participations utiles" value={String(safeNumber(member.participationCount))} icon="activity" />
         <Mini label="Bonus implication" value={`${implicationBonus.toFixed(0)}%`} icon="score" />
-        <Mini label={payment ? 'Montant payé' : 'Paye proposée'} value={formatUsd(amount)} icon="payroll" />
         <div className="flex flex-wrap justify-end gap-2">
           <button className="saas-ghost-btn !h-9 px-3" onClick={onToggleCalculation}>{calculationOpen ? 'Masquer calcul' : 'Voir calcul'}</button>
           {actions}
@@ -728,6 +760,15 @@ function PayrollMemberCard({ member, status, period, payment, lastPayment, calcu
         </div>
       ) : null}
     </article>
+  );
+}
+
+function PayAmountBadge({ amount, paid }: { amount: number; paid: boolean }) {
+  return (
+    <div className="rounded-xl border border-amber-200/35 bg-[#f3d6ae]/15 px-4 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.18)]">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#f6d6b3]">{paid ? 'Payé' : 'Paye'}</p>
+      <p className="mt-1 text-2xl font-black leading-none text-[#fff1dd]">{formatUsd(amount)}</p>
+    </div>
   );
 }
 
@@ -814,14 +855,17 @@ function ExpensesPage(props: {
   statsRows: Expense[];
   logs: LogRow[];
   canCreate: boolean;
+  canEdit: boolean;
   canReimburse: boolean;
   canCancel: boolean;
   canLogs: boolean;
   onCreate: (form: ExpenseFormState, reset: () => void) => Promise<void>;
+  onUpdate: (row: Expense, form: ExpenseFormState, close: () => void) => Promise<void>;
   onReimburse: (row: Expense) => Promise<void>;
   onCancel: (row: Expense) => Promise<void>;
 }) {
   const [form, setForm] = useState<ExpenseFormState>({ memberId: props.members[0]?.id ?? '', amount: '', category: 'Garage', note: '' });
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const allRows = useMemo(() => {
     const source = props.statsRows.length ? props.statsRows : [...props.pending, ...props.reimbursed];
     return source.filter((row) => row.status === 'pending' || row.status === 'reimbursed');
@@ -859,6 +903,7 @@ function ExpensesPage(props: {
       <section className="grid gap-4 xl:grid-cols-2">
         <ExpenseList title="Dépenses en attente" icon="pending" rows={props.pending} empty="Aucune dépense en attente." actions={(row) => (
           <>
+            {props.canEdit ? <button className="saas-ghost-btn !h-9 px-3 text-xs" onClick={() => setEditingExpense(row)}>Modifier</button> : null}
             {props.canReimburse ? <button className="saas-primary-btn !h-9 px-3 text-xs" onClick={() => void props.onReimburse(row)}>Rembourser</button> : null}
             {props.canCancel ? <button className="saas-ghost-btn !h-9 px-3 text-xs" onClick={() => void props.onCancel(row)}>Annuler</button> : null}
           </>
@@ -872,6 +917,56 @@ function ExpensesPage(props: {
       </section>
 
       {props.canLogs ? <LogList title="Logs récents" rows={props.logs.filter((row) => row.action.includes('expense')).slice(0, 60)} /> : null}
+      {editingExpense ? (
+        <EditExpenseModal
+          expense={editingExpense}
+          members={props.members}
+          onClose={() => setEditingExpense(null)}
+          onSave={(draft) => props.onUpdate(editingExpense, draft, () => setEditingExpense(null))}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function EditExpenseModal({ expense, members, onClose, onSave }: { expense: Expense; members: MemberSummary[]; onClose: () => void; onSave: (form: ExpenseFormState) => Promise<void> }) {
+  const [draft, setDraft] = useState<ExpenseFormState>({
+    memberId: expense.member_id ?? members[0]?.id ?? '',
+    amount: String(expense.amount ?? ''),
+    category: expense.category || 'Autres',
+    note: expense.note ?? ''
+  });
+
+  return (
+    <div className="fixed inset-0 z-[240] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+      <article className="glass-card w-full max-w-2xl p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="inline-flex items-center gap-2 text-base font-semibold text-[#fff1dd]"><SmallIcon name="expense" />Modifier la dépense</h3>
+          <button type="button" className="saas-ghost-btn !h-9 px-3" onClick={onClose}>Fermer</button>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Field label="Membre" icon="member">
+            <select className="saas-input" value={draft.memberId} onChange={(event) => setDraft((cur) => ({ ...cur, memberId: event.target.value }))}>
+              {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
+            </select>
+          </Field>
+          <Field label="Catégorie" icon="category">
+            <select className="saas-input" value={draft.category} onChange={(event) => setDraft((cur) => ({ ...cur, category: event.target.value }))}>
+              {CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}
+            </select>
+          </Field>
+          <Field label="Montant" icon="amount">
+            <input className="saas-input" value={draft.amount} onChange={(event) => setDraft((cur) => ({ ...cur, amount: event.target.value }))} inputMode="decimal" />
+          </Field>
+          <Field label="Note optionnelle">
+            <input className="saas-input" value={draft.note} onChange={(event) => setDraft((cur) => ({ ...cur, note: event.target.value }))} />
+          </Field>
+        </div>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button type="button" className="saas-ghost-btn" onClick={onClose}>Annuler</button>
+          <button type="button" className="saas-primary-btn" disabled={!draft.memberId || Number(draft.amount) <= 0} onClick={() => void onSave(draft)}>Enregistrer</button>
+        </div>
+      </article>
     </div>
   );
 }

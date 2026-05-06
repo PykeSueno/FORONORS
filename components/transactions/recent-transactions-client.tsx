@@ -21,6 +21,7 @@ type RecentTransaction = {
     quantity: number;
     movement_type: 'purchase' | 'sale' | 'stock_in' | 'stock_out';
     unit_price?: number;
+    total_amount?: number;
     items: { image_url: string | null; category_key?: string | null; type_key?: string | null } | Array<{ image_url: string | null; category_key?: string | null; type_key?: string | null }> | null;
   }>;
 };
@@ -176,7 +177,7 @@ export function RecentTransactionsClient({
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-[#ffe8ca]">{line.item_name_snapshot} x{line.quantity}</p>
-                      <p className="text-xs text-[#efd0aa]">{humanStockMovementLabel(line.movement_type)}</p>
+                       <p className="text-xs text-[#efd0aa]">{humanStockMovementLabel(line.movement_type)} · Total {formatUsd(Number(line.total_amount ?? Number(line.quantity) * Number(line.unit_price ?? 0)))}</p>
                     </div>
                   </div>
                 );
@@ -220,7 +221,8 @@ function EditTransactionModal({ transaction, onClose, onError }: { transaction: 
     image_url: Array.isArray(line.items) ? line.items[0]?.image_url ?? null : line.items?.image_url ?? null,
     movement_type: line.movement_type,
     quantity: Number(line.quantity),
-    unit_price: Number(line.unit_price ?? 0)
+    unit_price: Number(line.unit_price ?? 0),
+    manual_total: Number(line.total_amount ?? Number(line.quantity) * Number(line.unit_price ?? 0))
   })));
   const [stockByItemId, setStockByItemId] = useState<Record<number, number>>({});
 
@@ -250,7 +252,7 @@ function EditTransactionModal({ transaction, onClose, onError }: { transaction: 
     const response = await fetch(`/api/transactions/recent/${transaction.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason, member_label: memberLabel, lines: lines.map((line) => ({ item_id: line.item_id, movement_type: line.movement_type, quantity: line.quantity, unit_price: line.unit_price })) })
+      body: JSON.stringify({ reason, member_label: memberLabel, lines: lines.map((line) => ({ item_id: line.item_id, movement_type: line.movement_type, quantity: line.quantity, unit_price: line.unit_price, manual_total: line.manual_total })) })
     });
 
     if (!response.ok) {
@@ -298,7 +300,7 @@ function EditTransactionModal({ transaction, onClose, onError }: { transaction: 
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-[#efcdab]">Quantité</p>
-                  <input className="saas-input" value={line.quantity} onChange={(e) => updateLine(index, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
+                  <input className="saas-input min-w-24" value={line.quantity} onChange={(e) => updateLine(index, { quantity: Math.max(1, Number(e.target.value || 1)) })} />
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-[#efcdab]">Prix unitaire</p>
@@ -306,7 +308,8 @@ function EditTransactionModal({ transaction, onClose, onError }: { transaction: 
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-[#efcdab]">Total ligne</p>
-                  <p className="saas-input flex items-center">{formatUsd(line.quantity * line.unit_price)}</p>
+                  <input className="saas-input" value={line.manual_total} onChange={(e) => updateLine(index, { manual_total: Math.max(0, Number(e.target.value || 0)) })} />
+                  <p className="mt-1 text-[10px] text-[#ffe8ca]">Total modifié</p>
                 </div>
               </div>
             </div>
