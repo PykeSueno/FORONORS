@@ -65,7 +65,7 @@ export function QuantityStepper({ value, onDecrease, onIncrease, onChange, min =
 export function CompactLineGrid({ type, children }: { type: 'transaction' | 'four' | 'sale'; children: ReactNode }) {
   const config = type === 'transaction'
     ? {
-      cols: 'grid-cols-[8.75rem_10.5rem_6.875rem_7.5rem_1.75rem]',
+      cols: 'grid-cols-[8.75rem_10.5rem_6.875rem_14rem_1.75rem]',
       gap: 'gap-x-1.5',
     }
     : type === 'four'

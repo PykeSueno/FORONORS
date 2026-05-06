@@ -736,7 +736,7 @@ function PayrollMemberCard({ member, status, period, payment, lastPayment, calcu
           <p className="mt-1 inline-flex items-center gap-1 text-[#f3d0aa]"><SmallIcon name="payroll" className="h-3.5 w-3.5" />Dernière paye : {lastPayment ? `${new Date(lastPayment.created_at).toLocaleDateString('fr-FR')} — ${formatUsd(lastPayment.amount)}` : 'aucune'}</p>
         </div>
         <StatusBadge status={status} />
-        <PayAmountBadge amount={amount} paid={Boolean(payment)} />
+        <PayAmountBadge amount={amount} />
         <Mini label="Argent apporté" value={formatUsd(member.moneyContribution)} icon="money" />
         <Mini label="Activités réalisées" value={String(safeNumber(member.activityCount))} icon="actions" />
         <Mini label="Participations utiles" value={String(safeNumber(member.participationCount))} icon="activity" />
@@ -763,10 +763,10 @@ function PayrollMemberCard({ member, status, period, payment, lastPayment, calcu
   );
 }
 
-function PayAmountBadge({ amount, paid }: { amount: number; paid: boolean }) {
+function PayAmountBadge({ amount }: { amount: number }) {
   return (
     <div className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-amber-200/35 bg-[#f3d6ae]/15 px-3 shadow-[0_8px_20px_rgba(0,0,0,0.14)]">
-      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#f6d6b3]">{paid ? 'Payé' : 'Paye'}</span>
+      <SmallIcon name="payroll" className="h-4 w-4 text-[#f6d6b3]" />
       <span className="text-base font-black leading-none text-[#fff1dd]">{formatUsd(amount)}</span>
     </div>
   );
@@ -846,6 +846,7 @@ function PayrollSettings({ config, canSave, onSave }: { config: PayrollConfig; c
 }
 
 type ExpenseFormState = { memberId: string; amount: string; category: string; note: string };
+type ExpensePanel = 'create' | 'member' | 'category';
 
 function ExpensesPage(props: {
   members: MemberSummary[];
@@ -866,6 +867,7 @@ function ExpensesPage(props: {
 }) {
   const [form, setForm] = useState<ExpenseFormState>({ memberId: props.members[0]?.id ?? '', amount: '', category: 'Garage', note: '' });
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [expensePanel, setExpensePanel] = useState<ExpensePanel>(props.canCreate ? 'create' : 'member');
   const allRows = useMemo(() => {
     const source = props.statsRows.length ? props.statsRows : [...props.pending, ...props.reimbursed];
     return source.filter((row) => row.status === 'pending' || row.status === 'reimbursed');
@@ -887,18 +889,29 @@ function ExpensesPage(props: {
         <Metric label="Dépenses" value={String(allRows.length)} icon="expense" />
       </section>
 
-      {props.canCreate ? (
-        <section className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-[#fff1dd]">Nouvelle dépense</h3>
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Field label="Membre" icon="member"><select className="saas-input" value={form.memberId} onChange={(event) => setForm((cur) => ({ ...cur, memberId: event.target.value }))}>{props.members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select></Field>
-            <Field label="Catégorie" icon="category"><select className="saas-input" value={form.category} onChange={(event) => setForm((cur) => ({ ...cur, category: event.target.value }))}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>
-            <Field label="Montant" icon="amount"><input className="saas-input" value={form.amount} onChange={(event) => setForm((cur) => ({ ...cur, amount: event.target.value }))} inputMode="decimal" /></Field>
-            <Field label="Note optionnelle"><input className="saas-input" value={form.note} onChange={(event) => setForm((cur) => ({ ...cur, note: event.target.value }))} /></Field>
+      <section className="glass-card p-4">
+        <div className="flex flex-wrap gap-2">
+          {props.canCreate ? <ExpensePanelButton active={expensePanel === 'create'} onClick={() => setExpensePanel('create')}>Nouvelle dépense</ExpensePanelButton> : null}
+          <ExpensePanelButton active={expensePanel === 'member'} onClick={() => setExpensePanel('member')}>Par membre</ExpensePanelButton>
+          <ExpensePanelButton active={expensePanel === 'category'} onClick={() => setExpensePanel('category')}>Par catégorie</ExpensePanelButton>
+        </div>
+
+        {expensePanel === 'create' && props.canCreate ? (
+          <div className="mt-4">
+            <h3 className="text-sm font-semibold text-[#fff1dd]">Nouvelle dépense</h3>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <Field label="Membre" icon="member"><select className="saas-input" value={form.memberId} onChange={(event) => setForm((cur) => ({ ...cur, memberId: event.target.value }))}>{props.members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select></Field>
+              <Field label="Catégorie" icon="category"><select className="saas-input" value={form.category} onChange={(event) => setForm((cur) => ({ ...cur, category: event.target.value }))}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>
+              <Field label="Montant" icon="amount"><input className="saas-input" value={form.amount} onChange={(event) => setForm((cur) => ({ ...cur, amount: event.target.value }))} inputMode="decimal" /></Field>
+              <Field label="Note optionnelle"><input className="saas-input" value={form.note} onChange={(event) => setForm((cur) => ({ ...cur, note: event.target.value }))} /></Field>
+            </div>
+            <button className="saas-primary-btn mt-5" disabled={!form.memberId || Number(form.amount) <= 0} onClick={() => void props.onCreate(form, reset)}>Créer la dépense</button>
           </div>
-          <button className="saas-primary-btn mt-5" disabled={!form.memberId || Number(form.amount) <= 0} onClick={() => void props.onCreate(form, reset)}>Créer la dépense</button>
-        </section>
-      ) : null}
+        ) : null}
+
+        {expensePanel === 'member' ? <div className="mt-4"><StatsBlock title="Dépenses par membre" icon="member" rows={byMember} /></div> : null}
+        {expensePanel === 'category' ? <div className="mt-4"><StatsBlock title="Dépenses par catégorie" icon="category" rows={byCategory} /></div> : null}
+      </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
         <ExpenseList title="Dépenses en attente" icon="pending" rows={props.pending} empty="Aucune dépense en attente." actions={(row) => (
@@ -911,11 +924,6 @@ function ExpensesPage(props: {
         <ExpenseList title="Dépenses remboursées" icon="paid" rows={props.reimbursed} empty="Aucune dépense remboursée." />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        <StatsBlock title="Dépenses par membre" icon="member" rows={byMember} />
-        <StatsBlock title="Dépenses par catégorie" icon="category" rows={byCategory} />
-      </section>
-
       {props.canLogs ? <LogList title="Logs récents" rows={props.logs.filter((row) => row.action.includes('expense')).slice(0, 60)} /> : null}
       {editingExpense ? (
         <EditExpenseModal
@@ -926,6 +934,18 @@ function ExpensesPage(props: {
         />
       ) : null}
     </div>
+  );
+}
+
+function ExpensePanelButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? 'border-[#f3d6ae]/60 bg-[#f3d6ae]/20 text-[#fff1dd]' : 'border-white/10 bg-[#3f281b]/55 text-[#efcdab] hover:bg-[#563622]/70'}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
 
