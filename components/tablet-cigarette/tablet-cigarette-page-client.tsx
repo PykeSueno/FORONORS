@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatUsd } from '@/lib/currency';
 import { computeProcessorEstimates, PROCESSOR_BOAT_FROM_BOTTLES } from '@/lib/processor';
 
@@ -21,10 +21,53 @@ type TabletDay = {
 type CigaretteDay = { id: number; business_day: string; chest_amount: number; passages_count: number; total_revenue: number; packs_sold: number; packs_deposit_remaining?: number } | null;
 
 type TabletPassage = { id: number; member_user_id?: string | null; member_label: string; before_cash: number; after_cash: number; before_kits: number; after_kits: number; before_cutters: number; after_cutters: number; created_at: string };
-type CigarettePassage = { id: number; member_user_id?: string | null; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; status?: string; created_at: string };
+type CigarettePassage = { id: number; member_user_id?: string | null; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_deposit_packs?: number | null; after_deposit_packs?: number | null; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; status?: string | null; created_at: string };
 
 type Tab = 'home' | 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
 type HistoryCard = { id: string; title: string; meta: string; type: string; amount: string; status: string; lines: string[]; items: Array<{ label: string; imageUrl?: string; icon: string }> };
+type HistoryRangeMode = 'current' | 'previous' | 'custom';
+type JobTypeFilter = 'all' | 'tablet' | 'cigarette' | 'processor';
+type JobHistoryEntry = {
+  id: string;
+  type: Exclude<JobTypeFilter, 'all'>;
+  memberIds: string[];
+  memberLabel: string;
+  createdAt: string;
+  title: string;
+  amount: string;
+  status: string;
+  lines: string[];
+  tabletPassages?: number;
+  tabletKits?: number;
+  tabletCutters?: number;
+  tabletMoney?: number;
+  cigarettePassages?: number;
+  cigarettePacks?: number;
+  cigaretteCash?: number;
+  cigaretteBankPending?: number;
+  cigaretteBankReceived?: number;
+  processorProduced?: number;
+  processorSold?: number;
+  processorMoney?: number;
+};
+type MemberJobStats = {
+  key: string;
+  label: string;
+  tabletPassages: number;
+  tabletKits: number;
+  tabletCutters: number;
+  tabletMoney: number;
+  cigarettePassages: number;
+  cigarettePacks: number;
+  cigaretteCash: number;
+  cigaretteBankPending: number;
+  cigaretteBankReceived: number;
+  processorProduced: number;
+  processorSold: number;
+  processorMoney: number;
+  totalActivities: number;
+  lastActivity: string;
+};
 
 export function TabletCigarettePageClient(props: {
   members: Array<{ id: string; name: string; username: string }>;
@@ -45,6 +88,7 @@ export function TabletCigarettePageClient(props: {
   cigaretteImageUrl: string;
   processorInStock: number;
   processorImageUrl: string;
+  initialHistoryRange: { startIso: string; endIso: string };
   canTabletAccess: boolean;
   canCigaretteAccess: boolean;
   canTabletManageDaily: boolean;
@@ -65,7 +109,7 @@ export function TabletCigarettePageClient(props: {
   defaultMemberLabel: string;
 }) {
   const {
-    members, tabletBusinessDay, cigaretteBusinessDay, tabletDay, cigaretteDay, tabletPassages, cigarettePassages, tabletStatsPassages, cigaretteStatsPassages, groupCash, kitsInStock, cuttersInStock, packsInStock, kitImageUrl, cutterImageUrl, cigaretteImageUrl, processorInStock, processorImageUrl,
+    members, tabletBusinessDay, cigaretteBusinessDay, tabletDay, cigaretteDay, tabletPassages, cigarettePassages, tabletStatsPassages, cigaretteStatsPassages, groupCash, kitsInStock, cuttersInStock, packsInStock, kitImageUrl, cutterImageUrl, cigaretteImageUrl, processorInStock, processorImageUrl, initialHistoryRange,
     canTabletAccess, canCigaretteAccess, canTabletManageDaily, canTabletCreatePassage, canCigaretteCreatePassage, canCigaretteCreateForAny, canHistory, canStats,
     canProcessorView, canProcessorCreate, canProcessorProduction, canProcessorSale, canProcessorStats, canProcessorLogs, processorSessions, processorStatsSessions,
     defaultMemberId, defaultMemberLabel
@@ -100,6 +144,14 @@ export function TabletCigarettePageClient(props: {
   const [processorRealReceived, setProcessorRealReceived] = useState('500');
   const [processorStockState, setProcessorStockState] = useState(processorInStock);
   const [cigarettePaymentMode, setCigarettePaymentMode] = useState<'cash' | 'bank'>('cash');
+  const [historyRangeMode, setHistoryRangeMode] = useState<HistoryRangeMode>('current');
+  const [customStartDate, setCustomStartDate] = useState(initialHistoryRange.startIso.slice(0, 10));
+  const [customEndDate, setCustomEndDate] = useState(new Date(new Date(initialHistoryRange.endIso).getTime() - 86400000).toISOString().slice(0, 10));
+  const [memberFilter, setMemberFilter] = useState('all');
+  const [jobTypeFilter, setJobTypeFilter] = useState<JobTypeFilter>('all');
+  const [statsSort, setStatsSort] = useState<'activity' | 'member'>('activity');
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const initialHistorySkipped = useRef(false);
 
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const activeMemberIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
@@ -117,6 +169,13 @@ export function TabletCigarettePageClient(props: {
     const participantIds = processorParticipantIds(row);
     return participantIds.some((id) => activeMemberIds.has(id));
   }), [activeMemberIds, processorParticipantIds, processorStatsSessionsState]);
+  const historyRangeLabel = useMemo(() => {
+    const start = new Date(historyRangeMode === 'custom' ? `${customStartDate}T00:00:00.000Z` : initialHistoryRange.startIso);
+    const end = new Date(historyRangeMode === 'custom' ? `${customEndDate}T00:00:00.000Z` : initialHistoryRange.endIso);
+    if (historyRangeMode === 'previous') return 'Semaine passée';
+    if (historyRangeMode === 'custom') return `${start.toLocaleDateString('fr-FR')} - ${end.toLocaleDateString('fr-FR')}`;
+    return 'Semaine actuelle';
+  }, [customEndDate, customStartDate, historyRangeMode, initialHistoryRange.endIso, initialHistoryRange.startIso]);
   const processorEstimate = useMemo(() => computeProcessorEstimates(processorBottles, processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES), [processorBottles, processorBoatFee]);
   const processorSaleTotalEstimated = Math.max(0, Math.round(processorSaleQty * 0.5 * 100));
   const processorSaleTotalReal = Math.max(0, Number(processorRealReceived || 0));
@@ -137,6 +196,42 @@ export function TabletCigarettePageClient(props: {
   useEffect(() => {
     setProcessorSaleQty((current) => Math.max(0, Math.min(processorSaleMax, current)));
   }, [processorSaleMax]);
+
+  useEffect(() => {
+    if (!canHistory && !canStats) return;
+    if (!initialHistorySkipped.current && historyRangeMode === 'current') {
+      initialHistorySkipped.current = true;
+      return;
+    }
+    if (historyRangeMode === 'custom' && (!customStartDate || !customEndDate || customStartDate > customEndDate)) return;
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({ range: historyRangeMode });
+    if (historyRangeMode === 'custom') {
+      params.set('date_from', customStartDate);
+      params.set('date_to', customEndDate);
+    }
+
+    setHistoryLoading(true);
+    fetch(`/api/jobs/history?${params.toString()}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error((await response.json().catch(() => ({ message: 'Chargement historique impossible.' }))).message);
+        return response.json() as Promise<{ tabletPassages?: TabletPassage[]; cigarettePassages?: CigarettePassage[]; processorSessions?: Array<Record<string, unknown>> }>;
+      })
+      .then((payload) => {
+        setTabletStatsPassagesState(payload.tabletPassages ?? []);
+        setCigaretteStatsPassagesState(payload.cigarettePassages ?? []);
+        setProcessorStatsSessionsState(payload.processorSessions ?? []);
+      })
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Chargement historique impossible.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setHistoryLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [canHistory, canStats, customEndDate, customStartDate, historyRangeMode]);
 
   const processorStatsQuick = useMemo(() => {
     const rows = activeProcessorStatsSessions.filter((row) => row.status === 'validated');
@@ -297,6 +392,209 @@ export function TabletCigarettePageClient(props: {
 
     return { tabletRows, cigaretteRows, processorRows };
   }, [cigaretteImageUrl, cigarettePassagesState, cutterImageUrl, kitImageUrl, membersById, processorImageUrl, processorSessionsState, tabletPassagesState]);
+
+  const jobsHistoryEntries = useMemo<JobHistoryEntry[]>(() => {
+    const tabletEntries = tabletStatsPassagesState.map((entry) => {
+      const kitsAdded = Math.max(0, Number(entry.after_kits ?? 0) - Number(entry.before_kits ?? 0));
+      const cuttersAdded = Math.max(0, Number(entry.after_cutters ?? 0) - Number(entry.before_cutters ?? 0));
+      const spent = Math.max(0, Number(entry.before_cash ?? 0) - Number(entry.after_cash ?? 0));
+      return {
+        id: `tablet-${entry.id}`,
+        type: 'tablet' as const,
+        memberIds: entry.member_user_id ? [entry.member_user_id] : [],
+        memberLabel: entry.member_label,
+        createdAt: entry.created_at,
+        title: entry.member_label,
+        amount: formatUsd(spent),
+        status: 'Validé',
+        lines: [
+          `Kits +${kitsAdded} · Disqueuses +${cuttersAdded}`,
+          `Dépôt ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`
+        ],
+        tabletPassages: 1,
+        tabletKits: kitsAdded,
+        tabletCutters: cuttersAdded,
+        tabletMoney: spent
+      };
+    });
+
+    const cigaretteEntries = cigaretteStatsPassagesState.map((entry) => {
+      const revenue = Number(entry.revenue_amount ?? 0);
+      const statusLabel = entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reçu' : 'Cash reçu';
+      const mode = entry.status === 'pending_bank' || entry.status === 'received_bank' ? 'Bank' : 'Cash';
+      return {
+        id: `cigarette-${entry.id}`,
+        type: 'cigarette' as const,
+        memberIds: entry.member_user_id ? [entry.member_user_id] : [],
+        memberLabel: entry.member_label,
+        createdAt: entry.created_at,
+        title: entry.member_label,
+        amount: formatUsd(revenue),
+        status: statusLabel,
+        lines: [
+          `Paquets ${entry.before_packs} -> ${entry.after_packs} · Vendus ${entry.quantity_sold}`,
+          `Mode ${mode} · Groupe ${formatUsd(entry.before_group_cash)} -> ${formatUsd(entry.after_group_cash)}`
+        ],
+        cigarettePassages: 1,
+        cigarettePacks: Number(entry.quantity_sold ?? 0),
+        cigaretteCash: entry.status === 'validated' ? revenue : 0,
+        cigaretteBankPending: entry.status === 'pending_bank' ? revenue : 0,
+        cigaretteBankReceived: entry.status === 'received_bank' ? revenue : 0
+      };
+    });
+
+    const processorEntries = activeProcessorStatsSessions.map((entry) => {
+      const isSale = entry.operation_type === 'sale';
+      const qty = Number(entry.processors_count ?? 0);
+      const stockAfter = Number(entry.stock_after ?? 0);
+      const stockBefore = isSale ? stockAfter + qty : Math.max(0, stockAfter - qty);
+      const participantIds = processorParticipantIds(entry);
+      const participants = participantIds
+        .map((id) => {
+          const member = membersById.get(id);
+          return member ? (member.name || member.username) : id;
+        })
+        .join(', ');
+      return {
+        id: `processor-${String(entry.id)}`,
+        type: 'processor' as const,
+        memberIds: participantIds,
+        memberLabel: participants || 'Processeur',
+        createdAt: String(entry.created_at),
+        title: participants || (isSale ? 'Vente processeur' : 'Production processeur'),
+        amount: isSale ? formatUsd(Number(entry.real_received ?? 0)) : `${qty} produits`,
+        status: isSale ? 'Vente validée' : 'Production validée',
+        lines: [
+          `${isSale ? 'Vendus' : 'Produits'} ${qty} · Stock ${stockBefore} -> ${stockAfter}`,
+          `${isSale ? 'Argent réel reçu' : 'Coût'} ${formatUsd(isSale ? Number(entry.real_received ?? 0) : Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))}`
+        ],
+        processorProduced: isSale ? 0 : qty,
+        processorSold: isSale ? qty : 0,
+        processorMoney: isSale ? Number(entry.real_received ?? 0) : 0
+      };
+    });
+
+    return [...tabletEntries, ...cigaretteEntries, ...processorEntries]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [activeProcessorStatsSessions, cigaretteStatsPassagesState, membersById, processorParticipantIds, tabletStatsPassagesState]);
+
+  const filteredJobsHistoryEntries = useMemo(() => jobsHistoryEntries.filter((entry) => {
+    if (jobTypeFilter !== 'all' && entry.type !== jobTypeFilter) return false;
+    if (memberFilter === 'all') return true;
+    return entry.memberIds.includes(memberFilter);
+  }), [jobTypeFilter, jobsHistoryEntries, memberFilter]);
+
+  const historyWeeks = useMemo(() => {
+    const dayLabels = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+    const weeks = new Map<string, { key: string; label: string; days: Array<{ label: string; dateKey: string; tablet: JobHistoryEntry[]; cigarette: JobHistoryEntry[]; processor: JobHistoryEntry[] }> }>();
+
+    function mondayStart(date: Date) {
+      const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+      const day = (start.getUTCDay() + 6) % 7;
+      start.setUTCDate(start.getUTCDate() - day);
+      return start;
+    }
+
+    for (const entry of filteredJobsHistoryEntries) {
+      const date = new Date(entry.createdAt);
+      if (Number.isNaN(date.getTime())) continue;
+      const weekStart = mondayStart(date);
+      const weekKey = weekStart.toISOString().slice(0, 10);
+      const week = weeks.get(weekKey) ?? {
+        key: weekKey,
+        label: historyRangeMode === 'current' ? 'Semaine actuelle' : historyRangeMode === 'previous' ? 'Semaine passée' : `Semaine du ${weekStart.toLocaleDateString('fr-FR')}`,
+        days: dayLabels.map((label, index) => {
+          const dayDate = new Date(weekStart);
+          dayDate.setUTCDate(weekStart.getUTCDate() + index);
+          return { label, dateKey: dayDate.toISOString().slice(0, 10), tablet: [], cigarette: [], processor: [] };
+        })
+      };
+      const dayIndex = (date.getUTCDay() + 6) % 7;
+      week.days[dayIndex][entry.type].push(entry);
+      weeks.set(weekKey, week);
+    }
+
+    return Array.from(weeks.values()).sort((a, b) => b.key.localeCompare(a.key));
+  }, [filteredJobsHistoryEntries, historyRangeMode]);
+
+  const jobStatsTotals = useMemo(() => filteredJobsHistoryEntries.reduce((totals, entry) => ({
+    tabletPassages: totals.tabletPassages + Number(entry.tabletPassages ?? 0),
+    tabletKits: totals.tabletKits + Number(entry.tabletKits ?? 0),
+    tabletCutters: totals.tabletCutters + Number(entry.tabletCutters ?? 0),
+    tabletMoney: totals.tabletMoney + Number(entry.tabletMoney ?? 0),
+    cigarettePassages: totals.cigarettePassages + Number(entry.cigarettePassages ?? 0),
+    cigarettePacks: totals.cigarettePacks + Number(entry.cigarettePacks ?? 0),
+    cigaretteCash: totals.cigaretteCash + Number(entry.cigaretteCash ?? 0),
+    cigaretteBankPending: totals.cigaretteBankPending + Number(entry.cigaretteBankPending ?? 0),
+    cigaretteBankReceived: totals.cigaretteBankReceived + Number(entry.cigaretteBankReceived ?? 0),
+    processorProduced: totals.processorProduced + Number(entry.processorProduced ?? 0),
+    processorSold: totals.processorSold + Number(entry.processorSold ?? 0),
+    processorMoney: totals.processorMoney + Number(entry.processorMoney ?? 0),
+    totalActivities: totals.totalActivities + 1
+  }), {
+    tabletPassages: 0,
+    tabletKits: 0,
+    tabletCutters: 0,
+    tabletMoney: 0,
+    cigarettePassages: 0,
+    cigarettePacks: 0,
+    cigaretteCash: 0,
+    cigaretteBankPending: 0,
+    cigaretteBankReceived: 0,
+    processorProduced: 0,
+    processorSold: 0,
+    processorMoney: 0,
+    totalActivities: 0
+  }), [filteredJobsHistoryEntries]);
+
+  const jobStatsByMember = useMemo(() => {
+    const map = new Map<string, MemberJobStats>();
+    for (const entry of filteredJobsHistoryEntries) {
+      const memberIds = entry.memberIds.length > 0 ? entry.memberIds : [`label:${entry.memberLabel}`];
+      for (const id of memberIds) {
+        const member = membersById.get(id);
+        const key = member ? id : id;
+        const current = map.get(key) ?? {
+          key,
+          label: member ? (member.name || member.username) : entry.memberLabel,
+          tabletPassages: 0,
+          tabletKits: 0,
+          tabletCutters: 0,
+          tabletMoney: 0,
+          cigarettePassages: 0,
+          cigarettePacks: 0,
+          cigaretteCash: 0,
+          cigaretteBankPending: 0,
+          cigaretteBankReceived: 0,
+          processorProduced: 0,
+          processorSold: 0,
+          processorMoney: 0,
+          totalActivities: 0,
+          lastActivity: entry.createdAt
+        };
+        current.tabletPassages += Number(entry.tabletPassages ?? 0);
+        current.tabletKits += Number(entry.tabletKits ?? 0);
+        current.tabletCutters += Number(entry.tabletCutters ?? 0);
+        current.tabletMoney += Number(entry.tabletMoney ?? 0);
+        current.cigarettePassages += Number(entry.cigarettePassages ?? 0);
+        current.cigarettePacks += Number(entry.cigarettePacks ?? 0);
+        current.cigaretteCash += Number(entry.cigaretteCash ?? 0);
+        current.cigaretteBankPending += Number(entry.cigaretteBankPending ?? 0);
+        current.cigaretteBankReceived += Number(entry.cigaretteBankReceived ?? 0);
+        current.processorProduced += Number(entry.processorProduced ?? 0);
+        current.processorSold += Number(entry.processorSold ?? 0);
+        current.processorMoney += Number(entry.processorMoney ?? 0);
+        current.totalActivities += 1;
+        if (new Date(entry.createdAt).getTime() > new Date(current.lastActivity).getTime()) current.lastActivity = entry.createdAt;
+        map.set(key, current);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => (
+      statsSort === 'member'
+        ? a.label.localeCompare(b.label, 'fr')
+        : b.totalActivities - a.totalActivities || b.processorMoney + b.cigaretteCash + b.cigaretteBankReceived - (a.processorMoney + a.cigaretteCash + a.cigaretteBankReceived)
+    ));
+  }, [filteredJobsHistoryEntries, membersById, statsSort]);
 
   function selectMember(id: string) {
     setMemberId(id);
@@ -680,6 +978,13 @@ export function TabletCigarettePageClient(props: {
       ) : null}
 
       {tab === 'history' && canHistory ? (
+        <section className="space-y-4">
+          <JobsFilters title="Historique Jobs" subtitle={`${historyRangeLabel} · ${filteredJobsHistoryEntries.length} activité(s)`} members={members} rangeMode={historyRangeMode} customStartDate={customStartDate} customEndDate={customEndDate} memberFilter={memberFilter} typeFilter={jobTypeFilter} loading={historyLoading} onRangeMode={setHistoryRangeMode} onCustomStart={setCustomStartDate} onCustomEnd={setCustomEndDate} onMember={setMemberFilter} onType={setJobTypeFilter} />
+          <WeeklyJobsHistory weeks={historyWeeks} showProcessor={canProcessorLogs} />
+        </section>
+      ) : null}
+
+      {false && tab === 'history' && canHistory ? (
         <section className="grid gap-4 xl:grid-cols-3">
           <HistoryColumn title="TABLETTE" icon="📱" rows={historyColumns.tabletRows} empty="Aucun passage tablette." />
           <HistoryColumn title="CIGARETTE" icon="🚬" rows={historyColumns.cigaretteRows} empty="Aucun passage cigarette." />
@@ -688,6 +993,36 @@ export function TabletCigarettePageClient(props: {
       ) : null}
 
       {tab === 'stats' && canStats ? (
+        <section className="space-y-4">
+          <JobsFilters title="Stats Jobs" subtitle={`${historyRangeLabel} · ${jobStatsTotals.totalActivities} activité(s)`} members={members} rangeMode={historyRangeMode} customStartDate={customStartDate} customEndDate={customEndDate} memberFilter={memberFilter} typeFilter={jobTypeFilter} loading={historyLoading} onRangeMode={setHistoryRangeMode} onCustomStart={setCustomStartDate} onCustomEnd={setCustomEndDate} onMember={setMemberFilter} onType={setJobTypeFilter} />
+          <article className="glass-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold text-[#fff1dd]">Stats globales semaine</h4>
+              <select className="saas-input !h-9 w-48" value={statsSort} onChange={(event) => setStatsSort(event.target.value as 'activity' | 'member')}>
+                <option value="activity">Tri total activité</option>
+                <option value="member">Tri membre</option>
+              </select>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+              <Stat label="Passages tablette" value={String(jobStatsTotals.tabletPassages)} icon="📱" />
+              <Stat label="Kits / disqueuses" value={`${jobStatsTotals.tabletKits} / ${jobStatsTotals.tabletCutters}`} icon="🧰" />
+              <Stat label="Argent tablette" value={formatUsd(jobStatsTotals.tabletMoney)} icon="💸" />
+              <Stat label="Passages cigarette" value={String(jobStatsTotals.cigarettePassages)} icon="🚬" />
+              <Stat label="Paquets vendus" value={String(jobStatsTotals.cigarettePacks)} icon="📦" />
+              <Stat label="Cash cigarette" value={formatUsd(jobStatsTotals.cigaretteCash)} icon="💵" />
+              <Stat label="Bank attente" value={formatUsd(jobStatsTotals.cigaretteBankPending)} icon="🏦" />
+              <Stat label="Bank reçu" value={formatUsd(jobStatsTotals.cigaretteBankReceived)} icon="✅" />
+              <Stat label="Processeurs produits" value={String(jobStatsTotals.processorProduced)} icon="⚙️" />
+              <Stat label="Processeurs vendus" value={String(jobStatsTotals.processorSold)} icon="📦" />
+              <Stat label="Argent processeur" value={formatUsd(jobStatsTotals.processorMoney)} icon="💰" />
+              <Stat label="Total activités" value={String(jobStatsTotals.totalActivities)} icon="📊" />
+            </div>
+          </article>
+          <JobsStatsTable rows={jobStatsByMember} />
+        </section>
+      ) : null}
+
+      {false && tab === 'stats' && canStats ? (
         <section className="space-y-3">
           <article className="glass-card p-5">
             <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Tablette</h4>
@@ -791,6 +1126,195 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: stri
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-lg border border-white/10 bg-[#3b2418]/60 px-2 py-2"><p className="text-[11px] text-[#efcdab]">{label}</p><p className="text-sm font-semibold text-[#ffe8ca]">{value}</p></div>;
+}
+
+function JobsFilters({
+  title,
+  subtitle,
+  members,
+  rangeMode,
+  customStartDate,
+  customEndDate,
+  memberFilter,
+  typeFilter,
+  loading,
+  onRangeMode,
+  onCustomStart,
+  onCustomEnd,
+  onMember,
+  onType
+}: {
+  title: string;
+  subtitle: string;
+  members: Array<{ id: string; name: string; username: string }>;
+  rangeMode: HistoryRangeMode;
+  customStartDate: string;
+  customEndDate: string;
+  memberFilter: string;
+  typeFilter: JobTypeFilter;
+  loading: boolean;
+  onRangeMode: (value: HistoryRangeMode) => void;
+  onCustomStart: (value: string) => void;
+  onCustomEnd: (value: string) => void;
+  onMember: (value: string) => void;
+  onType: (value: JobTypeFilter) => void;
+}) {
+  return (
+    <article className="glass-card p-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-[#fff1dd]">📚 {title}</h3>
+          <p className="text-xs text-[#efcdab]">{subtitle}{loading ? ' · chargement...' : ''}</p>
+        </div>
+        <div className="grid w-full gap-2 md:w-auto md:grid-cols-[150px_150px_150px_150px]">
+          <select className="saas-input !h-9" value={rangeMode} onChange={(event) => onRangeMode(event.target.value as HistoryRangeMode)}>
+            <option value="current">Semaine actuelle</option>
+            <option value="previous">Semaine passée</option>
+            <option value="custom">Période personnalisée</option>
+          </select>
+          <select className="saas-input !h-9" value={memberFilter} onChange={(event) => onMember(event.target.value)}>
+            <option value="all">Tous membres</option>
+            {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
+          </select>
+          <select className="saas-input !h-9" value={typeFilter} onChange={(event) => onType(event.target.value as JobTypeFilter)}>
+            <option value="all">Tous types</option>
+            <option value="tablet">Tablette</option>
+            <option value="cigarette">Cigarette</option>
+            <option value="processor">Processeur</option>
+          </select>
+          <div className="grid grid-cols-2 gap-2">
+            <input className="saas-input !h-9" type="date" value={customStartDate} disabled={rangeMode !== 'custom'} onChange={(event) => onCustomStart(event.target.value)} />
+            <input className="saas-input !h-9" type="date" value={customEndDate} disabled={rangeMode !== 'custom'} onChange={(event) => onCustomEnd(event.target.value)} />
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function WeeklyJobsHistory({
+  weeks,
+  showProcessor
+}: {
+  weeks: Array<{ key: string; label: string; days: Array<{ label: string; dateKey: string; tablet: JobHistoryEntry[]; cigarette: JobHistoryEntry[]; processor: JobHistoryEntry[] }> }>;
+  showProcessor: boolean;
+}) {
+  if (weeks.length === 0) {
+    return <article className="glass-card p-4 text-sm text-[#efcdab]">Aucune activité Jobs sur cette période.</article>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {weeks.map((week) => (
+        <article key={week.key} className="glass-card p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[#fff1dd]">{week.label}</h3>
+          <div className="mt-3 space-y-3">
+            {week.days.map((day) => (
+              <div key={day.dateKey} className="rounded-xl border border-white/10 bg-[#2f1d14]/50 p-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-sm font-semibold text-[#ffe8ca]">{day.label}</h4>
+                  <span className="text-xs text-[#efcdab]">{new Date(`${day.dateKey}T00:00:00.000Z`).toLocaleDateString('fr-FR')}</span>
+                </div>
+                <div className={`grid gap-3 ${showProcessor ? 'xl:grid-cols-3' : 'xl:grid-cols-2'}`}>
+                  <JobsDayColumn title="📱 Tablette" entries={day.tablet} empty="Aucun passage tablette." />
+                  <JobsDayColumn title="🚬 Cigarette" entries={day.cigarette} empty="Aucun passage cigarette." />
+                  {showProcessor ? <JobsDayColumn title="⚙️ Processeur" entries={day.processor} empty="Aucune activité processeur." /> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function JobsDayColumn({ title, entries, empty }: { title: string; entries: JobHistoryEntry[]; empty: string }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#3f281b]/45 p-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h5 className="text-xs font-semibold text-[#fff1dd]">{title}</h5>
+        <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-[#efcdab]">{entries.length}</span>
+      </div>
+      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+        {entries.length === 0 ? <p className="text-xs text-[#d9b48f]">{empty}</p> : entries.map((entry) => (
+          <article key={entry.id} className="rounded-lg border border-white/10 bg-[#24160f]/60 p-2 text-xs text-[#efcdab]">
+            <div className="flex items-start justify-between gap-2">
+              <p className="font-semibold text-[#ffe8ca]">{entry.title}</p>
+              <span className="shrink-0 text-[10px] text-[#d9b48f]">{new Date(entry.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-[#ffe8ca]">{entry.amount}</span>
+              <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px]">{entry.status}</span>
+            </div>
+            {entry.lines.map((line) => <p key={line} className="mt-1 leading-relaxed">{line}</p>)}
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function JobsStatsTable({ rows }: { rows: MemberJobStats[] }) {
+  return (
+    <article className="glass-card p-5">
+      <h4 className="text-sm font-semibold text-[#fff1dd]">Stats par membre</h4>
+      <div className="mt-3 overflow-x-auto">
+        <table className="min-w-[1180px] text-left text-xs text-[#efcdab]">
+          <thead className="text-[#ffe8ca]">
+            <tr>
+              <th className="px-2 py-2">Membre</th>
+              <th className="px-2 py-2" colSpan={4}>📱 Tablette</th>
+              <th className="px-2 py-2" colSpan={5}>🚬 Cigarette</th>
+              <th className="px-2 py-2" colSpan={3}>⚙️ Processeur</th>
+              <th className="px-2 py-2" colSpan={2}>📊 Total</th>
+            </tr>
+            <tr className="border-t border-white/10 text-[11px] text-[#d9b48f]">
+              <th className="px-2 py-1"></th>
+              <th className="px-2 py-1">Pass.</th>
+              <th className="px-2 py-1">Kits</th>
+              <th className="px-2 py-1">Disq.</th>
+              <th className="px-2 py-1">Argent</th>
+              <th className="px-2 py-1">Pass.</th>
+              <th className="px-2 py-1">Paquets</th>
+              <th className="px-2 py-1">Cash</th>
+              <th className="px-2 py-1">Bank attente</th>
+              <th className="px-2 py-1">Bank reçu</th>
+              <th className="px-2 py-1">Produits</th>
+              <th className="px-2 py-1">Vendus</th>
+              <th className="px-2 py-1">Argent</th>
+              <th className="px-2 py-1">Activités</th>
+              <th className="px-2 py-1">Dernière activité</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="border-t border-white/10">
+                <td className="px-2 py-2 font-semibold text-[#ffe8ca]">{row.label}</td>
+                <td className="px-2 py-2">{row.tabletPassages}</td>
+                <td className="px-2 py-2">{row.tabletKits}</td>
+                <td className="px-2 py-2">{row.tabletCutters}</td>
+                <td className="px-2 py-2">{formatUsd(row.tabletMoney)}</td>
+                <td className="px-2 py-2">{row.cigarettePassages}</td>
+                <td className="px-2 py-2">{row.cigarettePacks}</td>
+                <td className="px-2 py-2">{formatUsd(row.cigaretteCash)}</td>
+                <td className="px-2 py-2">{formatUsd(row.cigaretteBankPending)}</td>
+                <td className="px-2 py-2">{formatUsd(row.cigaretteBankReceived)}</td>
+                <td className="px-2 py-2">{row.processorProduced}</td>
+                <td className="px-2 py-2">{row.processorSold}</td>
+                <td className="px-2 py-2">{formatUsd(row.processorMoney)}</td>
+                <td className="px-2 py-2 font-semibold text-[#ffe8ca]">{row.totalActivities}</td>
+                <td className="px-2 py-2">{row.lastActivity ? new Date(row.lastActivity).toLocaleString('fr-FR') : '-'}</td>
+              </tr>
+            ))}
+            {rows.length === 0 ? (
+              <tr className="border-t border-white/10"><td className="px-2 py-3" colSpan={15}>Aucune stat Jobs sur cette période.</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  );
 }
 
 function HistoryColumn({ title, icon, rows, empty }: { title: string; icon: string; rows: HistoryCard[]; empty: string }) {
