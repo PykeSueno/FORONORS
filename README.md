@@ -1,5 +1,7 @@
 # FORONORS
 
+Déploiement actif en cours le 2026-05-07.
+
 Base Next.js + TypeScript + Tailwind + Supabase (DB only), avec authentification personnalisée username/mot de passe.
 
 ## Démarrage
