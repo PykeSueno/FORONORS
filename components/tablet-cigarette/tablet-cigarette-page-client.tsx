@@ -26,6 +26,7 @@ type CigarettePassage = { id: number; member_user_id?: string | null; member_lab
 type Tab = 'home' | 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
 type HistoryCard = { id: string; title: string; meta: string; type: string; amount: string; status: string; lines: string[]; items: Array<{ label: string; imageUrl?: string; icon: string }> };
 type HistoryRangeMode = 'current' | 'previous' | 'custom';
+type HistoryDayFilter = 'all' | '0' | '1' | '2' | '3' | '4' | '5' | '6';
 type JobTypeFilter = 'all' | 'tablet' | 'cigarette' | 'processor';
 type JobHistoryEntry = {
   id: string;
@@ -68,6 +69,14 @@ type MemberJobStats = {
   totalActivities: number;
   lastActivity: string;
 };
+
+const JOB_DAY_LABELS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as const;
+
+function jobDayIndex(dateIso: string) {
+  const date = new Date(dateIso);
+  if (Number.isNaN(date.getTime())) return -1;
+  return (date.getUTCDay() + 6) % 7;
+}
 
 export function TabletCigarettePageClient(props: {
   members: Array<{ id: string; name: string; username: string }>;
@@ -145,6 +154,7 @@ export function TabletCigarettePageClient(props: {
   const [processorStockState, setProcessorStockState] = useState(processorInStock);
   const [cigarettePaymentMode, setCigarettePaymentMode] = useState<'cash' | 'bank'>('cash');
   const [historyRangeMode, setHistoryRangeMode] = useState<HistoryRangeMode>('current');
+  const [historyDayFilter, setHistoryDayFilter] = useState<HistoryDayFilter>('all');
   const [customStartDate, setCustomStartDate] = useState(initialHistoryRange.startIso.slice(0, 10));
   const [customEndDate, setCustomEndDate] = useState(new Date(new Date(initialHistoryRange.endIso).getTime() - 86400000).toISOString().slice(0, 10));
   const [memberFilter, setMemberFilter] = useState('all');
@@ -484,8 +494,24 @@ export function TabletCigarettePageClient(props: {
     return entry.memberIds.includes(memberFilter);
   }), [jobTypeFilter, jobsHistoryEntries, memberFilter]);
 
+  const historyDayCounts = useMemo(() => {
+    const counts = JOB_DAY_LABELS.map(() => 0);
+    for (const entry of filteredJobsHistoryEntries) {
+      const index = jobDayIndex(entry.createdAt);
+      if (index >= 0) counts[index] += 1;
+    }
+    return counts;
+  }, [filteredJobsHistoryEntries]);
+
+  const visibleHistoryEntries = useMemo(() => (
+    historyDayFilter === 'all'
+      ? filteredJobsHistoryEntries
+      : filteredJobsHistoryEntries.filter((entry) => jobDayIndex(entry.createdAt) === Number(historyDayFilter))
+  ), [filteredJobsHistoryEntries, historyDayFilter]);
+
+  const historyDayLabel = historyDayFilter === 'all' ? 'Tous les jours' : JOB_DAY_LABELS[Number(historyDayFilter)];
+
   const historyWeeks = useMemo(() => {
-    const dayLabels = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
     const weeks = new Map<string, { key: string; label: string; days: Array<{ label: string; dateKey: string; tablet: JobHistoryEntry[]; cigarette: JobHistoryEntry[]; processor: JobHistoryEntry[] }> }>();
 
     function mondayStart(date: Date) {
@@ -495,7 +521,7 @@ export function TabletCigarettePageClient(props: {
       return start;
     }
 
-    for (const entry of filteredJobsHistoryEntries) {
+    for (const entry of visibleHistoryEntries) {
       const date = new Date(entry.createdAt);
       if (Number.isNaN(date.getTime())) continue;
       const weekStart = mondayStart(date);
@@ -503,7 +529,7 @@ export function TabletCigarettePageClient(props: {
       const week = weeks.get(weekKey) ?? {
         key: weekKey,
         label: historyRangeMode === 'current' ? 'Semaine actuelle' : historyRangeMode === 'previous' ? 'Semaine passée' : `Semaine du ${weekStart.toLocaleDateString('fr-FR')}`,
-        days: dayLabels.map((label, index) => {
+        days: JOB_DAY_LABELS.map((label, index) => {
           const dayDate = new Date(weekStart);
           dayDate.setUTCDate(weekStart.getUTCDate() + index);
           return { label, dateKey: dayDate.toISOString().slice(0, 10), tablet: [], cigarette: [], processor: [] };
@@ -515,7 +541,7 @@ export function TabletCigarettePageClient(props: {
     }
 
     return Array.from(weeks.values()).sort((a, b) => b.key.localeCompare(a.key));
-  }, [filteredJobsHistoryEntries, historyRangeMode]);
+  }, [historyRangeMode, visibleHistoryEntries]);
 
   const jobStatsTotals = useMemo(() => filteredJobsHistoryEntries.reduce((totals, entry) => ({
     tabletPassages: totals.tabletPassages + Number(entry.tabletPassages ?? 0),
@@ -979,8 +1005,9 @@ export function TabletCigarettePageClient(props: {
 
       {tab === 'history' && canHistory ? (
         <section className="space-y-4">
-          <JobsFilters title="Historique Jobs" subtitle={`${historyRangeLabel} · ${filteredJobsHistoryEntries.length} activité(s)`} members={members} rangeMode={historyRangeMode} customStartDate={customStartDate} customEndDate={customEndDate} memberFilter={memberFilter} typeFilter={jobTypeFilter} loading={historyLoading} onRangeMode={setHistoryRangeMode} onCustomStart={setCustomStartDate} onCustomEnd={setCustomEndDate} onMember={setMemberFilter} onType={setJobTypeFilter} />
-          <WeeklyJobsHistory weeks={historyWeeks} showProcessor={canProcessorLogs} />
+          <JobsFilters title="Historique Jobs" subtitle={`${historyRangeLabel} · semaine ${filteredJobsHistoryEntries.length} · affiché ${visibleHistoryEntries.length} (${historyDayLabel})`} members={members} rangeMode={historyRangeMode} customStartDate={customStartDate} customEndDate={customEndDate} memberFilter={memberFilter} typeFilter={jobTypeFilter} loading={historyLoading} onRangeMode={setHistoryRangeMode} onCustomStart={setCustomStartDate} onCustomEnd={setCustomEndDate} onMember={setMemberFilter} onType={setJobTypeFilter} />
+          <HistoryDayNavigation rangeLabel={historyRangeLabel} selectedDay={historyDayFilter} counts={historyDayCounts} visibleCount={visibleHistoryEntries.length} totalCount={filteredJobsHistoryEntries.length} onSelect={setHistoryDayFilter} />
+          <WeeklyJobsHistory weeks={historyWeeks} selectedDay={historyDayFilter} showProcessor={canProcessorLogs} />
         </section>
       ) : null}
 
@@ -1192,11 +1219,59 @@ function JobsFilters({
   );
 }
 
+function HistoryDayNavigation({
+  rangeLabel,
+  selectedDay,
+  counts,
+  visibleCount,
+  totalCount,
+  onSelect
+}: {
+  rangeLabel: string;
+  selectedDay: HistoryDayFilter;
+  counts: number[];
+  visibleCount: number;
+  totalCount: number;
+  onSelect: (value: HistoryDayFilter) => void;
+}) {
+  const options: Array<{ value: HistoryDayFilter; label: string; count: number }> = [
+    { value: 'all', label: 'Tous', count: totalCount },
+    ...JOB_DAY_LABELS.map((label, index) => ({ value: String(index) as HistoryDayFilter, label, count: counts[index] ?? 0 }))
+  ];
+
+  return (
+    <article className="glass-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-[#fff1dd]">Jours de semaine</h3>
+          <p className="text-xs text-[#efcdab]">{visibleCount} activité(s) affichée(s)</p>
+        </div>
+        <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-3 py-1 text-xs font-semibold text-[#ffe8ca]">{rangeLabel}</span>
+      </div>
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`filter-pill shrink-0 ${selectedDay === option.value ? 'filter-pill-active' : ''}`}
+            onClick={() => onSelect(option.value)}
+          >
+            {option.label}
+            <span className="ml-1 rounded-full border border-white/10 bg-[#24160f]/55 px-1.5 py-0.5 text-[10px]">{option.count}</span>
+          </button>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function WeeklyJobsHistory({
   weeks,
+  selectedDay,
   showProcessor
 }: {
   weeks: Array<{ key: string; label: string; days: Array<{ label: string; dateKey: string; tablet: JobHistoryEntry[]; cigarette: JobHistoryEntry[]; processor: JobHistoryEntry[] }> }>;
+  selectedDay: HistoryDayFilter;
   showProcessor: boolean;
 }) {
   if (weeks.length === 0) {
@@ -1209,7 +1284,7 @@ function WeeklyJobsHistory({
         <article key={week.key} className="glass-card p-4">
           <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[#fff1dd]">{week.label}</h3>
           <div className="mt-3 space-y-3">
-            {week.days.map((day) => (
+            {(selectedDay === 'all' ? week.days : week.days.filter((_, index) => index === Number(selectedDay))).map((day) => (
               <div key={day.dateKey} className="rounded-xl border border-white/10 bg-[#2f1d14]/50 p-3">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <h4 className="text-sm font-semibold text-[#ffe8ca]">{day.label}</h4>
