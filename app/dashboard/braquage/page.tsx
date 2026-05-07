@@ -5,13 +5,6 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { RobberiesPageClient } from '@/components/robberies/robberies-page-client';
 
-function weekStartIso(now: Date) {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - start.getDay());
-  return start.toISOString();
-}
-
 type Run = {
   id: number;
   created_at: string;
@@ -45,46 +38,6 @@ export default async function RobberyPage() {
   ]);
 
   const typedRuns = (runs ?? []) as Run[];
-  const activeMemberIds = new Set((members ?? []).map((member) => member.id));
-  const weekIso = weekStartIso(new Date());
-  const weekRuns = typedRuns.filter((run) => run.created_at >= weekIso && (run.participants ?? []).some((participant) => participant.id && activeMemberIds.has(participant.id)));
-
-  const resources = new Map<string, number>();
-  for (const run of weekRuns) {
-    for (const consumed of run.consumed_items ?? []) {
-      resources.set(consumed.itemName, (resources.get(consumed.itemName) ?? 0) + Number(consumed.required ?? 0));
-    }
-  }
-
-  const playerMap = new Map<string, { name: string; total: number; fleeca: number; bijouterie: number; morgue: number; money: number; last: string }>();
-  for (const run of weekRuns) {
-    for (const participant of run.participants ?? []) {
-      if (!participant.id || !activeMemberIds.has(participant.id)) continue;
-      const key = participant.id || participant.label;
-      const prev = playerMap.get(key) ?? { name: participant.label, total: 0, fleeca: 0, bijouterie: 0, morgue: 0, money: 0, last: run.created_at };
-      prev.total += 1;
-      prev[run.robbery_type] += 1;
-      prev.money += Number(run.money_amount ?? 0);
-      if (new Date(run.created_at).getTime() > new Date(prev.last).getTime()) prev.last = run.created_at;
-      playerMap.set(key, prev);
-    }
-  }
-
-  const playerStats = Array.from(playerMap.values())
-    .map((entry) => ({ ...entry, avg: entry.total > 0 ? entry.money / entry.total : 0 }))
-    .sort((a, b) => b.total - a.total || b.money - a.money);
-
-  const stats = {
-    total: weekRuns.length,
-    fleeca: weekRuns.filter((run) => run.robbery_type === 'fleeca').length,
-    bijouterie: weekRuns.filter((run) => run.robbery_type === 'bijouterie').length,
-    morgue: weekRuns.filter((run) => run.robbery_type === 'morgue').length,
-    success: weekRuns.filter((run) => (run.status ?? 'success') === 'success').length,
-    arrested: weekRuns.filter((run) => (run.status ?? 'success') === 'arrested').length,
-    moneyIn: weekRuns.reduce((sum, run) => sum + Number(run.money_amount ?? 0), 0),
-    moneyLost: weekRuns.reduce((sum, run) => sum + Number(run.lost_money ?? 0), 0),
-    resources: Array.from(resources.entries()).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty).slice(0, 8)
-  };
 
   return (
     <div className="space-y-5">
@@ -97,8 +50,6 @@ export default async function RobberyPage() {
         canArrested={canArrested}
         canStats={canStats}
         canLogs={canLogs}
-        stats={stats}
-        playerStats={playerStats}
       />
     </div>
   );

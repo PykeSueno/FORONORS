@@ -2,7 +2,6 @@
 
 import Image from 'next/image';
 import { type Dispatch, type SetStateAction, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { formatUsd } from '@/lib/currency';
 
 type Item = { id: number; name: string; quantity: number; image_url: string | null; category_key?: string | null; type_key?: string | null };
@@ -24,13 +23,14 @@ type RobberyType = 'fleeca' | 'bijouterie' | 'morgue';
 type RoleStats = { memberId: string; name: string; total: number; braqueur: number; braqueurMoney: number; braqueurLast: string | null; mule: number; muleSuccess: number; muleLast: string | null; hostage: number; hostageLast: string | null; recentBraqueur: number; recentMule: number; recentHostage: number };
 type Suggestion = { title: string; icon: string; names: Array<{ name: string; reason: string; score: number }> };
 
-const ROBBERY_DEFS: Array<{ key: RobberyType; title: string; icon: string; stockResources: Array<{ label: string; qty: number }>; nonStockPrereqs?: string[] }> = [
-  { key: 'fleeca', title: 'Fleeca', icon: '🏦', stockResources: [{ label: 'Pétoire', qty: 1 }, { label: 'Munition de Pistolet', qty: 1 }, { label: 'Perceuse', qty: 1 }, { label: 'Foret', qty: 4 }, { label: 'Clé USB', qty: 1 }] },
-  { key: 'bijouterie', title: 'Bijouterie', icon: '💎', stockResources: [{ label: 'Gaz BZ', qty: 1 }, { label: 'Munition de Pistolet', qty: 1 }], nonStockPrereqs: ['Masque à gaz', 'Casse de carton'] },
+const ROBBERY_DEFS: Array<{ key: RobberyType; title: string; icon: string; stockResources: Array<{ label: string; qty: number }>; optionalStockResources?: Array<{ label: string; defaultQty: number }>; nonStockPrereqs?: string[] }> = [
+  { key: 'fleeca', title: 'Fleeca', icon: '🏦', stockResources: [{ label: 'Pétoire', qty: 1 }, { label: 'Munition de Pistolet', qty: 1 }, { label: 'Perceuse', qty: 1 }, { label: 'Foret', qty: 4 }, { label: 'Clé USB', qty: 1 }], optionalStockResources: [{ label: 'Menu', defaultQty: 0 }] },
+  { key: 'bijouterie', title: 'Bijouterie', icon: '💎', stockResources: [{ label: 'Gaz BZ', qty: 1 }, { label: 'Munition de Pistolet', qty: 1 }], optionalStockResources: [{ label: 'Menu', defaultQty: 0 }], nonStockPrereqs: ['Masque à gaz', 'Casse de carton'] },
   { key: 'morgue', title: 'Morgue', icon: '🟥', stockResources: [{ label: 'Carte rouge', qty: 1 }] }
 ];
 
-function normalize(value: string) { return value.toLowerCase().replace(/[’']/g, '').trim(); }
+function normalize(value: string) { return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, '').trim(); }
+function weekStartIso(now: Date) { const start = new Date(now); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - start.getDay()); return start.toISOString(); }
 function roleLabel(role?: string) { if (role === 'braqueur') return 'Braqueur'; if (role === 'plan_mule_recup') return 'Mule / Récup'; if (role === 'otage_apporte') return 'Otage'; return 'Participant'; }
 function roleIcon(role?: string) { if (role === 'braqueur') return '🎯'; if (role === 'plan_mule_recup') return '🚗'; if (role === 'otage_apporte') return '🤝'; return '👤'; }
 function lastLabel(value: string | null) { return value ? new Date(value).toLocaleDateString('fr-FR') : 'Jamais'; }
@@ -113,7 +113,7 @@ function suggest(rows: RoleStats[], role: RoleKey, limit: number): Suggestion['n
     .map(({ row, score }) => ({ name: row.name, score: Math.round(score), reason: rotationReason(row, role, score) }));
 }
 
-export function RobberiesPageClient({ runs, items, members, canCreate, canArrested, canStats, canLogs, stats, playerStats }: {
+export function RobberiesPageClient({ runs, items, members, canCreate, canArrested, canStats, canLogs }: {
   runs: Run[];
   items: Item[];
   members: Array<{ id: string; label: string }>;
@@ -121,10 +121,9 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
   canArrested: boolean;
   canStats: boolean;
   canLogs: boolean;
-  stats: { total: number; fleeca: number; bijouterie: number; morgue: number; success: number; arrested: number; moneyIn: number; moneyLost: number; resources: Array<{ name: string; qty: number }> };
-  playerStats: Array<{ name: string; total: number; fleeca: number; bijouterie: number; morgue: number; money: number; avg: number; last: string }>;
 }) {
-  const router = useRouter();
+  const [currentRuns, setCurrentRuns] = useState(runs);
+  const [currentItems, setCurrentItems] = useState(items);
   const [robberyType, setRobberyType] = useState<RobberyType>('fleeca');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [braqueurIds, setBraqueurIds] = useState<string[]>([]);
@@ -139,8 +138,9 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
   const [seizedQuery, setSeizedQuery] = useState('');
   const [seizedCategory, setSeizedCategory] = useState('all');
   const [seizedRows, setSeizedRows] = useState<Array<{ item_id: number; quantity: number }>>([]);
+  const [optionalMenuQtyByType, setOptionalMenuQtyByType] = useState<Record<RobberyType, number>>({ fleeca: 0, bijouterie: 0, morgue: 0 });
 
-  const roleStats = useMemo(() => buildRoleStats(runs, members), [runs, members]);
+  const roleStats = useMemo(() => buildRoleStats(currentRuns, members), [currentRuns, members]);
   const rotationSuggestions = useMemo<Suggestion[]>(() => [
     { title: '4 Braqueurs conseillés', icon: '🎯', names: suggest(roleStats, 'braqueur', 4) },
     { title: '2 Mule / récup conseillés', icon: '🚗', names: suggest(roleStats, 'plan_mule_recup', 2) }
@@ -152,21 +152,74 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
     { title: 'Plan Mule / Récup', values: muleIds, setValues: setMuleIds }
   ];
   const selectedDef = useMemo(() => ROBBERY_DEFS.find((entry) => entry.key === robberyType) ?? ROBBERY_DEFS[0], [robberyType]);
-  const availability = useMemo(() => selectedDef.stockResources.map((need) => { const item = items.find((entry) => normalize(entry.name).includes(normalize(need.label))); const stock = Number(item?.quantity ?? 0); return { ...need, itemId: item?.id ?? null, itemName: item?.name ?? need.label, image: item?.image_url ?? null, stock, ok: stock >= need.qty }; }), [items, selectedDef]);
-  const canValidate = canCreate && !saving && moneyAmount > 0 && selectedMembers.length > 0 && availability.every((entry) => entry.ok);
+  const availability = useMemo(() => selectedDef.stockResources.map((need) => { const item = currentItems.find((entry) => normalize(entry.name).includes(normalize(need.label))); const stock = Number(item?.quantity ?? 0); return { ...need, itemId: item?.id ?? null, itemName: item?.name ?? need.label, image: item?.image_url ?? null, stock, ok: stock >= need.qty }; }), [currentItems, selectedDef]);
+  const menuAvailability = useMemo(() => {
+    const need = selectedDef.optionalStockResources?.find((entry) => normalize(entry.label) === 'menu');
+    if (!need) return null;
+    const item = currentItems.find((entry) => normalize(entry.name).includes('menu'));
+    const stock = Number(item?.quantity ?? 0);
+    const qty = Math.min(Math.max(0, optionalMenuQtyByType[robberyType] ?? need.defaultQty), stock);
+    return { ...need, itemId: item?.id ?? null, itemName: item?.name ?? need.label, image: item?.image_url ?? null, stock, qty, ok: qty <= stock };
+  }, [currentItems, optionalMenuQtyByType, robberyType, selectedDef]);
+  const canValidate = canCreate && !saving && moneyAmount > 0 && selectedMembers.length > 0 && availability.every((entry) => entry.ok) && (menuAvailability?.ok ?? true);
   const seizedRowsById = useMemo(() => new Map(seizedRows.map((row) => [row.item_id, row.quantity])), [seizedRows]);
-  const filteredSeizableItems = useMemo(() => { const q = seizedQuery.trim().toLowerCase(); return items.filter((item) => (seizedCategory === 'all' || (item.category_key ?? 'stock').toLowerCase() === seizedCategory) && (!q || item.name.toLowerCase().includes(q)) && Number(item.quantity ?? 0) > 0); }, [items, seizedCategory, seizedQuery]);
+  const filteredSeizableItems = useMemo(() => { const q = seizedQuery.trim().toLowerCase(); return currentItems.filter((item) => (seizedCategory === 'all' || (item.category_key ?? 'stock').toLowerCase() === seizedCategory) && (!q || item.name.toLowerCase().includes(q)) && Number(item.quantity ?? 0) > 0); }, [currentItems, seizedCategory, seizedQuery]);
+  const activeMemberIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
+  const weekRuns = useMemo(() => {
+    const weekIso = weekStartIso(new Date());
+    return currentRuns.filter((run) => run.created_at >= weekIso && (run.participants ?? []).some((participant) => participant.id && activeMemberIds.has(participant.id)));
+  }, [activeMemberIds, currentRuns]);
+  const computedStats = useMemo(() => {
+    const resources = new Map<string, number>();
+    for (const run of weekRuns) {
+      for (const consumed of run.consumed_items ?? []) resources.set(consumed.itemName, (resources.get(consumed.itemName) ?? 0) + Number(consumed.required ?? 0));
+    }
+    return {
+      total: weekRuns.length,
+      fleeca: weekRuns.filter((run) => run.robbery_type === 'fleeca').length,
+      bijouterie: weekRuns.filter((run) => run.robbery_type === 'bijouterie').length,
+      morgue: weekRuns.filter((run) => run.robbery_type === 'morgue').length,
+      success: weekRuns.filter((run) => (run.status ?? 'success') === 'success').length,
+      arrested: weekRuns.filter((run) => (run.status ?? 'success') === 'arrested').length,
+      moneyIn: weekRuns.reduce((sum, run) => sum + Number(run.money_amount ?? 0), 0),
+      moneyLost: weekRuns.reduce((sum, run) => sum + Number(run.lost_money ?? 0), 0),
+      resources: Array.from(resources.entries()).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty).slice(0, 8)
+    };
+  }, [weekRuns]);
+  const computedPlayerStats = useMemo(() => {
+    const playerMap = new Map<string, { name: string; total: number; fleeca: number; bijouterie: number; morgue: number; money: number; last: string }>();
+    for (const run of weekRuns) {
+      for (const participant of run.participants ?? []) {
+        if (!participant.id || !activeMemberIds.has(participant.id)) continue;
+        const prev = playerMap.get(participant.id) ?? { name: participant.label, total: 0, fleeca: 0, bijouterie: 0, morgue: 0, money: 0, last: run.created_at };
+        prev.total += 1;
+        prev[run.robbery_type] += 1;
+        prev.money += Number(run.money_amount ?? 0);
+        if (new Date(run.created_at).getTime() > new Date(prev.last).getTime()) prev.last = run.created_at;
+        playerMap.set(participant.id, prev);
+      }
+    }
+    return Array.from(playerMap.values()).map((entry) => ({ ...entry, avg: entry.total > 0 ? entry.money / entry.total : 0 })).sort((a, b) => b.total - a.total || b.money - a.money);
+  }, [activeMemberIds, weekRuns]);
 
   async function submit(action: 'success' | 'arrested') {
     setError('');
     if (selectedMembers.length === 0) return setError('Sélectionne au moins un participant.');
     if (action === 'success' && !canValidate) return setError('Validation impossible: vérifie participants, stock et montant.');
-    const payload = { action, robbery_type: robberyType, money_amount: Math.max(0, moneyAmount), lost_money: Math.max(0, lostMoney), participant_ids: selectedMembers, braqueur_ids: braqueurIds, hostage_ids: hostageIds, mule_ids: muleIds, seized_resources: seizedRows.filter((row) => row.item_id > 0 && row.quantity > 0), note: seizedNote };
+    if (action === 'success' && menuAvailability && menuAvailability.qty > menuAvailability.stock) return setError('Stock Menu insuffisant.');
+    const optional_resources = menuAvailability ? [{ name: 'Menu', item_id: menuAvailability.itemId ?? undefined, quantity: menuAvailability.qty }] : [];
+    const payload = { action, robbery_type: robberyType, money_amount: Math.max(0, moneyAmount), lost_money: Math.max(0, lostMoney), participant_ids: selectedMembers, braqueur_ids: braqueurIds, hostage_ids: hostageIds, mule_ids: muleIds, optional_resources, seized_resources: seizedRows.filter((row) => row.item_id > 0 && row.quantity > 0), note: seizedNote };
     setSaving(true);
     const res = await fetch('/api/robberies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     setSaving(false);
     if (!res.ok) { const data = await res.json().catch(() => ({ message: 'Validation impossible.' })); return setError(data.message ?? 'Validation impossible.'); }
-    setMoneyAmount(0); setLostMoney(0); setSeizedNote(''); setSeizedRows([]); setSelectedMembers([]); setBraqueurIds([]); setHostageIds([]); setMuleIds([]); setArrestedOpen(false); router.refresh();
+    const data = await res.json().catch(() => null) as { run?: Run; itemUpdates?: Array<{ id: number; quantity: number }> } | null;
+    if (data?.itemUpdates?.length) setCurrentItems((cur) => cur.map((item) => {
+      const update = data.itemUpdates?.find((entry) => entry.id === item.id);
+      return update ? { ...item, quantity: update.quantity } : item;
+    }));
+    if (data?.run) setCurrentRuns((cur) => [data.run as Run, ...cur]);
+    setMoneyAmount(0); setLostMoney(0); setSeizedNote(''); setSeizedRows([]); setSelectedMembers([]); setBraqueurIds([]); setHostageIds([]); setMuleIds([]); setArrestedOpen(false); setOptionalMenuQtyByType((cur) => ({ ...cur, [robberyType]: 0 }));
   }
 
   return (
@@ -174,8 +227,8 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
       <section className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
         <article className="glass-card p-5">
           <h3 className="text-base font-semibold text-[#fff1dd]">Choix du braquage</h3>
-          <div className="mt-3 grid gap-2 md:grid-cols-3">{ROBBERY_DEFS.map((def) => <button key={def.key} type="button" onClick={() => setRobberyType(def.key)} className={`rounded-xl border p-3 text-left ${robberyType === def.key ? 'border-amber-200/60 bg-[#5a3a27]/70' : 'border-white/10 bg-[#3a2519]/55'}`}><p className="text-lg">{def.icon} {def.title}</p><p className="mt-1 text-xs text-[#efcdab]">{def.stockResources.map((entry) => `${entry.qty} ${entry.label}`).join(' · ')}</p></button>)}</div>
-          <div className="mt-3 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3"><p className="text-sm font-semibold text-[#ffe8ca]">Ressources stock</p><div className="mt-2 grid gap-2 md:grid-cols-2">{availability.map((entry) => <div key={entry.label} className={`rounded-lg border px-2 py-2 ${entry.ok ? 'border-emerald-300/25 bg-emerald-500/10' : 'border-rose-300/30 bg-rose-500/10'}`}><div className="flex items-center gap-2"><div className="h-9 w-9 overflow-hidden rounded-md border border-white/10 bg-[#1f120d]">{entry.image ? <Image src={entry.image} alt={entry.itemName} width={36} height={36} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs">📦</div>}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-[#ffe8ca]">{entry.itemName}</p><p className="text-[11px] text-[#efcdab]">Requis {entry.qty} · Dispo {entry.stock}</p></div><span className={`text-[10px] font-semibold ${entry.ok ? 'text-[#c5f2b9]' : 'text-[#f2b9b9]'}`}>{entry.ok ? 'OK' : 'Insuffisant'}</span></div></div>)}</div>{selectedDef.nonStockPrereqs?.length ? <div className="mt-3 rounded-lg border border-amber-300/25 bg-amber-500/10 p-2"><p className="text-xs font-semibold text-[#ffe8ca]">Prérequis non déduits</p><p className="mt-1 text-xs text-[#efcdab]">{selectedDef.nonStockPrereqs.join(' · ')}</p></div> : null}</div>
+          <div className="mt-3 grid gap-2 md:grid-cols-3">{ROBBERY_DEFS.map((def) => <button key={def.key} type="button" onClick={() => setRobberyType(def.key)} className={`rounded-xl border p-3 text-left ${robberyType === def.key ? 'border-amber-200/60 bg-[#5a3a27]/70' : 'border-white/10 bg-[#3a2519]/55'}`}><p className="text-lg">{def.icon} {def.title}</p><p className="mt-1 text-xs text-[#efcdab]">{def.stockResources.map((entry) => `${entry.qty} ${entry.label}`).join(' · ')}{def.optionalStockResources?.length ? ` · ${def.optionalStockResources.map((entry) => `${entry.label} optionnel`).join(' · ')}` : ''}</p></button>)}</div>
+          <div className="mt-3 rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3"><p className="text-sm font-semibold text-[#ffe8ca]">Ressources stock</p><div className="mt-2 grid gap-2 md:grid-cols-2">{availability.map((entry) => <div key={entry.label} className={`rounded-lg border px-2 py-2 ${entry.ok ? 'border-emerald-300/25 bg-emerald-500/10' : 'border-rose-300/30 bg-rose-500/10'}`}><div className="flex items-center gap-2"><div className="h-9 w-9 overflow-hidden rounded-md border border-white/10 bg-[#1f120d]">{entry.image ? <Image src={entry.image} alt={entry.itemName} width={36} height={36} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs">📦</div>}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-[#ffe8ca]">{entry.itemName}</p><p className="text-[11px] text-[#efcdab]">Requis {entry.qty} · Dispo {entry.stock}</p></div><span className={`text-[10px] font-semibold ${entry.ok ? 'text-[#c5f2b9]' : 'text-[#f2b9b9]'}`}>{entry.ok ? 'OK' : 'Insuffisant'}</span></div></div>)}</div>{menuAvailability ? <div className="mt-3 rounded-lg border border-sky-300/25 bg-sky-500/10 p-2"><p className="text-xs font-semibold text-[#ffe8ca]">Ressource optionnelle</p><div className="mt-2 grid gap-2 sm:grid-cols-[2.4rem_minmax(0,1fr)_7rem] sm:items-center"><div className="h-9 w-9 overflow-hidden rounded-md border border-white/10 bg-[#1f120d]">{menuAvailability.image ? <Image src={menuAvailability.image} alt={menuAvailability.itemName} width={36} height={36} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full items-center justify-center text-xs">📦</div>}</div><div className="min-w-0"><p className="truncate text-xs font-semibold text-[#ffe8ca]">{menuAvailability.itemName}</p><p className="text-[11px] text-[#efcdab]">Défaut 0 · Dispo {menuAvailability.stock}</p></div><input type="number" min={0} max={menuAvailability.stock} className="saas-input !h-9 !min-h-9 w-full text-sm" value={menuAvailability.qty} onChange={(event) => { const next = Math.min(menuAvailability.stock, Math.max(0, Number(event.target.value || 0))); setOptionalMenuQtyByType((cur) => ({ ...cur, [robberyType]: next })); }} /></div>{menuAvailability.qty > 0 ? <p className="mt-1 text-[11px] text-[#d7ebff]">Retirera {menuAvailability.qty} Menu du stock.</p> : <p className="mt-1 text-[11px] text-[#efcdab]">Quantité 0: aucun Menu retiré.</p>}</div> : null}{selectedDef.nonStockPrereqs?.length ? <div className="mt-3 rounded-lg border border-amber-300/25 bg-amber-500/10 p-2"><p className="text-xs font-semibold text-[#ffe8ca]">Prérequis non déduits</p><p className="mt-1 text-xs text-[#efcdab]">{selectedDef.nonStockPrereqs.join(' · ')}</p></div> : null}</div>
         </article>
 
         <article className="glass-card space-y-3 p-5">
@@ -190,9 +243,9 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
         </article>
       </section>
 
-      {canStats ? <section className="space-y-3"><div className="grid gap-2 md:grid-cols-5 xl:grid-cols-10"><Stat label="Total" value={String(stats.total)} icon="🧾" /><Stat label="Fleeca" value={String(stats.fleeca)} icon="🏦" /><Stat label="Bijouterie" value={String(stats.bijouterie)} icon="💎" /><Stat label="Morgue" value={String(stats.morgue)} icon="🟥" /><Stat label="Réussis" value={String(stats.success)} icon="✅" /><Stat label="Arrêtés" value={String(stats.arrested)} icon="🚔" /><Stat label="Argent rentré" value={formatUsd(stats.moneyIn)} icon="💵" /><Stat label="Argent perdu" value={formatUsd(stats.moneyLost)} icon="💸" /><Stat label="Bénéfice net" value={formatUsd(stats.moneyIn - stats.moneyLost)} icon="📈" /><Stat label="Ressources" value={String(stats.resources.reduce((sum, row) => sum + row.qty, 0))} icon="📦" /></div><RotationSuggestions suggestions={rotationSuggestions} /><section className="grid gap-3 xl:grid-cols-3"><RoleRanking title="Classement braqueurs" icon="🎯" rows={roleStats} role="braqueur" /><RoleRanking title="Classement mules / récup" icon="🚗" rows={roleStats} role="plan_mule_recup" /><RoleRanking title="Classement otages" icon="🤝" rows={roleStats} role="otage_apporte" /></section><LegacyRanking rows={playerStats} resources={stats.resources} /></section> : null}
+      {canStats ? <section className="space-y-3"><div className="grid gap-2 md:grid-cols-5 xl:grid-cols-10"><Stat label="Total" value={String(computedStats.total)} icon="🧾" /><Stat label="Fleeca" value={String(computedStats.fleeca)} icon="🏦" /><Stat label="Bijouterie" value={String(computedStats.bijouterie)} icon="💎" /><Stat label="Morgue" value={String(computedStats.morgue)} icon="🟥" /><Stat label="Réussis" value={String(computedStats.success)} icon="✅" /><Stat label="Arrêtés" value={String(computedStats.arrested)} icon="🚔" /><Stat label="Argent rentré" value={formatUsd(computedStats.moneyIn)} icon="💵" /><Stat label="Argent perdu" value={formatUsd(computedStats.moneyLost)} icon="💸" /><Stat label="Bénéfice net" value={formatUsd(computedStats.moneyIn - computedStats.moneyLost)} icon="📈" /><Stat label="Ressources" value={String(computedStats.resources.reduce((sum, row) => sum + row.qty, 0))} icon="📦" /></div><RotationSuggestions suggestions={rotationSuggestions} /><section className="grid gap-3 xl:grid-cols-3"><RoleRanking title="Classement braqueurs" icon="🎯" rows={roleStats} role="braqueur" /><RoleRanking title="Classement mules / récup" icon="🚗" rows={roleStats} role="plan_mule_recup" /><RoleRanking title="Classement otages" icon="🤝" rows={roleStats} role="otage_apporte" /></section><LegacyRanking rows={computedPlayerStats} resources={computedStats.resources} /></section> : null}
 
-      {canLogs ? <section className="glass-card p-5"><h3 className="text-base font-semibold text-[#fff1dd]">Historique braquage</h3><div className="mt-3 space-y-2">{runs.map((run) => <HistoryCard key={run.id} run={run} />)}{runs.length === 0 ? <p className="text-sm text-[#efcdab]">Aucun braquage enregistré.</p> : null}</div></section> : null}
+      {canLogs ? <section className="glass-card p-5"><h3 className="text-base font-semibold text-[#fff1dd]">Historique braquage</h3><div className="mt-3 space-y-2">{currentRuns.map((run) => <HistoryCard key={run.id} run={run} />)}{currentRuns.length === 0 ? <p className="text-sm text-[#efcdab]">Aucun braquage enregistré.</p> : null}</div></section> : null}
     </div>
   );
 }

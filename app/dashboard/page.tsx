@@ -2,7 +2,6 @@ import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { DashboardShellClient } from '@/components/dashboard/dashboard-shell-client';
-import { buildPayrollPreview, payrollDisplayWindow, weekWindow, DEFAULT_PAYROLL_CONFIG } from '@/lib/payroll';
 
 const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'activity_payroll', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
 
@@ -54,42 +53,14 @@ export default async function DashboardPage() {
     ? await supabase.from('users').select('name, role, dashboard_layout').eq('id', session.userId).maybeSingle()
     : { data: null };
 
-  const myPayEstimate = session && canActivityPayrollPreview
-    ? await (async () => {
-        const now = new Date();
-        const displayWindow = payrollDisplayWindow(now);
-        const currentWeek = { startIso: displayWindow.startIso, endIso: displayWindow.endIso };
-        const previousWeek = weekWindow(new Date(displayWindow.startIso), -1);
-        const displayStartIso = displayWindow.startIso;
-        const [currentPreview, previousPreview, activeCustomRun] = await Promise.all([
-          buildPayrollPreview(supabase, { weekStartIso: currentWeek.startIso, weekEndIso: currentWeek.endIso, config: DEFAULT_PAYROLL_CONFIG }),
-          buildPayrollPreview(supabase, { weekStartIso: previousWeek.startIso, weekEndIso: previousWeek.endIso, config: DEFAULT_PAYROLL_CONFIG })
-          , supabase.from('payroll_runs').select('id, week_start, week_end, period_mode').eq('period_mode', 'custom').lte('week_start', displayStartIso).gt('week_end', displayStartIso).order('validated_at', { ascending: false }).limit(1).maybeSingle()
-        ]);
-        const currentMember = currentPreview.members.find((entry) => entry.memberId === session.userId);
-        const previousMember = previousPreview.members.find((entry) => entry.memberId === session.userId);
-        if (activeCustomRun.data?.id) {
-          const { data: customMember } = await supabase.from('payroll_run_members').select('amount').eq('payroll_run_id', activeCustomRun.data.id).eq('member_user_id', session.userId).maybeSingle();
-          return {
-            currentEstimate: Number.isFinite(Number(customMember?.amount)) ? Number(customMember?.amount ?? 0) : 0,
-            previousEstimate: Number.isFinite(Number(previousMember?.proposedPay)) ? Number(previousMember?.proposedPay ?? 0) : 0
-          };
-        }
-        return {
-          currentEstimate: Number.isFinite(Number(currentMember?.proposedPay)) ? Number(currentMember?.proposedPay ?? 0) : 0,
-          previousEstimate: Number.isFinite(Number(previousMember?.proposedPay)) ? Number(previousMember?.proposedPay ?? 0) : 0
-        };
-      })()
-    : { currentEstimate: 0, previousEstimate: 0 };
-
   const initialOrder = (Array.isArray(user?.dashboard_layout) ? user?.dashboard_layout.filter((value: unknown) => typeof value === 'string') : DEFAULT_ORDER) as string[];
 
   return (
     <DashboardShellClient
       name={user?.name || session?.username || 'Utilisateur'}
       role={user?.role || session?.role || 'Utilisateur'}
-      payEstimateCurrent={myPayEstimate.currentEstimate}
-      payEstimatePrevious={myPayEstimate.previousEstimate}
+      payEstimateCurrent={0}
+      payEstimatePrevious={0}
       canUpdatePassword={canUpdatePassword}
       initialOrder={initialOrder}
       flags={{

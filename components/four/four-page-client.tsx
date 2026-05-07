@@ -40,9 +40,10 @@ function getFourItemCategory(item: Item): FourCategory | null {
   return null;
 }
 
-export function FourPageClient({ items, initialTransactions, canCreate, canEditOwn, canEditAny, canCancelOwn, canCancelAny, currentUserId }: {
+export function FourPageClient({ items, initialTransactions, initialCashBalance, canCreate, canEditOwn, canEditAny, canCancelOwn, canCancelAny, currentUserId }: {
   items: Item[];
   initialTransactions: FourTx[];
+  initialCashBalance: number;
   canCreate: boolean;
   canEditOwn: boolean;
   canEditAny: boolean;
@@ -50,7 +51,9 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
   canCancelAny: boolean;
   currentUserId: string;
 }) {
+  const [currentItems, setCurrentItems] = useState(items);
   const [transactions, setTransactions] = useState(initialTransactions);
+  const [cashBalance, setCashBalance] = useState(initialCashBalance);
   const [query, setQuery] = useState('');
   const [counterparty, setCounterparty] = useState('');
   const [draftKind, setDraftKind] = useState<LineKind>('buy');
@@ -60,11 +63,12 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
   const [error, setError] = useState('');
 
   const availableItems = useMemo(
-    () => items
+    () => currentItems
       .filter((item) => isAllowedFourItem(item) && getFourItemCategory(item) === itemCategory)
       .filter((item) => item.name.toLowerCase().includes(query.toLowerCase())),
-    [items, itemCategory, query]
+    [currentItems, itemCategory, query]
   );
+  const itemById = useMemo(() => new Map(currentItems.map((item) => [item.id, item])), [currentItems]);
   const draftTotals = useMemo(() => {
     const purchases = draftLines.filter((line) => line.movement_kind === 'buy').reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
     const sales = draftLines.filter((line) => line.movement_kind === 'sell').reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
@@ -72,9 +76,17 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
   }, [draftLines]);
 
   function upsertLine(item: Item) {
+    setError('');
     setDraftLines((current) => {
       const idx = current.findIndex((line) => line.item_id === item.id && line.movement_kind === draftKind);
       const unitPrice = draftKind === 'buy' ? Number(item.buy_price ?? 0) : Number(item.sell_price ?? 0);
+      if (draftKind === 'sell') {
+        const currentQty = idx >= 0 ? current[idx].quantity : 0;
+        if (currentQty >= Number(item.quantity ?? 0)) {
+          setError(`Stock insuffisant pour ${item.name}.`);
+          return current;
+        }
+      }
       if (idx >= 0) return current.map((line, i) => i === idx ? { ...line, quantity: line.quantity + 1 } : line);
       return [...current, { item_id: item.id, item_name: item.name, item_image_url: item.image_url, movement_kind: draftKind, quantity: 1, unit_price: unitPrice }];
     });
@@ -85,11 +97,20 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
     return canCancelAny || (canCancelOwn && tx.created_by === currentUserId);
   }
 
-  async function reloadTransactions() {
-    const res = await fetch('/api/four/transactions', { cache: 'no-store' });
-    if (!res.ok) return;
-    const payload = await res.json() as { transactions: FourTx[] };
-    setTransactions(payload.transactions ?? []);
+  function applyMutationPayload(payload: { transaction?: FourTx | null; itemUpdates?: Array<{ id: number; quantity: number }>; cash?: { after: number } }) {
+    if (payload.itemUpdates?.length) {
+      setCurrentItems((current) => current.map((item) => {
+        const update = payload.itemUpdates?.find((entry) => entry.id === item.id);
+        return update ? { ...item, quantity: update.quantity } : item;
+      }));
+    }
+    if (payload.transaction) {
+      setTransactions((current) => {
+        const without = current.filter((tx) => tx.id !== payload.transaction?.id);
+        return [payload.transaction as FourTx, ...without].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      });
+    }
+    if (payload.cash) setCashBalance(Number(payload.cash.after ?? 0));
   }
 
   async function submit() {
@@ -102,10 +123,10 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
       body: JSON.stringify(editingTxId ? { transaction_id: editingTxId, ...payload } : payload)
     });
     if (!res.ok) return setError((await res.json()).message ?? 'Validation impossible.');
+    applyMutationPayload(await res.json());
     setDraftLines([]);
     setCounterparty('');
     setEditingTxId(null);
-    await reloadTransactions();
   }
 
   async function cancelTx(txId: number) {
@@ -115,11 +136,17 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
       body: JSON.stringify({ transaction_id: txId, reason: 'Annulation depuis module FOUR direct' })
     });
     if (!res.ok) return setError((await res.json()).message ?? 'Annulation impossible.');
-    await reloadTransactions();
+    applyMutationPayload(await res.json());
   }
 
   return (
     <div className="space-y-4">
+      <section className="grid gap-2 md:grid-cols-4">
+        <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2.5">
+          <p className="text-xs text-[#efcdab]">Caisse groupe</p>
+          <p className="mt-1 text-base font-semibold text-[#ffe8ca]">{formatUsd(cashBalance)}</p>
+        </div>
+      </section>
       <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <article className="glass-card space-y-3 p-5">
           <div className="flex items-center gap-2">
@@ -151,7 +178,10 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
           <h4 className="text-base font-semibold text-[#fff1dd]">{editingTxId ? `Modifier transaction #${editingTxId}` : 'Nouvelle transaction FOUR'}</h4>
           <input className="saas-input w-full" placeholder="Interlocuteur / Client / Groupe" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} />
           <div className="space-y-2">
-            {draftLines.map((line, idx) => (
+            {draftLines.map((line, idx) => {
+              const itemStock = Number(itemById.get(line.item_id)?.quantity ?? 0);
+              const maxSellQty = editingTxId && line.movement_kind === 'sell' ? itemStock + line.quantity : itemStock;
+              return (
               <div key={`${line.item_id}-${idx}`} className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
                 <div className="flex items-center gap-2">
                   <div className="h-10 w-10 overflow-hidden rounded-lg border border-white/10 bg-[#1f120d]">
@@ -161,7 +191,12 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                 </div>
                 <CompactLineGrid type="four">
                   <CompactField label="Type">
-                    <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, movement_kind: e.target.value as LineKind } : entry))}>
+                    <select className="saas-input !h-9 !min-h-9 w-full text-sm" value={line.movement_kind} onChange={(e) => setDraftLines((cur) => cur.map((entry, i) => {
+                      if (i !== idx) return entry;
+                      const movementKind = e.target.value as LineKind;
+                      const stock = Number(itemById.get(entry.item_id)?.quantity ?? 0);
+                      return { ...entry, movement_kind: movementKind, quantity: movementKind === 'sell' ? Math.max(1, Math.min(entry.quantity, stock)) : entry.quantity };
+                    }))}>
                       <option value="buy">Achat</option>
                       <option value="sell">Vente</option>
                     </select>
@@ -171,9 +206,10 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                     <QuantityStepper
                       value={line.quantity}
                       onDecrease={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, entry.quantity - 1) } : entry))}
-                      onIncrease={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: entry.quantity + 1 } : entry))}
-                      onChange={(next) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: Math.max(1, next || 1) } : entry))}
+                      onIncrease={() => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: entry.movement_kind === 'sell' ? Math.min(maxSellQty, entry.quantity + 1) : entry.quantity + 1 } : entry))}
+                      onChange={(next) => setDraftLines((cur) => cur.map((entry, i) => i === idx ? { ...entry, quantity: entry.movement_kind === 'sell' ? Math.max(1, Math.min(maxSellQty, next || 1)) : Math.max(1, next || 1) } : entry))}
                     />
+                    {line.movement_kind === 'sell' ? <p className="mt-1 text-[10px] text-[#efcdab]">Stock dispo {maxSellQty}</p> : null}
                   </CompactField>
 
                   <CompactField label="Prix">
@@ -185,7 +221,7 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                   </CompactActionField>
                 </CompactLineGrid>
               </div>
-            ))}
+            ); })}
           </div>
 
           <div className="grid gap-2 md:grid-cols-3">
@@ -226,7 +262,7 @@ export function FourPageClient({ items, initialTransactions, canCreate, canEditO
                 {canManage(tx, 'edit') && (tx.status ?? 'validated') === 'validated' ? <button type="button" className="saas-ghost-btn" onClick={() => {
                   setEditingTxId(tx.id);
                   setCounterparty(tx.counterparty || '');
-                  setDraftLines((tx.four_transaction_lines ?? []).map((line) => ({ item_id: line.item_id, item_name: line.item_name, movement_kind: line.movement_kind, quantity: Number(line.quantity), unit_price: Number(line.unit_price) })));
+                  setDraftLines((tx.four_transaction_lines ?? []).map((line) => ({ item_id: line.item_id, item_name: line.item_name, item_image_url: itemById.get(line.item_id)?.image_url ?? null, movement_kind: line.movement_kind, quantity: Number(line.quantity), unit_price: Number(line.unit_price) })));
                 }}>Modifier</button> : null}
                 {canManage(tx, 'cancel') && (tx.status ?? 'validated') === 'validated' ? <button type="button" className="saas-ghost-btn" onClick={() => void cancelTx(tx.id)}>Annuler</button> : null}
               </div>

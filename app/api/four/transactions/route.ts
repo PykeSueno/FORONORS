@@ -7,6 +7,9 @@ import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
 type TxLine = { item_id: number; movement_kind: 'buy' | 'sell'; quantity: number; unit_price: number };
+type ResolvedLine = { itemId: number; itemName: string; movementKind: 'buy' | 'sell'; quantity: number; unitPrice: number; totalAmount: number };
+type ItemEffect = { itemId: number; itemName: string; before: number; after: number; delta: number };
+type CashEffect = { before: number; after: number; delta: number };
 
 function canManageTx(actorId: string, txOwnerId: string | null, canOwn: boolean, canAny: boolean) {
   if (canAny) return true;
@@ -30,7 +33,12 @@ function isValidatedStatus(status: string | null | undefined) {
 async function parseResolvedLines(lines: TxLine[]) {
   if (lines.length === 0) throw new Error('Aucune ligne transaction.');
   const supabase = getSupabaseAdmin();
-  const resolved: Array<{ itemId: number; itemName: string; movementKind: 'buy' | 'sell'; quantity: number; unitPrice: number; totalAmount: number }> = [];
+  const itemIds = Array.from(new Set(lines.map((line) => Number(line.item_id)).filter(Boolean)));
+  const { data: itemRows } = itemIds.length > 0
+    ? await supabase.from('items').select('id, name, category_key, type_key').in('id', itemIds)
+    : { data: [] };
+  const itemById = new Map((itemRows ?? []).map((item) => [Number(item.id), item]));
+  const resolved: ResolvedLine[] = [];
   let totalPurchases = 0;
   let totalSales = 0;
 
@@ -39,7 +47,7 @@ async function parseResolvedLines(lines: TxLine[]) {
     const qty = Math.max(1, Number(line.quantity));
     const price = Math.max(0, Number(line.unit_price));
     if (!itemId) throw new Error('Item invalide.');
-    const { data: item } = await supabase.from('items').select('id, name, category_key, type_key').eq('id', itemId).maybeSingle();
+    const item = itemById.get(itemId);
     if (!item) throw new Error(`Item #${itemId} introuvable.`);
     if (!isAllowedFourItem(item)) throw new Error(`${item.name} n'est pas autorisé dans le FOUR.`);
     const totalAmount = qty * price;
@@ -51,27 +59,59 @@ async function parseResolvedLines(lines: TxLine[]) {
   return { resolved, totalPurchases, totalSales, profitLoss: totalSales - totalPurchases };
 }
 
-async function applyTransactionEffect(args: { transactionId: number | null; actorUserId: string; lines: Array<{ itemId: number; itemName: string; movementKind: 'buy' | 'sell'; quantity: number; unitPrice: number; totalAmount: number }>; multiplier: 1 | -1; label: string }) {
+async function getFourTransaction(supabase: ReturnType<typeof getSupabaseAdmin>, txId: number) {
+  const { data } = await supabase
+    .from('four_transactions')
+    .select('id, counterparty, status, cancel_reason, created_by, total_purchases, total_sales, profit_loss, created_at, updated_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount)')
+    .eq('id', txId)
+    .maybeSingle();
+  return data;
+}
+
+async function getItemUpdates(supabase: ReturnType<typeof getSupabaseAdmin>, itemIds: number[]) {
+  const ids = Array.from(new Set(itemIds.filter(Boolean)));
+  if (ids.length === 0) return [];
+  const { data } = await supabase.from('items').select('id, quantity').in('id', ids);
+  return (data ?? []).map((item) => ({ id: Number(item.id), quantity: Number(item.quantity ?? 0) }));
+}
+
+async function applyTransactionEffect(args: { sessionId: number | null; transactionId: number | null; actorUserId: string; lines: ResolvedLine[]; multiplier: 1 | -1; label: string }) {
   const supabase = getSupabaseAdmin();
-  const itemDelta = new Map<number, number>();
+  const itemEffects: ItemEffect[] = [];
   let cashDelta = 0;
 
   for (const line of args.lines) {
     const direction = line.movementKind === 'buy' ? 1 : -1;
     const stockDelta = direction * line.quantity * args.multiplier;
-    const existing = itemDelta.get(line.itemId) ?? 0;
-    itemDelta.set(line.itemId, existing + stockDelta);
     const money = (line.movementKind === 'sell' ? line.totalAmount : -line.totalAmount) * args.multiplier;
     cashDelta += money;
-  }
-
-  for (const [itemId, delta] of itemDelta.entries()) {
-    if (!delta) continue;
-    const { data: item } = await supabase.from('items').select('id, quantity').eq('id', itemId).maybeSingle();
-    if (!item) throw new Error(`Item #${itemId} introuvable.`);
-    const nextQty = Number(item.quantity ?? 0) + delta;
-    if (nextQty < 0) throw new Error(`Stock insuffisant sur item #${itemId}.`);
-    await supabase.from('items').update({ quantity: nextQty, updated_at: new Date().toISOString() }).eq('id', itemId);
+    if (!stockDelta) continue;
+    const { data: item } = await supabase.from('items').select('id, name, quantity').eq('id', line.itemId).maybeSingle();
+    if (!item) throw new Error(`Item #${line.itemId} introuvable.`);
+    const before = Number(item.quantity ?? 0);
+    const nextQty = before + stockDelta;
+    if (nextQty < 0) throw new Error(`Stock insuffisant sur item #${line.itemId}.`);
+    await supabase.from('items').update({ quantity: nextQty, updated_at: new Date().toISOString() }).eq('id', line.itemId);
+    itemEffects.push({ itemId: line.itemId, itemName: line.itemName || item.name, before, after: nextQty, delta: stockDelta });
+    await supabase.from('item_stock_movements').insert({
+      item_id: line.itemId,
+      item_name: line.itemName || item.name,
+      quantity_delta: stockDelta,
+      transaction_type: `four_${line.movementKind}_${args.multiplier === 1 ? 'direct' : 'rollback'}`,
+      user_id: args.actorUserId
+    });
+    if (args.sessionId) {
+      await supabase.from('four_movements').insert({
+        session_id: args.sessionId,
+        movement_kind: line.movementKind,
+        item_id: line.itemId,
+        item_name: line.itemName || item.name,
+        quantity: line.quantity * args.multiplier,
+        unit_price: line.unitPrice,
+        total_amount: line.totalAmount * args.multiplier,
+        created_by: args.actorUserId
+      });
+    }
   }
 
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
@@ -84,9 +124,12 @@ async function applyTransactionEffect(args: { transactionId: number | null; acto
     type: cashDelta >= 0 ? 'entry' : 'exit',
     amount: Math.abs(cashDelta),
     label: args.label,
-    user_id: args.actorUserId
+    user_id: args.actorUserId,
+    before_amount: cashBefore,
+    after_amount: cashAfter
   });
   await syncMoneyItemToGroupCash(supabase);
+  return { itemEffects, cashEffect: { before: cashBefore, after: cashAfter, delta: cashDelta } as CashEffect };
 }
 
 export async function GET() {
@@ -158,16 +201,20 @@ export async function POST(request: Request) {
       total_amount: line.totalAmount
     })));
     if (lineError) return NextResponse.json({ message: 'Enregistrement des lignes FOUR impossible.' }, { status: 400 });
-    await applyTransactionEffect({ transactionId: tx.id, actorUserId: session.userId, lines: resolved, multiplier: 1, label: `FOUR transaction #${tx.id}` });
+    const effects = await applyTransactionEffect({ sessionId: directSession.id, transactionId: tx.id, actorUserId: session.userId, lines: resolved, multiplier: 1, label: `FOUR transaction #${tx.id}` });
+    const [transaction, itemUpdates] = await Promise.all([
+      getFourTransaction(supabase, tx.id),
+      getItemUpdates(supabase, effects.itemEffects.map((effect) => effect.itemId))
+    ]);
     await createAuditLog({
       actorUserId: session.userId,
       action: 'four.transaction.validate',
       entityType: 'four_transaction',
       entityId: tx.id,
       summary: `FOUR direct · transaction #${tx.id}`,
-      newValues: { counterparty: body.counterparty ?? null, totalPurchases, totalSales, profitLoss, lines: resolved }
+      newValues: { counterparty: body.counterparty ?? null, totalPurchases, totalSales, profitLoss, lines: resolved, stockEffects: effects.itemEffects, cashEffect: effects.cashEffect }
     });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, transaction, itemUpdates, cash: effects.cashEffect });
   } catch (error) {
     if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Validation impossible.' }, { status: 400 });
@@ -195,7 +242,7 @@ export async function PATCH(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: tx } = await supabase
     .from('four_transactions')
-    .select('id, status, created_by, four_transaction_lines(item_id, item_name, movement_kind, quantity, unit_price, total_amount)')
+    .select('id, session_id, status, created_by, four_transaction_lines(item_id, item_name, movement_kind, quantity, unit_price, total_amount)')
     .eq('id', txId)
     .maybeSingle();
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
@@ -213,8 +260,8 @@ export async function PATCH(request: Request) {
       totalAmount: Number(line.total_amount ?? 0)
     }));
     const { resolved, totalPurchases, totalSales, profitLoss } = await parseResolvedLines(body.lines ?? []);
-    await applyTransactionEffect({ transactionId: txId, actorUserId: session.userId, lines: previousLines, multiplier: -1, label: `FOUR edit rollback #${txId}` });
-    await applyTransactionEffect({ transactionId: txId, actorUserId: session.userId, lines: resolved, multiplier: 1, label: `FOUR edit apply #${txId}` });
+    const rollbackEffects = await applyTransactionEffect({ sessionId: Number(tx.session_id ?? 0) || null, transactionId: txId, actorUserId: session.userId, lines: previousLines, multiplier: -1, label: `FOUR edit rollback #${txId}` });
+    const applyEffects = await applyTransactionEffect({ sessionId: Number(tx.session_id ?? 0) || null, transactionId: txId, actorUserId: session.userId, lines: resolved, multiplier: 1, label: `FOUR edit apply #${txId}` });
 
     await supabase.from('four_transactions').update({
       counterparty: body.counterparty?.trim() || null,
@@ -239,10 +286,12 @@ export async function PATCH(request: Request) {
       entityType: 'four_transaction',
       entityId: txId,
       summary: `Modification transaction FOUR #${txId}`,
-      oldValues: { lines: previousLines },
-      newValues: { counterparty: body.counterparty?.trim() || null, totalPurchases, totalSales, profitLoss, lines: resolved }
+      oldValues: { lines: previousLines, stockEffects: rollbackEffects.itemEffects, cashEffect: rollbackEffects.cashEffect },
+      newValues: { counterparty: body.counterparty?.trim() || null, totalPurchases, totalSales, profitLoss, lines: resolved, stockEffects: applyEffects.itemEffects, cashEffect: applyEffects.cashEffect }
     });
-    return NextResponse.json({ ok: true });
+    const touchedItemIds = [...previousLines.map((line) => line.itemId), ...resolved.map((line) => line.itemId)];
+    const [transaction, itemUpdates] = await Promise.all([getFourTransaction(supabase, txId), getItemUpdates(supabase, touchedItemIds)]);
+    return NextResponse.json({ ok: true, transaction, itemUpdates, cash: applyEffects.cashEffect });
   } catch (error) {
     if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Modification impossible.' }, { status: 400 });
@@ -269,7 +318,7 @@ export async function DELETE(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: tx } = await supabase
     .from('four_transactions')
-    .select('id, status, created_by, four_transaction_lines(item_id, item_name, movement_kind, quantity, unit_price, total_amount)')
+    .select('id, session_id, status, created_by, four_transaction_lines(item_id, item_name, movement_kind, quantity, unit_price, total_amount)')
     .eq('id', txId)
     .maybeSingle();
   if (!tx) return NextResponse.json({ message: 'Transaction introuvable.' }, { status: 404 });
@@ -286,7 +335,7 @@ export async function DELETE(request: Request) {
       unitPrice: Number(line.unit_price ?? 0),
       totalAmount: Number(line.total_amount ?? 0)
     }));
-    await applyTransactionEffect({ transactionId: txId, actorUserId: session.userId, lines: previousLines, multiplier: -1, label: `FOUR annulation #${txId}` });
+    const effects = await applyTransactionEffect({ sessionId: Number(tx.session_id ?? 0) || null, transactionId: txId, actorUserId: session.userId, lines: previousLines, multiplier: -1, label: `FOUR annulation #${txId}` });
     await supabase.from('four_transactions').update({
       status: 'canceled',
       cancel_reason: body.reason?.trim() || null,
@@ -301,9 +350,10 @@ export async function DELETE(request: Request) {
       entityId: txId,
       summary: `Annulation transaction FOUR #${txId}`,
       oldValues: { lines: previousLines },
-      newValues: { reason: body.reason?.trim() || null }
+      newValues: { reason: body.reason?.trim() || null, stockEffects: effects.itemEffects, cashEffect: effects.cashEffect }
     });
-    return NextResponse.json({ ok: true });
+    const [transaction, itemUpdates] = await Promise.all([getFourTransaction(supabase, txId), getItemUpdates(supabase, previousLines.map((line) => line.itemId))]);
+    return NextResponse.json({ ok: true, transaction, itemUpdates, cash: effects.cashEffect });
   } catch (error) {
     if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Annulation impossible.' }, { status: 400 });

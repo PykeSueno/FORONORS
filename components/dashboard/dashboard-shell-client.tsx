@@ -55,15 +55,23 @@ function OpsDashboardIcon() {
 
 export function DashboardShellClient({ name, role, payEstimateCurrent, payEstimatePrevious, canUpdatePassword, initialOrder, flags }: { name: string; role: string; payEstimateCurrent: number; payEstimatePrevious: number; canUpdatePassword: boolean; initialOrder: string[]; flags: DashboardFlags }) {
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
+  const [payEstimate, setPayEstimate] = useState({ current: payEstimateCurrent, previous: payEstimatePrevious });
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch('/api/dashboard/summary', { cache: 'no-store', signal: controller.signal })
+    const summaryRequest = fetch('/api/dashboard/summary', { cache: 'no-store', signal: controller.signal })
       .then((response) => response.ok ? response.json() : null)
       .then((data) => { if (data) setSummary(data as SummaryPayload); })
       .catch(() => {});
+    const payrollRequest = flags.canActivityPayrollPreview
+      ? fetch('/api/dashboard/payroll-preview', { cache: 'no-store', signal: controller.signal })
+          .then((response) => response.ok ? response.json() : null)
+          .then((data) => { if (data) setPayEstimate({ current: Number(data.currentEstimate ?? 0), previous: Number(data.previousEstimate ?? 0) }); })
+          .catch(() => {})
+      : Promise.resolve();
+    void Promise.all([summaryRequest, payrollRequest]);
     return () => controller.abort();
-  }, []);
+  }, [flags.canActivityPayrollPreview]);
 
   const cards = useMemo<Card[]>(() => [
     flags.canMoneyPreview ? { id: 'money', href: '/dashboard/argent', enabled: flags.canMoneyAccess, icon: '💰', title: 'Argent', value: summary ? formatUsd(summary.values.cashBalance) : '…', subtitle: 'Caisse actuelle' } : null,
@@ -129,11 +137,11 @@ export function DashboardShellClient({ name, role, payEstimateCurrent, payEstima
               </div>
               <div className="rounded-xl border border-emerald-300/20 bg-gradient-to-br from-emerald-500/20 to-emerald-700/10 px-3 py-2">
                 <p className="text-[11px] uppercase tracking-[0.08em] text-[#d9f5d4]">💸 Salaire estimé semaine</p>
-                <p className="text-base font-semibold text-[#ecffe8]">{formatUsd(payEstimateCurrent)}</p>
+                <p className="text-base font-semibold text-[#ecffe8]">{formatUsd(payEstimate.current)}</p>
               </div>
               <div className="rounded-xl border border-white/10 bg-[#2f1c13]/55 px-3 py-2">
                 <p className="text-[11px] uppercase tracking-[0.08em] text-[#e7c39b]">📊 Semaine passée</p>
-                <p className="text-sm font-medium text-[#f9dfbe]">{formatUsd(payEstimatePrevious)}</p>
+                <p className="text-sm font-medium text-[#f9dfbe]">{formatUsd(payEstimate.previous)}</p>
               </div>
             </div>
           </div>

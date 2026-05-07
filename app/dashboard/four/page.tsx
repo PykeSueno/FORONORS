@@ -14,13 +14,14 @@ export default async function FourPage() {
   if (!permissions.includes('four.access')) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: items }, { data: transactions }] = await Promise.all([
+  const [{ data: items }, { data: transactions }, { data: cash }] = await Promise.all([
     supabase.from('items').select('id, name, image_url, quantity, buy_price, sell_price, category_key, type_key').order('name', { ascending: true }),
     supabase
       .from('four_transactions')
       .select('id, counterparty, status, cancel_reason, created_by, total_purchases, total_sales, profit_loss, created_at, updated_at, four_transaction_lines(id, item_id, item_name, movement_kind, quantity, unit_price, total_amount)')
       .order('created_at', { ascending: false })
-      .limit(300)
+      .limit(300),
+    supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle()
   ]);
 
   return (
@@ -34,6 +35,7 @@ export default async function FourPage() {
       <FourPageClient
         items={items ?? []}
         initialTransactions={transactions ?? []}
+        initialCashBalance={Number(cash?.balance ?? 0)}
         canCreate={permissions.includes('four.transaction.validate')}
         canEditOwn={permissions.includes('four.transaction.edit.own') || permissions.includes('four.transaction.manage.own') || permissions.includes('four.transaction.manage')}
         canEditAny={permissions.includes('four.transaction.edit.any') || permissions.includes('four.transaction.manage.any')}

@@ -54,10 +54,10 @@ export async function GET() {
   dayStart.setHours(0, 0, 0, 0);
   const dayStartIso = dayStart.toISOString();
 
-  const [{ data: cash }, { data: itemQuantities }, { data: txRows }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { data: saleObjectsTodayRows }, { data: cigaretteToday }, { data: tabletToday }, { data: processorTodayRows }, { data: activitiesTodayRows }, { data: activeMembersForCounts }, { data: fourTodayRows }, { data: pendingExpensesRows }] = await Promise.all([
+  const [{ data: cash }, { data: itemQuantities }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { data: saleObjectsTodayRows }, { data: cigaretteToday }, { data: tabletToday }, { data: processorTodayRows }, { data: activitiesTodayRows }, { data: activeMembersForCounts }, { data: fourTodayRows }, { data: pendingExpensesRows }] = await Promise.all([
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canItemsPreview ? supabase.from('items').select('quantity') : Promise.resolve({ data: [] }),
-    canTransactionsPreview ? supabase.from('transactions').select('id, actor_user_id, member_user_id').limit(5000) : Promise.resolve({ data: [] }),
+    canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canMembersPreview ? supabase.from('users').select('id', { count: 'exact', head: true }).eq('is_active', true) : Promise.resolve({ count: null }),
     canLogsPreview ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canShowMoneyMovements ? supabase.from('cash_movements').select('type, amount, label, created_at, users(name, username)').order('created_at', { ascending: false }).limit(8) : Promise.resolve({ data: [] }),
@@ -78,7 +78,7 @@ export async function GET() {
     canActivityPreview
       ? supabase.from('activities').select('id, member_user_id, activity_members(member_user_id)').gte('created_at', activityDayStart.toISOString()).lt('created_at', activityDayEnd.toISOString())
       : Promise.resolve({ data: [] }),
-    (canTransactionsPreview || canSaleObjectsPreview || canCigarettePreview || canTabletPreview || canProcessorPreview || canActivityPreview || canFourPreview)
+    (canSaleObjectsPreview || canCigarettePreview || canTabletPreview || canProcessorPreview || canActivityPreview || canFourPreview || canExpensesPreview)
       ? supabase.from('users').select('id').eq('is_active', true).limit(2000)
       : Promise.resolve({ data: [] }),
     canFourPreview
@@ -91,10 +91,6 @@ export async function GET() {
   ]);
   const itemsStockTotal = Number(((itemQuantities ?? []) as Array<{ quantity: number | null }>).reduce((acc, item) => acc + Number(item.quantity ?? 0), 0));
   const activeIds = new Set((activeMembersForCounts ?? []).map((row: { id: string }) => row.id));
-  const txCount = ((txRows ?? []) as Array<{ actor_user_id?: string | null; member_user_id?: string | null }>).filter((row) => {
-    const id = row.member_user_id || row.actor_user_id;
-    return id ? activeIds.has(id) : false;
-  }).length;
   const saleObjectsToday = ((saleObjectsTodayRows ?? []) as Array<{ created_by?: string | null }>).filter((row) => row.created_by && activeIds.has(row.created_by)).length;
   const fourToday = ((fourTodayRows ?? []) as Array<{ total_purchases: number | null; total_sales: number | null; created_by?: string | null }>).filter((row) => row.created_by && activeIds.has(row.created_by)).reduce((acc, row) => {
     acc.purchases += Number(row.total_purchases ?? 0);
@@ -117,7 +113,7 @@ export async function GET() {
       cashBalance: Number(cash?.balance ?? 0),
       expensesPendingTotal,
       itemsCount: itemsStockTotal,
-      txCount: txCount,
+      txCount: txCount ?? 0,
       membersCount: membersCount ?? 0,
       logsCount: logsCount ?? 0,
       saleObjectsToday: Number(saleObjectsToday),

@@ -19,6 +19,7 @@ type Body = {
   hostage_ids?: string[];
   mule_ids?: string[];
   seized_resources?: Array<{ item_id: number; quantity: number }>;
+  optional_resources?: Array<{ name?: string; item_id?: number; quantity: number }>;
   note?: string;
 };
 
@@ -39,6 +40,7 @@ const STOCK_REQUIREMENTS: Record<RobberyType, StockReq[]> = {
   ],
   morgue: [{ name: 'carte rouge', qty: 1 }]
 };
+const OPTIONAL_MENU_ROBBERIES = new Set<RobberyType>(['fleeca', 'bijouterie']);
 
 function normalize(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, '').trim();
@@ -106,6 +108,17 @@ export async function POST(request: Request) {
       const consume = !(body.robbery_type === 'fleeca' && ['petoire', 'munition de pistolet'].includes(normalize(req.name)));
       consumed.push({ itemId: found.id, itemName: found.name, required: req.qty, before, after: consume ? before - req.qty : before, consumed: consume });
     }
+    if (OPTIONAL_MENU_ROBBERIES.has(body.robbery_type)) {
+      const menuRequest = (body.optional_resources ?? []).find((entry) => normalize(entry.name ?? '') === 'menu');
+      const menuQty = Math.max(0, Number(menuRequest?.quantity ?? 0));
+      if (menuQty > 0) {
+        const found = items.find((item) => item.id === Number(menuRequest?.item_id) || normalize(item.name).includes('menu'));
+        if (!found) return NextResponse.json({ message: 'Ressource optionnelle introuvable: Menu.' }, { status: 400 });
+        const before = Number(found.quantity ?? 0);
+        if (before < menuQty) return NextResponse.json({ message: `Stock insuffisant: ${found.name}.` }, { status: 400 });
+        consumed.push({ itemId: found.id, itemName: found.name, required: menuQty, before, after: before - menuQty, consumed: true });
+      }
+    }
   } else {
     for (const seized of body.seized_resources ?? []) {
       const qty = Math.max(0, Number(seized.quantity ?? 0));
@@ -134,11 +147,12 @@ export async function POST(request: Request) {
     return (roles.length > 0 ? roles : ['participant']).map((role) => ({ id, label, role }));
   });
 
+  const consumedStock = consumed.filter((entry) => entry.consumed);
   await Promise.all([
-    ...consumed.filter((entry) => entry.consumed).map((entry) => supabase.from('items').update({ quantity: entry.after, updated_at: new Date().toISOString() }).eq('id', entry.itemId)),
+    ...consumedStock.map((entry) => supabase.from('items').update({ quantity: entry.after, updated_at: new Date().toISOString() }).eq('id', entry.itemId)),
     supabase.from('group_cash').update({ balance: moneyAfter, updated_at: new Date().toISOString() }).eq('id', cash.id),
-    consumed.some((entry) => entry.consumed)
-      ? supabase.from('item_stock_movements').insert(consumed.filter((entry) => entry.consumed).map((entry) => ({
+    consumedStock.length > 0
+      ? supabase.from('item_stock_movements').insert(consumedStock.map((entry) => ({
           item_id: entry.itemId,
           item_name: entry.itemName,
           quantity_delta: -entry.required,
@@ -151,10 +165,12 @@ export async function POST(request: Request) {
       amount: moneyDelta,
       label: action === 'success' ? `Braquage ${body.robbery_type}` : `Braquage arrêté ${body.robbery_type}`,
       user_id: session.userId,
-      before_amount: moneyBefore,
+          before_amount: moneyBefore,
       after_amount: moneyAfter
-    }),
-    supabase.from('robbery_runs').insert({
+    })
+  ]);
+
+  const { data: run } = await supabase.from('robbery_runs').insert({
       user_id: session.userId,
       user_name: session.username,
       robbery_type: body.robbery_type,
@@ -166,8 +182,7 @@ export async function POST(request: Request) {
       consumed_items: consumed,
       participants: participantRows,
       note: (body.note ?? '').trim() || null
-    })
-  ]);
+    }).select('*').maybeSingle();
 
   await syncMoneyItemToGroupCash(supabase);
   await createAuditLog({
@@ -192,5 +207,10 @@ export async function POST(request: Request) {
     }
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    run,
+    itemUpdates: consumedStock.map((entry) => ({ id: entry.itemId, quantity: entry.after })),
+    cash: { before: moneyBefore, after: moneyAfter }
+  });
 }

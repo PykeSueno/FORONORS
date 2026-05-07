@@ -242,6 +242,7 @@ select 0
 where not exists (select 1 from public.group_cash);
 
 create index if not exists idx_money_item_sales_created_at on public.money_item_sales(created_at desc);
+create index if not exists idx_cash_movements_created_at on public.cash_movements(created_at desc);
 create index if not exists idx_sale_object_orders_created_at on public.sale_object_orders(created_at desc);
 create index if not exists idx_sale_object_orders_status on public.sale_object_orders(status, buyer_type);
 
@@ -279,7 +280,9 @@ create table if not exists public.audit_logs (
 
 create index if not exists idx_items_category_type on public.items(category_key, type_key);
 create index if not exists idx_items_name on public.items(name);
+create index if not exists idx_users_active on public.users(is_active) where is_active = true;
 create index if not exists idx_audit_logs_action_created_at on public.audit_logs(action, created_at desc);
+create index if not exists idx_audit_logs_created_at on public.audit_logs(created_at desc);
 create index if not exists idx_audit_logs_entity on public.audit_logs(entity_type, entity_id);
 
 alter table public.items enable row level security;
@@ -386,6 +389,7 @@ create table if not exists public.item_stock_movements (
 create index if not exists idx_transactions_created_at on public.transactions(created_at desc);
 create index if not exists idx_transaction_lines_transaction on public.transaction_lines(transaction_id);
 create index if not exists idx_item_stock_movements_created_at on public.item_stock_movements(created_at desc);
+create index if not exists idx_item_stock_movements_item_created_at on public.item_stock_movements(item_id, created_at desc);
 
 alter table public.transactions enable row level security;
 alter table public.transaction_lines enable row level security;
@@ -529,6 +533,7 @@ create table if not exists public.tablet_passages (
 );
 
 create index if not exists idx_tablet_passages_created_at on public.tablet_passages(created_at desc);
+create index if not exists idx_tablet_days_business_day on public.tablet_days(business_day);
 
 alter table public.tablet_days enable row level security;
 alter table public.tablet_passages enable row level security;
@@ -597,6 +602,7 @@ alter table public.cigarette_passages add column if not exists before_deposit_pa
 alter table public.cigarette_passages add column if not exists after_deposit_packs integer;
 
 create index if not exists idx_cigarette_passages_created_at on public.cigarette_passages(created_at desc);
+create index if not exists idx_cigarette_passages_business_day_status on public.cigarette_passages(business_day, status);
 
 alter table public.cigarette_days enable row level security;
 alter table public.cigarette_passages enable row level security;
@@ -765,6 +771,8 @@ create table if not exists public.four_transaction_lines (
 create index if not exists idx_four_sessions_status_opened_at on public.four_sessions(status, opened_at desc);
 create index if not exists idx_four_movements_session_id on public.four_movements(session_id, created_at desc);
 create index if not exists idx_four_transactions_session_id on public.four_transactions(session_id, created_at desc);
+create index if not exists idx_four_transactions_status_created_at on public.four_transactions(status, created_at desc);
+create index if not exists idx_four_transactions_created_by_created_at on public.four_transactions(created_by, created_at desc);
 create index if not exists idx_four_transaction_lines_tx_id on public.four_transaction_lines(transaction_id);
 
 alter table public.four_sessions enable row level security;
@@ -1194,6 +1202,7 @@ create table if not exists public.processor_sessions (
   created_at timestamptz not null default timezone('utc', now())
 );
 create index if not exists idx_processor_sessions_created_at on public.processor_sessions(created_at desc);
+create index if not exists idx_processor_sessions_status_created_at on public.processor_sessions(status, created_at desc);
 alter table public.processor_sessions enable row level security;
 drop policy if exists "allow_service_role_all_processor_sessions" on public.processor_sessions;
 create policy "allow_service_role_all_processor_sessions" on public.processor_sessions for all using (true) with check (true);
