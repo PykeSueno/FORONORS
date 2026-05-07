@@ -54,9 +54,9 @@ export async function GET() {
   dayStart.setHours(0, 0, 0, 0);
   const dayStartIso = dayStart.toISOString();
 
-  const [{ data: cash }, { data: itemQuantities }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { data: saleObjectsTodayRows }, { data: cigaretteToday }, { data: tabletToday }, { data: processorTodayRows }, { data: activitiesTodayRows }, { data: activeMembersForCounts }, { data: fourTodayRows }, { data: pendingExpensesRows }] = await Promise.all([
+  const [{ data: cash }, { data: itemsStockTotalRes }, { count: txCount }, { count: membersCount }, { count: logsCount }, { data: recentCash }, { data: recentStock }, { data: moneyItem }, { data: saleObjectsTodayRows }, { data: cigaretteToday }, { data: tabletToday }, { data: processorTodayRows }, { data: activitiesTodayRows }, { data: activeMembersForCounts }, { data: fourTodayRows }, { data: pendingExpensesRows }] = await Promise.all([
     canMoneyPreview ? supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle() : Promise.resolve({ data: null }),
-    canItemsPreview ? supabase.from('items').select('quantity') : Promise.resolve({ data: [] }),
+    canItemsPreview ? supabase.rpc('get_items_stock_total') : Promise.resolve({ data: 0 }),
     canTransactionsPreview ? supabase.from('transactions').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
     canMembersPreview ? supabase.from('users').select('id', { count: 'exact', head: true }).eq('is_active', true) : Promise.resolve({ count: null }),
     canLogsPreview ? supabase.from('audit_logs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: null }),
@@ -89,7 +89,7 @@ export async function GET() {
       : Promise.resolve({ data: [] })
 
   ]);
-  const itemsStockTotal = Number(((itemQuantities ?? []) as Array<{ quantity: number | null }>).reduce((acc, item) => acc + Number(item.quantity ?? 0), 0));
+  const itemsStockTotal = Number((itemsStockTotalRes as number | string | null) ?? 0);
   const activeIds = new Set((activeMembersForCounts ?? []).map((row: { id: string }) => row.id));
   const saleObjectsToday = ((saleObjectsTodayRows ?? []) as Array<{ created_by?: string | null }>).filter((row) => row.created_by && activeIds.has(row.created_by)).length;
   const fourToday = ((fourTodayRows ?? []) as Array<{ total_purchases: number | null; total_sales: number | null; created_by?: string | null }>).filter((row) => row.created_by && activeIds.has(row.created_by)).reduce((acc, row) => {

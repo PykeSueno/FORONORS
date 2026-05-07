@@ -31,9 +31,9 @@ function computeEffects(line: TxLineInput, isMoneyItem: boolean) {
   return { stockEffect: -Number(line.quantity), moneyEffect: 0, total };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+  if (!session) return NextResponse.json({ message: 'Non autorisÃ©.' }, { status: 401 });
 
   const [canAccess, canCreate, canEditOwn, canEditAny, canCancelOwn, canCancelAny, canManageOwn, canManageAny] = await Promise.all([
     hasUserPermission(session.userId, 'transactions.access'),
@@ -46,30 +46,43 @@ export async function GET() {
     hasUserPermission(session.userId, 'transactions.manage.any')
   ]);
   if (!canAccess || (!canCreate && !canEditOwn && !canEditAny && !canCancelOwn && !canCancelAny && !canManageOwn && !canManageAny)) {
-    return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+    return NextResponse.json({ message: 'AccÃ¨s refusÃ©.' }, { status: 403 });
   }
 
+  const url = new URL(request.url);
+  const page = Math.max(1, Number.parseInt(url.searchParams.get('page') || '1', 10) || 1);
+  const pageSize = Math.min(200, Math.max(20, Number.parseInt(url.searchParams.get('page_size') || '50', 10) || 50));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const dateFrom = url.searchParams.get('date_from');
+  const dateTo = url.searchParams.get('date_to');
+  const memberLabel = url.searchParams.get('member_label')?.trim();
+
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  let query = supabase
     .from('transactions')
-    .select('id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, money_effect, stock_effect)')
+    .select('id, reason, member_label, total_money_in, total_money_out, profit_loss, created_at, transaction_lines(item_name_snapshot, quantity, movement_type, money_effect, stock_effect)', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(100);
+    .range(from, to);
+  if (dateFrom) query = query.gte('created_at', dateFrom);
+  if (dateTo) query = query.lte('created_at', dateTo);
+  if (memberLabel) query = query.ilike('member_label', `%${memberLabel}%`);
+
+  const { data, error, count } = await query;
 
   if (error) return NextResponse.json({ message: 'Lecture transactions impossible.' }, { status: 500 });
 
-  return NextResponse.json({ transactions: data ?? [] });
+  return NextResponse.json({ transactions: data ?? [], total: count ?? 0, page, pageSize });
 }
-
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+  if (!session) return NextResponse.json({ message: 'Non autorisÃ©.' }, { status: 401 });
 
   const [canAccess, canCreate] = await Promise.all([
     hasUserPermission(session.userId, 'transactions.access'),
     hasUserPermission(session.userId, 'transactions.create')
   ]);
-  if (!canAccess || !canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canAccess || !canCreate) return NextResponse.json({ message: 'AccÃ¨s refusÃ©.' }, { status: 403 });
 
   const body = (await request.json()) as {
     reason?: string;
@@ -162,12 +175,12 @@ export async function POST(request: Request) {
       stock_in_count: stockIn,
       stock_out_count: stockOut,
       profit_loss: profitLoss,
-      summary: `${resolvedLines.length} items • ${body.reason.trim()}`
+      summary: `${resolvedLines.length} items â€¢ ${body.reason.trim()}`
     })
     .select('id')
     .maybeSingle();
 
-  if (txError || !transaction) return NextResponse.json({ message: 'Création transaction impossible.' }, { status: 400 });
+  if (txError || !transaction) return NextResponse.json({ message: 'CrÃ©ation transaction impossible.' }, { status: 400 });
 
   await supabase.from('transaction_lines').insert(resolvedLines.map((line) => ({ ...line, transaction_id: transaction.id })));
 
@@ -212,3 +225,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true, transactionId: transaction.id });
 }
+
