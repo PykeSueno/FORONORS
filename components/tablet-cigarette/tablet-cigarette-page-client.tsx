@@ -217,6 +217,12 @@ export function TabletCigarettePageClient(props: {
     last: cigaretteStatsByMember.reduce((last, row) => !last || new Date(row.last).getTime() > new Date(last).getTime() ? row.last : last, '')
   }), [cigaretteStatsByMember]);
 
+  const cigaretteDayPaymentStats = useMemo(() => ({
+    cash: cigarettePassagesState.filter((row) => row.status === 'validated').reduce((sum, row) => sum + Number(row.revenue_amount ?? 0), 0),
+    bankPending: cigarettePassagesState.filter((row) => row.status === 'pending_bank').reduce((sum, row) => sum + Number(row.revenue_amount ?? 0), 0),
+    bankReceived: cigarettePassagesState.filter((row) => row.status === 'received_bank').reduce((sum, row) => sum + Number(row.revenue_amount ?? 0), 0)
+  }), [cigarettePassagesState]);
+
   const processorStatsTotals = useMemo(() => ({
     produced: activeProcessorStatsSessions.reduce((sum, row) => sum + Number(row.operation_type === 'production' ? row.processors_count : 0), 0),
     sold: activeProcessorStatsSessions.reduce((sum, row) => sum + Number(row.operation_type === 'sale' ? row.processors_count : 0), 0),
@@ -264,6 +270,9 @@ export function TabletCigarettePageClient(props: {
 
     const processorRows: HistoryCard[] = processorSessionsState.slice(0, 100).map((entry) => {
       const isSale = String(entry.operation_type) === 'sale';
+      const qty = Number(entry.processors_count ?? 0);
+      const stockAfter = Number(entry.stock_after ?? 0);
+      const stockBefore = isSale ? stockAfter + qty : Math.max(0, stockAfter - qty);
       const participantIds = Array.isArray(entry.participant_user_ids) ? entry.participant_user_ids as string[] : [];
       const participants = participantIds
         .map((id) => {
@@ -275,13 +284,13 @@ export function TabletCigarettePageClient(props: {
         id: `p-${String(entry.id)}`,
         title: isSale ? 'Vente' : 'Production',
         type: 'Processeur',
-        amount: isSale ? formatUsd(Number(entry.real_received ?? 0)) : `${Number(entry.processors_count ?? 0)} produits`,
+        amount: isSale ? formatUsd(Number(entry.real_received ?? 0)) : `${qty} produits`,
         status: isSale ? 'Vente validée' : 'Production validée',
         meta: new Date(String(entry.created_at)).toLocaleString('fr-FR'),
         items: [{ label: 'Processeur', imageUrl: processorImageUrl, icon: '⚙️' }],
         lines: [
-          `${participants || '-'} · Qté ${Number(entry.processors_count ?? 0)}`,
-          `${isSale ? 'Reçu' : 'Coût'} ${formatUsd(isSale ? Number(entry.real_received ?? 0) : Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))} · Stock ${Number(entry.stock_after ?? 0)}`
+          `${participants || '-'} · Qté ${qty}`,
+          `${isSale ? 'Reçu' : 'Coût'} ${formatUsd(isSale ? Number(entry.real_received ?? 0) : Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))} · Stock ${stockBefore} -> ${stockAfter}`
         ]
       };
     });
@@ -445,7 +454,7 @@ export function TabletCigarettePageClient(props: {
 
       {tab === 'tablet' && canTabletAccess ? (
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <article className="glass-card p-5">
+          <article className="glass-card p-5 xl:col-span-2">
             <h3 className="text-base font-semibold text-[#fff1dd]">Tablette — {tabletBusinessDay}</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               <Stat label="Dépôt matin" value={formatUsd(tabletDeposit)} icon="💵" />
@@ -457,7 +466,7 @@ export function TabletCigarettePageClient(props: {
               <Stat label="Disqueuses avant / après" value={`${tabletInitialCutters} -> ${cuttersState}`} icon="🪚" />
               <Stat label="Passages validés" value={String(tabletDayState?.passages_count ?? 0)} icon="🧾" />
             </div>
-            <div className="mt-4 rounded-xl border border-white/10 bg-[#2f1d14]/50 p-3">
+            <div className="mt-4 hidden rounded-xl border border-white/10 bg-[#2f1d14]/50 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-sm font-semibold text-[#ffe8ca]">Historique Tablette du jour</h4>
                 <span className="text-xs text-[#efcdab]">{tabletPassagesState.length} passage(s)</span>
@@ -510,18 +519,21 @@ export function TabletCigarettePageClient(props: {
               {canTabletCreatePassage ? <button className="saas-primary-btn w-full" onClick={() => void createTabletPassage()}>Valider</button> : null}
             </div>
           </article>
+          <HistoryColumn title="HISTORIQUE TABLETTE" icon="📱" rows={historyColumns.tabletRows} empty="Aucun passage tablette." />
         </section>
       ) : null}
 
       {tab === 'cigarette' && canCigaretteAccess ? (
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <article className="glass-card p-5">
+          <article className="glass-card p-5 xl:col-span-2">
             <h3 className="text-base font-semibold text-[#fff1dd]">Cigarette — {cigaretteBusinessDay}</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               <Stat label="Paquets vendus" value={String(cigaretteDayState?.packs_sold ?? 0)} icon="🚬" />
               <Stat label="Recette" value={formatUsd(Number(cigaretteDayState?.total_revenue ?? 0))} icon="💵" />
               <Stat label="Dépôt Cigarette" value={formatUsd(Number(cigaretteDayState?.chest_amount ?? 0))} icon="🏦" />
               <Stat label="Stock paquets" value={String(packsState)} icon="📦" />
+              <Stat label="Cash reçu" value={formatUsd(cigaretteDayPaymentStats.cash)} icon="💵" />
+              <Stat label="Bank attente / reçu" value={`${formatUsd(cigaretteDayPaymentStats.bankPending)} / ${formatUsd(cigaretteDayPaymentStats.bankReceived)}`} icon="🧾" />
               <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="💰" />
             </div>
           </article>
@@ -558,6 +570,7 @@ export function TabletCigarettePageClient(props: {
               {canCigaretteCreatePassage ? <button className="saas-primary-btn w-full" onClick={() => void createCigarettePassage()}>Valider passage</button> : null}
             </div>
           </article>
+          <HistoryColumn title="HISTORIQUE CIGARETTE" icon="🚬" rows={historyColumns.cigaretteRows} empty="Aucun passage cigarette." />
         </section>
       ) : null}
 
@@ -661,6 +674,7 @@ export function TabletCigarettePageClient(props: {
               </div>
               {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" disabled={processorSaleQty <= 0 || processorSaleQty > processorRemainingToday || processorSaleQty > processorStockState} onClick={() => void createProcessorSale()}>Valider vente</button> : null}
             </article> : null}
+            <HistoryColumn title="HISTORIQUE PROCESSEUR" icon="⚙️" rows={canProcessorLogs ? historyColumns.processorRows : []} empty={canProcessorLogs ? 'Aucun log processeur.' : 'Accès historique processeur requis.'} />
           </div>
         </section>
       ) : null}

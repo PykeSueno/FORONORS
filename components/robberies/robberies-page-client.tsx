@@ -73,45 +73,48 @@ function rotationScore(row: RoleStats, role: RoleKey) {
   const recentTarget = roleRecent(row, role);
   const idleBonus = Math.min(26, ageDays(roleLast(row, role)) / 3);
   const lowRoleBonus = Math.max(0, 4 - targetCount) * 7;
-  const helpBonus = Math.min(24, otherRecent(row, role) * (role === 'braqueur' ? 7 : 4));
+  const helpBonus = Math.min(34, otherRecent(row, role) * (role === 'braqueur' ? 9 : 4));
   const participationBonus = Math.min(12, Math.max(0, row.total - targetCount) * 1.8);
-  let score = 55 + idleBonus + lowRoleBonus + helpBonus + participationBonus - recentTarget * 18 - targetCount * 2.5;
-  if (role === 'braqueur') score += row.recentMule * 6 + row.recentHostage * 5 - row.recentBraqueur * 7;
+  let score = 55 + idleBonus + lowRoleBonus + helpBonus + participationBonus - recentTarget * 22 - targetCount * 2.5;
+  if (role === 'braqueur') score += row.recentMule * 16 + row.recentHostage * 12 - row.recentBraqueur * 28;
   if (role === 'plan_mule_recup') score += (row.recentBraqueur + row.recentHostage) * 3 - row.recentMule * 7;
   if (role === 'otage_apporte') score += (row.recentBraqueur + row.recentMule) * 3 - row.recentHostage * 7;
   return score;
 }
 
-function rotationReason(row: RoleStats, role: RoleKey, score: number) {
+function rotationReason(row: RoleStats, role: RoleKey) {
   const label = roleShortLabel(role);
   const targetCount = roleCount(row, role);
   const recentTarget = roleRecent(row, role);
-  const other = otherRecent(row, role);
   const days = ageDays(roleLast(row, role));
-  if (role === 'braqueur' && row.recentBraqueur < 0.5 && row.recentMule + row.recentHostage >= 1) {
-    return `${row.name} monte en braqueur: il a aidé récemment en mule/récup ou otage sans prendre le rôle principal.`;
+  if (role === 'braqueur' && row.recentMule >= 0.5 && row.recentBraqueur < 1) {
+    return 'A fait mule/récup récemment, priorité pour braquer.';
   }
+  if (role === 'braqueur' && row.recentHostage >= 0.5 && row.recentBraqueur < 1.5) {
+    return 'A apporté des otages, mérite rotation.';
+  }
+  if (role === 'braqueur' && row.recentBraqueur >= 1) return 'A déjà braqué récemment, score réduit.';
   if (recentTarget >= 2) {
-    return `${row.name} reste dans la liste avec ${Math.round(score)} pts, mais son score est réduit car il a déjà tenu le rôle ${label} récemment.`;
+    return `Rôle ${label} déjà tenu récemment, score réduit.`;
   }
   if (targetCount === 0) {
-    return `${row.name} est prioritaire: aucun passage enregistré en ${label}, la rotation l’avantage.`;
+    return `Peu utilisé sur ce rôle récemment: aucun passage ${label} enregistré.`;
   }
   if (days >= 21) {
-    return `${row.name} remonte en ${label}: son dernier passage date d’environ ${Math.round(days)} jours.`;
+    return `Peu utilisé sur ce rôle récemment: dernier passage il y a ${Math.round(days)} jours.`;
   }
-  if (other >= 1.5) {
-    return `${row.name} est favorisé en ${label}: il a davantage aidé sur d’autres rôles que sur celui-ci.`;
+  if (otherRecent(row, role) >= 1.5) {
+    return `A aidé sur d'autres rôles, rotation favorable en ${label}.`;
   }
-  return `${row.name} ressort en ${label} grâce à un équilibre faible volume, participation et ancienneté du rôle.`;
+  return `Équilibre rotation: volume faible et ancienneté correcte en ${label}.`;
 }
 
 function suggest(rows: RoleStats[], role: RoleKey, limit: number): Suggestion['names'] {
   return [...rows]
     .map((row) => ({ row, score: rotationScore(row, role) }))
-    .sort((a, b) => b.score - a.score || lastTime(roleLast(a.row, role)) - lastTime(roleLast(b.row, role)) || a.row.total - b.row.total || a.row.name.localeCompare(b.row.name, 'fr'))
+    .sort((a, b) => b.score - a.score || lastTime(roleLast(a.row, role)) - lastTime(roleLast(b.row, role)) || a.row.total - b.row.total || roleRecent(a.row, role) - roleRecent(b.row, role) || a.row.name.localeCompare(b.row.name, 'fr'))
     .slice(0, limit)
-    .map(({ row, score }) => ({ name: row.name, score: Math.round(score), reason: rotationReason(row, role, score) }));
+    .map(({ row, score }) => ({ name: row.name, score: Math.round(score), reason: rotationReason(row, role) }));
 }
 
 export function RobberiesPageClient({ runs, items, members, canCreate, canArrested, canStats, canLogs }: {
@@ -142,7 +145,8 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
   const [optionalMenuQtyByType, setOptionalMenuQtyByType] = useState<Record<RobberyType, number>>({ fleeca: 0, bijouterie: 0, morgue: 0 });
   const [insightPanel, setInsightPanel] = useState<InsightPanel>(canStats ? 'suggestions' : 'history');
 
-  const roleStats = useMemo(() => buildRoleStats(currentRuns, members), [currentRuns, members]);
+  const selectedRuns = useMemo(() => currentRuns.filter((run) => run.robbery_type === robberyType), [currentRuns, robberyType]);
+  const roleStats = useMemo(() => buildRoleStats(selectedRuns, members), [selectedRuns, members]);
   const rotationSuggestions = useMemo<Suggestion[]>(() => [
     { title: '4 Braqueurs conseillés', icon: '🎯', names: suggest(roleStats, 'braqueur', 4) },
     { title: '2 Mule / récup conseillés', icon: '🚗', names: suggest(roleStats, 'plan_mule_recup', 2) }
@@ -169,8 +173,8 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
   const activeMemberIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
   const weekRuns = useMemo(() => {
     const weekIso = weekStartIso(new Date());
-    return currentRuns.filter((run) => run.created_at >= weekIso && (run.participants ?? []).some((participant) => participant.id && activeMemberIds.has(participant.id)));
-  }, [activeMemberIds, currentRuns]);
+    return selectedRuns.filter((run) => run.created_at >= weekIso && (run.participants ?? []).some((participant) => participant.id && activeMemberIds.has(participant.id)));
+  }, [activeMemberIds, selectedRuns]);
   const computedStats = useMemo(() => {
     const resources = new Map<string, number>();
     for (const run of weekRuns) {
@@ -246,7 +250,7 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
       </section>
 
       {canStats ? <div className="grid gap-2 md:grid-cols-5 xl:grid-cols-10"><Stat label="Total" value={String(computedStats.total)} icon="🧾" /><Stat label="Fleeca" value={String(computedStats.fleeca)} icon="🏦" /><Stat label="Bijouterie" value={String(computedStats.bijouterie)} icon="💎" /><Stat label="Morgue" value={String(computedStats.morgue)} icon="🟥" /><Stat label="Réussis" value={String(computedStats.success)} icon="✅" /><Stat label="Arrêtés" value={String(computedStats.arrested)} icon="🚔" /><Stat label="Argent rentré" value={formatUsd(computedStats.moneyIn)} icon="💵" /><Stat label="Argent perdu" value={formatUsd(computedStats.moneyLost)} icon="💸" /><Stat label="Bénéfice net" value={formatUsd(computedStats.moneyIn - computedStats.moneyLost)} icon="📈" /><Stat label="Ressources" value={String(computedStats.resources.reduce((sum, row) => sum + row.qty, 0))} icon="📦" /></div> : null}
-      {canStats || canLogs ? <RobberyInsights active={insightPanel} setActive={setInsightPanel} canStats={canStats} canLogs={canLogs} suggestions={rotationSuggestions} runs={currentRuns} roleStats={roleStats} playerStats={computedPlayerStats} resources={computedStats.resources} /> : null}
+      {canStats || canLogs ? <RobberyInsights active={insightPanel} setActive={setInsightPanel} canStats={canStats} canLogs={canLogs} suggestions={rotationSuggestions} runs={selectedRuns} roleStats={roleStats} playerStats={computedPlayerStats} resources={computedStats.resources} /> : null}
     </div>
   );
 }

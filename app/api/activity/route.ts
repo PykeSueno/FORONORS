@@ -6,26 +6,31 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
-type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo';
+type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'garage';
 const ACTIVITY_LABELS: Record<ActivityType, string> = {
   mailbox: 'Boîte aux lettres',
   burglary: 'Cambriolage',
   container: 'Conteneur',
   processor: 'Processeur',
-  cargo: 'Cargo'
+  cargo: 'Cargo',
+  garage: 'Garage'
 };
 
 const CARGO_LOOT_NAMES = new Set(['Argent', 'Tableau & Peinture', 'Pochon de Cocaïne', 'Marteau', 'Pied de biche']);
 
 type EquipmentRow = { id: number; name: string; quantity: number };
 
-function pickBestEquipment(items: EquipmentRow[], keyword: 'kit' | 'disqueuse' | 'bouteille de plongee' | 'perceuse laser') {
+function normalizeEquipmentName(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function pickBestEquipment(items: EquipmentRow[], keyword: 'kit' | 'disqueuse' | 'bouteille de plongee' | 'perceuse laser' | 'pince a couper') {
   if (items.length === 0) return null;
   const normalizedKeyword = keyword.toLowerCase();
 
   return [...items].sort((a, b) => {
-    const aName = a.name.toLowerCase();
-    const bName = b.name.toLowerCase();
+    const aName = normalizeEquipmentName(a.name);
+    const bName = normalizeEquipmentName(b.name);
 
     const aExact = aName === normalizedKeyword || aName === `${normalizedKeyword}s`;
     const bExact = bName === normalizedKeyword || bName === `${normalizedKeyword}s`;
@@ -81,7 +86,7 @@ export async function POST(request: Request) {
     lines?: Array<{ item_id: number; quantity: number }>;
   };
 
-  if (!body.activity_type || !['mailbox', 'burglary', 'container', 'processor', 'cargo'].includes(body.activity_type)) {
+  if (!body.activity_type || !['mailbox', 'burglary', 'container', 'processor', 'cargo', 'garage'].includes(body.activity_type)) {
     return NextResponse.json({ message: 'Type activité invalide.' }, { status: 400 });
   }
   if (body.activity_type === 'processor') {
@@ -119,19 +124,23 @@ export async function POST(request: Request) {
         ? 'disqueuse'
         : body.activity_type === 'cargo'
           ? 'perceuse laser'
-          : 'bouteille de plongee';
+          : body.activity_type === 'garage'
+            ? 'pince a couper'
+            : 'bouteille de plongee';
     const itemQuery = body.activity_type === 'processor'
       ? supabase.from('items').select('id, name, quantity').eq('name', 'Bouteille de Plong\u00e9e').limit(1)
       : body.activity_type === 'cargo'
         ? supabase.from('items').select('id, name, quantity').eq('name', 'Perceuse Laser').limit(1)
+        : body.activity_type === 'garage'
+          ? supabase.from('items').select('id, name, quantity').or('name.ilike.%Pince a Couper%,name.ilike.%Pince à Couper%').order('name', { ascending: true }).limit(20)
       : supabase.from('items').select('id, name, quantity').ilike('name', `%${keyword}%`).order('name', { ascending: true }).limit(20);
     const { data: matches } = await itemQuery;
     equipmentRow = pickBestEquipment((matches ?? []) as EquipmentRow[], keyword);
     if (!equipmentRow) return NextResponse.json({ message: 'Équipement introuvable pour cette activité.' }, { status: 400 });
-    const requiredEquipment = body.activity_type === 'cargo' ? 1 : equipmentUsed;
+    const requiredEquipment = body.activity_type === 'cargo' || body.activity_type === 'garage' ? 1 : equipmentUsed;
     if (requiredEquipment <= 0) return NextResponse.json({ message: 'Quantité d’équipement requise.' }, { status: 400 });
     if (Number(equipmentRow.quantity) < requiredEquipment) return NextResponse.json({ message: `Stock insuffisant pour ${equipmentRow.name}.` }, { status: 400 });
-    shouldConsumeEquipment = body.activity_type !== 'cargo';
+    shouldConsumeEquipment = body.activity_type !== 'cargo' && body.activity_type !== 'garage';
   }
 
   const mergedLines = new Map<number, number>();
