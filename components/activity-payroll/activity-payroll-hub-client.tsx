@@ -891,14 +891,14 @@ function ExpensesPage(props: {
 
       <section className="glass-card p-4">
         <div className="flex flex-wrap gap-2">
-          {props.canCreate ? <ExpensePanelButton active={expensePanel === 'create'} onClick={() => setExpensePanel('create')}>Nouvelle dépense</ExpensePanelButton> : null}
-          <ExpensePanelButton active={expensePanel === 'member'} onClick={() => setExpensePanel('member')}>Par membre</ExpensePanelButton>
-          <ExpensePanelButton active={expensePanel === 'category'} onClick={() => setExpensePanel('category')}>Par catégorie</ExpensePanelButton>
+          {props.canCreate ? <ExpensePanelButton active={expensePanel === 'create'} onClick={() => setExpensePanel('create')}>🧾 Nouvelle dépense</ExpensePanelButton> : null}
+          <ExpensePanelButton active={expensePanel === 'member'} onClick={() => setExpensePanel('member')}>👤 Par membre</ExpensePanelButton>
+          <ExpensePanelButton active={expensePanel === 'category'} onClick={() => setExpensePanel('category')}>🏷️ Par catégorie</ExpensePanelButton>
         </div>
 
         {expensePanel === 'create' && props.canCreate ? (
           <div className="mt-4">
-            <h3 className="text-sm font-semibold text-[#fff1dd]">Nouvelle dépense</h3>
+            <h3 className="text-sm font-semibold text-[#fff1dd]">🧾 Nouvelle dépense</h3>
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <Field label="Membre" icon="member"><select className="saas-input" value={form.memberId} onChange={(event) => setForm((cur) => ({ ...cur, memberId: event.target.value }))}>{props.members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}</select></Field>
               <Field label="Catégorie" icon="category"><select className="saas-input" value={form.category} onChange={(event) => setForm((cur) => ({ ...cur, category: event.target.value }))}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>

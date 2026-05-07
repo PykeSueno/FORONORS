@@ -15,7 +15,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const [{ data: cash }, { data: movements }] = await Promise.all([
     supabase.from('group_cash').select('id, balance, updated_at').order('id').limit(1).maybeSingle(),
-    supabase.from('cash_movements').select('id, type, amount, label, created_at, user_id, users(name, username)').order('created_at', { ascending: false }).limit(30)
+    supabase.from('cash_movements').select('id, type, amount, label, created_at, user_id, before_amount, after_amount, users(name, username)').order('created_at', { ascending: false }).limit(30)
   ]);
 
   return NextResponse.json({ cash, movements: movements ?? [] });
@@ -38,20 +38,31 @@ export async function PATCH(request: Request) {
 
   const previousBalance = Number(cash.balance);
   const nextBalance = Number(body.balance);
+  if (!Number.isFinite(nextBalance) || nextBalance < 0) return NextResponse.json({ message: 'Balance invalide.' }, { status: 400 });
   const delta = nextBalance - previousBalance;
 
   await supabase.from('group_cash').update({ balance: nextBalance, updated_at: new Date().toISOString() }).eq('id', cash.id);
   await syncMoneyItemToGroupCash(supabase);
 
   if (delta !== 0) {
-    await supabase.from('cash_movements').insert({
+    const { data: movement } = await supabase.from('cash_movements').insert({
       type: 'adjust',
       amount: delta,
       label: body.label?.trim() || 'Ajustement manuel',
       user_id: session.userId,
       before_amount: previousBalance,
       after_amount: nextBalance
+    }).select('id, type, amount, label, created_at, user_id, before_amount, after_amount, users(name, username)').maybeSingle();
+    await createAuditLog({
+      actorUserId: session.userId,
+      action: 'money.edit',
+      entityType: 'cash',
+      entityId: cash.id,
+      summary: `Ajustement argent de ${previousBalance} à ${nextBalance}`,
+      oldValues: { balance: previousBalance },
+      newValues: { balance: nextBalance, delta }
     });
+    return NextResponse.json({ ok: true, cash: { balance: nextBalance }, movement });
   }
 
   await createAuditLog({
@@ -64,5 +75,5 @@ export async function PATCH(request: Request) {
     newValues: { balance: nextBalance, delta }
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, cash: { balance: nextBalance }, movement: null });
 }

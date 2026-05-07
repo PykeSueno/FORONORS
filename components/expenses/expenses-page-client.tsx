@@ -139,7 +139,7 @@ export function ExpensesPageClient({
 
       <section className="glass-card p-3">
         <div className="flex flex-wrap gap-2">
-          {canCreate ? <TabButton active={tab === 'new'} onClick={() => setTab('new')}>➕ Nouvelle dépense</TabButton> : null}
+          {canCreate ? <TabButton active={tab === 'new'} onClick={() => setTab('new')}>🧾 Nouvelle dépense</TabButton> : null}
           <TabButton active={tab === 'pending'} onClick={() => setTab('pending')}>🕒 Dépenses en attente</TabButton>
           {canHistory ? <TabButton active={tab === 'reimbursed'} onClick={() => setTab('reimbursed')}>✅ Remboursées</TabButton> : null}
           {canStats ? <TabButton active={tab === 'stats'} onClick={() => setTab('stats')}>📊 Stats</TabButton> : null}
@@ -152,7 +152,7 @@ export function ExpensesPageClient({
 
       {tab === 'new' && canCreate ? (
         <section className="glass-card p-5">
-          <h2 className="text-lg font-semibold text-[#fff1dd]">Nouvelle dépense</h2>
+          <h2 className="text-lg font-semibold text-[#fff1dd]">🧾 Nouvelle dépense</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <Field label="Membre"><select className="saas-input" value={memberId} onChange={(event) => setMemberId(event.target.value)}>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></Field>
             <Field label="Catégorie"><select className="saas-input" value={category} onChange={(event) => setCategory(event.target.value)}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>
@@ -178,8 +178,8 @@ export function ExpensesPageClient({
 
       {tab === 'stats' && canStats ? (
         <section className="grid gap-4 xl:grid-cols-2">
-          <StatsBlock title="Dépenses par catégorie" rows={byCategory} />
-          <StatsBlock title="Dépenses par membre" rows={byMember} />
+          <StatsBlock title="🏷️ Par catégorie" rows={byCategory} />
+          <StatsBlock title="👤 Par membre" rows={byMember} />
           <article className="glass-card p-4">
             <h3 className="text-sm font-semibold text-[#fff1dd]">Moyenne remboursement</h3>
             <p className="mt-2 text-2xl font-semibold text-[#ffe8ca]">{totals.avgDays.toFixed(1)} jours</p>

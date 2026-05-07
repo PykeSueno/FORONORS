@@ -23,6 +23,7 @@ function moneyMovementIcon(type: string) {
   if (type === 'sale') return '🛒';
   if (type === 'purchase') return '🧾';
   if (type === 'payment') return '🧑‍💼';
+  if (type === 'laundering') return '🏦';
   if (type === 'tablet_passage' || type === 'tablet_morning_deposit') return '📱';
   if (type === 'four_close') return '🔥';
   if (type.startsWith('drugs_')) return '🧪';
@@ -39,7 +40,7 @@ export function MoneyPageClient({
   initialMovements: Movement[];
 }) {
   const [balance, setBalance] = useState(String(initialBalance));
-  const [movements] = useState<Movement[]>(initialMovements);
+  const [movements, setMovements] = useState<Movement[]>(initialMovements);
   const [type, setType] = useState('entry');
   const [amount, setAmount] = useState('');
   const [label, setLabel] = useState('');
@@ -50,34 +51,44 @@ export function MoneyPageClient({
 
   async function saveBalance(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextBalance = Number(balance);
+    if (!Number.isFinite(nextBalance) || nextBalance < 0) return setError('Montant invalide.');
     const response = await fetch('/api/money', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ balance: Number(balance), label: 'Ajustement depuis page Argent' })
+      body: JSON.stringify({ balance: nextBalance, label: 'Ajustement depuis page Argent' })
     });
 
+    const payload = await response.json().catch(() => ({} as { message?: string; cash?: { balance: number }; movement?: Movement | null }));
     if (!response.ok) {
-      setError('Mise à jour impossible.');
+      setError(payload.message ?? 'Mise à jour impossible.');
       return;
     }
 
-    window.location.reload();
+    setBalance(String(Number(payload.cash?.balance ?? balance)));
+    if (payload.movement) setMovements((rows) => [payload.movement as Movement, ...rows]);
   }
 
   async function addMovement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const movementAmount = Number(amount);
+    if (!Number.isFinite(movementAmount) || movementAmount <= 0) return setError('Montant invalide.');
     const response = await fetch('/api/money/movements', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, amount: Number(amount), label })
+      body: JSON.stringify({ type, amount: movementAmount, label: type === 'laundering' ? (label.trim() || 'Blanchiment — ajout banque') : label })
     });
 
+    const payload = await response.json().catch(() => ({} as { message?: string; cash?: { balance: number }; movement?: Movement }));
     if (!response.ok) {
-      setError('Création mouvement impossible.');
+      setError(payload.message ?? 'Création mouvement impossible.');
       return;
     }
 
-    window.location.reload();
+    setBalance(String(Number(payload.cash?.balance ?? balance)));
+    if (payload.movement) setMovements((rows) => [payload.movement as Movement, ...rows]);
+    setAmount('');
+    setLabel('');
   }
 
   return (
@@ -110,9 +121,10 @@ export function MoneyPageClient({
               <option value="purchase">Achat</option>
               <option value="sale">Vente</option>
               <option value="payment">Paiement</option>
+              <option value="laundering">Blanchiment</option>
             </select>
             <input className="saas-input w-full" placeholder="Montant" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-            <input className="saas-input w-full" placeholder="Libellé" value={label} onChange={(e) => setLabel(e.target.value)} required />
+            <input className="saas-input w-full" placeholder={type === 'laundering' ? 'Blanchiment — ajout banque' : 'Libellé'} value={label} onChange={(e) => setLabel(e.target.value)} required={type !== 'laundering'} />
             <button className="saas-primary-btn" type="submit">Ajouter</button>
           </form>
         </section>
@@ -124,14 +136,22 @@ export function MoneyPageClient({
           {movements.map((movement) => (
             <div key={movement.id} className="rounded-xl border border-white/10 bg-[#5a3924]/55 px-3 py-2 text-sm text-[#ffe4c6]">
               <p>{moneyMovementIcon(movement.type)} {Array.isArray(movement.users) ? (movement.users[0]?.name || movement.users[0]?.username) : (movement.users?.name || movement.users?.username) || 'Groupe'} — {humanMoneyMovementLabel(movement.type)} — {movement.label}</p>
-              {movement.before_amount != null && movement.after_amount != null ? (
-                <p className="text-xs text-[#efcdab]">Avant : {formatUsd(Number(movement.before_amount))} · Mouvement : {Number(movement.amount) >= 0 ? '+' : ''}{formatUsd(Number(movement.amount))} · Après : {formatUsd(Number(movement.after_amount))}</p>
-              ) : null}
+              {movement.before_amount != null && movement.after_amount != null ? <MoneyBeforeAfter movement={movement} /> : null}
               <p className="text-xs text-[#efcdab]">{new Date(movement.created_at).toLocaleString('fr-FR')}</p>
             </div>
           ))}
         </div>
       </section>
     </div>
+  );
+}
+
+function MoneyBeforeAfter({ movement }: { movement: Movement }) {
+  const amount = Number(movement.amount ?? 0);
+  const movementLabel = movement.type === 'laundering' ? 'Blanchiment' : 'Mouvement';
+  return (
+    <p className="text-xs text-[#efcdab]">
+      Avant : {formatUsd(Number(movement.before_amount ?? 0))} · {movementLabel} : {amount >= 0 ? '+' : ''}{formatUsd(amount)} · Après : {formatUsd(Number(movement.after_amount ?? 0))}
+    </p>
   );
 }
