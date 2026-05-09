@@ -559,7 +559,9 @@ values
   ('tablet.daily.manage'),
   ('tablet.stats.view'),
   ('tablet.logs.view'),
-  ('tablet.preview')
+  ('tablet.preview'),
+  ('jobs.tablet.webhook.view'),
+  ('jobs.tablet.webhook.edit')
 on conflict (name) do nothing;
 
 create table if not exists public.cigarette_days (

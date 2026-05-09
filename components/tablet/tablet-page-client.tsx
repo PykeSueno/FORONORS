@@ -25,7 +25,7 @@ type Passage = {
   created_at: string;
 };
 
-export function TabletPageClient({ day, businessDay, members, passages, groupCash, kitsInStock, cuttersInStock, canManageDaily, canCreatePassage, defaultMemberId, defaultMemberLabel }: { day: Day; businessDay: string; members: Array<{ id: string; name: string; username: string }>; passages: Passage[]; groupCash: number; kitsInStock: number; cuttersInStock: number; canManageDaily: boolean; canCreatePassage: boolean; defaultMemberId: string; defaultMemberLabel: string }) {
+export function TabletPageClient({ day, businessDay, members, passages, groupCash, kitsInStock, cuttersInStock, canManageDaily, canCreatePassage, canViewWebhook, canEditWebhook, webhookConfigured, defaultMemberId, defaultMemberLabel }: { day: Day; businessDay: string; members: Array<{ id: string; name: string; username: string }>; passages: Passage[]; groupCash: number; kitsInStock: number; cuttersInStock: number; canManageDaily: boolean; canCreatePassage: boolean; canViewWebhook: boolean; canEditWebhook: boolean; webhookConfigured: boolean; defaultMemberId: string; defaultMemberLabel: string }) {
   const router = useRouter();
   const [deposit, setDeposit] = useState(String(day?.deposited_amount ?? 4000));
   const [dayState, setDayState] = useState<Day>(day);
@@ -36,6 +36,10 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
   const [memberId, setMemberId] = useState(defaultMemberId);
   const [memberLabel, setMemberLabel] = useState(defaultMemberLabel);
   const [error, setError] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookReady, setWebhookReady] = useState(webhookConfigured);
+  const [webhookMessage, setWebhookMessage] = useState('');
+  const [webhookBusy, setWebhookBusy] = useState(false);
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
 
   async function saveDeposit() {
@@ -63,6 +67,35 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
     if (typeof payload.kitsInStock === 'number') setKitsState(payload.kitsInStock);
     if (typeof payload.cuttersInStock === 'number') setCuttersState(payload.cuttersInStock);
     if (!payload.passage) router.refresh();
+  }
+
+  async function saveWebhook() {
+    setWebhookBusy(true);
+    setWebhookMessage('');
+    const response = await fetch('/api/tablet/webhook', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ webhookUrl }) });
+    setWebhookBusy(false);
+    if (!response.ok) {
+      const data = (await response.json()) as { message?: string };
+      setWebhookMessage(data.message ?? 'Configuration webhook impossible.');
+      return;
+    }
+    const payload = (await response.json()) as { configured?: boolean };
+    setWebhookReady(Boolean(payload.configured));
+    setWebhookUrl('');
+    setWebhookMessage('Webhook enregistré.');
+  }
+
+  async function testWebhook() {
+    setWebhookBusy(true);
+    setWebhookMessage('');
+    const response = await fetch('/api/tablet/webhook/test', { method: 'POST' });
+    setWebhookBusy(false);
+    if (!response.ok) {
+      const data = (await response.json()) as { message?: string };
+      setWebhookMessage(data.message ?? 'Test webhook impossible.');
+      return;
+    }
+    setWebhookMessage('Test envoyé.');
   }
 
   return (
@@ -103,6 +136,32 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
             <button className="saas-primary-btn" onClick={() => void createPassage()}>Valider passage</button>
           </div>
           <p className="mt-1 text-[11px] text-[#efcdab]">Membre sélectionné: <span className="font-semibold text-[#ffe8ca]">{memberLabel || 'Groupe'}</span></p>
+        </section>
+      ) : null}
+
+      {canViewWebhook ? (
+        <section className="glass-card p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-[#fff1dd]">Webhook Tablette Discord</h3>
+              <p className="mt-1 text-xs text-[#efcdab]">Statut webhook : <span className={webhookReady ? 'font-semibold text-emerald-200' : 'font-semibold text-amber-200'}>{webhookReady ? 'configuré' : 'non configuré'}</span></p>
+            </div>
+            {canEditWebhook ? <button className="saas-ghost-btn" disabled={!webhookReady || webhookBusy} onClick={() => void testWebhook()}>Tester webhook</button> : null}
+          </div>
+          {canEditWebhook ? (
+            <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
+              <input
+                className="saas-input"
+                type="password"
+                value={webhookUrl}
+                onChange={(event) => setWebhookUrl(event.target.value)}
+                placeholder={webhookReady ? 'Webhook déjà configuré - coller une nouvelle URL pour remplacer' : 'URL webhook Discord'}
+                autoComplete="off"
+              />
+              <button className="saas-primary-btn" disabled={webhookBusy} onClick={() => void saveWebhook()}>Enregistrer</button>
+            </div>
+          ) : null}
+          {webhookMessage ? <p className="mt-2 text-xs text-[#efcdab]">{webhookMessage}</p> : null}
         </section>
       ) : null}
 

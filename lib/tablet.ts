@@ -23,3 +23,24 @@ export function getTabletBusinessDate(input = new Date()) {
   if (parts.hour < 8) date.setUTCDate(date.getUTCDate() - 1);
   return date.toISOString().slice(0, 10);
 }
+
+export function formatParisDateTime(input: Date | string) {
+  return new Intl.DateTimeFormat('fr-FR', {
+    timeZone: TABLET_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).format(new Date(input));
+}
+
+export function formatParisDate(input: Date | string) {
+  return new Intl.DateTimeFormat('fr-FR', {
+    timeZone: TABLET_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date(input));
+}

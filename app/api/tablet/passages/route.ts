@@ -7,6 +7,7 @@ import { getTabletBusinessDate } from '@/lib/tablet';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 import { ensureTabletMorningDeposit } from '@/lib/tablet-deposit';
+import { sendTabletPassageDiscord } from '@/lib/tablet-discord-webhook';
 
 type EquipmentRow = { id: number; name: string; quantity: number };
 
@@ -105,6 +106,8 @@ export async function POST(request: Request) {
     created_by: session.userId
   }).select('id, member_user_id, member_label, before_cash, after_cash, before_kits, after_kits, before_cutters, after_cutters, created_at').maybeSingle();
 
+  if (!passage) return NextResponse.json({ message: 'Création du passage impossible.' }, { status: 500 });
+
   const { data: updatedDay } = await supabase
     .from('tablet_days')
     .update({
@@ -149,6 +152,18 @@ export async function POST(request: Request) {
     summary: `Passage tablette ${memberLabel} | dépôt ${beforeCash}$ -> ${afterCash}$ | groupe ${beforeGroupBalance}$ -> ${afterGroupBalance}$ | ${kitName} ${beforeKits}->${afterKits} | ${cutterName} ${beforeCutters}->${afterCutters}`,
     oldValues: { beforeCash, beforeGroupBalance, beforeKits, beforeCutters },
     newValues: { memberLabel, afterCash, afterGroupBalance, afterKits, afterCutters, businessDay }
+  });
+
+  await sendTabletPassageDiscord(supabase, session.userId, {
+    id: passage.id,
+    member_label: passage.member_label,
+    before_cash: Number(passage.before_cash),
+    after_cash: Number(passage.after_cash),
+    before_kits: Number(passage.before_kits),
+    after_kits: Number(passage.after_kits),
+    before_cutters: Number(passage.before_cutters),
+    after_cutters: Number(passage.after_cutters),
+    created_at: passage.created_at
   });
 
   return NextResponse.json({ ok: true, passage, day: updatedDay, groupCash: afterGroupBalance, kitsInStock: afterKits, cuttersInStock: afterCutters });

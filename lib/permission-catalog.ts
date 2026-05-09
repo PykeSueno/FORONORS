@@ -79,7 +79,9 @@ const EXACT: Record<string, PermissionInfo> = {
   'tobacco.processor.sale.view': { module: 'Travail', section: 'Vue', label: 'Voir vente Processeur', hint: 'Permet de consulter la vente Processeur.' },
   'tobacco.processor.sale.validate': { module: 'Travail', section: 'Creation', label: 'Valider vente Processeur', hint: 'Permet de valider une vente Processeur.' },
   'tobacco.processor.sale.edit': { module: 'Travail', section: 'Gestion', label: 'Modifier vente Processeur', hint: 'Permet de modifier une vente Processeur.' },
-  'tobacco.processor.sale.cancel': { module: 'Travail', section: 'Modification / Annulation', label: 'Annuler vente Processeur', hint: 'Permet d annuler une vente Processeur.' }
+  'tobacco.processor.sale.cancel': { module: 'Travail', section: 'Modification / Annulation', label: 'Annuler vente Processeur', hint: 'Permet d annuler une vente Processeur.' },
+  'jobs.tablet.webhook.view': { module: 'Travail', section: 'Technique', label: 'Voir webhook Tablette Discord', hint: 'Affiche le statut du webhook Discord Tablette.' },
+  'jobs.tablet.webhook.edit': { module: 'Travail', section: 'Technique', label: 'Configurer webhook Tablette Discord', hint: 'Permet d enregistrer et tester le webhook Discord Tablette.' }
 };
 
 const PREFIX_MODULES: Array<[string, string]> = [

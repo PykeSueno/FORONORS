@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from './supabase';
 import { expandPermissionAliases, normalizePermissionNames } from './permission-normalization';
+import { PERMISSION_LABELS } from './permission-catalog';
 
 type PermissionRelation = { permissions: { name: string } | { name: string }[] | null };
 
@@ -15,7 +16,8 @@ export async function getUserPermissions(userId: string) {
 
   if (roleName === 'patron') {
     const { data: allPermissions } = await supabase.from('permissions').select('name');
-    const canonical = normalizePermissionNames((allPermissions ?? []).map((item) => item.name));
+    const builtinPermissions = Object.keys(PERMISSION_LABELS);
+    const canonical = normalizePermissionNames([...(allPermissions ?? []).map((item) => item.name), ...builtinPermissions]);
     return Array.from(new Set(canonical.flatMap((permission) => expandPermissionAliases(permission))));
   }
 
