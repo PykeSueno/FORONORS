@@ -139,32 +139,6 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
         </section>
       ) : null}
 
-      {canViewWebhook ? (
-        <section className="glass-card p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-semibold text-[#fff1dd]">Webhook Tablette Discord</h3>
-              <p className="mt-1 text-xs text-[#efcdab]">Statut webhook : <span className={webhookReady ? 'font-semibold text-emerald-200' : 'font-semibold text-amber-200'}>{webhookReady ? 'configuré' : 'non configuré'}</span></p>
-            </div>
-            {canEditWebhook ? <button className="saas-ghost-btn" disabled={!webhookReady || webhookBusy} onClick={() => void testWebhook()}>Tester webhook</button> : null}
-          </div>
-          {canEditWebhook ? (
-            <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
-              <input
-                className="saas-input"
-                type="password"
-                value={webhookUrl}
-                onChange={(event) => setWebhookUrl(event.target.value)}
-                placeholder={webhookReady ? 'Webhook déjà configuré - coller une nouvelle URL pour remplacer' : 'URL webhook Discord'}
-                autoComplete="off"
-              />
-              <button className="saas-primary-btn" disabled={webhookBusy} onClick={() => void saveWebhook()}>Enregistrer</button>
-            </div>
-          ) : null}
-          {webhookMessage ? <p className="mt-2 text-xs text-[#efcdab]">{webhookMessage}</p> : null}
-        </section>
-      ) : null}
-
       {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
 
       <section className="glass-card p-5">
@@ -184,6 +158,33 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
           ))}
         </div>
       </section>
+
+      {canViewWebhook ? (
+        <section className="glass-card border border-[#e8b979]/30 bg-[#3b2418]/75 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-[#fff1dd]">📡 Webhook Discord Tablette</h3>
+              <p className="mt-1 text-xs text-[#efcdab]">
+                Statut : <span className={webhookReady ? 'font-semibold text-emerald-200' : 'font-semibold text-red-200'}>{webhookReady ? '✅ Configuré' : '❌ Non configuré'}</span>
+              </p>
+            </div>
+            {canEditWebhook ? <button className="saas-ghost-btn" disabled={!webhookReady || webhookBusy} onClick={() => void testWebhook()}>Tester webhook</button> : null}
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
+            <input
+              className="saas-input"
+              type={canEditWebhook ? 'password' : 'text'}
+              value={canEditWebhook ? webhookUrl : (webhookReady ? 'Webhook configuré' : 'Aucun webhook configuré')}
+              onChange={(event) => setWebhookUrl(event.target.value)}
+              placeholder={webhookReady ? 'URL webhook Discord - coller une nouvelle URL pour remplacer' : 'URL webhook Discord'}
+              autoComplete="off"
+              readOnly={!canEditWebhook}
+            />
+            {canEditWebhook ? <button className="saas-primary-btn" disabled={webhookBusy} onClick={() => void saveWebhook()}>Enregistrer</button> : null}
+          </div>
+          {webhookMessage ? <p className="mt-2 text-xs text-[#efcdab]">{webhookMessage}</p> : null}
+        </section>
+      ) : null}
     </div>
   );
 }

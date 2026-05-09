@@ -90,7 +90,7 @@ export async function testTabletWebhook(supabase: SupabaseClient) {
   const webhookUrl = await getTabletWebhookUrl(supabase);
   if (!webhookUrl) return { ok: false, message: 'Webhook tablette non configuré.' };
 
-  await postToDiscord(webhookUrl, `🧪 Test webhook Tablette FORONORS\n🕒 Date : ${formatParisDateTime(new Date())}`);
+  await postToDiscord(webhookUrl, '✅ Test webhook tablette FORONORS');
   return { ok: true };
 }
 
