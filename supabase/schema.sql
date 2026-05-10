@@ -312,7 +312,9 @@ values
   ('logs.access'),
   ('logs.view'),
   ('logs.preview'),
-  ('logs.webhook.manage')
+  ('logs.webhook.manage'),
+  ('logs.webhooks.tablet.view'),
+  ('logs.webhooks.tablet.edit')
 on conflict (name) do nothing;
 
 insert into storage.buckets (id, name, public)

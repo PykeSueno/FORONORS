@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getCronActorUserId, sendTabletDailyReport } from '@/lib/tablet-discord-webhook';
+import { ensureTabletMorningDeposit } from '@/lib/tablet-deposit';
+import { getTabletParisHour } from '@/lib/tablet';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getTabletBusinessDate, getTabletParisHour } from '@/lib/tablet';
+import { getCronActorUserId, sendTabletMorningReport } from '@/lib/tablet-discord-webhook';
 
 async function handler(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -11,15 +12,17 @@ async function handler(request: Request) {
   }
 
   const parisHour = getTabletParisHour(new Date());
-  if (parisHour !== 0) return NextResponse.json({ ok: true, skipped: true, reason: 'not_midnight_paris', parisHour });
+  if (parisHour !== 8) return NextResponse.json({ ok: true, skipped: true, reason: 'not_8h_paris', parisHour });
 
   const supabase = getSupabaseAdmin();
   const actorUserId = await getCronActorUserId(supabase);
   if (!actorUserId) return NextResponse.json({ message: 'Aucun utilisateur actif pour journaliser le cron.' }, { status: 500 });
 
-  const reportDate = getTabletBusinessDate(new Date());
-  const result = await sendTabletDailyReport(supabase, actorUserId, reportDate);
-  return NextResponse.json({ ok: true, ...result, parisHour });
+  const deposit = await ensureTabletMorningDeposit(supabase, { actorUserId, onlyAfterCutoff: true });
+  if (!deposit.day) return NextResponse.json({ ok: true, skipped: true, reason: deposit.reason, parisHour });
+
+  const result = await sendTabletMorningReport(supabase, actorUserId, deposit.day);
+  return NextResponse.json({ ok: true, deposit: deposit.reason, ...result, parisHour });
 }
 
 export async function GET(request: Request) {

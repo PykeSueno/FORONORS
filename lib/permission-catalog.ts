@@ -60,6 +60,8 @@ const EXACT: Record<string, PermissionInfo> = {
   'members.view': { module: 'Membres', section: 'Vue', label: 'Voir les membres', hint: 'Permet de consulter les membres.' },
   'roles.manage': { module: 'Roles', section: 'Gestion', label: 'Gerer roles et permissions', hint: 'Permet de gerer les roles et permissions.' },
   'roles.rename': { module: 'Roles', section: 'Gestion', label: 'Renommer un role', hint: 'Permet de modifier le nom d un role existant.' },
+  'logs.webhooks.tablet.view': { module: 'Logs', section: 'Technique', label: 'Voir webhook Tablette', hint: 'Affiche la configuration du webhook Discord Tablette.' },
+  'logs.webhooks.tablet.edit': { module: 'Logs', section: 'Technique', label: 'Configurer webhook Tablette', hint: 'Permet d enregistrer et tester le webhook Discord Tablette.' },
   'robberies.view': { module: 'Braquage', section: 'Vue', label: 'Voir le module Braquage', hint: 'Permet d afficher la page Braquage.' },
   'robberies.create': { module: 'Braquage', section: 'Creation', label: 'Creer un braquage', hint: 'Permet de valider un braquage.' },
   'robberies.fleeca.multi_roles': { module: 'Braquage', section: 'Gestion', label: 'Gerer multi-roles Fleeca', hint: 'Permet de saisir plusieurs roles pour un meme participant Fleeca.' },

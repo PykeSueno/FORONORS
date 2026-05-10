@@ -7,7 +7,6 @@ import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getTabletBusinessDate } from '@/lib/tablet';
 import { ensureTabletMorningDeposit } from '@/lib/tablet-deposit';
-import { getTabletWebhookStatus } from '@/lib/tablet-discord-webhook';
 
 export default async function TabletPage() {
   const session = await getSession();
@@ -20,13 +19,12 @@ export default async function TabletPage() {
   const supabase = getSupabaseAdmin();
   await ensureTabletMorningDeposit(supabase, { actorUserId: session.userId, onlyAfterCutoff: true });
 
-  const [{ data: day }, { data: members }, { data: cash }, { data: kitItem }, { data: cutterItem }, webhookStatus] = await Promise.all([
+  const [{ data: day }, { data: members }, { data: cash }, { data: kitItem }, { data: cutterItem }] = await Promise.all([
     supabase.from('tablet_days').select('*').eq('business_day', businessDay).maybeSingle(),
     supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true }),
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
     supabase.from('items').select('name, quantity').ilike('name', '%kit%').limit(1).maybeSingle(),
-    supabase.from('items').select('name, quantity').ilike('name', '%disqueuse%').limit(1).maybeSingle(),
-    permissions.includes('jobs.tablet.webhook.view') ? getTabletWebhookStatus(supabase) : Promise.resolve({ configured: false })
+    supabase.from('items').select('name, quantity').ilike('name', '%disqueuse%').limit(1).maybeSingle()
   ]);
 
   const { data: dayPassages } = day?.id
@@ -53,9 +51,6 @@ export default async function TabletPage() {
         cuttersInStock={Number(cutterItem?.quantity ?? 0)}
         canManageDaily={permissions.includes('tablet.daily.manage')}
         canCreatePassage={permissions.includes('tablet.passage.create')}
-        canViewWebhook={permissions.includes('jobs.tablet.webhook.view')}
-        canEditWebhook={permissions.includes('jobs.tablet.webhook.edit')}
-        webhookConfigured={webhookStatus.configured}
         defaultMemberId={session.userId}
         defaultMemberLabel={currentMember?.name || currentMember?.username || 'Groupe'}
       />

@@ -5,6 +5,14 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/tablet-morning-report",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/tablet-morning-report",
+      "schedule": "0 7 * * *"
+    },
+    {
       "path": "/api/cron/tablet-daily-report",
       "schedule": "0 22 * * *"
     },
