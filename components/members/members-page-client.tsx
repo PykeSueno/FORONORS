@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   SIMPLE_PERMISSION_MODULES,
   SIMPLE_ROLE_PRESETS,
-  describePermission,
   permissionsForSimpleKeys
 } from '@/lib/permission-catalog';
 import { toCanonicalPermission } from '@/lib/permission-normalization';
@@ -89,6 +88,44 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.display_order - b.display_order), [roles]);
   const sortedMembers = useMemo(() => sortMembersByGrade(members), [members]);
   const selectedRoles = useMemo(() => sortedRoles.filter((role) => selectedRoleIds.includes(role.id)), [selectedRoleIds, sortedRoles]);
+  const permissionNameById = useMemo(() => new Map(permissions.map((permission) => [permission.id, toCanonicalPermission(permission.name)])), [permissions]);
+  const roleSummaries = useMemo(() => {
+    const simpleActions = SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => ({
+      moduleKey: module.key,
+      permissionNames: permission.permissions.map(toCanonicalPermission)
+    })));
+    const totalActions = simpleActions.length;
+
+    return new Map(sortedRoles.map((role) => {
+      const roleNames = new Set(role.permission_ids.map((permissionId) => permissionNameById.get(permissionId)).filter(Boolean) as string[]);
+      const enabledActions = simpleActions.filter((action) => action.permissionNames.some((permissionName) => roleNames.has(permissionName)));
+      const completeModules = SIMPLE_PERMISSION_MODULES.filter((module) => {
+        const moduleActions = simpleActions.filter((action) => action.moduleKey === module.key);
+        return moduleActions.length > 0 && moduleActions.every((action) => action.permissionNames.some((permissionName) => roleNames.has(permissionName)));
+      }).length;
+      const ratio = totalActions > 0 ? Math.round((enabledActions.length / totalActions) * 100) : 0;
+      const roleName = role.name.trim().toUpperCase();
+      const headline = roleName === 'ADMIN' || roleName === 'PATRON'
+        ? `${ratio}% accès`
+        : roleName === 'PARTENAIRE'
+          ? 'Accès partenaire sécurisé'
+          : roleName === 'MEMBRE'
+            ? 'Accès limité'
+            : 'Accès gestion';
+      const moneyAccess = enabledActions.some((action) => action.moduleKey === 'money' || action.moduleKey === 'member_ops');
+      const detail = roleName === 'PARTENAIRE'
+        ? 'FOUR partenaire, missions, planning et stock autorisé'
+        : moneyAccess
+          ? `${completeModules} modules complets`
+          : `${completeModules} modules, pas accès argent`;
+
+      return [role.id, {
+        headline,
+        detail,
+        internalCount: role.permission_ids.length
+      }] as const;
+    }));
+  }, [permissionNameById, sortedRoles]);
 
   async function refreshAll() {
     const [membersRes, rolesRes, permissionsRes] = await Promise.all([
@@ -230,7 +267,11 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
               <div key={role.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
                 <div>
                   <p className="font-medium text-[#fff2df]">{role.name}</p>
-                  <p className="text-xs text-[#efcdab]">{role.permission_ids.length} permission(s)</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#efcdab]">
+                    <span className="rounded-full border border-white/10 bg-[#3b2418]/50 px-2 py-0.5 text-[#ffe3c4]">{roleSummaries.get(role.id)?.headline ?? 'Accès personnalisé'}</span>
+                    <span>{roleSummaries.get(role.id)?.detail ?? 'Résumé indisponible'}</span>
+                    <span>{roleSummaries.get(role.id)?.internalCount ?? role.permission_ids.length} permissions internes</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {canRenameRole ? <button className="saas-ghost-btn" onClick={() => { setSelectedRoleIds([role.id]); setIsRoleModalOpen(true); }}>✏️ Modifier le nom</button> : null}
@@ -483,14 +524,6 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
     const allPermissionIds = displayPermissions.map((permission) => permission.id);
     return Object.fromEntries(allPermissionIds.map((permissionId) => [permissionId, selectedRoles.every((role) => role.permission_ids.includes(permissionId))]));
   });
-  const [mixedPermissionIds] = useState<Set<number>>(() => {
-    const allPermissionIds = displayPermissions.map((permission) => permission.id);
-    return new Set(allPermissionIds.filter((permissionId) => {
-      const withPermission = selectedRoles.filter((role) => role.permission_ids.includes(permissionId)).length;
-      return withPermission > 0 && withPermission < selectedRoles.length;
-    }));
-  });
-  const [newPermission, setNewPermission] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const renameTarget = selectedRoles.length === 1 ? selectedRoles[0] : null;
   const [roleNameDraft, setRoleNameDraft] = useState(renameTarget?.name ?? '');
@@ -516,10 +549,6 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
         .filter((id): id is number => Number.isInteger(id))
     }))
   })), [permissionIdByName]);
-
-  const visiblePermissionIds = useMemo(() => new Set(simpleModules.flatMap((module) => module.permissions.flatMap((permission) => permission.permissionIds))), [simpleModules]);
-
-  const advancedPermissions = useMemo(() => displayPermissions.filter((permission) => !visiblePermissionIds.has(permission.id)), [displayPermissions, visiblePermissionIds]);
 
   useEffect(() => {
     if (simpleModules.length === 0) return;
@@ -560,22 +589,6 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
     const response = await fetch(`/api/roles/${selectedRoles[0].id}`, { method: 'DELETE' });
     if (!response.ok) return onError('Suppression rôle impossible.');
     onClose();
-    await onSaved();
-  }
-
-  async function addPermission() {
-    if (!canManageRoles) return;
-    const permissionName = newPermission.trim().toLowerCase();
-    if (!permissionName) return;
-
-    const response = await fetch('/api/permissions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: permissionName })
-    });
-
-    if (!response.ok) return onError('Création permission impossible.');
-    setNewPermission('');
     await onSaved();
   }
 
@@ -780,36 +793,8 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
                 })}
               </div>
 
-              {advancedPermissions.length > 0 ? (
-                <details className="rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-[#ffe9ce]">Permissions techniques restantes ({advancedPermissions.length})</summary>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {advancedPermissions.map((permission) => {
-                      const info = describePermission(permission.name);
-                      return (
-                        <label key={permission.id} title={info.hint} className="flex items-start gap-2 rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(checked[permission.id])}
-                            ref={(el) => {
-                              if (el) el.indeterminate = mixedPermissionIds.has(permission.id) && !checked[permission.id];
-                            }}
-                            onChange={(e) => setChecked((current) => ({ ...current, [permission.id]: e.target.checked }))}
-                          />
-                          <span>{info.label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </details>
-              ) : null}
             </div>
           ) : null}
-
-          {canManageRoles ? <div className="flex gap-2">
-            <input className="saas-input flex-1" placeholder="Nouvelle permission" value={newPermission} onChange={(e) => setNewPermission(e.target.value)} />
-            <button className="saas-ghost-btn" onClick={() => void addPermission()}>Ajouter</button>
-          </div> : null}
 
           {canManageRoles ? <div className="flex justify-end gap-2">
             {selectedRoles.length === 1 ? <div className="flex items-center"><RemoveLineButton onClick={() => void removeRole()} title="Supprimer le rôle" /></div> : null}

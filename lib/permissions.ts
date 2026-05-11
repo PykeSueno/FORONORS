@@ -11,15 +11,43 @@ const PARTNER_BLOCKED_PREFIXES = ['money.', 'payroll.', 'member_ops.', 'roles.',
 const PARTNER_BLOCKED_EXACT = new Set([
   'dashboard.money.movements.preview',
   'dashboard.money.movements.access',
+  'four.partner.config',
+  'four.partner.logs',
+  'four.history.view',
+  'four.stats.view',
+  'four.transaction.validate',
+  'four.transaction.edit.own',
+  'four.transaction.edit.any',
+  'four.transaction.cancel.own',
+  'four.transaction.cancel.any',
+  'four.transaction.recent.edit.own',
+  'four.transaction.recent.edit.any',
   'members.password.view',
   'members.password.copy',
   'members.password.edit',
   'members.credentials.copy'
 ]);
 
+const PARTNER_ALLOWED_EXACT = new Set([
+  'items.access',
+  'items.preview',
+  'items.movements.view',
+  'dashboard.stock.movements.preview',
+  'dashboard.stock.movements.access',
+  'four.access',
+  'four.preview',
+  'four.partner.view',
+  'four.partner.sell',
+  'four.partner.history.view',
+  'four.partner.stats.view',
+  'four.messages.view',
+  'four.messages.manage'
+]);
+
 function enforcePartnerSafety(roleName: string, permissions: string[]) {
   if (roleName !== 'partenaire') return permissions;
   return permissions.filter((permission) => (
+    PARTNER_ALLOWED_EXACT.has(permission) &&
     !PARTNER_BLOCKED_EXACT.has(permission) &&
     !PARTNER_BLOCKED_PREFIXES.some((prefix) => permission.startsWith(prefix))
   ));
