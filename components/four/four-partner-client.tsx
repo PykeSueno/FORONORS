@@ -64,10 +64,10 @@ type PartnerClientProps = {
 };
 
 const CARD_CLASS =
-  'glass-card h-full rounded-2xl border border-[#d4c0a0]/60 bg-[#f4ead8]/90 p-4 shadow-sm shadow-[#6b3f1d]/10 md:p-5';
+  'glass-card h-full rounded-2xl border border-white/10 bg-[#4a2f20]/70 p-4 shadow-sm shadow-black/10 md:p-5';
 
 const INPUT_CLASS =
-  'w-full rounded-xl border border-[#d8c5a9] bg-[#fffaf2] px-3 py-2 text-sm text-[#3f2718] outline-none transition focus:border-[#9b6a3e] focus:ring-2 focus:ring-[#9b6a3e]/20';
+  'w-full rounded-xl border border-white/10 bg-[#2b1a12]/70 px-3 py-2 text-sm text-[#fff1dd] outline-none transition focus:border-[#f2cc9b]/70 focus:ring-2 focus:ring-[#f2cc9b]/15';
 
 const CATEGORY_LABELS: Record<string, string> = {
   all: 'Toutes categories',
@@ -92,10 +92,10 @@ function statusLabel(status: FourPartnerSale['status']) {
 }
 
 function statusTone(status: FourPartnerSale['status']) {
-  if (status === 'bank_pending') return 'border-amber-300 bg-amber-100 text-amber-900';
-  if (status === 'bank_received') return 'border-emerald-300 bg-emerald-100 text-emerald-900';
-  if (status === 'canceled') return 'border-red-300 bg-red-100 text-red-900';
-  return 'border-green-300 bg-green-100 text-green-900';
+  if (status === 'bank_pending') return 'border-amber-300/40 bg-amber-500/10 text-amber-100';
+  if (status === 'bank_received') return 'border-emerald-300/40 bg-emerald-500/10 text-emerald-100';
+  if (status === 'canceled') return 'border-red-300/40 bg-red-100 text-red-900';
+  return 'border-emerald-300/40 bg-emerald-500/10 text-emerald-100';
 }
 
 function categoryLabel(value: string) {
@@ -401,7 +401,7 @@ export function FourPartnerClient({
       </section>
 
       {error ? (
-        <div className="rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+        <div className="rounded-2xl border border-red-300/40 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-100">
           {error}
         </div>
       ) : null}
@@ -491,10 +491,10 @@ function CycleCard({
               className={`rounded-2xl border p-3 transition ${
                 active
                   ? 'border-[#8b5a2b] bg-[#6b3f1d] text-[#fff7e8] shadow-sm'
-                  : 'border-[#d8c5a9] bg-[#fff8ee] text-[#4a2d1a]'
+                  : 'border-white/10 bg-[#2f1d14]/65 text-[#ffe8ca]'
               }`}
             >
-              <div className={`text-xs font-black uppercase ${active ? 'text-[#f6d7a7]' : 'text-[#9b6a3e]'}`}>
+              <div className={`text-xs font-black uppercase ${active ? 'text-[#f6d7a7]' : 'text-[#f6d7a7]'}`}>
                 {step.label}
               </div>
               <div className="mt-1 truncate text-sm font-black">{step.value}</div>
@@ -530,7 +530,7 @@ function CycleCard({
 
           <div className="grid items-end gap-2 sm:grid-cols-[1fr_auto]">
             <label className="space-y-1">
-              <span className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">Date de depart</span>
+              <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">Date de depart</span>
               <input
                 type="date"
                 value={configDraft.cycle_start_date}
@@ -550,7 +550,7 @@ function CycleCard({
           </div>
         </div>
       ) : (
-        <div className="mt-4 rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3 text-sm font-semibold text-[#6f4a2c]">
+        <div className="mt-4 rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3 text-sm font-semibold text-[#efcdab]">
           Depart du cycle : {configDraft.cycle_start_date}
         </div>
       )}
@@ -575,15 +575,15 @@ function TodayCard({
 }) {
   return (
     <article className={`${CARD_CLASS} relative overflow-hidden`}>
-      <div className="absolute right-5 top-5 rounded-full border border-[#d8c5a9] bg-[#fff8ee] px-3 py-1 text-xs font-black uppercase text-[#8b5a2b]">
+      <div className="absolute right-5 top-5 rounded-full border border-white/10 bg-[#2f1d14]/65 px-3 py-1 text-xs font-black uppercase text-[#efcdab]">
         Aujourd&apos;hui
       </div>
 
       <CardHeader eyebrow={today.isOff ? 'Repos cycle' : 'Partenaire actif'} title={today.label} />
 
       {today.isOff ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-[#c9ad83] bg-[#fff8ee] p-4">
-          <div className="text-sm font-black uppercase text-[#8b5a2b]">Objectif</div>
+        <div className="mt-5 rounded-2xl border border-dashed border-[#f2cc9b]/35 bg-[#2f1d14]/65 p-4">
+          <div className="text-sm font-black uppercase text-[#efcdab]">Objectif</div>
           <p className="mt-2 text-sm font-semibold leading-6 text-[#5f3b22]">
             Refaire les stocks. Aucune vente partenaire n&apos;est prevue aujourd&apos;hui.
           </p>
@@ -598,8 +598,8 @@ function TodayCard({
           <div
             className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-black ${
               stockOk
-                ? 'border-green-300 bg-green-100 text-green-900'
-                : 'border-amber-300 bg-amber-100 text-amber-900'
+                ? 'border-emerald-300/40 bg-emerald-500/10 text-emerald-100'
+                : 'border-amber-300/40 bg-amber-500/10 text-amber-100'
             }`}
           >
             {stockOk ? 'Stock OK' : 'Stock insuffisant'}
@@ -628,11 +628,11 @@ function PreviewCard({ preview }: { preview: ReturnType<typeof getFourPartnerPre
             className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2 ${
               day.date === todayKey
                 ? 'border-[#8b5a2b] bg-[#6b3f1d] text-[#fff7e8]'
-                : 'border-[#d8c5a9] bg-[#fff8ee] text-[#4a2d1a]'
+                : 'border-white/10 bg-[#2f1d14]/65 text-[#ffe8ca]'
             }`}
           >
             <div>
-              <div className={`text-xs font-black uppercase ${day.date === todayKey ? 'text-[#f6d7a7]' : 'text-[#9b6a3e]'}`}>
+              <div className={`text-xs font-black uppercase ${day.date === todayKey ? 'text-[#f6d7a7]' : 'text-[#f6d7a7]'}`}>
                 {compactDate(day.date)}
               </div>
               <div className="text-sm font-black">{day.label}</div>
@@ -686,12 +686,12 @@ function SaleCard({
 
       <div className="mt-4 space-y-3">
         <label className="space-y-1">
-          <span className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">Partenaire</span>
+          <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">Partenaire</span>
           <input value={partner} readOnly className={`${INPUT_CLASS} font-black`} />
         </label>
 
         <label className="space-y-1">
-          <span className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">Montant recu</span>
+          <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">Montant recu</span>
           <input
             type="number"
             min={0}
@@ -706,7 +706,7 @@ function SaleCard({
           <Stepper label="Disqueuses vendues" value={cuttersSold} onChange={setCuttersSold} />
         </div>
 
-        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-1">
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-1">
           {(['cash', 'bank'] as const).map((method) => (
             <button
               key={method}
@@ -715,7 +715,7 @@ function SaleCard({
               className={`rounded-xl px-3 py-2 text-sm font-black transition ${
                 paymentMethod === method
                   ? 'bg-[#6b3f1d] text-[#fff7e8]'
-                  : 'text-[#6f4a2c] hover:bg-[#ead9bd]'
+                  : 'text-[#efcdab] hover:bg-[#4a2f20]/80'
               }`}
             >
               {method === 'cash' ? 'Cash' : 'Bank'}
@@ -723,9 +723,9 @@ function SaleCard({
           ))}
         </div>
 
-        <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
-          <div className="text-xs font-black uppercase text-[#8b5a2b]">Recap vente</div>
-          <div className="mt-3 grid gap-2 text-sm font-semibold text-[#4a2d1a] sm:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
+          <div className="text-xs font-black uppercase text-[#efcdab]">Recap vente</div>
+          <div className="mt-3 grid gap-2 text-sm font-semibold text-[#ffe8ca] sm:grid-cols-2">
             <InfoLine label="Kits" value={`${kitStock} -> ${kitAfter}`} />
             <InfoLine label="Disqueuses" value={`${cutterStock} -> ${cutterAfter}`} />
             <InfoLine
@@ -793,57 +793,57 @@ function ReportedItemsCard({
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_.92fr]">
-        <div className="min-h-[280px] rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+        <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
           <div className="mb-3 flex items-center justify-between">
-            <div className="text-xs font-black uppercase text-[#8b5a2b]">Liste items</div>
-            <div className="text-xs font-bold text-[#8b5a2b]">{availableItems.length} resultats</div>
+            <div className="text-xs font-black uppercase text-[#efcdab]">Liste items</div>
+            <div className="text-xs font-bold text-[#efcdab]">{availableItems.length} resultats</div>
           </div>
           <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
             {availableItems.map((item) => (
               <div
                 key={item.id}
-                className="grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-2xl border border-[#e2d1b6] bg-[#fffaf2] p-2"
+                className="grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-2xl border border-white/10 bg-[#2b1a12]/70 p-2"
               >
                 <ItemImage item={item} />
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-black text-[#3f2718]">{item.name}</div>
-                  <div className="text-xs font-semibold text-[#8b5a2b]">Stock actuel : {item.quantity}</div>
+                  <div className="truncate text-sm font-black text-[#fff1dd]">{item.name}</div>
+                  <div className="text-xs font-semibold text-[#efcdab]">Stock actuel : {item.quantity}</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => addReportedItem(item)}
-                  className="rounded-xl border border-[#c5a77f] bg-[#f2dfc0] px-3 py-2 text-sm font-black text-[#5c371f] transition hover:bg-[#e5c99c]"
+                  className="rounded-xl border border-white/15 bg-[#5b3924]/75 px-3 py-2 text-sm font-black text-[#ffe8ca] transition hover:bg-[#6b452d]/85"
                 >
                   Ajouter
                 </button>
               </div>
             ))}
             {availableItems.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#c9ad83] p-4 text-center text-sm font-semibold text-[#8b5a2b]">
+              <div className="rounded-2xl border border-dashed border-[#f2cc9b]/35 p-4 text-center text-sm font-semibold text-[#efcdab]">
                 Aucun item trouve.
               </div>
             ) : null}
           </div>
         </div>
 
-        <div className="min-h-[280px] rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
-          <div className="mb-3 text-xs font-black uppercase text-[#8b5a2b]">Objets selectionnes</div>
+        <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
+          <div className="mb-3 text-xs font-black uppercase text-[#efcdab]">Objets selectionnes</div>
           <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
             {selectedReported.map((line) => (
               <div
                 key={line.item_id}
-                className="rounded-2xl border border-[#e2d1b6] bg-[#fffaf2] p-2"
+                className="rounded-2xl border border-white/10 bg-[#2b1a12]/70 p-2"
               >
                 <div className="grid grid-cols-[40px_1fr_auto] items-center gap-3">
                   <ItemImage item={line.item} />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-black text-[#3f2718]">{line.item?.name}</div>
-                    <div className="text-xs font-semibold text-[#8b5a2b]">Stock : {line.item?.quantity ?? 0}</div>
+                    <div className="truncate text-sm font-black text-[#fff1dd]">{line.item?.name}</div>
+                    <div className="text-xs font-semibold text-[#efcdab]">Stock : {line.item?.quantity ?? 0}</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => changeReportedQuantity(line.item_id, 0)}
-                    className="h-8 w-8 rounded-full border border-[#d8c5a9] bg-[#fff8ee] text-sm font-black text-[#8b5a2b] transition hover:bg-red-100 hover:text-red-800"
+                    className="h-8 w-8 rounded-full border border-white/10 bg-[#2f1d14]/65 text-sm font-black text-[#efcdab] transition hover:bg-red-500/15 hover:text-red-100"
                     aria-label="Retirer"
                   >
                     x
@@ -860,7 +860,7 @@ function ReportedItemsCard({
               </div>
             ))}
             {selectedReported.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#c9ad83] p-4 text-center text-sm font-semibold text-[#8b5a2b]">
+              <div className="rounded-2xl border border-dashed border-[#f2cc9b]/35 p-4 text-center text-sm font-semibold text-[#efcdab]">
                 Aucun objet selectionne.
               </div>
             ) : null}
@@ -888,28 +888,28 @@ function HistoryCard({
 
       <div className="mt-4 space-y-3">
         {sales.slice(0, 10).map((sale) => (
-          <div key={sale.id} className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+          <div key={sale.id} className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-black text-[#3f2718]">{sale.partner_name}</div>
-                <div className="text-xs font-semibold text-[#8b5a2b]">{formatDate(sale.created_at)}</div>
+                <div className="text-sm font-black text-[#fff1dd]">{sale.partner_name}</div>
+                <div className="text-xs font-semibold text-[#efcdab]">{formatDate(sale.created_at)}</div>
               </div>
               <span className={`rounded-full border px-3 py-1 text-xs font-black ${statusTone(sale.status)}`}>
                 {statusLabel(sale.status)}
               </span>
             </div>
 
-            <div className="mt-3 grid gap-2 text-sm font-semibold text-[#4a2d1a] sm:grid-cols-4">
+            <div className="mt-3 grid gap-2 text-sm font-semibold text-[#ffe8ca] sm:grid-cols-4">
               <InfoLine label="Kits" value={String(sale.kits_sold)} />
               <InfoLine label="Disqueuses" value={String(sale.cutters_sold)} />
               <InfoLine label="Mode" value={sale.payment_method === 'cash' ? 'Cash' : 'Bank'} />
               <InfoLine label="Montant" value={formatUsd(sale.amount_received)} />
             </div>
 
-            <div className="mt-3 rounded-2xl border border-[#e2d1b6] bg-[#fffaf2] px-3 py-2 text-xs font-semibold text-[#6f4a2c]">
+            <div className="mt-3 rounded-2xl border border-white/10 bg-[#2b1a12]/70 px-3 py-2 text-xs font-semibold text-[#efcdab]">
               Objets rapportes :{' '}
               {sale.reported_items?.length
-                ? sale.reported_items.map((item) => `${item.item_name} x${item.quantity}`).join(' · ')
+                ? sale.reported_items.map((item) => `${item.item_name} x${item.quantity}`).join(' Â· ')
                 : 'Aucun'}
             </div>
 
@@ -928,7 +928,7 @@ function HistoryCard({
         ))}
 
         {sales.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#c9ad83] p-4 text-center text-sm font-semibold text-[#8b5a2b]">
+          <div className="rounded-2xl border border-dashed border-[#f2cc9b]/35 p-4 text-center text-sm font-semibold text-[#efcdab]">
             Aucune vente partenaire.
           </div>
         ) : null}
@@ -971,7 +971,7 @@ function StatsCard({
         <StatList title="Retours objets" values={stats.reportedTotals} empty="Aucun retour" />
       </div>
 
-      <div className="mt-4 grid gap-2 text-sm font-semibold text-[#4a2d1a] sm:grid-cols-2">
+      <div className="mt-4 grid gap-2 text-sm font-semibold text-[#ffe8ca] sm:grid-cols-2">
         <InfoLine label="Jours off visibles" value={String(stats.offDays)} />
         <InfoLine label="Stock moyen restant" value={String(stats.avgStock)} />
       </div>
@@ -982,8 +982,8 @@ function StatsCard({
 function CardHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div>
-      <div className="text-xs font-black uppercase tracking-[0.16em] text-[#9b6a3e]">{eyebrow}</div>
-      <h2 className="mt-1 text-xl font-black text-[#3f2718]">{title}</h2>
+      <div className="text-xs font-black uppercase tracking-[0.16em] text-[#f6d7a7]">{eyebrow}</div>
+      <h2 className="mt-1 text-xl font-black text-[#fff1dd]">{title}</h2>
     </div>
   );
 }
@@ -999,7 +999,7 @@ function LabeledInput({
 }) {
   return (
     <label className="space-y-1">
-      <span className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">{label}</span>
+      <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">{label}</span>
       <input value={value} onChange={(event) => onChange(event.target.value)} className={INPUT_CLASS} />
     </label>
   );
@@ -1007,19 +1007,19 @@ function LabeledInput({
 
 function StockTile({ label, value, footer }: { label: string; value: string; footer: string }) {
   return (
-    <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-4">
-      <div className="text-xs font-black uppercase text-[#8b5a2b]">{label}</div>
-      <div className="mt-2 text-3xl font-black text-[#3f2718]">{value}</div>
-      <div className="mt-1 text-xs font-semibold text-[#8b5a2b]">{footer}</div>
+    <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-4">
+      <div className="text-xs font-black uppercase text-[#efcdab]">{label}</div>
+      <div className="mt-2 text-3xl font-black text-[#fff1dd]">{value}</div>
+      <div className="mt-1 text-xs font-semibold text-[#efcdab]">{footer}</div>
     </div>
   );
 }
 
 function InfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#e2d1b6] bg-[#fffaf2] px-3 py-2">
-      <div className="text-[11px] font-black uppercase text-[#9b6a3e]">{label}</div>
-      <div className="mt-1 truncate text-sm font-black text-[#3f2718]">{value}</div>
+    <div className="rounded-xl border border-white/10 bg-[#2b1a12]/70 px-3 py-2">
+      <div className="text-[11px] font-black uppercase text-[#f6d7a7]">{label}</div>
+      <div className="mt-1 truncate text-sm font-black text-[#fff1dd]">{value}</div>
     </div>
   );
 }
@@ -1036,13 +1036,13 @@ function Stepper({
   min?: number;
 }) {
   return (
-    <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
-      <div className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">{label}</div>
+    <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
+      <div className="text-xs font-black uppercase tracking-wide text-[#efcdab]">{label}</div>
       <div className="mt-2 grid grid-cols-[36px_1fr_36px] items-center gap-2">
         <button
           type="button"
           onClick={() => onChange(Math.max(min, value - 1))}
-          className="h-9 rounded-xl border border-[#c5a77f] bg-[#f2dfc0] text-lg font-black text-[#5c371f] transition hover:bg-[#e5c99c]"
+          className="h-9 rounded-xl border border-white/15 bg-[#5b3924]/75 text-lg font-black text-[#ffe8ca] transition hover:bg-[#6b452d]/85"
         >
           -
         </button>
@@ -1056,7 +1056,7 @@ function Stepper({
         <button
           type="button"
           onClick={() => onChange(value + 1)}
-          className="h-9 rounded-xl border border-[#c5a77f] bg-[#f2dfc0] text-lg font-black text-[#5c371f] transition hover:bg-[#e5c99c]"
+          className="h-9 rounded-xl border border-white/15 bg-[#5b3924]/75 text-lg font-black text-[#ffe8ca] transition hover:bg-[#6b452d]/85"
         >
           +
         </button>
@@ -1067,11 +1067,11 @@ function Stepper({
 
 function ItemImage({ item }: { item?: Pick<Item, 'name' | 'image_url'> }) {
   return (
-    <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-[#d8c5a9] bg-[#ead9bd]">
+    <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-white/10 bg-[#3f281b]/70">
       {item?.image_url ? (
         <Image src={item.image_url} alt={item.name} fill sizes="40px" className="object-cover" />
       ) : (
-        <div className="grid h-full w-full place-items-center text-xs font-black text-[#8b5a2b]">
+        <div className="grid h-full w-full place-items-center text-xs font-black text-[#efcdab]">
           {(item?.name ?? '?').slice(0, 2).toUpperCase()}
         </div>
       )}
@@ -1094,8 +1094,8 @@ function SmallButton({
       onClick={onClick}
       className={`rounded-xl border px-3 py-2 text-xs font-black transition ${
         danger
-          ? 'border-red-300 bg-red-50 text-red-800 hover:bg-red-100'
-          : 'border-[#c5a77f] bg-[#f2dfc0] text-[#5c371f] hover:bg-[#e5c99c]'
+          ? 'border-red-300/40 bg-red-500/10 text-red-100 hover:bg-red-500/15'
+          : 'border-white/15 bg-[#5b3924]/75 text-[#ffe8ca] hover:bg-[#6b452d]/85'
       }`}
     >
       {children}
@@ -1105,9 +1105,9 @@ function SmallButton({
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
-      <div className="text-[11px] font-black uppercase text-[#9b6a3e]">{label}</div>
-      <div className="mt-1 text-lg font-black text-[#3f2718]">{value}</div>
+    <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
+      <div className="text-[11px] font-black uppercase text-[#f6d7a7]">{label}</div>
+      <div className="mt-1 text-lg font-black text-[#fff1dd]">{value}</div>
     </div>
   );
 }
@@ -1124,16 +1124,16 @@ function StatList({
   const entries = Object.entries(values).slice(0, 5);
 
   return (
-    <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
-      <div className="text-xs font-black uppercase text-[#8b5a2b]">{title}</div>
+    <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
+      <div className="text-xs font-black uppercase text-[#efcdab]">{title}</div>
       <div className="mt-2 space-y-2">
         {entries.map(([name, value]) => (
-          <div key={name} className="flex items-center justify-between gap-3 text-sm font-semibold text-[#4a2d1a]">
+          <div key={name} className="flex items-center justify-between gap-3 text-sm font-semibold text-[#ffe8ca]">
             <span className="truncate">{name}</span>
             <span className="font-black">{value}</span>
           </div>
         ))}
-        {entries.length === 0 ? <div className="text-sm font-semibold text-[#8b5a2b]">{empty}</div> : null}
+        {entries.length === 0 ? <div className="text-sm font-semibold text-[#efcdab]">{empty}</div> : null}
       </div>
     </div>
   );
@@ -1142,17 +1142,17 @@ function StatList({
 function SaleDetail({ sale, onClose }: { sale: FourPartnerSale; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-xl rounded-3xl border border-[#d4c0a0] bg-[#f4ead8] p-5 shadow-2xl">
+      <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#4a2f20] p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.16em] text-[#9b6a3e]">Detail vente</div>
-            <h3 className="mt-1 text-xl font-black text-[#3f2718]">{sale.partner_name}</h3>
-            <p className="mt-1 text-sm font-semibold text-[#8b5a2b]">{formatDate(sale.created_at)}</p>
+            <div className="text-xs font-black uppercase tracking-[0.16em] text-[#f6d7a7]">Detail vente</div>
+            <h3 className="mt-1 text-xl font-black text-[#fff1dd]">{sale.partner_name}</h3>
+            <p className="mt-1 text-sm font-semibold text-[#efcdab]">{formatDate(sale.created_at)}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="h-9 w-9 rounded-full border border-[#d8c5a9] bg-[#fff8ee] text-sm font-black text-[#8b5a2b]"
+            className="h-9 w-9 rounded-full border border-white/10 bg-[#2f1d14]/65 text-sm font-black text-[#efcdab]"
           >
             x
           </button>
@@ -1167,18 +1167,18 @@ function SaleDetail({ sale, onClose }: { sale: FourPartnerSale; onClose: () => v
           <InfoLine label="Date cycle" value={sale.sale_date} />
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
-          <div className="text-xs font-black uppercase text-[#8b5a2b]">Objets rapportes</div>
+        <div className="mt-4 rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
+          <div className="text-xs font-black uppercase text-[#efcdab]">Objets rapportes</div>
           <div className="mt-2 space-y-2">
             {sale.reported_items?.map((item) => (
-              <div key={`${item.item_id}-${item.item_name}`} className="flex items-center gap-3 text-sm font-semibold text-[#4a2d1a]">
+              <div key={`${item.item_id}-${item.item_name}`} className="flex items-center gap-3 text-sm font-semibold text-[#ffe8ca]">
                 <ItemImage item={{ name: item.item_name, image_url: item.image_url }} />
                 <span className="min-w-0 flex-1 truncate">{item.item_name}</span>
                 <span className="font-black">x{item.quantity}</span>
               </div>
             ))}
             {!sale.reported_items?.length ? (
-              <div className="text-sm font-semibold text-[#8b5a2b]">Aucun objet rapporte.</div>
+              <div className="text-sm font-semibold text-[#efcdab]">Aucun objet rapporte.</div>
             ) : null}
           </div>
         </div>

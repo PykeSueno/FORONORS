@@ -89,11 +89,16 @@ const EXACT: Record<string, PermissionInfo> = {
   'tobacco.processor.sale.edit': { module: 'Travail', section: 'Gestion', label: 'Modifier vente Processeur', hint: 'Permet de modifier une vente Processeur.' },
   'tobacco.processor.sale.cancel': { module: 'Travail', section: 'Modification / Annulation', label: 'Annuler vente Processeur', hint: 'Permet d annuler une vente Processeur.' },
   'jobs.tablet.webhook.view': { module: 'Travail', section: 'Technique', label: 'Voir webhook Tablette Discord', hint: 'Affiche le statut du webhook Discord Tablette.' },
-  'jobs.tablet.webhook.edit': { module: 'Travail', section: 'Technique', label: 'Configurer webhook Tablette Discord', hint: 'Permet d enregistrer et tester le webhook Discord Tablette.' }
+  'jobs.tablet.webhook.edit': { module: 'Travail', section: 'Technique', label: 'Configurer webhook Tablette Discord', hint: 'Permet d enregistrer et tester le webhook Discord Tablette.' },
+  'jobs.stone.view': { module: 'Travail', section: 'Vue', label: 'Voir Jobs Pierre', hint: 'Affiche la page Pierre.' },
+  'jobs.stone.sell': { module: 'Travail', section: 'Creation', label: 'Vendre Saphir Brut', hint: 'Permet de valider une vente Pierre.' },
+  'jobs.stone.history.view': { module: 'Travail', section: 'Historique', label: 'Historique Pierre', hint: 'Permet de consulter les ventes Pierre.' },
+  'jobs.stone.stats.view': { module: 'Travail', section: 'Stats', label: 'Stats Pierre', hint: 'Permet de consulter les statistiques Pierre.' },
+  'jobs.stone.logs': { module: 'Travail', section: 'Logs', label: 'Logs Pierre', hint: 'Permet de consulter les logs Pierre.' }
 };
 
 const PREFIX_MODULES: Array<[string, string]> = [
-  ['dashboard.', 'Dashboard'], ['money.', 'Argent'], ['payroll.', 'Argent'], ['expenses.', 'ACTIVITÉS & PAYES & DÉPENSES'], ['sale.objects.', 'Vente objets'], ['sale_objects.', 'Vente objets'], ['items.', 'Items'], ['transactions.recent.', 'Transactions recentes'], ['transactions.', 'Transactions'], ['member_ops.', 'ACTIVITÉS & PAYES & DÉPENSES'], ['activity_payroll.', 'ACTIVITÉS & PAYES & DÉPENSES'], ['activity.', 'Activite'], ['four.', 'FOUR'], ['drugs.', 'Drogues'], ['robberies.', 'Braquage'], ['tablet.', 'Travail'], ['cigarette.', 'Travail'], ['tobacco.processor.', 'Travail'], ['members.', 'Membres'], ['roles.', 'Roles'], ['logs.', 'Logs'], ['account.', 'Compte']
+  ['dashboard.', 'Dashboard'], ['money.', 'Argent'], ['payroll.', 'Argent'], ['expenses.', 'ACTIVITÉS & PAYES & DÉPENSES'], ['sale.objects.', 'Vente objets'], ['sale_objects.', 'Vente objets'], ['items.', 'Items'], ['transactions.recent.', 'Transactions recentes'], ['transactions.', 'Transactions'], ['member_ops.', 'ACTIVITÉS & PAYES & DÉPENSES'], ['activity_payroll.', 'ACTIVITÉS & PAYES & DÉPENSES'], ['activity.', 'Activite'], ['four.', 'FOUR'], ['drugs.', 'Drogues'], ['robberies.', 'Braquage'], ['tablet.', 'Travail'], ['cigarette.', 'Travail'], ['tobacco.processor.', 'Travail'], ['jobs.stone.', 'Travail'], ['members.', 'Membres'], ['roles.', 'Roles'], ['logs.', 'Logs'], ['account.', 'Compte']
 ];
 
 function humanize(name: string) {

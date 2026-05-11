@@ -26,8 +26,9 @@ export async function GET(request: Request) {
   const canTablet = permissions.includes('tablet.access') || permissions.includes('tablet.stats.view');
   const canCigarette = permissions.includes('cigarette.history.view') || permissions.includes('cigarette.stats.view');
   const canProcessor = permissions.includes('tobacco.processor.logs') || permissions.includes('tobacco.processor.stats');
+  const canStone = permissions.includes('jobs.stone.history.view') || permissions.includes('jobs.stone.stats.view');
 
-  if (!canTablet && !canCigarette && !canProcessor) {
+  if (!canTablet && !canCigarette && !canProcessor && !canStone) {
     return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
   }
 
@@ -44,7 +45,8 @@ export async function GET(request: Request) {
     endIso: window.endIso,
     includeTablet: canTablet,
     includeCigarette: canCigarette,
-    includeProcessor: canProcessor
+    includeProcessor: canProcessor,
+    includeStone: canStone
   });
 
   return NextResponse.json({ ...data, range: window });
