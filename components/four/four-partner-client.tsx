@@ -1,11 +1,27 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
-import { formatUsd } from '@/lib/currency';
-import { getFourPartnerCycleDay, getFourPartnerPreview, getNextOffDay, getNextPartnerDay, toDateKey, type FourPartnerConfig } from '@/lib/four-partner';
+import { type ReactNode, useMemo, useState } from 'react';
 
-type Item = { id: number; name: string; image_url: string | null; quantity: number; category_key?: string | null; type_key?: string | null };
+import { formatUsd } from '@/lib/currency';
+import {
+  type FourPartnerConfig,
+  getFourPartnerCycleDay,
+  getFourPartnerPreview,
+  getNextOffDay,
+  getNextPartnerDay,
+  toDateKey,
+} from '@/lib/four-partner';
+
+type Item = {
+  id: number;
+  name: string;
+  quantity: number;
+  category_key?: string | null;
+  type_key?: string | null;
+  image_url?: string | null;
+};
+
 export type FourPartnerSale = {
   id: number;
   sale_date: string;
@@ -15,23 +31,94 @@ export type FourPartnerSale = {
   amount_received: number;
   payment_method: 'cash' | 'bank';
   status: 'validated' | 'bank_pending' | 'bank_received' | 'canceled';
-  reported_items: Array<{ item_id: number; item_name: string; image_url: string | null; quantity: number }>;
-  stock_snapshot?: { kits?: { before: number; after: number }; cutters?: { before: number; after: number } };
+  reported_items?: Array<{
+    item_id: number;
+    item_name: string;
+    quantity: number;
+    image_url?: string | null;
+    before?: number;
+    after?: number;
+  }>;
+  stock_snapshot?: {
+    kits?: { item_id: number; item_name: string; before: number; after: number; sold: number };
+    cutters?: { item_id: number; item_name: string; before: number; after: number; sold: number };
+  };
   cash_before?: number | null;
   cash_after?: number | null;
-  created_at: string;
+  created_at?: string | null;
 };
-type ReportedDraft = { item_id: number; quantity: number };
+
+type ReportedDraft = {
+  item_id: number;
+  quantity: number;
+};
+
+type PartnerClientProps = {
+  config: FourPartnerConfig;
+  items: Item[];
+  sales: FourPartnerSale[];
+  canConfig: boolean;
+  canSell: boolean;
+  canHistory: boolean;
+  canStats: boolean;
+};
+
+const CARD_CLASS =
+  'glass-card h-full rounded-2xl border border-[#d4c0a0]/60 bg-[#f4ead8]/90 p-4 shadow-sm shadow-[#6b3f1d]/10 md:p-5';
+
+const INPUT_CLASS =
+  'w-full rounded-xl border border-[#d8c5a9] bg-[#fffaf2] px-3 py-2 text-sm text-[#3f2718] outline-none transition focus:border-[#9b6a3e] focus:ring-2 focus:ring-[#9b6a3e]/20';
+
+const CATEGORY_LABELS: Record<string, string> = {
+  all: 'Toutes categories',
+  objects: 'Objets',
+  equipment: 'Equipement',
+  drugs: 'Produits',
+  misc: 'Divers',
+};
 
 function normalizeName(value: string) {
-  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 function statusLabel(status: FourPartnerSale['status']) {
-  if (status === 'validated') return 'Validé';
   if (status === 'bank_pending') return 'Bank en attente';
-  if (status === 'bank_received') return 'Reçu bank';
-  return 'Annulé';
+  if (status === 'bank_received') return 'Recu bank';
+  if (status === 'canceled') return 'Annule';
+  return 'Valide';
+}
+
+function statusTone(status: FourPartnerSale['status']) {
+  if (status === 'bank_pending') return 'border-amber-300 bg-amber-100 text-amber-900';
+  if (status === 'bank_received') return 'border-emerald-300 bg-emerald-100 text-emerald-900';
+  if (status === 'canceled') return 'border-red-300 bg-red-100 text-red-900';
+  return 'border-green-300 bg-green-100 text-green-900';
+}
+
+function categoryLabel(value: string) {
+  return CATEGORY_LABELS[value] ?? value;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '-';
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function compactDate(value: string) {
+  return new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+  }).format(new Date(`${value}T12:00:00`));
 }
 
 export function FourPartnerClient({
@@ -41,16 +128,8 @@ export function FourPartnerClient({
   canConfig,
   canSell,
   canHistory,
-  canStats
-}: {
-  config: FourPartnerConfig;
-  items: Item[];
-  sales: FourPartnerSale[];
-  canConfig: boolean;
-  canSell: boolean;
-  canHistory: boolean;
-  canStats: boolean;
-}) {
+  canStats,
+}: PartnerClientProps) {
   const [config, setConfig] = useState(initialConfig);
   const [currentItems, setCurrentItems] = useState(items);
   const [sales, setSales] = useState(initialSales);
@@ -61,290 +140,317 @@ export function FourPartnerClient({
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank'>('cash');
   const [reported, setReported] = useState<ReportedDraft[]>([]);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('');
-  const [error, setError] = useState('');
+  const [category, setCategory] = useState('all');
+  const [error, setError] = useState<string | null>(null);
   const [detailSale, setDetailSale] = useState<FourPartnerSale | null>(null);
 
-  const today = useMemo(() => getFourPartnerCycleDay(config, toDateKey()), [config]);
+  const today = useMemo(() => getFourPartnerCycleDay(config), [config]);
   const preview = useMemo(() => getFourPartnerPreview(config, 7), [config]);
   const nextPartner = useMemo(() => getNextPartnerDay(config), [config]);
   const nextOff = useMemo(() => getNextOffDay(config), [config]);
-  const itemById = useMemo(() => new Map(currentItems.map((item) => [item.id, item])), [currentItems]);
-  const kitItem = useMemo(() => currentItems.find((item) => normalizeName(item.name).includes('kit')), [currentItems]);
-  const cutterItem = useMemo(() => currentItems.find((item) => normalizeName(item.name).includes('disqueuse')), [currentItems]);
-  const stockOk = Number(kitItem?.quantity ?? 0) >= 20 && Number(cutterItem?.quantity ?? 0) >= 20;
-  const categories = useMemo(() => Array.from(new Set(currentItems.map((item) => item.category_key).filter(Boolean))) as string[], [currentItems]);
-  const availableItems = useMemo(() => currentItems
-    .filter((item) => !category || item.category_key === category)
-    .filter((item) => item.name.toLowerCase().includes(query.toLowerCase()))
-    .slice(0, 80), [currentItems, category, query]);
+
+  const itemById = useMemo(() => {
+    const map = new Map<number, Item>();
+    currentItems.forEach((item) => map.set(item.id, item));
+    return map;
+  }, [currentItems]);
+
+  const kitItem = useMemo(
+    () => currentItems.find((item) => normalizeName(item.name).includes('kit')),
+    [currentItems],
+  );
+
+  const cutterItem = useMemo(
+    () => currentItems.find((item) => normalizeName(item.name).includes('disqueuse')),
+    [currentItems],
+  );
+
+  const kitStock = Number(kitItem?.quantity ?? 0);
+  const cutterStock = Number(cutterItem?.quantity ?? 0);
+  const kitAfter = Math.max(0, kitStock - kitsSold);
+  const cutterAfter = Math.max(0, cutterStock - cuttersSold);
+  const saleHasStock = kitStock >= kitsSold && cutterStock >= cuttersSold;
+  const stockOk = kitStock >= 20 && cutterStock >= 20;
+
+  const categories = useMemo(() => {
+    const values = new Set(currentItems.map((item) => item.category_key).filter(Boolean) as string[]);
+    return ['all', ...Array.from(values)];
+  }, [currentItems]);
+
+  const availableItems = useMemo(() => {
+    const normalized = normalizeName(query);
+    return currentItems
+      .filter((item) => !kitItem || item.id !== kitItem.id)
+      .filter((item) => !cutterItem || item.id !== cutterItem.id)
+      .filter((item) => category === 'all' || item.category_key === category)
+      .filter((item) => normalizeName(item.name).includes(normalized))
+      .slice(0, 18);
+  }, [category, currentItems, cutterItem, kitItem, query]);
+
+  const selectedReported = useMemo(
+    () =>
+      reported
+        .map((line) => ({
+          ...line,
+          item: itemById.get(line.item_id),
+        }))
+        .filter((line) => line.item),
+    [itemById, reported],
+  );
 
   const stats = useMemo(() => {
     const activeSales = sales.filter((sale) => sale.status !== 'canceled');
-    const byPartner = new Map<string, { count: number; kits: number; cutters: number; cash: number; bank: number }>();
-    const reportedTotals = new Map<string, number>();
-    for (const sale of activeSales) {
-      const current = byPartner.get(sale.partner_name) ?? { count: 0, kits: 0, cutters: 0, cash: 0, bank: 0 };
-      current.count += 1;
-      current.kits += Number(sale.kits_sold ?? 0);
-      current.cutters += Number(sale.cutters_sold ?? 0);
-      if (sale.payment_method === 'cash') current.cash += Number(sale.amount_received ?? 0);
-      if (sale.payment_method === 'bank') current.bank += Number(sale.amount_received ?? 0);
-      byPartner.set(sale.partner_name, current);
-      for (const item of sale.reported_items ?? []) {
-        reportedTotals.set(item.item_name, (reportedTotals.get(item.item_name) ?? 0) + Number(item.quantity ?? 0));
-      }
-    }
-    const respected = activeSales.filter((sale) => getFourPartnerCycleDay(config, sale.sale_date).label === sale.partner_name).length;
-    const avgKit = activeSales.length ? activeSales.reduce((sum, sale) => sum + Number(sale.stock_snapshot?.kits?.after ?? 0), 0) / activeSales.length : 0;
-    const avgCutter = activeSales.length ? activeSales.reduce((sum, sale) => sum + Number(sale.stock_snapshot?.cutters?.after ?? 0), 0) / activeSales.length : 0;
-    return {
-      byPartner: Array.from(byPartner.entries()),
-      reportedTotals: Array.from(reportedTotals.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8),
-      cash: activeSales.filter((sale) => sale.payment_method === 'cash').reduce((sum, sale) => sum + Number(sale.amount_received ?? 0), 0),
-      bank: activeSales.filter((sale) => sale.payment_method === 'bank').reduce((sum, sale) => sum + Number(sale.amount_received ?? 0), 0),
-      offDays: preview.filter((day) => day.isOff).length,
-      respectRate: activeSales.length ? Math.round((respected / activeSales.length) * 100) : 0,
-      avgStock: { kit: avgKit, cutter: avgCutter }
-    };
-  }, [sales, config, preview]);
+    const byPartner = activeSales.reduce<Record<string, number>>((acc, sale) => {
+      acc[sale.partner_name] = (acc[sale.partner_name] ?? 0) + 1;
+      return acc;
+    }, {});
 
-  function addReportedItem(itemId: number) {
+    const reportedTotals = activeSales.reduce<Record<string, number>>((acc, sale) => {
+      sale.reported_items?.forEach((item) => {
+        acc[item.item_name] = (acc[item.item_name] ?? 0) + item.quantity;
+      });
+      return acc;
+    }, {});
+
+    const cash = activeSales
+      .filter((sale) => sale.payment_method === 'cash')
+      .reduce((sum, sale) => sum + Number(sale.amount_received ?? 0), 0);
+    const bank = activeSales
+      .filter((sale) => sale.payment_method === 'bank')
+      .reduce((sum, sale) => sum + Number(sale.amount_received ?? 0), 0);
+    const kits = activeSales.reduce((sum, sale) => sum + Number(sale.kits_sold ?? 0), 0);
+    const cutters = activeSales.reduce((sum, sale) => sum + Number(sale.cutters_sold ?? 0), 0);
+    const objects = Object.values(reportedTotals).reduce((sum, quantity) => sum + quantity, 0);
+    const avgStock = Math.round((kitStock + cutterStock) / 2);
+    const cycleRespect = activeSales.length
+      ? Math.round(
+          (activeSales.filter((sale) => {
+            const expected = getFourPartnerCycleDay(config, sale.sale_date);
+            return !expected.isOff && expected.label === sale.partner_name;
+          }).length /
+            activeSales.length) *
+            100,
+        )
+      : 100;
+
+    return {
+      byPartner,
+      reportedTotals,
+      cash,
+      bank,
+      kits,
+      cutters,
+      objects,
+      avgStock,
+      cycleRespect,
+      offDays: preview.filter((day) => day.isOff).length,
+    };
+  }, [config, cutterStock, kitStock, preview, sales]);
+
+  function addReportedItem(item: Item) {
     setReported((current) => {
-      const index = current.findIndex((entry) => entry.item_id === itemId);
-      if (index >= 0) return current.map((entry, idx) => idx === index ? { ...entry, quantity: entry.quantity + 1 } : entry);
-      return [...current, { item_id: itemId, quantity: 1 }];
+      const existing = current.find((line) => line.item_id === item.id);
+      if (existing) {
+        return current.map((line) =>
+          line.item_id === item.id ? { ...line, quantity: line.quantity + 1 } : line,
+        );
+      }
+      return [...current, { item_id: item.id, quantity: 1 }];
     });
   }
 
-  function applyPayload(payload: { sale?: FourPartnerSale; itemUpdates?: Array<{ id: number; quantity: number }> }) {
-    if (payload.itemUpdates?.length) {
-      setCurrentItems((current) => current.map((item) => {
-        const update = payload.itemUpdates?.find((entry) => entry.id === item.id);
-        return update ? { ...item, quantity: update.quantity } : item;
-      }));
+  function changeReportedQuantity(itemId: number, quantity: number) {
+    setReported((current) =>
+      current
+        .map((line) => (line.item_id === itemId ? { ...line, quantity: Math.max(0, quantity) } : line))
+        .filter((line) => line.quantity > 0),
+    );
+  }
+
+  function applyPayload(payload: {
+    config?: FourPartnerConfig;
+    items?: Item[];
+    sales?: FourPartnerSale[];
+    sale?: FourPartnerSale;
+    itemUpdates?: Array<{ id: number; quantity: number }>;
+  }) {
+    if (payload.config) {
+      setConfig(payload.config);
+      setConfigDraft(payload.config);
+    }
+    if (payload.items) setCurrentItems(payload.items);
+    if (payload.sales) setSales(payload.sales);
+    if (payload.itemUpdates) {
+      setCurrentItems((current) =>
+        current.map((item) => {
+          const update = payload.itemUpdates?.find((entry) => entry.id === item.id);
+          return update ? { ...item, quantity: update.quantity } : item;
+        }),
+      );
     }
     if (payload.sale) {
-      setSales((current) => [payload.sale as FourPartnerSale, ...current.filter((sale) => sale.id !== payload.sale?.id)].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      const nextSale = payload.sale;
+      setSales((current) => {
+        const exists = current.some((sale) => sale.id === nextSale.id);
+        return exists
+          ? current.map((sale) => (sale.id === nextSale.id ? nextSale : sale))
+          : [nextSale, ...current];
+      });
     }
   }
 
   async function saveConfig() {
-    setError('');
-    const res = await fetch('/api/four/partner', {
+    setError(null);
+    const response = await fetch('/api/four/partner', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(configDraft)
+      body: JSON.stringify(configDraft),
     });
-    const data = await res.json();
-    if (!res.ok) return setError(data.message ?? 'Sauvegarde impossible.');
-    setConfig(data.config);
-    setConfigDraft(data.config);
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload.message ?? payload.error ?? 'Configuration impossible.');
+      return;
+    }
+    applyPayload(payload);
   }
 
   async function submitSale() {
-    setError('');
-    const res = await fetch('/api/four/partner', {
+    setError(null);
+    const response = await fetch('/api/four/partner', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        sale_date: today.date,
         partner_name: today.label,
+        sale_date: toDateKey(new Date()),
         kits_sold: kitsSold,
         cutters_sold: cuttersSold,
         amount_received: amountReceived,
         payment_method: paymentMethod,
         reported_items: reported
-      })
+          .filter((line) => line.quantity > 0)
+          .map((line) => ({
+            ...line,
+            item_name: itemById.get(line.item_id)?.name,
+          })),
+      }),
     });
-    const data = await res.json();
-    if (!res.ok) return setError(data.message ?? 'Vente impossible.');
-    applyPayload(data);
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload.message ?? payload.error ?? 'Vente impossible.');
+      return;
+    }
     setReported([]);
     setAmountReceived(0);
+    applyPayload(payload);
   }
 
-  async function markBankReceived(saleId: number) {
-    const res = await fetch('/api/four/partner', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sale_id: saleId }) });
-    const data = await res.json();
-    if (!res.ok) return setError(data.message ?? 'Action impossible.');
-    applyPayload(data);
+  async function markBankReceived(sale: FourPartnerSale) {
+    setError(null);
+    const response = await fetch('/api/four/partner', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sale_id: sale.id }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload.message ?? payload.error ?? 'Mise a jour impossible.');
+      return;
+    }
+    applyPayload(payload);
   }
 
-  async function cancelSale(saleId: number) {
-    const reason = window.prompt('Raison annulation') || 'Erreur de saisie';
-    const res = await fetch('/api/four/partner', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sale_id: saleId, reason }) });
-    const data = await res.json();
-    if (!res.ok) return setError(data.message ?? 'Annulation impossible.');
-    applyPayload(data);
+  async function cancelSale(sale: FourPartnerSale) {
+    const reason = window.prompt('Motif annulation vente partenaire ?');
+    if (!reason) return;
+
+    setError(null);
+    const response = await fetch('/api/four/partner', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sale_id: sale.id, reason }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload.message ?? payload.error ?? 'Annulation impossible.');
+      return;
+    }
+    applyPayload(payload);
   }
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-4 xl:grid-cols-[1fr_1.1fr_.9fr]">
-        <article className="glass-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#efcdab]">Cycle partenaire</p>
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            {[config.partner_one, config.partner_two, config.partner_three, config.off_label].map((label, index) => (
-              <div key={`${label}-${index}`} className={`rounded-xl border p-2 text-center ${today.position === index + 1 ? 'border-amber-200/70 bg-amber-400/15' : 'border-white/10 bg-[#3b2418]/50'}`}>
-                <p className="text-[11px] text-[#efcdab]">J{index + 1}</p>
-                <p className="truncate text-sm font-semibold text-[#ffe8ca]">{label}</p>
-              </div>
-            ))}
-          </div>
-          {canConfig ? (
-            <div className="mt-4 space-y-2">
-              <input className="saas-input w-full" value={configDraft.partner_one} onChange={(e) => setConfigDraft((cur) => ({ ...cur, partner_one: e.target.value }))} placeholder="Partenaire 1" />
-              <input className="saas-input w-full" value={configDraft.partner_two} onChange={(e) => setConfigDraft((cur) => ({ ...cur, partner_two: e.target.value }))} placeholder="Partenaire 2" />
-              <input className="saas-input w-full" value={configDraft.partner_three} onChange={(e) => setConfigDraft((cur) => ({ ...cur, partner_three: e.target.value }))} placeholder="Partenaire 3" />
-              <div className="grid grid-cols-2 gap-2">
-                <input className="saas-input w-full" value={configDraft.off_label} onChange={(e) => setConfigDraft((cur) => ({ ...cur, off_label: e.target.value }))} placeholder="Jour off" />
-                <input className="saas-input w-full" type="date" value={configDraft.cycle_start_date} onChange={(e) => setConfigDraft((cur) => ({ ...cur, cycle_start_date: e.target.value }))} />
-              </div>
-              <button className="saas-primary-btn w-full" onClick={() => void saveConfig()}>Enregistrer</button>
-            </div>
-          ) : null}
-        </article>
+      <section className="grid items-stretch gap-4 xl:grid-cols-[1fr_1.05fr_.95fr]">
+        <CycleCard
+          canConfig={canConfig}
+          configDraft={configDraft}
+          setConfigDraft={setConfigDraft}
+          saveConfig={saveConfig}
+          todayStep={today.position}
+        />
 
-        <article className="glass-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#efcdab]">Aujourd’hui</p>
-          <h2 className="mt-2 text-3xl font-semibold text-[#fff1dd]">{today.label}</h2>
-          {today.isOff ? (
-            <div className="mt-4 rounded-xl border border-sky-200/20 bg-sky-500/10 p-3 text-sm text-[#dcefff]">
-              <p className="font-semibold">Objectif day-off</p>
-              <p>Refaire les stocks. Pas de vente partenaire aujourd’hui.</p>
-            </div>
-          ) : (
-            <>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <StockCard label="Kits à vendre" expected={20} current={Number(kitItem?.quantity ?? 0)} image={kitItem?.image_url ?? null} />
-                <StockCard label="Disqueuses à vendre" expected={20} current={Number(cutterItem?.quantity ?? 0)} image={cutterItem?.image_url ?? null} />
-              </div>
-              <p className={`mt-3 rounded-xl border px-3 py-2 text-sm font-semibold ${stockOk ? 'border-emerald-200/25 bg-emerald-500/10 text-[#d7f6d0]' : 'border-red-200/30 bg-red-500/10 text-red-100'}`}>
-                {stockOk ? '✅ Stock OK' : '❌ Stock insuffisant'}
-              </p>
-            </>
-          )}
-          <div className="mt-3 grid gap-2 text-xs text-[#efcdab] sm:grid-cols-2">
-            <p className="rounded-lg border border-white/10 bg-[#3b2418]/45 p-2">Prochain partenaire<br /><span className="text-sm font-semibold text-[#ffe8ca]">{nextPartner ? `${nextPartner.label} · ${new Date(nextPartner.date).toLocaleDateString('fr-FR')}` : '-'}</span></p>
-            <p className="rounded-lg border border-white/10 bg-[#3b2418]/45 p-2">Prochain day-off<br /><span className="text-sm font-semibold text-[#ffe8ca]">{nextOff ? new Date(nextOff.date).toLocaleDateString('fr-FR') : '-'}</span></p>
-          </div>
-        </article>
+        <TodayCard
+          today={today}
+          kitStock={kitStock}
+          cutterStock={cutterStock}
+          stockOk={stockOk}
+          nextPartner={nextPartner}
+          nextOff={nextOff}
+        />
 
-        <article className="glass-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#efcdab]">7 prochains jours</p>
-          <div className="mt-3 space-y-2">
-            {preview.map((day) => (
-              <div key={day.date} className={`grid grid-cols-[90px_1fr] rounded-lg border px-3 py-2 text-sm ${day.isOff ? 'border-sky-200/20 bg-sky-500/10' : 'border-white/10 bg-[#3b2418]/50'}`}>
-                <span className="text-[#efcdab]">{new Date(day.date).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' })}</span>
-                <span className="truncate font-semibold text-[#ffe8ca]">{day.label}</span>
-              </div>
-            ))}
-          </div>
-        </article>
+        <PreviewCard preview={preview} />
       </section>
 
-      {error ? <p className="rounded-xl border border-red-200/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
+      {error ? (
+        <div className="rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+          {error}
+        </div>
+      ) : null}
 
       {!today.isOff && canSell ? (
-        <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
-          <article className="glass-card p-5">
-            <h3 className="text-base font-semibold text-[#fff1dd]">Vente partenaire</h3>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <input className="saas-input" value={today.label} readOnly />
-              <input className="saas-input" type="number" value={amountReceived} onChange={(e) => setAmountReceived(Math.max(0, Number(e.target.value || 0)))} placeholder="Prix total reçu" />
-              <Stepper label="Kits vendus" value={kitsSold} setValue={setKitsSold} />
-              <Stepper label="Disqueuses vendues" value={cuttersSold} setValue={setCuttersSold} />
-            </div>
-            <div className="mt-3 flex gap-2">
-              <button className={`filter-pill ${paymentMethod === 'cash' ? 'filter-pill-active' : ''}`} onClick={() => setPaymentMethod('cash')}>Cash</button>
-              <button className={`filter-pill ${paymentMethod === 'bank' ? 'filter-pill-active' : ''}`} onClick={() => setPaymentMethod('bank')}>Bank</button>
-            </div>
-            <button className="saas-primary-btn mt-4 w-full" onClick={() => void submitSale()}>Valider vente partenaire</button>
-          </article>
+        <section className="grid items-start gap-4 xl:grid-cols-[.9fr_1.1fr]">
+          <SaleCard
+            partner={today.label}
+            kitsSold={kitsSold}
+            cuttersSold={cuttersSold}
+            amountReceived={amountReceived}
+            paymentMethod={paymentMethod}
+            kitStock={kitStock}
+            cutterStock={cutterStock}
+            kitAfter={kitAfter}
+            cutterAfter={cutterAfter}
+            saleHasStock={saleHasStock}
+            setKitsSold={setKitsSold}
+            setCuttersSold={setCuttersSold}
+            setAmountReceived={setAmountReceived}
+            setPaymentMethod={setPaymentMethod}
+            submitSale={submitSale}
+          />
 
-          <article className="glass-card p-5">
-            <h3 className="text-base font-semibold text-[#fff1dd]">Objets rapportés</h3>
-            <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
-              <input className="saas-input" placeholder="Rechercher item" value={query} onChange={(e) => setQuery(e.target.value)} />
-              <select className="saas-input" value={category} onChange={(e) => setCategory(e.target.value)}>
-                <option value="">Toutes catégories</option>
-                {categories.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
-              </select>
-            </div>
-            <div className="mt-3 grid max-h-64 gap-2 overflow-auto sm:grid-cols-2">
-              {availableItems.map((item) => (
-                <button key={item.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#3b2418]/55 p-2 text-left" onClick={() => addReportedItem(item.id)}>
-                  <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#1f120d]">{item.image_url ? <Image src={item.image_url} alt={item.name} width={40} height={40} className="h-full w-full object-cover" unoptimized /> : null}</div>
-                  <div className="min-w-0"><p className="truncate text-sm font-semibold text-[#ffe8ca]">{item.name}</p><p className="text-xs text-[#efcdab]">Stock {item.quantity}</p></div>
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 space-y-2">
-              {reported.map((line, index) => {
-                const item = itemById.get(line.item_id);
-                if (!item) return null;
-                return (
-                  <div key={`${line.item_id}-${index}`} className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#2f1d14]/60 p-2">
-                    <span className="flex-1 text-sm text-[#ffe8ca]">{item.name}</span>
-                    <input className="saas-input w-20 text-center" value={line.quantity} onChange={(e) => setReported((cur) => cur.map((entry, idx) => idx === index ? { ...entry, quantity: Math.max(1, Number(e.target.value || 1)) } : entry))} />
-                    <button className="saas-ghost-btn !px-2" onClick={() => setReported((cur) => cur.filter((_, idx) => idx !== index))}>×</button>
-                  </div>
-                );
-              })}
-            </div>
-          </article>
+          <ReportedItemsCard
+            query={query}
+            setQuery={setQuery}
+            category={category}
+            setCategory={setCategory}
+            categories={categories}
+            availableItems={availableItems}
+            selectedReported={selectedReported}
+            addReportedItem={addReportedItem}
+            changeReportedQuantity={changeReportedQuantity}
+          />
         </section>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+      <section className="grid items-start gap-4 xl:grid-cols-[1.12fr_.88fr]">
         {canHistory ? (
-          <article className="glass-card p-5">
-            <h3 className="text-base font-semibold text-[#fff1dd]">Historique partenaire</h3>
-            <div className="mt-3 space-y-2">
-              {sales.slice(0, 12).map((sale) => (
-                <div key={sale.id} className="rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
-                  <div className="grid gap-2 md:grid-cols-[1fr_auto]">
-                    <div>
-                      <p className="font-semibold text-[#ffe8ca]">#{sale.id} · {sale.partner_name} · {new Date(sale.sale_date).toLocaleDateString('fr-FR')}</p>
-                      <p className="text-xs text-[#efcdab]">{sale.kits_sold} kits · {sale.cutters_sold} disqueuses · {formatUsd(Number(sale.amount_received))} · {sale.payment_method.toUpperCase()} · {statusLabel(sale.status)}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button className="saas-ghost-btn !px-3 !py-1 text-xs" onClick={() => setDetailSale(sale)}>Détail</button>
-                      {sale.status === 'bank_pending' && canSell ? <button className="saas-ghost-btn !px-3 !py-1 text-xs" onClick={() => void markBankReceived(sale.id)}>Bank reçu</button> : null}
-                      {sale.status !== 'canceled' && canSell ? <button className="saas-ghost-btn !px-3 !py-1 text-xs" onClick={() => void cancelSale(sale.id)}>Annuler</button> : null}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {sales.length === 0 ? <p className="text-sm text-[#efcdab]">Aucune vente partenaire.</p> : null}
-            </div>
-          </article>
+          <HistoryCard
+            sales={sales}
+            onDetail={setDetailSale}
+            onBankReceived={markBankReceived}
+            onCancel={cancelSale}
+          />
         ) : null}
 
-        {canStats ? (
-          <article className="glass-card p-5">
-            <h3 className="text-base font-semibold text-[#fff1dd]">Stats partenaire</h3>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <MiniStat label="Cash total" value={formatUsd(stats.cash)} />
-              <MiniStat label="Bank total" value={formatUsd(stats.bank)} />
-              <MiniStat label="Jours off aperçu" value={String(stats.offDays)} />
-              <MiniStat label="Respect cycle" value={`${stats.respectRate}%`} />
-              <MiniStat label="Stock moyen kits" value={stats.avgStock.kit.toFixed(1)} />
-              <MiniStat label="Stock moyen disqueuses" value={stats.avgStock.cutter.toFixed(1)} />
-            </div>
-            <div className="mt-3 space-y-2">
-              {stats.byPartner.map(([partner, row]) => (
-                <div key={partner} className="rounded-lg border border-white/10 bg-[#2f1d14]/55 p-2 text-xs text-[#efcdab]">
-                  <p className="font-semibold text-[#ffe8ca]">{partner}</p>
-                  <p>{row.count} ventes · {row.kits} kits · {row.cutters} disqueuses · Cash {formatUsd(row.cash)} · Bank {formatUsd(row.bank)}</p>
-                </div>
-              ))}
-              {stats.reportedTotals.length > 0 ? <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-[#efcdab]">Objets rapportés</p> : null}
-              {stats.reportedTotals.map(([name, qty]) => <p key={name} className="text-xs text-[#efcdab]">{name}: x{qty}</p>)}
-            </div>
-          </article>
-        ) : null}
+        {canStats ? <StatsCard stats={stats} /> : null}
       </section>
 
       {detailSale ? <SaleDetail sale={detailSale} onClose={() => setDetailSale(null)} /> : null}
@@ -352,63 +458,729 @@ export function FourPartnerClient({
   );
 }
 
-function StockCard({ label, expected, current, image }: { label: string; expected: number; current: number; image: string | null }) {
+function CycleCard({
+  canConfig,
+  configDraft,
+  setConfigDraft,
+  saveConfig,
+  todayStep,
+}: {
+  canConfig: boolean;
+  configDraft: FourPartnerConfig;
+  setConfigDraft: (config: FourPartnerConfig) => void;
+  saveConfig: () => void;
+  todayStep: number;
+}) {
+  const steps = [
+    { label: 'J1', value: configDraft.partner_one },
+    { label: 'J2', value: configDraft.partner_two },
+    { label: 'J3', value: configDraft.partner_three },
+    { label: 'J4', value: configDraft.off_label },
+  ];
+
   return (
-    <div className="rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
-      <div className="flex items-center gap-2">
-        <div className="h-11 w-11 overflow-hidden rounded-lg bg-[#1f120d]">{image ? <Image src={image} alt={label} width={44} height={44} className="h-full w-full object-cover" unoptimized /> : null}</div>
-        <div>
-          <p className="text-sm font-semibold text-[#ffe8ca]">{label}</p>
-          <p className="text-xs text-[#efcdab]">Stock {current} / {expected}</p>
+    <article className={CARD_CLASS}>
+      <CardHeader eyebrow="Cycle 4 jours" title="Cycle partenaire" />
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {steps.map((step, index) => {
+          const active = todayStep === index + 1;
+          return (
+            <div
+              key={step.label}
+              className={`rounded-2xl border p-3 transition ${
+                active
+                  ? 'border-[#8b5a2b] bg-[#6b3f1d] text-[#fff7e8] shadow-sm'
+                  : 'border-[#d8c5a9] bg-[#fff8ee] text-[#4a2d1a]'
+              }`}
+            >
+              <div className={`text-xs font-black uppercase ${active ? 'text-[#f6d7a7]' : 'text-[#9b6a3e]'}`}>
+                {step.label}
+              </div>
+              <div className="mt-1 truncate text-sm font-black">{step.value}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {canConfig ? (
+        <div className="mt-4 space-y-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <LabeledInput
+              label="Partenaire 1"
+              value={configDraft.partner_one}
+              onChange={(value) => setConfigDraft({ ...configDraft, partner_one: value })}
+            />
+            <LabeledInput
+              label="Partenaire 2"
+              value={configDraft.partner_two}
+              onChange={(value) => setConfigDraft({ ...configDraft, partner_two: value })}
+            />
+            <LabeledInput
+              label="Partenaire 3"
+              value={configDraft.partner_three}
+              onChange={(value) => setConfigDraft({ ...configDraft, partner_three: value })}
+            />
+            <LabeledInput
+              label="Jour off"
+              value={configDraft.off_label}
+              onChange={(value) => setConfigDraft({ ...configDraft, off_label: value })}
+            />
+          </div>
+
+          <div className="grid items-end gap-2 sm:grid-cols-[1fr_auto]">
+            <label className="space-y-1">
+              <span className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">Date de depart</span>
+              <input
+                type="date"
+                value={configDraft.cycle_start_date}
+                onChange={(event) =>
+                  setConfigDraft({ ...configDraft, cycle_start_date: event.target.value })
+                }
+                className={INPUT_CLASS}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={saveConfig}
+              className="rounded-xl bg-[#6b3f1d] px-4 py-2 text-sm font-black text-[#fff7e8] shadow-sm transition hover:bg-[#4b2a15]"
+            >
+              Enregistrer
+            </button>
+          </div>
         </div>
+      ) : (
+        <div className="mt-4 rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3 text-sm font-semibold text-[#6f4a2c]">
+          Depart du cycle : {configDraft.cycle_start_date}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function TodayCard({
+  today,
+  kitStock,
+  cutterStock,
+  stockOk,
+  nextPartner,
+  nextOff,
+}: {
+  today: ReturnType<typeof getFourPartnerCycleDay>;
+  kitStock: number;
+  cutterStock: number;
+  stockOk: boolean;
+  nextPartner: ReturnType<typeof getNextPartnerDay>;
+  nextOff: ReturnType<typeof getNextOffDay>;
+}) {
+  return (
+    <article className={`${CARD_CLASS} relative overflow-hidden`}>
+      <div className="absolute right-5 top-5 rounded-full border border-[#d8c5a9] bg-[#fff8ee] px-3 py-1 text-xs font-black uppercase text-[#8b5a2b]">
+        Aujourd'hui
+      </div>
+
+      <CardHeader eyebrow={today.isOff ? 'Repos cycle' : 'Partenaire actif'} title={today.label} />
+
+      {today.isOff ? (
+        <div className="mt-5 rounded-2xl border border-dashed border-[#c9ad83] bg-[#fff8ee] p-4">
+          <div className="text-sm font-black uppercase text-[#8b5a2b]">Objectif</div>
+          <p className="mt-2 text-sm font-semibold leading-6 text-[#5f3b22]">
+            Refaire les stocks. Aucune vente partenaire n'est prevue aujourd'hui.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <StockTile label="Kits a vendre" value="20" footer={`Stock actuel : ${kitStock}`} />
+            <StockTile label="Disqueuses a vendre" value="20" footer={`Stock actuel : ${cutterStock}`} />
+          </div>
+
+          <div
+            className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-black ${
+              stockOk
+                ? 'border-green-300 bg-green-100 text-green-900'
+                : 'border-amber-300 bg-amber-100 text-amber-900'
+            }`}
+          >
+            {stockOk ? 'Stock OK' : 'Stock insuffisant'}
+          </div>
+        </>
+      )}
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <InfoLine label="Prochain partenaire" value={nextPartner ? `${nextPartner.label} - ${nextPartner.date}` : '-'} />
+        <InfoLine label="Prochain day-off" value={nextOff ? nextOff.date : '-'} />
+      </div>
+    </article>
+  );
+}
+
+function PreviewCard({ preview }: { preview: ReturnType<typeof getFourPartnerPreview> }) {
+  const todayKey = toDateKey();
+
+  return (
+    <article className={CARD_CLASS}>
+      <CardHeader eyebrow="Planning" title="7 prochains jours" />
+      <div className="mt-4 space-y-2">
+        {preview.map((day) => (
+          <div
+            key={day.date}
+            className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2 ${
+              day.date === todayKey
+                ? 'border-[#8b5a2b] bg-[#6b3f1d] text-[#fff7e8]'
+                : 'border-[#d8c5a9] bg-[#fff8ee] text-[#4a2d1a]'
+            }`}
+          >
+            <div>
+              <div className={`text-xs font-black uppercase ${day.date === todayKey ? 'text-[#f6d7a7]' : 'text-[#9b6a3e]'}`}>
+                {compactDate(day.date)}
+              </div>
+              <div className="text-sm font-black">{day.label}</div>
+            </div>
+            <div className="rounded-full border border-current/25 px-2 py-1 text-xs font-black">
+              {day.isOff ? 'Off' : `J${day.position}`}
+            </div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function SaleCard({
+  partner,
+  kitsSold,
+  cuttersSold,
+  amountReceived,
+  paymentMethod,
+  kitStock,
+  cutterStock,
+  kitAfter,
+  cutterAfter,
+  saleHasStock,
+  setKitsSold,
+  setCuttersSold,
+  setAmountReceived,
+  setPaymentMethod,
+  submitSale,
+}: {
+  partner: string;
+  kitsSold: number;
+  cuttersSold: number;
+  amountReceived: number;
+  paymentMethod: 'cash' | 'bank';
+  kitStock: number;
+  cutterStock: number;
+  kitAfter: number;
+  cutterAfter: number;
+  saleHasStock: boolean;
+  setKitsSold: (value: number) => void;
+  setCuttersSold: (value: number) => void;
+  setAmountReceived: (value: number) => void;
+  setPaymentMethod: (value: 'cash' | 'bank') => void;
+  submitSale: () => void;
+}) {
+  return (
+    <article className={CARD_CLASS}>
+      <CardHeader eyebrow="Validation" title="Vente partenaire" />
+
+      <div className="mt-4 space-y-3">
+        <label className="space-y-1">
+          <span className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">Partenaire</span>
+          <input value={partner} readOnly className={`${INPUT_CLASS} font-black`} />
+        </label>
+
+        <label className="space-y-1">
+          <span className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">Montant recu</span>
+          <input
+            type="number"
+            min={0}
+            value={amountReceived}
+            onChange={(event) => setAmountReceived(Number(event.target.value))}
+            className={INPUT_CLASS}
+          />
+        </label>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Stepper label="Kits vendus" value={kitsSold} onChange={setKitsSold} />
+          <Stepper label="Disqueuses vendues" value={cuttersSold} onChange={setCuttersSold} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-1">
+          {(['cash', 'bank'] as const).map((method) => (
+            <button
+              key={method}
+              type="button"
+              onClick={() => setPaymentMethod(method)}
+              className={`rounded-xl px-3 py-2 text-sm font-black transition ${
+                paymentMethod === method
+                  ? 'bg-[#6b3f1d] text-[#fff7e8]'
+                  : 'text-[#6f4a2c] hover:bg-[#ead9bd]'
+              }`}
+            >
+              {method === 'cash' ? 'Cash' : 'Bank'}
+            </button>
+          ))}
+        </div>
+
+        <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+          <div className="text-xs font-black uppercase text-[#8b5a2b]">Recap vente</div>
+          <div className="mt-3 grid gap-2 text-sm font-semibold text-[#4a2d1a] sm:grid-cols-2">
+            <InfoLine label="Kits" value={`${kitStock} -> ${kitAfter}`} />
+            <InfoLine label="Disqueuses" value={`${cutterStock} -> ${cutterAfter}`} />
+            <InfoLine
+              label={paymentMethod === 'cash' ? 'Argent ajoute' : 'Bank en attente'}
+              value={formatUsd(amountReceived)}
+            />
+            <InfoLine label="Stock" value={saleHasStock ? 'OK' : 'Insuffisant'} />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={submitSale}
+          disabled={!saleHasStock}
+          className={`w-full rounded-2xl px-4 py-3 text-sm font-black text-[#fff7e8] shadow-sm transition ${
+            saleHasStock ? 'bg-[#6b3f1d] hover:bg-[#4b2a15]' : 'cursor-not-allowed bg-[#9f8669] opacity-60'
+          }`}
+        >
+          Valider vente partenaire
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function ReportedItemsCard({
+  query,
+  setQuery,
+  category,
+  setCategory,
+  categories,
+  availableItems,
+  selectedReported,
+  addReportedItem,
+  changeReportedQuantity,
+}: {
+  query: string;
+  setQuery: (value: string) => void;
+  category: string;
+  setCategory: (value: string) => void;
+  categories: string[];
+  availableItems: Item[];
+  selectedReported: Array<ReportedDraft & { item?: Item }>;
+  addReportedItem: (item: Item) => void;
+  changeReportedQuantity: (itemId: number, quantity: number) => void;
+}) {
+  return (
+    <article className={CARD_CLASS}>
+      <CardHeader eyebrow="Retours stock" title="Objets rapportes" />
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Rechercher un item"
+          className={INPUT_CLASS}
+        />
+        <select value={category} onChange={(event) => setCategory(event.target.value)} className={INPUT_CLASS}>
+          {categories.map((value) => (
+            <option key={value} value={value}>
+              {categoryLabel(value)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_.92fr]">
+        <div className="min-h-[280px] rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-xs font-black uppercase text-[#8b5a2b]">Liste items</div>
+            <div className="text-xs font-bold text-[#8b5a2b]">{availableItems.length} resultats</div>
+          </div>
+          <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+            {availableItems.map((item) => (
+              <div
+                key={item.id}
+                className="grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-2xl border border-[#e2d1b6] bg-[#fffaf2] p-2"
+              >
+                <ItemImage item={item} />
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-black text-[#3f2718]">{item.name}</div>
+                  <div className="text-xs font-semibold text-[#8b5a2b]">Stock actuel : {item.quantity}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => addReportedItem(item)}
+                  className="rounded-xl border border-[#c5a77f] bg-[#f2dfc0] px-3 py-2 text-sm font-black text-[#5c371f] transition hover:bg-[#e5c99c]"
+                >
+                  Ajouter
+                </button>
+              </div>
+            ))}
+            {availableItems.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[#c9ad83] p-4 text-center text-sm font-semibold text-[#8b5a2b]">
+                Aucun item trouve.
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="min-h-[280px] rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+          <div className="mb-3 text-xs font-black uppercase text-[#8b5a2b]">Objets selectionnes</div>
+          <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+            {selectedReported.map((line) => (
+              <div
+                key={line.item_id}
+                className="rounded-2xl border border-[#e2d1b6] bg-[#fffaf2] p-2"
+              >
+                <div className="grid grid-cols-[40px_1fr_auto] items-center gap-3">
+                  <ItemImage item={line.item} />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-[#3f2718]">{line.item?.name}</div>
+                    <div className="text-xs font-semibold text-[#8b5a2b]">Stock : {line.item?.quantity ?? 0}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => changeReportedQuantity(line.item_id, 0)}
+                    className="h-8 w-8 rounded-full border border-[#d8c5a9] bg-[#fff8ee] text-sm font-black text-[#8b5a2b] transition hover:bg-red-100 hover:text-red-800"
+                    aria-label="Retirer"
+                  >
+                    x
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <Stepper
+                    label="Quantite"
+                    value={line.quantity}
+                    min={1}
+                    onChange={(value) => changeReportedQuantity(line.item_id, value)}
+                  />
+                </div>
+              </div>
+            ))}
+            {selectedReported.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[#c9ad83] p-4 text-center text-sm font-semibold text-[#8b5a2b]">
+                Aucun objet selectionne.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function HistoryCard({
+  sales,
+  onDetail,
+  onBankReceived,
+  onCancel,
+}: {
+  sales: FourPartnerSale[];
+  onDetail: (sale: FourPartnerSale) => void;
+  onBankReceived: (sale: FourPartnerSale) => void;
+  onCancel: (sale: FourPartnerSale) => void;
+}) {
+  return (
+    <article className={CARD_CLASS}>
+      <CardHeader eyebrow="Suivi" title="Historique partenaire" />
+
+      <div className="mt-4 space-y-3">
+        {sales.slice(0, 10).map((sale) => (
+          <div key={sale.id} className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-black text-[#3f2718]">{sale.partner_name}</div>
+                <div className="text-xs font-semibold text-[#8b5a2b]">{formatDate(sale.created_at)}</div>
+              </div>
+              <span className={`rounded-full border px-3 py-1 text-xs font-black ${statusTone(sale.status)}`}>
+                {statusLabel(sale.status)}
+              </span>
+            </div>
+
+            <div className="mt-3 grid gap-2 text-sm font-semibold text-[#4a2d1a] sm:grid-cols-4">
+              <InfoLine label="Kits" value={String(sale.kits_sold)} />
+              <InfoLine label="Disqueuses" value={String(sale.cutters_sold)} />
+              <InfoLine label="Mode" value={sale.payment_method === 'cash' ? 'Cash' : 'Bank'} />
+              <InfoLine label="Montant" value={formatUsd(sale.amount_received)} />
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-[#e2d1b6] bg-[#fffaf2] px-3 py-2 text-xs font-semibold text-[#6f4a2c]">
+              Objets rapportes :{' '}
+              {sale.reported_items?.length
+                ? sale.reported_items.map((item) => `${item.item_name} x${item.quantity}`).join(' · ')
+                : 'Aucun'}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <SmallButton onClick={() => onDetail(sale)}>Voir detail</SmallButton>
+              {sale.status === 'bank_pending' ? (
+                <SmallButton onClick={() => onBankReceived(sale)}>Marquer bank recu</SmallButton>
+              ) : null}
+              {sale.status !== 'canceled' ? (
+                <SmallButton danger onClick={() => onCancel(sale)}>
+                  Annuler
+                </SmallButton>
+              ) : null}
+            </div>
+          </div>
+        ))}
+
+        {sales.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#c9ad83] p-4 text-center text-sm font-semibold text-[#8b5a2b]">
+            Aucune vente partenaire.
+          </div>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function StatsCard({
+  stats,
+}: {
+  stats: {
+    byPartner: Record<string, number>;
+    reportedTotals: Record<string, number>;
+    cash: number;
+    bank: number;
+    kits: number;
+    cutters: number;
+    objects: number;
+    avgStock: number;
+    cycleRespect: number;
+    offDays: number;
+  };
+}) {
+  return (
+    <article className={CARD_CLASS}>
+      <CardHeader eyebrow="Performance" title="Stats partenaire" />
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <MiniStat label="Cash total" value={formatUsd(stats.cash)} />
+        <MiniStat label="Bank total" value={formatUsd(stats.bank)} />
+        <MiniStat label="Kits vendus" value={String(stats.kits)} />
+        <MiniStat label="Disqueuses" value={String(stats.cutters)} />
+        <MiniStat label="Objets rapportes" value={String(stats.objects)} />
+        <MiniStat label="Cycle respecte" value={`${stats.cycleRespect}%`} />
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <StatList title="Ventes par partenaire" values={stats.byPartner} empty="Aucune vente" />
+        <StatList title="Retours objets" values={stats.reportedTotals} empty="Aucun retour" />
+      </div>
+
+      <div className="mt-4 grid gap-2 text-sm font-semibold text-[#4a2d1a] sm:grid-cols-2">
+        <InfoLine label="Jours off visibles" value={String(stats.offDays)} />
+        <InfoLine label="Stock moyen restant" value={String(stats.avgStock)} />
+      </div>
+    </article>
+  );
+}
+
+function CardHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
+  return (
+    <div>
+      <div className="text-xs font-black uppercase tracking-[0.16em] text-[#9b6a3e]">{eyebrow}</div>
+      <h2 className="mt-1 text-xl font-black text-[#3f2718]">{title}</h2>
+    </div>
+  );
+}
+
+function LabeledInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-1">
+      <span className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">{label}</span>
+      <input value={value} onChange={(event) => onChange(event.target.value)} className={INPUT_CLASS} />
+    </label>
+  );
+}
+
+function StockTile({ label, value, footer }: { label: string; value: string; footer: string }) {
+  return (
+    <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-4">
+      <div className="text-xs font-black uppercase text-[#8b5a2b]">{label}</div>
+      <div className="mt-2 text-3xl font-black text-[#3f2718]">{value}</div>
+      <div className="mt-1 text-xs font-semibold text-[#8b5a2b]">{footer}</div>
+    </div>
+  );
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#e2d1b6] bg-[#fffaf2] px-3 py-2">
+      <div className="text-[11px] font-black uppercase text-[#9b6a3e]">{label}</div>
+      <div className="mt-1 truncate text-sm font-black text-[#3f2718]">{value}</div>
+    </div>
+  );
+}
+
+function Stepper({
+  label,
+  value,
+  onChange,
+  min = 0,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+      <div className="text-xs font-black uppercase tracking-wide text-[#8b5a2b]">{label}</div>
+      <div className="mt-2 grid grid-cols-[36px_1fr_36px] items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          className="h-9 rounded-xl border border-[#c5a77f] bg-[#f2dfc0] text-lg font-black text-[#5c371f] transition hover:bg-[#e5c99c]"
+        >
+          -
+        </button>
+        <input
+          type="number"
+          min={min}
+          value={value}
+          onChange={(event) => onChange(Math.max(min, Number(event.target.value)))}
+          className={`${INPUT_CLASS} px-2 text-center font-black`}
+        />
+        <button
+          type="button"
+          onClick={() => onChange(value + 1)}
+          className="h-9 rounded-xl border border-[#c5a77f] bg-[#f2dfc0] text-lg font-black text-[#5c371f] transition hover:bg-[#e5c99c]"
+        >
+          +
+        </button>
       </div>
     </div>
   );
 }
 
-function Stepper({ label, value, setValue }: { label: string; value: number; setValue: (value: number) => void }) {
+function ItemImage({ item }: { item?: Pick<Item, 'name' | 'image_url'> }) {
   return (
-    <label className="block">
-      <span className="text-xs text-[#efcdab]">{label}</span>
-      <div className="mt-1 grid grid-cols-[38px_1fr_38px] gap-2">
-        <button className="saas-ghost-btn !px-0" onClick={() => setValue(Math.max(0, value - 1))}>-</button>
-        <input className="saas-input text-center" value={value} onChange={(e) => setValue(Math.max(0, Number(e.target.value || 0)))} />
-        <button className="saas-ghost-btn !px-0" onClick={() => setValue(value + 1)}>+</button>
-      </div>
-    </label>
+    <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-[#d8c5a9] bg-[#ead9bd]">
+      {item?.image_url ? (
+        <Image src={item.image_url} alt={item.name} fill sizes="40px" className="object-cover" />
+      ) : (
+        <div className="grid h-full w-full place-items-center text-xs font-black text-[#8b5a2b]">
+          {(item?.name ?? '?').slice(0, 2).toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SmallButton({
+  children,
+  onClick,
+  danger = false,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl border px-3 py-2 text-xs font-black transition ${
+        danger
+          ? 'border-red-300 bg-red-50 text-red-800 hover:bg-red-100'
+          : 'border-[#c5a77f] bg-[#f2dfc0] text-[#5c371f] hover:bg-[#e5c99c]'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-white/10 bg-[#3b2418]/50 p-3"><p className="text-xs text-[#efcdab]">{label}</p><p className="text-lg font-semibold text-[#ffe8ca]">{value}</p></div>;
+  return (
+    <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+      <div className="text-[11px] font-black uppercase text-[#9b6a3e]">{label}</div>
+      <div className="mt-1 text-lg font-black text-[#3f2718]">{value}</div>
+    </div>
+  );
+}
+
+function StatList({
+  title,
+  values,
+  empty,
+}: {
+  title: string;
+  values: Record<string, number>;
+  empty: string;
+}) {
+  const entries = Object.entries(values).slice(0, 5);
+
+  return (
+    <div className="rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+      <div className="text-xs font-black uppercase text-[#8b5a2b]">{title}</div>
+      <div className="mt-2 space-y-2">
+        {entries.map(([name, value]) => (
+          <div key={name} className="flex items-center justify-between gap-3 text-sm font-semibold text-[#4a2d1a]">
+            <span className="truncate">{name}</span>
+            <span className="font-black">{value}</span>
+          </div>
+        ))}
+        {entries.length === 0 ? <div className="text-sm font-semibold text-[#8b5a2b]">{empty}</div> : null}
+      </div>
+    </div>
+  );
 }
 
 function SaleDetail({ sale, onClose }: { sale: FourPartnerSale; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="glass-card max-h-[85vh] w-full max-w-2xl overflow-auto p-5">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-lg font-semibold text-[#fff1dd]">Détail vente partenaire #{sale.id}</h3>
-          <button className="saas-ghost-btn" onClick={onClose}>Fermer</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+      <div className="w-full max-w-xl rounded-3xl border border-[#d4c0a0] bg-[#f4ead8] p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.16em] text-[#9b6a3e]">Detail vente</div>
+            <h3 className="mt-1 text-xl font-black text-[#3f2718]">{sale.partner_name}</h3>
+            <p className="mt-1 text-sm font-semibold text-[#8b5a2b]">{formatDate(sale.created_at)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 w-9 rounded-full border border-[#d8c5a9] bg-[#fff8ee] text-sm font-black text-[#8b5a2b]"
+          >
+            x
+          </button>
         </div>
-        <div className="mt-3 grid gap-2 text-sm text-[#efcdab] sm:grid-cols-2">
-          <p>Partenaire: <span className="text-[#ffe8ca]">{sale.partner_name}</span></p>
-          <p>Date: {new Date(sale.sale_date).toLocaleDateString('fr-FR')}</p>
-          <p>Kits: {sale.kits_sold}</p>
-          <p>Disqueuses: {sale.cutters_sold}</p>
-          <p>Argent: {formatUsd(Number(sale.amount_received))}</p>
-          <p>Paiement: {sale.payment_method.toUpperCase()} · {statusLabel(sale.status)}</p>
-          <p>Caisse: {formatUsd(Number(sale.cash_before ?? 0))} → {formatUsd(Number(sale.cash_after ?? 0))}</p>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <InfoLine label="Kits vendus" value={String(sale.kits_sold)} />
+          <InfoLine label="Disqueuses vendues" value={String(sale.cutters_sold)} />
+          <InfoLine label="Paiement" value={sale.payment_method === 'cash' ? 'Cash' : 'Bank'} />
+          <InfoLine label="Montant" value={formatUsd(sale.amount_received)} />
+          <InfoLine label="Statut" value={statusLabel(sale.status)} />
+          <InfoLine label="Date cycle" value={sale.sale_date} />
         </div>
-        <h4 className="mt-4 text-sm font-semibold text-[#ffe8ca]">Objets rapportés</h4>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          {(sale.reported_items ?? []).map((item) => (
-            <div key={`${sale.id}-${item.item_id}`} className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#2f1d14]/55 p-2">
-              <div className="h-9 w-9 overflow-hidden rounded-md bg-[#1f120d]">{item.image_url ? <Image src={item.image_url} alt={item.item_name} width={36} height={36} className="h-full w-full object-cover" unoptimized /> : null}</div>
-              <p className="text-sm text-[#efcdab]">{item.item_name} x{item.quantity}</p>
-            </div>
-          ))}
-          {(sale.reported_items ?? []).length === 0 ? <p className="text-sm text-[#efcdab]">Aucun objet rapporté.</p> : null}
+
+        <div className="mt-4 rounded-2xl border border-[#d8c5a9] bg-[#fff8ee] p-3">
+          <div className="text-xs font-black uppercase text-[#8b5a2b]">Objets rapportes</div>
+          <div className="mt-2 space-y-2">
+            {sale.reported_items?.map((item) => (
+              <div key={`${item.item_id}-${item.item_name}`} className="flex items-center gap-3 text-sm font-semibold text-[#4a2d1a]">
+                <ItemImage item={{ name: item.item_name, image_url: item.image_url }} />
+                <span className="min-w-0 flex-1 truncate">{item.item_name}</span>
+                <span className="font-black">x{item.quantity}</span>
+              </div>
+            ))}
+            {!sale.reported_items?.length ? (
+              <div className="text-sm font-semibold text-[#8b5a2b]">Aucun objet rapporte.</div>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
