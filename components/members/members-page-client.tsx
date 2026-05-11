@@ -788,7 +788,7 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <select className="saas-input !h-9 min-w-[220px] !py-1 text-xs" value={copySourceRoleId} onChange={(event) => setCopySourceRoleId(event.target.value)}>
-                    <option value="">Copier permissions d'un role</option>
+                    <option value="">Copier permissions depuis un role</option>
                     {roles.map((role) => (
                       <option key={role.id} value={role.id}>{role.name}</option>
                     ))}
