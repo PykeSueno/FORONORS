@@ -840,6 +840,42 @@ create table if not exists public.four_transaction_lines (
   total_amount numeric(12,2) not null default 0
 );
 
+create table if not exists public.four_partner_config (
+  id integer primary key default 1,
+  partner_one text not null default 'CANNA CORP',
+  partner_two text not null default 'VMF',
+  partner_three text not null default 'LOSERRA',
+  off_label text not null default 'Day-off',
+  cycle_start_date date not null default current_date,
+  updated_by uuid references public.users(id) on delete set null,
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint four_partner_config_singleton check (id = 1)
+);
+
+create table if not exists public.four_partner_sales (
+  id bigint generated always as identity primary key,
+  sale_date date not null,
+  cycle_position integer not null check (cycle_position between 1 and 4),
+  partner_name text not null,
+  kits_sold integer not null default 20 check (kits_sold >= 0),
+  cutters_sold integer not null default 20 check (cutters_sold >= 0),
+  amount_received numeric(12,2) not null default 0,
+  payment_method text not null default 'cash' check (payment_method in ('cash', 'bank')),
+  status text not null default 'validated' check (status in ('validated', 'bank_pending', 'bank_received', 'canceled')),
+  reported_items jsonb not null default '[]'::jsonb,
+  stock_snapshot jsonb not null default '{}'::jsonb,
+  cash_before numeric(12,2),
+  cash_after numeric(12,2),
+  created_by uuid references public.users(id) on delete set null,
+  bank_received_by uuid references public.users(id) on delete set null,
+  bank_received_at timestamptz,
+  canceled_by uuid references public.users(id) on delete set null,
+  canceled_at timestamptz,
+  cancel_reason text,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 create index if not exists idx_four_sessions_status_opened_at on public.four_sessions(status, opened_at desc);
 create index if not exists idx_four_movements_session_id on public.four_movements(session_id, created_at desc);
 create index if not exists idx_four_transactions_session_id on public.four_transactions(session_id, created_at desc);
@@ -847,11 +883,16 @@ create index if not exists idx_four_transactions_status_created_at on public.fou
 create index if not exists idx_four_transactions_created_by_created_at on public.four_transactions(created_by, created_at desc);
 create index if not exists idx_four_transactions_status_created_by_created_at on public.four_transactions(status, created_by, created_at desc);
 create index if not exists idx_four_transaction_lines_tx_id on public.four_transaction_lines(transaction_id);
+create index if not exists idx_four_partner_sales_date_status on public.four_partner_sales(sale_date desc, status);
+create index if not exists idx_four_partner_sales_partner_date on public.four_partner_sales(partner_name, sale_date desc);
+create index if not exists idx_four_partner_sales_created_by_created_at on public.four_partner_sales(created_by, created_at desc);
 
 alter table public.four_sessions enable row level security;
 alter table public.four_movements enable row level security;
 alter table public.four_transactions enable row level security;
 alter table public.four_transaction_lines enable row level security;
+alter table public.four_partner_config enable row level security;
+alter table public.four_partner_sales enable row level security;
 
 drop policy if exists "allow_service_role_all_four_sessions" on public.four_sessions;
 create policy "allow_service_role_all_four_sessions"
@@ -881,6 +922,24 @@ for all
 using (true)
 with check (true);
 
+drop policy if exists "allow_service_role_all_four_partner_config" on public.four_partner_config;
+create policy "allow_service_role_all_four_partner_config"
+on public.four_partner_config
+for all
+using (true)
+with check (true);
+
+drop policy if exists "allow_service_role_all_four_partner_sales" on public.four_partner_sales;
+create policy "allow_service_role_all_four_partner_sales"
+on public.four_partner_sales
+for all
+using (true)
+with check (true);
+
+insert into public.four_partner_config (id, partner_one, partner_two, partner_three, off_label, cycle_start_date)
+values (1, 'CANNA CORP', 'VMF', 'LOSERRA', 'Day-off', '2026-05-11')
+on conflict (id) do nothing;
+
 insert into public.permissions (name)
 values
   ('four.preview'),
@@ -894,8 +953,28 @@ values
   ('four.transaction.manage.own'),
   ('four.transaction.manage.any'),
   ('four.logs.view'),
-  ('four.history.view')
+  ('four.history.view'),
+  ('four.partner.view'),
+  ('four.partner.config'),
+  ('four.partner.sell'),
+  ('four.partner.history.view'),
+  ('four.partner.stats.view'),
+  ('four.partner.logs')
 on conflict (name) do nothing;
+
+insert into public.role_permissions (role_id, permission_id)
+select r.id, p.id
+from public.roles r
+join public.permissions p on p.name in (
+  'four.partner.view',
+  'four.partner.config',
+  'four.partner.sell',
+  'four.partner.history.view',
+  'four.partner.stats.view',
+  'four.partner.logs'
+)
+where lower(r.name) = 'patron'
+on conflict (role_id, permission_id) do nothing;
 
 delete from public.permissions where name in ('four.open', 'four.close', 'four.cash.add', 'four.add_movement');
 

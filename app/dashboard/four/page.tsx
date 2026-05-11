@@ -29,8 +29,10 @@ export default async function FourPage() {
       <InternalPageHeader title="FOUR" subtitle="Transactions stock + argent" />
       <FourTabs
         active="four"
+        canSeeHistory={permissions.includes('four.history.view')}
         canSeeStats={permissions.includes('four.stats.view')}
         canSeeMessages={permissions.includes('four.messages.view')}
+        canSeePartner={permissions.includes('four.partner.view')}
       />
       <FourPageClient
         items={items ?? []}

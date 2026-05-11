@@ -18,7 +18,7 @@ export default async function FourStatsPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Stats FOUR" subtitle="Vue globale, clients, membres, items et historique détaillé" />
-      <FourTabs active="stats" canSeeStats canSeeMessages={permissions.includes('four.messages.view')} />
+      <FourTabs active="stats" canSeeHistory={permissions.includes('four.history.view')} canSeeStats canSeeMessages={permissions.includes('four.messages.view')} canSeePartner={permissions.includes('four.partner.view')} />
       <FourStatsClient totals={totals} byClient={byClient} byMember={byMember} byItem={byItem} history={history} />
     </div>
   );

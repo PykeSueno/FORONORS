@@ -19,7 +19,7 @@ export default async function FourMessagesPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Messages FOUR" subtitle="Messages prédéfinis avec copie, modification et suppression" />
-      <FourTabs active="messages" canSeeStats={permissions.includes('four.stats.view')} canSeeMessages />
+      <FourTabs active="messages" canSeeHistory={permissions.includes('four.history.view')} canSeeStats={permissions.includes('four.stats.view')} canSeeMessages canSeePartner={permissions.includes('four.partner.view')} />
       <FourMessagesClient initialMessages={messages ?? []} canManage={permissions.includes('four.messages.manage')} />
     </div>
   );
