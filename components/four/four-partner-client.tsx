@@ -576,7 +576,7 @@ function TodayCard({
   return (
     <article className={`${CARD_CLASS} relative overflow-hidden`}>
       <div className="absolute right-5 top-5 rounded-full border border-[#d8c5a9] bg-[#fff8ee] px-3 py-1 text-xs font-black uppercase text-[#8b5a2b]">
-        Aujourd'hui
+        Aujourd&apos;hui
       </div>
 
       <CardHeader eyebrow={today.isOff ? 'Repos cycle' : 'Partenaire actif'} title={today.label} />
@@ -585,7 +585,7 @@ function TodayCard({
         <div className="mt-5 rounded-2xl border border-dashed border-[#c9ad83] bg-[#fff8ee] p-4">
           <div className="text-sm font-black uppercase text-[#8b5a2b]">Objectif</div>
           <p className="mt-2 text-sm font-semibold leading-6 text-[#5f3b22]">
-            Refaire les stocks. Aucune vente partenaire n'est prevue aujourd'hui.
+            Refaire les stocks. Aucune vente partenaire n&apos;est prevue aujourd&apos;hui.
           </p>
         </div>
       ) : (
