@@ -18,6 +18,7 @@ type Body = {
   braqueur_ids?: string[];
   hostage_ids?: string[];
   mule_ids?: string[];
+  missions?: Array<{ role: 'otage_apporte' | 'plan_mule_recup'; group_name?: string; amount?: number; note?: string }>;
   seized_resources?: Array<{ item_id: number; quantity: number }>;
   optional_resources?: Array<{ name?: string; item_id?: number; quantity: number }>;
   note?: string;
@@ -78,6 +79,19 @@ export async function POST(request: Request) {
   const moneyAmount = Math.max(0, Number(body.money_amount ?? 0));
   const lostMoney = Math.max(0, Number(body.lost_money ?? 0));
   if (action === 'success' && moneyAmount <= 0) return NextResponse.json({ message: 'Argent rapporté invalide.' }, { status: 400 });
+  const missions = (body.missions ?? [])
+    .filter((mission) => mission.role === 'otage_apporte' || mission.role === 'plan_mule_recup')
+    .map((mission) => ({
+      role: mission.role,
+      groupName: (mission.group_name ?? '').trim(),
+      amount: Math.max(0, Number(mission.amount ?? 0)),
+      note: (mission.note ?? '').trim()
+    }))
+    .filter((mission) => mission.groupName || mission.amount > 0 || mission.note);
+  for (const mission of missions) {
+    if (!mission.groupName) return NextResponse.json({ message: 'Nom du groupe missionné requis.' }, { status: 400 });
+  }
+  const missionTotal = action === 'success' ? missions.reduce((sum, mission) => sum + mission.amount, 0) : 0;
 
   const supabase = getSupabaseAdmin();
   try {
@@ -132,7 +146,8 @@ export async function POST(request: Request) {
   }
 
   const moneyBefore = Number(cash.balance ?? 0);
-  const moneyDelta = action === 'success' ? moneyAmount : -lostMoney;
+  if (missionTotal > moneyBefore) return NextResponse.json({ message: 'Solde groupe insuffisant pour les missions.' }, { status: 400 });
+  const moneyDelta = action === 'success' ? moneyAmount - missionTotal : -lostMoney;
   const moneyAfter = moneyBefore + moneyDelta;
   if (moneyAfter < 0) return NextResponse.json({ message: 'Solde groupe insuffisant.' }, { status: 400 });
   const userById = new Map(users.map((entry) => [entry.id, entry]));
@@ -148,6 +163,39 @@ export async function POST(request: Request) {
   });
 
   const consumedStock = consumed.filter((entry) => entry.consumed);
+  const cashMovements = [];
+  if (action === 'success') {
+    cashMovements.push({
+      type: 'entry',
+      amount: moneyAmount,
+      label: `Braquage ${body.robbery_type}`,
+      user_id: session.userId,
+      before_amount: moneyBefore,
+      after_amount: moneyBefore + moneyAmount
+    });
+    let runningCash = moneyBefore + moneyAmount;
+    for (const mission of missions.filter((entry) => entry.amount > 0)) {
+      const afterMission = runningCash - mission.amount;
+      cashMovements.push({
+        type: 'exit',
+        amount: -mission.amount,
+        label: `Mission braquage — ${mission.role === 'otage_apporte' ? 'Otages' : 'Mule/Récup'} — Groupe ${mission.groupName}`,
+        user_id: session.userId,
+        before_amount: runningCash,
+        after_amount: afterMission
+      });
+      runningCash = afterMission;
+    }
+  } else {
+    cashMovements.push({
+      type: 'exit',
+      amount: moneyDelta,
+      label: `Braquage arrêté ${body.robbery_type}`,
+      user_id: session.userId,
+      before_amount: moneyBefore,
+      after_amount: moneyAfter
+    });
+  }
   await Promise.all([
     ...consumedStock.map((entry) => supabase.from('items').update({ quantity: entry.after, updated_at: new Date().toISOString() }).eq('id', entry.itemId)),
     supabase.from('group_cash').update({ balance: moneyAfter, updated_at: new Date().toISOString() }).eq('id', cash.id),
@@ -160,14 +208,7 @@ export async function POST(request: Request) {
           user_id: session.userId
         })))
       : Promise.resolve(),
-    supabase.from('cash_movements').insert({
-      type: moneyDelta >= 0 ? 'entry' : 'exit',
-      amount: moneyDelta,
-      label: action === 'success' ? `Braquage ${body.robbery_type}` : `Braquage arrêté ${body.robbery_type}`,
-      user_id: session.userId,
-          before_amount: moneyBefore,
-      after_amount: moneyAfter
-    })
+    supabase.from('cash_movements').insert(cashMovements)
   ]);
 
   const { data: run } = await supabase.from('robbery_runs').insert({
@@ -177,6 +218,9 @@ export async function POST(request: Request) {
       status: action,
       money_amount: action === 'success' ? moneyAmount : 0,
       lost_money: action === 'arrested' ? lostMoney : 0,
+      mission_costs: missions,
+      mission_total: missionTotal,
+      net_profit: action === 'success' ? moneyAmount - missionTotal : -lostMoney,
       money_before: moneyBefore,
       money_after: moneyAfter,
       consumed_items: consumed,
@@ -195,6 +239,9 @@ export async function POST(request: Request) {
       action,
       moneyAmount,
       lostMoney,
+      missionTotal,
+      missions,
+      netProfit: action === 'success' ? moneyAmount - missionTotal : -lostMoney,
       moneyBefore,
       moneyAfter,
       consumed,

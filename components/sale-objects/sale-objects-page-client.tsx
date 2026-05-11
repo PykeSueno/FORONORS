@@ -14,6 +14,7 @@ type SaleRow = {
   buyer_name: string;
   buyer_type: 'pawnshop_sud' | 'pawnshop_nord' | 'group';
   status: 'paid' | 'pending_receipt' | 'canceled';
+  receipt_method?: 'cash' | 'bank' | null;
   total_amount: number;
   sale_lines: Array<{ itemId: number; itemName: string; itemImageUrl?: string | null; quantity: number; unitPrice: number; lineTotal: number; stockBefore: number; stockAfter: number }>;
   cash_before: number | null;
@@ -38,6 +39,13 @@ function saleStatusMeta(status: SaleRow['status']) {
   if (status === 'paid') return { label: 'Reçu', badge: 'bg-emerald-500/20 text-emerald-200', detail: 'Argent reçu', stockHint: 'Stock sorti' };
   if (status === 'pending_receipt') return { label: 'En attente de réception', badge: 'bg-amber-500/20 text-amber-100', detail: 'Argent en attente', stockHint: 'Stock déjà sorti' };
   return { label: 'Annulé', badge: 'bg-rose-500/20 text-rose-200', detail: 'Vente annulée', stockHint: 'Stock restauré' };
+}
+
+function saleReceiptStatusMeta(sale: Pick<SaleRow, 'status' | 'receipt_method'>) {
+  if (sale.status !== 'paid') return saleStatusMeta(sale.status);
+  const label = sale.receipt_method === 'bank' ? 'Reçu bank' : sale.receipt_method === 'cash' ? 'Reçu cash' : 'Reçu';
+  const detail = sale.receipt_method === 'bank' ? 'Argent reçu bank' : 'Argent reçu cash';
+  return { label, badge: 'bg-emerald-500/20 text-emerald-200', detail, stockHint: 'Stock sorti' };
 }
 
 export function SaleObjectsPageClient({
@@ -89,6 +97,8 @@ export function SaleObjectsPageClient({
   const [routing, setRouting] = useState<Record<string, SaleObjectRouting>>({});
   const [routingFilter, setRoutingFilter] = useState<'all' | SaleObjectRouting>('all');
   const [routingQuery, setRoutingQuery] = useState('');
+  const [receiveConfirm, setReceiveConfirm] = useState<SaleRow | null>(null);
+  const [receiveBusy, setReceiveBusy] = useState(false);
 
 
   const buyerScopedItems = useMemo(() => {
@@ -171,9 +181,16 @@ export function SaleObjectsPageClient({
     router.refresh();
   }
 
-  async function markReceived(saleId: number) {
-    const response = await fetch(`/api/sale-objects/${saleId}/receive`, { method: 'POST' });
+  async function markReceivedWithMethod(saleId: number, receiptMethod: 'cash' | 'bank') {
+    setReceiveBusy(true);
+    const response = await fetch(`/api/sale-objects/${saleId}/receive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ receipt_method: receiptMethod })
+    });
+    setReceiveBusy(false);
     if (!response.ok) return setError((await response.json()).message ?? 'Réception impossible.');
+    setReceiveConfirm(null);
     await reloadHistory();
   }
 
@@ -364,7 +381,7 @@ export function SaleObjectsPageClient({
               {visibleSales.map((sale) => {
                 const canEdit = canEditAny || (canEditOwn && canManageOwn(sale));
                 const canCancel = canCancelAny || (canCancelOwn && canManageOwn(sale));
-                const statusMeta = saleStatusMeta(sale.status);
+                const statusMeta = saleReceiptStatusMeta(sale);
                 return (
                   <div key={sale.id} className="rounded-xl border border-white/10 bg-[#3b2418]/50 p-3">
                     <div className="flex items-center justify-between gap-2">
@@ -375,7 +392,7 @@ export function SaleObjectsPageClient({
                     <p className="mt-1 text-[11px] text-[#efcdab]">📦 {statusMeta.stockHint} · 💵 {statusMeta.detail}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => setDetail(sale)}>Voir détail</button>
-                      {sale.status === 'pending_receipt' && canReceive ? <button className="saas-primary-btn !px-2 !py-1 text-xs" onClick={() => void markReceived(sale.id)}>Reçu</button> : null}
+                      {sale.status === 'pending_receipt' && canReceive ? <button className="saas-primary-btn !px-2 !py-1 text-xs" onClick={() => setReceiveConfirm(sale)}>Reçu</button> : null}
                       {canEdit && sale.status !== 'canceled' ? <button className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => startEdit(sale)}>Modifier</button> : null}
                       {canCancel && sale.status !== 'canceled' ? <button className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => void cancelSale(sale.id)}>Annuler</button> : null}
                     </div>
@@ -439,7 +456,7 @@ export function SaleObjectsPageClient({
               <h3 className="text-lg font-semibold text-[#fff1dd]">Détail vente #{detail.id}</h3>
               <button className="saas-ghost-btn" onClick={() => setDetail(null)}>Fermer</button>
             </div>
-            <p className="mt-2 text-xs text-[#efcdab]">Acheteur: {detail.buyer_name} · Statut: {saleStatusMeta(detail.status).label}</p>
+            <p className="mt-2 text-xs text-[#efcdab]">Acheteur: {detail.buyer_name} · Statut: {saleReceiptStatusMeta(detail).label}</p>
             <p className="text-xs text-[#efcdab]">Argent groupe: {detail.cash_before != null ? formatUsd(Number(detail.cash_before)) : '-'} → {detail.cash_after != null ? formatUsd(Number(detail.cash_after)) : '-'}</p>
             {detail.status === 'pending_receipt' ? <p className="mt-1 text-xs text-[#f3d4b0]">📦 Les objets sont déjà sortis du stock. 💵 L’argent sera ajouté lors du clic sur “Reçu”.</p> : null}
             <div className="mt-3 space-y-2">
@@ -455,6 +472,24 @@ export function SaleObjectsPageClient({
                   <p>Stock {line.stockBefore} → {line.stockAfter}</p>
                 </article>
               ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {receiveConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <section className="glass-card w-full max-w-md p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-[#fff1dd]">Confirmer la réception</h3>
+                <p className="mt-1 text-sm text-[#efcdab]">Vente #{receiveConfirm.id} · {formatUsd(Number(receiveConfirm.total_amount ?? 0))}</p>
+              </div>
+              <button className="saas-ghost-btn" onClick={() => setReceiveConfirm(null)}>Fermer</button>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <button className="saas-primary-btn justify-center" disabled={receiveBusy} onClick={() => void markReceivedWithMethod(receiveConfirm.id, 'cash')}>Cash</button>
+              <button className="saas-ghost-btn justify-center" disabled={receiveBusy} onClick={() => void markReceivedWithMethod(receiveConfirm.id, 'bank')}>Bank</button>
             </div>
           </section>
         </div>

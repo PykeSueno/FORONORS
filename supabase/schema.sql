@@ -204,6 +204,8 @@ create table if not exists public.sale_object_orders (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+alter table public.sale_object_orders add column if not exists receipt_method text;
+
 alter table public.group_cash enable row level security;
 alter table public.cash_movements enable row level security;
 alter table public.money_item_sales enable row level security;
@@ -1169,6 +1171,9 @@ on conflict (name) do nothing;
 alter table public.robbery_runs add column if not exists status text not null default 'success';
 alter table public.robbery_runs add column if not exists lost_money numeric(12,2) not null default 0;
 alter table public.robbery_runs add column if not exists note text;
+alter table public.robbery_runs add column if not exists mission_costs jsonb not null default '[]'::jsonb;
+alter table public.robbery_runs add column if not exists mission_total numeric(12,2) not null default 0;
+alter table public.robbery_runs add column if not exists net_profit numeric(12,2) not null default 0;
 
 create table if not exists public.payroll_exclusions (
   id bigint generated always as identity primary key,
