@@ -41,7 +41,7 @@ export async function GET() {
 
   const { data } = await supabase
     .from('sale_object_orders')
-    .select('id, buyer_name, buyer_type, status, total_amount, sale_lines, cash_before, cash_after, receipt_method, created_by, received_by, canceled_by, received_at, canceled_at, created_at, updated_at, creator:created_by(name, username), receiver:received_by(name, username), canceler:canceled_by(name, username)')
+    .select('id, buyer_name, buyer_type, status, total_amount, sale_lines, cash_before, cash_after, receipt_method, created_by, received_by, canceled_by, received_at, canceled_at, created_at, updated_at, creator:created_by(name, username, iban_rib), receiver:received_by(name, username), canceler:canceled_by(name, username)')
     .order('created_at', { ascending: false })
     .limit(120);
 

@@ -10,6 +10,7 @@ type MemberRow = {
   id: string;
   name: string;
   username: string;
+  iban_rib: string | null;
   role_id: number | null;
   is_active: boolean;
   roles: { name: string } | { name: string }[] | null;
@@ -34,7 +35,7 @@ export default async function MembersPage() {
   const supabase = getSupabaseAdmin();
 
   const [{ data: members }, { data: roles }, permsResult, { data: expenseRows }] = await Promise.all([
-    supabase.from('users').select('id, name, username, role_id, is_active, roles(name)').order('username', { ascending: true }),
+    supabase.from('users').select('id, name, username, iban_rib, role_id, is_active, roles(name)').order('username', { ascending: true }),
     supabase.from('roles').select('id, name, display_order, role_permissions(permission_id)').order('display_order', { ascending: true }),
     userPermissions.includes('roles.manage')
       ? supabase.from('permissions').select('id, name').order('name', { ascending: true })
@@ -57,6 +58,7 @@ export default async function MembersPage() {
       id: member.id,
       name: member.name,
       username: member.username,
+      iban_rib: member.iban_rib,
       role_id: member.role_id,
       role_name: Array.isArray(member.roles) ? member.roles[0]?.name ?? '' : member.roles?.name ?? '',
       is_active: member.is_active

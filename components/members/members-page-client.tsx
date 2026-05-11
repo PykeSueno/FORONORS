@@ -13,6 +13,7 @@ type Member = {
   id: string;
   name: string;
   username: string;
+  iban_rib: string | null;
   role_id: number | null;
   role_name: string;
   is_active: boolean;
@@ -167,7 +168,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
       <div className="glass-card p-5">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold text-[#fff2de]">Membres & Rôles</h1>
-          {canCreateMember ? <button className="saas-primary-btn" onClick={() => setSelectedMember({ id: '', name: '', username: '', role_id: null, role_name: '', is_active: true })}>Nouveau membre</button> : null}
+          {canCreateMember ? <button className="saas-primary-btn" onClick={() => setSelectedMember({ id: '', name: '', username: '', iban_rib: '', role_id: null, role_name: '', is_active: true })}>Nouveau membre</button> : null}
         </div>
       </div>
 
@@ -369,6 +370,7 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
       body: JSON.stringify({
         name: draft.name,
         username: draft.username,
+        iban_rib: draft.iban_rib,
         role_id: draft.role_id,
         is_active: draft.is_active,
         password: canEditPassword ? (newPassword || undefined) : undefined
@@ -397,6 +399,7 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
         <div className="space-y-3">
           <input className="saas-input w-full" placeholder="Nom" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <input className="saas-input w-full" placeholder="User" value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value })} />
+          <input className="saas-input w-full" placeholder="IBAN / RIB" value={draft.iban_rib ?? ''} onChange={(e) => setDraft({ ...draft, iban_rib: e.target.value })} />
           <select className="saas-input w-full" value={draft.role_id ?? ''} onChange={(e) => setDraft({ ...draft, role_id: e.target.value ? Number(e.target.value) : null })}>
             <option value="">Sans rôle</option>
             {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}

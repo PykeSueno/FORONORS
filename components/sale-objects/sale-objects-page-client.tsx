@@ -9,6 +9,7 @@ import { CompactActionField, CompactField, CompactLineGrid, QuantityStepper, Rem
 import { resolveItemRouting, type SaleObjectRouting } from '@/lib/sale-objects-rules';
 
 type Item = { id: number; name: string; image_url: string | null; quantity: number; sell_price: number; category_label: string | null; category_key?: string | null };
+type SaleRelatedUser = { name?: string | null; username?: string | null; iban_rib?: string | null };
 type SaleRow = {
   id: number;
   buyer_name: string;
@@ -26,12 +27,12 @@ type SaleRow = {
   canceled_at: string | null;
   created_at: string;
   updated_at: string;
-  creator?: { name?: string | null; username?: string | null } | { name?: string | null; username?: string | null }[] | null;
-  receiver?: { name?: string | null; username?: string | null } | { name?: string | null; username?: string | null }[] | null;
+  creator?: SaleRelatedUser | SaleRelatedUser[] | null;
+  receiver?: SaleRelatedUser | SaleRelatedUser[] | null;
 };
 
 type CartLine = { item_id: number; item_name: string; image_url: string | null; stock: number; quantity: number; unit_price: number; line_total: number };
-type Member = { id: string; name: string | null; username: string | null };
+type Member = { id: string; name: string | null; username: string | null; iban_rib?: string | null };
 const PAWNSHOP_PHONE = '8202043';
 const PAWNSHOP_RIB = 'ZT96CO';
 
@@ -46,6 +47,26 @@ function saleReceiptStatusMeta(sale: Pick<SaleRow, 'status' | 'receipt_method'>)
   const label = sale.receipt_method === 'bank' ? 'Reçu bank' : sale.receipt_method === 'cash' ? 'Reçu cash' : 'Reçu';
   const detail = sale.receipt_method === 'bank' ? 'Argent reçu bank' : 'Argent reçu cash';
   return { label, badge: 'bg-emerald-500/20 text-emerald-200', detail, stockHint: 'Stock sorti' };
+}
+
+function getRelatedUser(user: SaleRelatedUser | SaleRelatedUser[] | null | undefined) {
+  return Array.isArray(user) ? user[0] ?? null : user ?? null;
+}
+
+function saleSellerName(sale: SaleRow) {
+  const creator = getRelatedUser(sale.creator);
+  return creator?.name || creator?.username || (sale.created_by ? 'Membre inconnu' : 'Groupe');
+}
+
+function saleSellerIbanRib(sale: SaleRow) {
+  const creator = getRelatedUser(sale.creator);
+  return creator?.iban_rib?.trim() || 'IBAN/RIB non renseignÃ©';
+}
+
+function expectedReceiptMode(sale: SaleRow) {
+  if (sale.receipt_method === 'cash') return 'Cash';
+  if (sale.receipt_method === 'bank') return 'Bank';
+  return 'En attente';
 }
 
 export function SaleObjectsPageClient({
@@ -220,7 +241,7 @@ export function SaleObjectsPageClient({
     setBuyerType(sale.buyer_type);
     setCustomBuyer(sale.buyer_type === 'group' ? sale.buyer_name : '');
     setSellerId(sale.created_by ?? '');
-    const creator = Array.isArray(sale.creator) ? sale.creator[0] : sale.creator;
+    const creator = getRelatedUser(sale.creator);
     setSellerLabel(creator?.name || creator?.username || 'Groupe');
   }
 
@@ -456,8 +477,14 @@ export function SaleObjectsPageClient({
               <h3 className="text-lg font-semibold text-[#fff1dd]">Détail vente #{detail.id}</h3>
               <button className="saas-ghost-btn" onClick={() => setDetail(null)}>Fermer</button>
             </div>
-            <p className="mt-2 text-xs text-[#efcdab]">Acheteur: {detail.buyer_name} · Statut: {saleReceiptStatusMeta(detail).label}</p>
-            <p className="text-xs text-[#efcdab]">Argent groupe: {detail.cash_before != null ? formatUsd(Number(detail.cash_before)) : '-'} → {detail.cash_after != null ? formatUsd(Number(detail.cash_after)) : '-'}</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <DetailField label="Vendeur" value={saleSellerName(detail)} />
+              <DetailField label="IBAN/RIB" value={saleSellerIbanRib(detail)} />
+              <DetailField label="Acheteur" value={detail.buyer_name} />
+              <DetailField label="Statut" value={saleReceiptStatusMeta(detail).label} />
+              <DetailField label="Mode attendu" value={expectedReceiptMode(detail)} />
+            </div>
+            <p className="mt-3 text-xs text-[#efcdab]">Argent groupe: {detail.cash_before != null ? formatUsd(Number(detail.cash_before)) : '-'} → {detail.cash_after != null ? formatUsd(Number(detail.cash_after)) : '-'}</p>
             {detail.status === 'pending_receipt' ? <p className="mt-1 text-xs text-[#f3d4b0]">📦 Les objets sont déjà sortis du stock. 💵 L’argent sera ajouté lors du clic sur “Reçu”.</p> : null}
             <div className="mt-3 space-y-2">
               {(detail.sale_lines ?? []).map((line, idx) => (
@@ -496,6 +523,15 @@ export function SaleObjectsPageClient({
       ) : null}
 
       {error ? <p className="fixed bottom-4 right-4 z-[100] rounded-xl border border-red-300/45 bg-red-500/10 px-4 py-2 text-sm text-red-100">{error}</p> : null}
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#2b1a12]/55 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-[0.12em] text-[#efcdab]">{label}</p>
+      <p className="mt-1 break-words text-sm font-semibold text-[#fff1dd]">{value}</p>
     </div>
   );
 }

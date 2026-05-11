@@ -46,6 +46,7 @@ create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   username text not null unique,
   name text not null default '',
+  iban_rib text,
   password_hash text not null,
   password_plain text,
   role text,
@@ -57,6 +58,7 @@ create table if not exists public.users (
 alter table public.roles add column if not exists display_order integer not null default 100;
 alter table public.users add column if not exists role_id bigint references public.roles(id) on delete set null;
 alter table public.users add column if not exists name text not null default '';
+alter table public.users add column if not exists iban_rib text;
 alter table public.users add column if not exists password_plain text;
 alter table public.users add column if not exists dashboard_layout jsonb;
 
