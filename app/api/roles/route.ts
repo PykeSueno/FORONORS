@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   const canManageRoles = await hasUserPermission(session.userId, 'roles.manage');
   if (!canManageRoles) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
-  const body = (await request.json()) as { name?: string; display_order?: number };
+  const body = (await request.json()) as { name?: string; display_order?: number; copy_from_role_id?: number };
 
   if (!body.name) {
     return NextResponse.json({ message: 'Nom du rôle requis.' }, { status: 400 });
@@ -76,10 +76,20 @@ export async function POST(request: Request) {
     name: body.name.trim(),
     display_order: body.display_order ?? 100
   };
-  const { data, error } = await supabase.from('roles').insert(payload).select('id, name').maybeSingle();
+  const { data, error } = await supabase.from('roles').insert(payload).select('id, name, display_order').maybeSingle();
 
   if (error) {
     return NextResponse.json({ message: 'Création du rôle impossible.' }, { status: 400 });
+  }
+
+  const copyFromRoleId = Number(body.copy_from_role_id ?? 0);
+  if (data?.id && Number.isInteger(copyFromRoleId) && copyFromRoleId > 0) {
+    const { data: sourcePermissions } = await supabase
+      .from('role_permissions')
+      .select('permission_id')
+      .eq('role_id', copyFromRoleId);
+    const rows = (sourcePermissions ?? []).map((row) => ({ role_id: data.id, permission_id: row.permission_id }));
+    if (rows.length > 0) await supabase.from('role_permissions').insert(rows);
   }
 
   await createAuditLog({
@@ -88,10 +98,10 @@ export async function POST(request: Request) {
     entityType: 'role',
     entityId: data?.id,
     summary: `Création du rôle ${data?.name ?? payload.name}`,
-    newValues: payload
+    newValues: { ...payload, copy_from_role_id: copyFromRoleId || null }
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, role: data });
 }
 
 export async function PATCH(request: Request) {

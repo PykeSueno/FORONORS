@@ -130,3 +130,223 @@ export function permissionOrder(permissionName: string) {
   const sectionIdx = SECTION_ORDER.indexOf(info.section as (typeof SECTION_ORDER)[number]);
   return sectionIdx === -1 ? 999 : sectionIdx;
 }
+
+export type PermissionModuleKey =
+  | 'stock'
+  | 'money'
+  | 'activity'
+  | 'member_ops'
+  | 'jobs'
+  | 'four'
+  | 'robberies'
+  | 'members'
+  | 'logs'
+  | 'admin';
+
+export type SimplePermission = {
+  key: string;
+  label: string;
+  permissions: string[];
+  partnerSafe?: boolean;
+};
+
+export type PermissionModule = {
+  key: PermissionModuleKey;
+  icon: string;
+  title: string;
+  description: string;
+  permissions: SimplePermission[];
+};
+
+export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
+  {
+    key: 'stock',
+    icon: '📦',
+    title: 'STOCK',
+    description: 'Items, stock et mouvements.',
+    permissions: [
+      { key: 'stock.view', label: 'Voir', partnerSafe: true, permissions: ['items.access', 'items.preview', 'dashboard.stock.movements.preview', 'dashboard.stock.movements.access'] },
+      { key: 'stock.edit', label: 'Modifier', permissions: ['items.create', 'items.edit', 'items.delete'] },
+      { key: 'stock.transactions', label: 'Transactions', permissions: ['transactions.access', 'transactions.create', 'transactions.edit.own', 'transactions.edit.any'] },
+      { key: 'stock.sales', label: 'Vente objets', permissions: ['sale.objects.access', 'sale.objects.create', 'sale.objects.receive', 'sale.objects.history.view'] }
+    ]
+  },
+  {
+    key: 'money',
+    icon: '💰',
+    title: 'ARGENT',
+    description: 'Caisse groupe et mouvements.',
+    permissions: [
+      { key: 'money.view', label: 'Voir', permissions: ['money.access', 'money.preview', 'dashboard.money.movements.preview', 'dashboard.money.movements.access'] },
+      { key: 'money.edit', label: 'Modifier', permissions: ['money.edit'] },
+      { key: 'money.history', label: 'Historique', permissions: ['money.history.view', 'money.movements.view'] }
+    ]
+  },
+  {
+    key: 'activity',
+    icon: '🎯',
+    title: 'ACTIVITÉ',
+    description: 'Activités, création et statistiques.',
+    permissions: [
+      { key: 'activity.view', label: 'Voir', partnerSafe: true, permissions: ['activity.access', 'activity.view', 'activity.preview'] },
+      { key: 'activity.create', label: 'Créer activité', permissions: ['activity.create', 'activity.processor.create'] },
+      { key: 'activity.stats', label: 'Stats', permissions: ['activity.stats.view', 'activity.processor.view'] }
+    ]
+  },
+  {
+    key: 'member_ops',
+    icon: '💸',
+    title: 'ACTIVITÉS & PAYES & DÉPENSES',
+    description: 'Payes, dépenses et logs opérationnels.',
+    permissions: [
+      { key: 'member_ops.view', label: 'Voir', permissions: ['member_ops.view', 'member_ops.activities.view', 'member_ops.payroll.view', 'member_ops.expenses.view'] },
+      { key: 'member_ops.payroll', label: 'Gérer payes', permissions: ['member_ops.payroll.pay', 'member_ops.payroll.adjust', 'member_ops.payroll.report', 'member_ops.payroll.exclude'] },
+      { key: 'member_ops.expenses', label: 'Gérer dépenses', permissions: ['member_ops.expenses.create', 'member_ops.expenses.edit', 'member_ops.expenses.reimburse', 'member_ops.expenses.cancel'] },
+      { key: 'member_ops.logs', label: 'Voir logs', permissions: ['member_ops.activities.logs', 'member_ops.payroll.logs', 'member_ops.expenses.logs'] }
+    ]
+  },
+  {
+    key: 'jobs',
+    icon: '🚬',
+    title: 'JOBS',
+    description: 'Tablette, cigarette, processeur et pierre.',
+    permissions: [
+      { key: 'jobs.view', label: 'Voir', partnerSafe: true, permissions: ['tablet.access', 'cigarette.access', 'tobacco.processor.view', 'jobs.stone.view'] },
+      { key: 'jobs.tablet', label: 'Tablette', permissions: ['tablet.passage.create', 'tablet.daily.manage', 'tablet.stats.view', 'tablet.logs.view', 'jobs.tablet.webhook.view', 'jobs.tablet.webhook.edit'] },
+      { key: 'jobs.cigarette', label: 'Cigarette', permissions: ['cigarette.passage.create', 'cigarette.passage.create.any', 'cigarette.history.view', 'cigarette.stats.view', 'cigarette.logs.view'] },
+      { key: 'jobs.processor', label: 'Processeur', permissions: ['tobacco.processor.create', 'tobacco.processor.production', 'tobacco.processor.sale', 'tobacco.processor.stats', 'tobacco.processor.logs'] },
+      { key: 'jobs.stone', label: 'Pierre', permissions: ['jobs.stone.sell', 'jobs.stone.history.view', 'jobs.stone.stats.view', 'jobs.stone.logs'] },
+      { key: 'jobs.history', label: 'Historique', partnerSafe: true, permissions: ['tablet.logs.view', 'cigarette.history.view', 'tobacco.processor.logs', 'jobs.stone.history.view'] },
+      { key: 'jobs.stats', label: 'Stats', permissions: ['tablet.stats.view', 'cigarette.stats.view', 'tobacco.processor.stats', 'jobs.stone.stats.view'] }
+    ]
+  },
+  {
+    key: 'four',
+    icon: '🔥',
+    title: 'FOUR',
+    description: 'Transactions, partenaire, messages et stats.',
+    permissions: [
+      { key: 'four.view', label: 'Voir', partnerSafe: true, permissions: ['four.access', 'four.preview'] },
+      { key: 'four.transactions', label: 'Transactions', permissions: ['four.transaction.validate', 'four.transaction.edit.own', 'four.transaction.edit.any'] },
+      { key: 'four.partner', label: 'Partenaire', partnerSafe: true, permissions: ['four.partner.view', 'four.partner.sell', 'four.partner.history.view', 'four.partner.stats.view'] },
+      { key: 'four.partner.config', label: 'Config partenaire', permissions: ['four.partner.config', 'four.partner.logs'] },
+      { key: 'four.messages', label: 'Messages', partnerSafe: true, permissions: ['four.messages.view', 'four.messages.manage'] },
+      { key: 'four.history', label: 'Historique', permissions: ['four.history.view'] },
+      { key: 'four.stats', label: 'Stats', permissions: ['four.stats.view'] }
+    ]
+  },
+  {
+    key: 'robberies',
+    icon: '🔫',
+    title: 'BRAQUAGE',
+    description: 'Braquages, historiques, stats et logs.',
+    permissions: [
+      { key: 'robberies.view', label: 'Voir', permissions: ['robberies.view'] },
+      { key: 'robberies.create', label: 'Créer braquage', permissions: ['robberies.create', 'robberies.arrested', 'robberies.fleeca.multi_roles', 'robberies.fleeca.verify_no_consume'] },
+      { key: 'robberies.history', label: 'Historique', permissions: ['robberies.view'] },
+      { key: 'robberies.stats', label: 'Stats', permissions: ['robberies.stats'] },
+      { key: 'robberies.logs', label: 'Logs', permissions: ['robberies.logs', 'robberies.cancel'] }
+    ]
+  },
+  {
+    key: 'members',
+    icon: '👥',
+    title: 'MEMBRES',
+    description: 'Membres, grades et identifiants.',
+    permissions: [
+      { key: 'members.view', label: 'Voir', permissions: ['members.access', 'members.view', 'members.preview'] },
+      { key: 'members.edit', label: 'Modifier', permissions: ['members.create', 'members.edit', 'members.delete', 'members.password.view', 'members.password.copy', 'members.password.edit', 'members.credentials.copy'] },
+      { key: 'members.grades', label: 'Grades', permissions: ['roles.rename'] }
+    ]
+  },
+  {
+    key: 'logs',
+    icon: '📜',
+    title: 'LOGS',
+    description: 'Logs, webhooks et export.',
+    permissions: [
+      { key: 'logs.view', label: 'Voir', permissions: ['logs.access', 'logs.view'] },
+      { key: 'logs.webhooks', label: 'Webhooks', permissions: ['logs.webhook.manage', 'logs.webhooks.tablet.view', 'logs.webhooks.tablet.edit'] },
+      { key: 'logs.export', label: 'Export', permissions: ['logs.view'] }
+    ]
+  },
+  {
+    key: 'admin',
+    icon: '⚙️',
+    title: 'ADMIN',
+    description: 'Configuration sensible.',
+    permissions: [
+      { key: 'admin.permissions', label: 'Permissions', permissions: ['roles.manage', 'roles.rename'] },
+      { key: 'admin.config', label: 'Configuration', permissions: ['roles.manage'] },
+      { key: 'admin.sql', label: 'SQL', permissions: ['roles.manage'] },
+      { key: 'admin.webhooks', label: 'Webhooks', permissions: ['logs.webhook.manage', 'logs.webhooks.tablet.edit', 'jobs.tablet.webhook.edit'] }
+    ]
+  }
+];
+
+export const SIMPLE_PERMISSION_BY_KEY = Object.fromEntries(
+  SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => [permission.key, permission]))
+) as Record<string, SimplePermission>;
+
+export const SIMPLE_ROLE_PRESETS: Record<string, string[]> = {
+  ADMIN: SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => permission.key)),
+  PATRON: SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => permission.key)).filter((key) => key !== 'admin.sql'),
+  GESTION: [
+    'stock.view',
+    'stock.edit',
+    'stock.transactions',
+    'stock.sales',
+    'money.view',
+    'money.edit',
+    'money.history',
+    'activity.view',
+    'activity.create',
+    'activity.stats',
+    'member_ops.view',
+    'member_ops.payroll',
+    'member_ops.expenses',
+    'member_ops.logs',
+    'jobs.view',
+    'jobs.tablet',
+    'jobs.cigarette',
+    'jobs.processor',
+    'jobs.stone',
+    'jobs.history',
+    'jobs.stats',
+    'four.view',
+    'four.transactions',
+    'four.partner',
+    'four.history',
+    'four.stats',
+    'robberies.view',
+    'robberies.create',
+    'robberies.stats',
+    'members.view',
+    'members.edit',
+    'logs.view'
+  ],
+  MEMBRE: [
+    'stock.view',
+    'activity.view',
+    'activity.create',
+    'jobs.view',
+    'jobs.tablet',
+    'jobs.cigarette',
+    'jobs.processor',
+    'jobs.stone',
+    'jobs.history',
+    'four.view',
+    'four.partner'
+  ],
+  PARTENAIRE: SIMPLE_PERMISSION_MODULES.flatMap((module) =>
+    module.permissions.filter((permission) => permission.partnerSafe).map((permission) => permission.key)
+  )
+};
+
+export function permissionsForSimpleKeys(simpleKeys: string[]) {
+  return Array.from(
+    new Set(
+      simpleKeys.flatMap((key) => SIMPLE_PERMISSION_BY_KEY[key]?.permissions ?? [])
+    )
+  );
+}

@@ -1,7 +1,12 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { describePermission, MODULE_ORDER, SECTION_ORDER } from '@/lib/permission-catalog';
+import {
+  SIMPLE_PERMISSION_MODULES,
+  SIMPLE_ROLE_PRESETS,
+  describePermission,
+  permissionsForSimpleKeys
+} from '@/lib/permission-catalog';
 import { toCanonicalPermission } from '@/lib/permission-normalization';
 import { sortMembersByGrade } from '@/lib/members';
 import { formatUsd } from '@/lib/currency';
@@ -223,7 +228,10 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
           <div className="mt-3 space-y-2">
             {sortedRoles.map((role) => (
               <div key={role.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#5b3924]/55 px-4 py-3">
-                <p className="font-medium text-[#fff2df]">{role.name}</p>
+                <div>
+                  <p className="font-medium text-[#fff2df]">{role.name}</p>
+                  <p className="text-xs text-[#efcdab]">{role.permission_ids.length} permission(s)</p>
+                </div>
                 <div className="flex items-center gap-2">
                   {canRenameRole ? <button className="saas-ghost-btn" onClick={() => { setSelectedRoleIds([role.id]); setIsRoleModalOpen(true); }}>✏️ Modifier le nom</button> : null}
                   {canManageRoles ? <button
@@ -490,51 +498,36 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
   const [criticalConfirmChecked, setCriticalConfirmChecked] = useState(false);
   const [criticalConfirmName, setCriticalConfirmName] = useState('');
   const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const renameIsCritical = Boolean(renameTarget && (isCriticalRoleName(renameTarget.name) || isCriticalRoleName(roleNameDraft)));
   const renameConfirmed = !renameIsCritical || (criticalConfirmChecked && criticalConfirmName.trim() === renameTarget?.name);
 
-  const modules = useMemo(() => {
-    const grouped: Record<string, Record<string, Permission[]>> = {};
-    for (const permission of displayPermissions) {
-      const info = describePermission(permission.name);
-      if (!grouped[info.module]) grouped[info.module] = {};
-      if (!grouped[info.module][info.section]) grouped[info.module][info.section] = [];
-      grouped[info.module][info.section].push(permission);
-    }
-
-    return Object.entries(grouped)
-      .sort(([moduleA], [moduleB]) => {
-        const orderA = MODULE_ORDER.indexOf(moduleA as (typeof MODULE_ORDER)[number]);
-        const orderB = MODULE_ORDER.indexOf(moduleB as (typeof MODULE_ORDER)[number]);
-        const a = orderA === -1 ? MODULE_ORDER.length : orderA;
-        const b = orderB === -1 ? MODULE_ORDER.length : orderB;
-        return a - b || moduleA.localeCompare(moduleB, 'fr');
-      })
-      .map(([moduleName, sectionMap]) => ({
-        moduleName,
-        sections: Object.entries(sectionMap)
-          .sort(([sectionA], [sectionB]) => {
-            const a = SECTION_ORDER.indexOf(sectionA as (typeof SECTION_ORDER)[number]);
-            const b = SECTION_ORDER.indexOf(sectionB as (typeof SECTION_ORDER)[number]);
-            const ai = a === -1 ? SECTION_ORDER.length : a;
-            const bi = b === -1 ? SECTION_ORDER.length : b;
-            return ai - bi || sectionA.localeCompare(sectionB, 'fr');
-          })
-          .map(([sectionName, sectionPermissions]) => ({
-            sectionName,
-            permissions: [...sectionPermissions].sort((a, b) => describePermission(a.name).label.localeCompare(describePermission(b.name).label, 'fr'))
-          }))
-      }));
+  const permissionIdByName = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const permission of displayPermissions) map.set(toCanonicalPermission(permission.name), permission.id);
+    return map;
   }, [displayPermissions]);
 
+  const simpleModules = useMemo(() => SIMPLE_PERMISSION_MODULES.map((module) => ({
+    ...module,
+    permissions: module.permissions.map((simplePermission) => ({
+      ...simplePermission,
+      permissionIds: simplePermission.permissions
+        .map((permissionName) => permissionIdByName.get(toCanonicalPermission(permissionName)))
+        .filter((id): id is number => Number.isInteger(id))
+    }))
+  })), [permissionIdByName]);
+
+  const visiblePermissionIds = useMemo(() => new Set(simpleModules.flatMap((module) => module.permissions.flatMap((permission) => permission.permissionIds))), [simpleModules]);
+
+  const advancedPermissions = useMemo(() => displayPermissions.filter((permission) => !visiblePermissionIds.has(permission.id)), [displayPermissions, visiblePermissionIds]);
+
   useEffect(() => {
-    if (modules.length === 0) return;
+    if (simpleModules.length === 0) return;
     setOpenModules((current) => {
       if (Object.keys(current).length > 0) return current;
-      return { [modules[0].moduleName]: true };
+      return Object.fromEntries(simpleModules.slice(0, 4).map((module) => [module.key, true]));
     });
-  }, [modules]);
+  }, [simpleModules]);
 
   useEffect(() => {
     setRoleNameDraft(renameTarget?.name ?? '');
@@ -583,6 +576,49 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
 
     if (!response.ok) return onError('Création permission impossible.');
     setNewPermission('');
+    await onSaved();
+  }
+
+  function simpleState(permissionIds: number[]) {
+    if (permissionIds.length === 0) return { checked: false, mixed: false };
+    const enabled = permissionIds.filter((id) => checked[id]).length;
+    return { checked: enabled === permissionIds.length, mixed: enabled > 0 && enabled < permissionIds.length };
+  }
+
+  function toggleSimplePermission(permissionIds: number[], next: boolean) {
+    setChecked((current) => ({
+      ...current,
+      ...Object.fromEntries(permissionIds.map((permissionId) => [permissionId, next]))
+    }));
+  }
+
+  function applySimpleKeys(simpleKeys: string[]) {
+    const permissionNames = permissionsForSimpleKeys(simpleKeys);
+    const nextIds = new Set(
+      permissionNames
+        .map((permissionName) => permissionIdByName.get(toCanonicalPermission(permissionName)))
+        .filter((id): id is number => Number.isInteger(id))
+    );
+    setChecked(Object.fromEntries(displayPermissions.map((permission) => [permission.id, nextIds.has(permission.id)])));
+  }
+
+  function copyFromRole(roleId: number) {
+    const source = selectedRoles.find((role) => role.id === roleId);
+    if (!source) return;
+    setChecked(Object.fromEntries(displayPermissions.map((permission) => [permission.id, source.permission_ids.includes(permission.id)])));
+  }
+
+  async function duplicateRole() {
+    if (!canManageRoles || selectedRoles.length !== 1) return;
+    const source = selectedRoles[0];
+    const nextName = window.prompt('Nom du nouveau rôle', `${source.name} copie`);
+    if (!nextName?.trim()) return;
+    const response = await fetch('/api/roles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nextName.trim(), display_order: source.display_order + 1, copy_from_role_id: source.id })
+    });
+    if (!response.ok) return onError('Duplication rôle impossible.');
     await onSaved();
   }
 
@@ -650,61 +686,125 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
             </section>
           ) : null}
 
-          {canManageRoles ? <div className="space-y-3">
-            {modules.map((module) => (
-              <section key={module.moduleName} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between text-left"
-                  onClick={() => setOpenModules((current) => ({ ...current, [module.moduleName]: !current[module.moduleName] }))}
-                >
-                  <h4 className="text-sm font-semibold text-[#ffe9ce]">{module.moduleName.toUpperCase()}</h4>
-                  <span className="text-xs text-[#efcba8]">{openModules[module.moduleName] ? '−' : '+'}</span>
-                </button>
-                {openModules[module.moduleName] ? <div className="mt-3 space-y-3">
-                  {module.sections.map((section) => (
-                    <div key={`${module.moduleName}-${section.sectionName}`} className="rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
+          {canManageRoles ? (
+            <div className="space-y-4">
+              <section className="rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#f5d8b5]">Rôles simplifiés</p>
+                    <p className="text-xs text-[#efcba8]">Copie rapide, duplication et reset sécurisé.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(Object.keys(SIMPLE_ROLE_PRESETS) as Array<keyof typeof SIMPLE_ROLE_PRESETS>).map((preset) => (
+                      <button key={preset} type="button" className="saas-ghost-btn !h-8 !px-3 !text-xs" onClick={() => applySimpleKeys(SIMPLE_ROLE_PRESETS[preset])}>
+                        Reset {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedRoles.map((role) => (
+                    <button key={role.id} type="button" className="filter-pill" onClick={() => copyFromRole(role.id)}>
+                      Copier {role.name}
+                    </button>
+                  ))}
+                  {selectedRoles.length === 1 ? (
+                    <button type="button" className="filter-pill" onClick={() => void duplicateRole()}>
+                      Dupliquer rôle
+                    </button>
+                  ) : null}
+                  <button type="button" className="filter-pill" onClick={() => applySimpleKeys([])}>
+                    Tout retirer
+                  </button>
+                </div>
+              </section>
+
+              <div className="grid gap-3 lg:grid-cols-2">
+                {simpleModules.map((module) => {
+                  const modulePermissionIds = module.permissions.flatMap((permission) => permission.permissionIds);
+                  const moduleState = simpleState(modulePermissionIds);
+                  return (
+                    <section key={module.key} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
                       <button
                         type="button"
-                        className="flex w-full items-center justify-between text-left"
-                        onClick={() => {
-                          const key = `${module.moduleName}-${section.sectionName}`;
-                          setOpenSections((current) => ({ ...current, [key]: !current[key] }));
-                        }}
+                        className="flex w-full items-center justify-between gap-3 text-left"
+                        onClick={() => setOpenModules((current) => ({ ...current, [module.key]: !current[module.key] }))}
                       >
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#f7d6ad]">{section.sectionName}</p>
-                        <span className="text-[11px] text-[#efcba8]">{openSections[`${module.moduleName}-${section.sectionName}`] ? '−' : '+'}</span>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-[#2f1d14]/65 text-lg">{module.icon}</span>
+                          <div className="min-w-0">
+                            <h4 className="truncate text-sm font-semibold text-[#ffe9ce]">{module.title}</h4>
+                            <p className="truncate text-xs text-[#efcba8]">{module.description}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs text-[#efcba8]">{openModules[module.key] ? '-' : '+'}</span>
                       </button>
-                      {openSections[`${module.moduleName}-${section.sectionName}`] ? <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                        {section.permissions.map((permission) => {
-                          const info = describePermission(permission.name);
-                          return (
-                            <label key={permission.id} title={info.hint} className="rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
-                              <div className="flex items-start gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(checked[permission.id])}
-                                  ref={(el) => {
-                                    if (!el) return;
-                                    el.indeterminate = mixedPermissionIds.has(permission.id) && !checked[permission.id];
-                                  }}
-                                  onChange={(e) => setChecked((current) => ({ ...current, [permission.id]: e.target.checked }))}
-                                />
-                                <div>
-                                  <p className="font-medium">{info.label}</p>
-                                  <p className="text-[11px] text-[#efcba8]">{info.hint}</p>
-                                </div>
-                              </div>
-                            </label>
-                          );
-                        })}
-                      </div> : null}
-                    </div>
-                  ))}
-                </div> : null}
-              </section>
-            ))}
-          </div> : null}
+
+                      {openModules[module.key] ? (
+                        <div className="mt-3 space-y-2">
+                          <label className="flex items-center justify-between rounded-lg border border-white/10 bg-[#3b2418]/55 px-3 py-2 text-sm text-[#fff1de]">
+                            <span className="font-semibold">Tout le module</span>
+                            <input
+                              type="checkbox"
+                              checked={moduleState.checked}
+                              ref={(el) => {
+                                if (el) el.indeterminate = moduleState.mixed;
+                              }}
+                              onChange={(event) => toggleSimplePermission(modulePermissionIds, event.target.checked)}
+                            />
+                          </label>
+
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {module.permissions.map((simplePermission) => {
+                              const state = simpleState(simplePermission.permissionIds);
+                              return (
+                                <label key={simplePermission.key} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
+                                  <span className="font-medium">{simplePermission.label}</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={state.checked}
+                                    disabled={simplePermission.permissionIds.length === 0}
+                                    ref={(el) => {
+                                      if (el) el.indeterminate = state.mixed;
+                                    }}
+                                    onChange={(event) => toggleSimplePermission(simplePermission.permissionIds, event.target.checked)}
+                                  />
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+                  );
+                })}
+              </div>
+
+              {advancedPermissions.length > 0 ? (
+                <details className="rounded-xl border border-white/10 bg-[#3b2418]/55 p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[#ffe9ce]">Permissions techniques restantes ({advancedPermissions.length})</summary>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {advancedPermissions.map((permission) => {
+                      const info = describePermission(permission.name);
+                      return (
+                        <label key={permission.id} title={info.hint} className="flex items-start gap-2 rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(checked[permission.id])}
+                            ref={(el) => {
+                              if (el) el.indeterminate = mixedPermissionIds.has(permission.id) && !checked[permission.id];
+                            }}
+                            onChange={(e) => setChecked((current) => ({ ...current, [permission.id]: e.target.checked }))}
+                          />
+                          <span>{info.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          ) : null}
 
           {canManageRoles ? <div className="flex gap-2">
             <input className="saas-input flex-1" placeholder="Nouvelle permission" value={newPermission} onChange={(e) => setNewPermission(e.target.value)} />

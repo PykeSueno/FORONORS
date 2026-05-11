@@ -1632,3 +1632,145 @@ on conflict (role_id, permission_id) do nothing;
 
 alter table public.processor_sessions add column if not exists accepted_count integer not null default 0;
 alter table public.processor_sessions add column if not exists rejected_count integer not null default 0;
+
+-- 15. Permissions simplifiees par roles standards
+-- L'UI manipule des groupes simples, mais on conserve les permissions techniques
+-- existantes pour ne pas casser les controles serveur historiques.
+
+insert into public.roles (name, display_order)
+values
+  ('ADMIN', 1),
+  ('PATRON', 5),
+  ('GESTION', 20),
+  ('MEMBRE', 50),
+  ('PARTENAIRE', 80)
+on conflict (name) do nothing;
+
+insert into public.role_permissions (role_id, permission_id)
+select r.id, p.id
+from public.roles r
+cross join public.permissions p
+where upper(r.name) in ('ADMIN', 'PATRON')
+on conflict (role_id, permission_id) do nothing;
+
+insert into public.role_permissions (role_id, permission_id)
+select r.id, p.id
+from public.roles r
+join public.permissions p on p.name in (
+  'items.access',
+  'items.preview',
+  'items.create',
+  'items.edit',
+  'transactions.access',
+  'transactions.create',
+  'transactions.edit.own',
+  'transactions.edit.any',
+  'sale.objects.access',
+  'sale.objects.create',
+  'sale.objects.receive',
+  'sale.objects.history.view',
+  'money.access',
+  'money.preview',
+  'money.edit',
+  'money.history.view',
+  'money.movements.view',
+  'activity.access',
+  'activity.view',
+  'activity.create',
+  'activity.stats.view',
+  'member_ops.view',
+  'member_ops.activities.view',
+  'member_ops.payroll.view',
+  'member_ops.payroll.pay',
+  'member_ops.payroll.adjust',
+  'member_ops.expenses.view',
+  'member_ops.expenses.create',
+  'member_ops.expenses.reimburse',
+  'tablet.access',
+  'tablet.passage.create',
+  'tablet.daily.manage',
+  'tablet.stats.view',
+  'tablet.logs.view',
+  'cigarette.access',
+  'cigarette.passage.create',
+  'cigarette.history.view',
+  'cigarette.stats.view',
+  'tobacco.processor.view',
+  'tobacco.processor.create',
+  'tobacco.processor.production',
+  'tobacco.processor.sale',
+  'tobacco.processor.stats',
+  'jobs.stone.view',
+  'jobs.stone.sell',
+  'jobs.stone.history.view',
+  'jobs.stone.stats.view',
+  'four.access',
+  'four.preview',
+  'four.transaction.validate',
+  'four.transaction.edit.own',
+  'four.partner.view',
+  'four.partner.sell',
+  'four.partner.history.view',
+  'four.partner.stats.view',
+  'four.history.view',
+  'four.stats.view',
+  'four.messages.view',
+  'robberies.view',
+  'robberies.create',
+  'robberies.stats',
+  'members.access',
+  'members.view',
+  'members.preview',
+  'members.create',
+  'members.edit',
+  'logs.access',
+  'logs.view'
+)
+where upper(r.name) = 'GESTION'
+on conflict (role_id, permission_id) do nothing;
+
+insert into public.role_permissions (role_id, permission_id)
+select r.id, p.id
+from public.roles r
+join public.permissions p on p.name in (
+  'items.access',
+  'items.preview',
+  'activity.access',
+  'activity.view',
+  'activity.create',
+  'tablet.access',
+  'tablet.passage.create',
+  'cigarette.access',
+  'cigarette.passage.create',
+  'tobacco.processor.view',
+  'tobacco.processor.create',
+  'jobs.stone.view',
+  'jobs.stone.sell',
+  'four.access',
+  'four.preview',
+  'four.partner.view',
+  'four.partner.sell'
+)
+where upper(r.name) = 'MEMBRE'
+on conflict (role_id, permission_id) do nothing;
+
+insert into public.role_permissions (role_id, permission_id)
+select r.id, p.id
+from public.roles r
+join public.permissions p on p.name in (
+  'items.access',
+  'items.preview',
+  'activity.access',
+  'activity.view',
+  'tablet.access',
+  'cigarette.access',
+  'tobacco.processor.view',
+  'jobs.stone.view',
+  'four.access',
+  'four.preview',
+  'four.partner.view',
+  'four.partner.history.view',
+  'four.messages.view'
+)
+where upper(r.name) = 'PARTENAIRE'
+on conflict (role_id, permission_id) do nothing;
