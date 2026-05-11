@@ -6,15 +6,14 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
-type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'garage' | 'stone';
+type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'garage';
 const ACTIVITY_LABELS: Record<ActivityType, string> = {
   mailbox: 'Boîte aux lettres',
   burglary: 'Cambriolage',
   container: 'Conteneur',
   processor: 'Processeur',
   cargo: 'Cargo',
-  garage: 'Garage',
-  stone: 'Pierre'
+  garage: 'Garage'
 };
 
 const CARGO_LOOT_NAMES = new Set(['Argent', 'Tableau & Peinture', 'Pochon de Cocaïne', 'Marteau', 'Pied de biche']);
@@ -59,6 +58,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('activities')
     .select('id, activity_type, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_name, quantity_added, before_quantity, after_quantity), activity_members(member_user_id, member_label)')
+    .neq('activity_type', 'stone')
     .order('created_at', { ascending: false })
     .limit(100);
 
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     lines?: Array<{ item_id: number; quantity: number }>;
   };
 
-  if (!body.activity_type || !['mailbox', 'burglary', 'container', 'processor', 'cargo', 'garage', 'stone'].includes(body.activity_type)) {
+  if (!body.activity_type || !['mailbox', 'burglary', 'container', 'processor', 'cargo', 'garage'].includes(body.activity_type)) {
     return NextResponse.json({ message: 'Type activité invalide.' }, { status: 400 });
   }
   if (body.activity_type === 'processor') {
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
   if (lines.length === 0) return NextResponse.json({ message: 'Ajoutez au moins un item récupéré.' }, { status: 400 });
 
   const equipmentUsed = Math.max(0, Number(body.equipment_used ?? 0));
-  if ((body.activity_type === 'mailbox' || body.activity_type === 'stone') && equipmentUsed > 0) {
+  if (body.activity_type === 'mailbox' && equipmentUsed > 0) {
     return NextResponse.json({ message: `${ACTIVITY_LABELS[body.activity_type]} ne consomme aucun équipement.` }, { status: 400 });
   }
 
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
 
   let equipmentRow: EquipmentRow | null = null;
   let shouldConsumeEquipment = false;
-  if (body.activity_type !== 'mailbox' && body.activity_type !== 'stone') {
+  if (body.activity_type !== 'mailbox') {
     const keyword = body.activity_type === 'burglary'
       ? 'kit'
       : body.activity_type === 'container'
@@ -160,10 +160,6 @@ export async function POST(request: Request) {
     if (body.activity_type === 'cargo' && !CARGO_LOOT_NAMES.has(item.name)) {
       return NextResponse.json({ message: `Item non autorisé pour Cargo: ${item.name}.` }, { status: 400 });
     }
-    if (body.activity_type === 'stone' && normalizeEquipmentName(item.name) !== 'pierre') {
-      return NextResponse.json({ message: `Item non autorisé pour Pierre: ${item.name}.` }, { status: 400 });
-    }
-
     const before = Number(item.quantity);
     const after = before + quantity;
     resolvedItems.push({ item_id: item.id, item_name: item.name, quantity, before, after, isMoneyItem: Boolean(item.is_money_item) });

@@ -8,7 +8,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 type ActivityRow = {
   id: number;
-  activity_type: 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'garage' | 'stone' | 'drug_sale';
+  activity_type: 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'garage' | 'drug_sale';
   member_user_id: string | null;
   member_label: string;
   proof_image_url: string | null;
@@ -57,6 +57,7 @@ export default async function ActivityPage() {
     supabase
       .from('activities')
       .select('id, activity_type, member_user_id, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_id, item_name, quantity_added, before_quantity, after_quantity), activity_members(member_user_id, member_label)')
+      .neq('activity_type', 'stone')
       .order('created_at', { ascending: false })
       .limit(50)
   ]);
@@ -88,7 +89,7 @@ export default async function ActivityPage() {
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Activité" subtitle="Boîte / Cambriolage / Conteneur / Cargo / Garage / Pierre / Processeur" />
+      <InternalPageHeader title="Activité" subtitle="Boîte / Cambriolage / Conteneur / Cargo / Garage / Processeur" />
       <ActivityTabs active="activity" canSeeStats={permissions.includes('activity.stats.view')} />
       <ActivityPageClient
         items={items ?? []}

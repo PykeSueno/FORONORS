@@ -1046,10 +1046,6 @@ insert into public.items (name, image_url, buy_price, sell_price, quantity, cate
 select 'Pack Meth', null, 0, 0, 0, 'drugs', 'Drogues', 'seeds', 'Graines'
 where not exists (select 1 from public.items where lower(name) = 'pack meth');
 
-insert into public.items (name, image_url, buy_price, sell_price, quantity, category_key, category_label, type_key, type_label)
-select 'Pierre', null, 0, 0, 0, 'objects', 'Objets', 'production', 'Production'
-where not exists (select 1 from public.items where lower(name) = 'pierre');
-
 create index if not exists idx_drug_transfos_status_sent_at on public.drug_transfos(status, sent_at desc);
 create index if not exists idx_drug_transfos_status_created_at on public.drug_transfos(status, sent_at desc);
 create index if not exists idx_drug_sales_type_created_at on public.drug_sales(drug_type, created_at desc);
