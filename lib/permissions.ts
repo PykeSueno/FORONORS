@@ -7,6 +7,10 @@ type PermissionRelation = { permissions: { name: string } | { name: string }[] |
 const CACHE_TTL_MS = 15_000;
 const permissionCache = new Map<string, { expiresAt: number; permissions: string[] }>();
 
+export function clearPermissionCache() {
+  permissionCache.clear();
+}
+
 const PARTNER_BLOCKED_PREFIXES = ['money.', 'payroll.', 'member_ops.', 'roles.', 'logs.', 'expenses.'];
 const PARTNER_BLOCKED_EXACT = new Set([
   'dashboard.money.movements.preview',

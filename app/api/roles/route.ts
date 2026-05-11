@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
-import { hasUserPermission } from '@/lib/permissions';
+import { clearPermissionCache, hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizePermissionNames, toCanonicalPermission } from '@/lib/permission-normalization';
 
@@ -115,22 +115,24 @@ export async function PATCH(request: Request) {
   const roleIds = Array.from(new Set((body.role_ids ?? []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)));
   if (roleIds.length === 0) return NextResponse.json({ message: 'Sélectionnez au moins un rôle.' }, { status: 400 });
 
+  const requestedPermissionIds = Array.from(new Set((body.permission_ids ?? []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)));
   const supabase = getSupabaseAdmin();
-  const [{ data: roles }, { data: selectedPermissions }, { data: allPermissions }, { data: previousRolePermissions }] = await Promise.all([
+  const [{ data: roles }, { data: allPermissions }, { data: previousRolePermissions }] = await Promise.all([
     supabase.from('roles').select('id, name').in('id', roleIds),
-    supabase.from('permissions').select('id, name').in('id', body.permission_ids ?? []),
     supabase.from('permissions').select('id, name'),
     supabase.from('role_permissions').select('role_id, permissions(name)').in('role_id', roleIds)
   ]);
   if (!roles || roles.length === 0) return NextResponse.json({ message: 'Rôles introuvables.' }, { status: 404 });
 
   const canonicalByName = new Map<string, number>();
+  const permissionNameById = new Map<number, string>();
   for (const permission of (allPermissions ?? []) as PermissionRow[]) {
     const canonical = toCanonicalPermission(permission.name);
     if (!canonicalByName.has(canonical) || permission.name === canonical) canonicalByName.set(canonical, permission.id);
+    permissionNameById.set(permission.id, permission.name);
   }
-  const selectedCanonical = normalizePermissionNames(((selectedPermissions ?? []) as PermissionRow[]).map((permission) => permission.name));
-  const permissionIds = selectedCanonical.map((name) => canonicalByName.get(name)).filter((id): id is number => Number.isInteger(id));
+  const selectedCanonical = normalizePermissionNames(requestedPermissionIds.map((permissionId) => permissionNameById.get(permissionId)).filter((name): name is string => Boolean(name)));
+  const permissionIds = Array.from(new Set(selectedCanonical.map((name) => canonicalByName.get(name)).filter((id): id is number => Number.isInteger(id))));
   const previousByRole = new Map<number, string[]>();
   for (const row of (previousRolePermissions ?? []) as Array<{ role_id: number; permissions: { name: string } | { name: string }[] | null }>) {
     const permissionName = Array.isArray(row.permissions) ? row.permissions[0]?.name : row.permissions?.name;
@@ -142,6 +144,7 @@ export async function PATCH(request: Request) {
   const { error: rpcError } = await supabase.rpc('set_roles_permissions_bulk', { p_role_ids: roleIds, p_permission_ids: permissionIds });
 
   if (rpcError) return NextResponse.json({ message: 'Mise à jour des rôles impossible.' }, { status: 400 });
+  clearPermissionCache();
 
   const roleChanges = (roles ?? []).map((role) => {
     const before = normalizePermissionNames(previousByRole.get(role.id) ?? []);
@@ -152,15 +155,24 @@ export async function PATCH(request: Request) {
 
   await createAuditLog({
     actorUserId: session.userId,
-    action: 'roles.permissions.bulk.edit',
+    action: 'role.permissions.updated',
     entityType: 'role',
     entityId: null,
     summary: `Mise à jour groupée des permissions sur ${roles.length} rôles`,
+    oldValues: {
+      roles: roleChanges.map((change) => ({
+        roleId: change.roleId,
+        roleName: change.roleName,
+        permissions: change.before
+      }))
+    },
     newValues: {
       roleIds: roles.map((role) => role.id),
       roleNames: roles.map((role) => role.name),
       permissionIds,
       permissionNames: selectedCanonical,
+      addedPermissions: Array.from(new Set(roleChanges.flatMap((change) => change.added))),
+      removedPermissions: Array.from(new Set(roleChanges.flatMap((change) => change.removed))),
       roleChanges
     }
   });

@@ -520,10 +520,6 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
     return Array.from(byCanonical.values());
   }, [permissions]);
 
-  const [checked, setChecked] = useState<Record<number, boolean>>(() => {
-    const allPermissionIds = displayPermissions.map((permission) => permission.id);
-    return Object.fromEntries(allPermissionIds.map((permissionId) => [permissionId, selectedRoles.every((role) => role.permission_ids.includes(permissionId))]));
-  });
   const [isSaving, setIsSaving] = useState(false);
   const renameTarget = selectedRoles.length === 1 ? selectedRoles[0] : null;
   const [roleNameDraft, setRoleNameDraft] = useState(renameTarget?.name ?? '');
@@ -549,6 +545,33 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
         .filter((id): id is number => Number.isInteger(id))
     }))
   })), [permissionIdByName]);
+  const simplePermissionByKey = useMemo(() => new Map(simpleModules.flatMap((module) => module.permissions.map((permission) => [permission.key, permission]))), [simpleModules]);
+
+  function simpleKeysFromRoles(roles: Role[]) {
+    return new Set(simpleModules.flatMap((module) => module.permissions.filter((permission) => (
+      permission.permissionIds.length > 0 &&
+      roles.length > 0 &&
+      roles.every((role) => permission.permissionIds.every((permissionId) => role.permission_ids.includes(permissionId)))
+    )).map((permission) => permission.key)));
+  }
+
+  function partialSimpleKeysFromRoles(roles: Role[]) {
+    return new Set(simpleModules.flatMap((module) => module.permissions.filter((permission) => {
+      if (permission.permissionIds.length === 0 || roles.length === 0) return false;
+      const enabledCount = permission.permissionIds.filter((permissionId) => roles.every((role) => role.permission_ids.includes(permissionId))).length;
+      return enabledCount > 0 && enabledCount < permission.permissionIds.length;
+    }).map((permission) => permission.key)));
+  }
+
+  const [checkedSimpleKeys, setCheckedSimpleKeys] = useState<Set<string>>(() => simpleKeysFromRoles(selectedRoles));
+  const [partialSimpleKeys, setPartialSimpleKeys] = useState<Set<string>>(() => partialSimpleKeysFromRoles(selectedRoles));
+  const [exactPermissionIds, setExactPermissionIds] = useState<Set<number> | null>(null);
+
+  useEffect(() => {
+    setCheckedSimpleKeys(simpleKeysFromRoles(selectedRoles));
+    setPartialSimpleKeys(partialSimpleKeysFromRoles(selectedRoles));
+    setExactPermissionIds(null);
+  }, [selectedRoles, simpleModules]);
 
   useEffect(() => {
     if (simpleModules.length === 0) return;
@@ -568,7 +591,13 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
     if (!canManageRoles) return;
     if (isSaving) return;
     setIsSaving(true);
-    const permissionIds = displayPermissions.filter((permission) => checked[permission.id]).map((permission) => permission.id);
+    const permissionIds = exactPermissionIds
+      ? Array.from(exactPermissionIds)
+      : Array.from(new Set(
+        permissionsForSimpleKeys(Array.from(checkedSimpleKeys))
+          .map((permissionName) => permissionIdByName.get(toCanonicalPermission(permissionName)))
+          .filter((id): id is number => Number.isInteger(id))
+      ));
     const response = await fetch('/api/roles', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -592,33 +621,65 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
     await onSaved();
   }
 
-  function simpleState(permissionIds: number[]) {
-    if (permissionIds.length === 0) return { checked: false, mixed: false };
-    const enabled = permissionIds.filter((id) => checked[id]).length;
-    return { checked: enabled === permissionIds.length, mixed: enabled > 0 && enabled < permissionIds.length };
+  function simpleKeyState(simpleKey: string) {
+    const permission = simplePermissionByKey.get(simpleKey);
+    if (!permission || permission.permissionIds.length === 0) return { checked: false, mixed: false };
+    if (checkedSimpleKeys.has(simpleKey)) return { checked: true, mixed: false };
+    return { checked: false, mixed: partialSimpleKeys.has(simpleKey) };
   }
 
-  function toggleSimplePermission(permissionIds: number[], next: boolean) {
-    setChecked((current) => ({
-      ...current,
-      ...Object.fromEntries(permissionIds.map((permissionId) => [permissionId, next]))
-    }));
+  function moduleState(simpleKeys: string[]) {
+    if (simpleKeys.length === 0) return { checked: false, mixed: false };
+    const states = simpleKeys.map(simpleKeyState);
+    const checkedCount = states.filter((state) => state.checked).length;
+    const hasMixed = states.some((state) => state.mixed);
+    return { checked: checkedCount === states.length, mixed: hasMixed || (checkedCount > 0 && checkedCount < states.length) };
+  }
+
+  function toggleSimplePermission(simpleKey: string, next: boolean) {
+    setExactPermissionIds(null);
+    setCheckedSimpleKeys((current) => {
+      const updated = new Set(current);
+      if (next) updated.add(simpleKey);
+      else updated.delete(simpleKey);
+      return updated;
+    });
+    setPartialSimpleKeys((current) => {
+      const updated = new Set(current);
+      updated.delete(simpleKey);
+      return updated;
+    });
+  }
+
+  function toggleModule(simpleKeys: string[], next: boolean) {
+    setExactPermissionIds(null);
+    setCheckedSimpleKeys((current) => {
+      const updated = new Set(current);
+      for (const simpleKey of simpleKeys) {
+        if (next) updated.add(simpleKey);
+        else updated.delete(simpleKey);
+      }
+      return updated;
+    });
+    setPartialSimpleKeys((current) => {
+      const updated = new Set(current);
+      for (const simpleKey of simpleKeys) updated.delete(simpleKey);
+      return updated;
+    });
   }
 
   function applySimpleKeys(simpleKeys: string[]) {
-    const permissionNames = permissionsForSimpleKeys(simpleKeys);
-    const nextIds = new Set(
-      permissionNames
-        .map((permissionName) => permissionIdByName.get(toCanonicalPermission(permissionName)))
-        .filter((id): id is number => Number.isInteger(id))
-    );
-    setChecked(Object.fromEntries(displayPermissions.map((permission) => [permission.id, nextIds.has(permission.id)])));
+    setExactPermissionIds(null);
+    setCheckedSimpleKeys(new Set(simpleKeys));
+    setPartialSimpleKeys(new Set());
   }
 
   function copyFromRole(roleId: number) {
     const source = selectedRoles.find((role) => role.id === roleId);
     if (!source) return;
-    setChecked(Object.fromEntries(displayPermissions.map((permission) => [permission.id, source.permission_ids.includes(permission.id)])));
+    setExactPermissionIds(new Set(source.permission_ids));
+    setCheckedSimpleKeys(simpleKeysFromRoles([source]));
+    setPartialSimpleKeys(partialSimpleKeysFromRoles([source]));
   }
 
   async function duplicateRole() {
@@ -734,8 +795,8 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
 
               <div className="grid gap-3 lg:grid-cols-2">
                 {simpleModules.map((module) => {
-                  const modulePermissionIds = module.permissions.flatMap((permission) => permission.permissionIds);
-                  const moduleState = simpleState(modulePermissionIds);
+                  const moduleSimpleKeys = module.permissions.map((permission) => permission.key);
+                  const state = moduleState(moduleSimpleKeys);
                   return (
                     <section key={module.key} className="rounded-xl border border-white/10 bg-[#4f3220]/45 p-3">
                       <button
@@ -759,17 +820,17 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
                             <span className="font-semibold">Tout le module</span>
                             <input
                               type="checkbox"
-                              checked={moduleState.checked}
+                              checked={state.checked}
                               ref={(el) => {
-                                if (el) el.indeterminate = moduleState.mixed;
+                                if (el) el.indeterminate = state.mixed;
                               }}
-                              onChange={(event) => toggleSimplePermission(modulePermissionIds, event.target.checked)}
+                              onChange={(event) => toggleModule(moduleSimpleKeys, event.target.checked)}
                             />
                           </label>
 
                           <div className="grid gap-2 sm:grid-cols-2">
                             {module.permissions.map((simplePermission) => {
-                              const state = simpleState(simplePermission.permissionIds);
+                              const state = simpleKeyState(simplePermission.key);
                               return (
                                 <label key={simplePermission.key} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
                                   <span className="font-medium">{simplePermission.label}</span>
@@ -780,7 +841,7 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
                                     ref={(el) => {
                                       if (el) el.indeterminate = state.mixed;
                                     }}
-                                    onChange={(event) => toggleSimplePermission(simplePermission.permissionIds, event.target.checked)}
+                                    onChange={(event) => toggleSimplePermission(simplePermission.key, event.target.checked)}
                                   />
                                 </label>
                               );
