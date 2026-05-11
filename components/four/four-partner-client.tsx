@@ -28,6 +28,8 @@ export type FourPartnerSale = {
   partner_name: string;
   kits_sold: number;
   cutters_sold: number;
+  kit_unit_price?: number | null;
+  cutter_unit_price?: number | null;
   amount_received: number;
   payment_method: 'cash' | 'bank';
   status: 'validated' | 'bank_pending' | 'bank_received' | 'canceled';
@@ -64,17 +66,24 @@ type PartnerClientProps = {
 };
 
 const CARD_CLASS =
-  'glass-card h-full rounded-2xl border border-white/10 bg-[#4a2f20]/70 p-4 shadow-sm shadow-black/10 md:p-5';
+  'glass-card h-full rounded-2xl border border-[#f2cc9b]/18 bg-[#533621]/72 p-4 shadow-sm shadow-black/10 md:p-5';
 
 const INPUT_CLASS =
-  'w-full rounded-xl border border-white/10 bg-[#2b1a12]/70 px-3 py-2 text-sm text-[#fff1dd] outline-none transition focus:border-[#f2cc9b]/70 focus:ring-2 focus:ring-[#f2cc9b]/15';
+  'w-full rounded-xl border border-[#f2cc9b]/16 bg-[#2d1b12]/78 px-3 py-2 text-sm text-[#fff1dd] outline-none transition focus:border-[#f2cc9b]/70 focus:ring-2 focus:ring-[#f2cc9b]/15';
 
 const CATEGORY_LABELS: Record<string, string> = {
-  all: 'Toutes categories',
+  all: 'Toutes catégories',
   objects: 'Objets',
-  equipment: 'Equipement',
+  objets: 'Objets',
+  equipment: 'Équipement',
+  Equipment: 'Équipement',
+  weapons: 'Armes',
+  other: 'Autres',
+  misc: 'Autres',
   drugs: 'Produits',
-  misc: 'Divers',
+  produits: 'Produits',
+  Produits: 'Produits',
+  Objets: 'Objets',
 };
 
 function normalizeName(value: string) {
@@ -86,9 +95,9 @@ function normalizeName(value: string) {
 
 function statusLabel(status: FourPartnerSale['status']) {
   if (status === 'bank_pending') return 'Bank en attente';
-  if (status === 'bank_received') return 'Recu bank';
-  if (status === 'canceled') return 'Annule';
-  return 'Valide';
+  if (status === 'bank_received') return 'Reçu bank';
+  if (status === 'canceled') return 'Annulé';
+  return 'Validé';
 }
 
 function statusTone(status: FourPartnerSale['status']) {
@@ -99,7 +108,17 @@ function statusTone(status: FourPartnerSale['status']) {
 }
 
 function categoryLabel(value: string) {
-  return CATEGORY_LABELS[value] ?? value;
+  return CATEGORY_LABELS[value] ?? CATEGORY_LABELS[value.toLowerCase()] ?? 'Autres';
+}
+
+function categoryKey(value?: string | null) {
+  const normalized = String(value || 'objects').trim().toLowerCase();
+  if (['objects', 'objets', 'object'].includes(normalized)) return 'objects';
+  if (['equipment', 'equipement', 'équipement'].includes(normalized)) return 'equipment';
+  if (['weapons', 'armes', 'weapon'].includes(normalized)) return 'weapons';
+  if (['drugs', 'produits', 'product', 'products'].includes(normalized)) return 'drugs';
+  if (['other', 'others', 'misc', 'autres'].includes(normalized)) return 'other';
+  return 'other';
 }
 
 function formatDate(value?: string | null) {
@@ -136,11 +155,12 @@ export function FourPartnerClient({
   const [configDraft, setConfigDraft] = useState(initialConfig);
   const [kitsSold, setKitsSold] = useState(20);
   const [cuttersSold, setCuttersSold] = useState(20);
-  const [amountReceived, setAmountReceived] = useState(0);
+  const [kitPrice, setKitPrice] = useState(0);
+  const [cutterPrice, setCutterPrice] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank'>('cash');
   const [reported, setReported] = useState<ReportedDraft[]>([]);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('all');
+  const [category, setCategory] = useState('objects');
   const [error, setError] = useState<string | null>(null);
   const [detailSale, setDetailSale] = useState<FourPartnerSale | null>(null);
 
@@ -171,10 +191,11 @@ export function FourPartnerClient({
   const cutterAfter = Math.max(0, cutterStock - cuttersSold);
   const saleHasStock = kitStock >= kitsSold && cutterStock >= cuttersSold;
   const stockOk = kitStock >= 20 && cutterStock >= 20;
+  const saleTotal = Math.max(0, kitsSold * kitPrice + cuttersSold * cutterPrice);
 
   const categories = useMemo(() => {
-    const values = new Set(currentItems.map((item) => item.category_key).filter(Boolean) as string[]);
-    return ['all', ...Array.from(values)];
+    const values = new Set(currentItems.map((item) => categoryKey(item.category_key)));
+    return Array.from(new Set(['objects', 'all', ...Array.from(values)]));
   }, [currentItems]);
 
   const availableItems = useMemo(() => {
@@ -182,7 +203,7 @@ export function FourPartnerClient({
     return currentItems
       .filter((item) => !kitItem || item.id !== kitItem.id)
       .filter((item) => !cutterItem || item.id !== cutterItem.id)
-      .filter((item) => category === 'all' || item.category_key === category)
+      .filter((item) => category === 'all' || categoryKey(item.category_key) === category)
       .filter((item) => normalizeName(item.name).includes(normalized))
       .slice(0, 18);
   }, [category, currentItems, cutterItem, kitItem, query]);
@@ -324,7 +345,9 @@ export function FourPartnerClient({
         sale_date: toDateKey(new Date()),
         kits_sold: kitsSold,
         cutters_sold: cuttersSold,
-        amount_received: amountReceived,
+        kit_unit_price: kitPrice,
+        cutter_unit_price: cutterPrice,
+        amount_received: saleTotal,
         payment_method: paymentMethod,
         reported_items: reported
           .filter((line) => line.quantity > 0)
@@ -340,7 +363,6 @@ export function FourPartnerClient({
       return;
     }
     setReported([]);
-    setAmountReceived(0);
     applyPayload(payload);
   }
 
@@ -395,6 +417,8 @@ export function FourPartnerClient({
           stockOk={stockOk}
           nextPartner={nextPartner}
           nextOff={nextOff}
+          kitItem={kitItem}
+          cutterItem={cutterItem}
         />
 
         <PreviewCard preview={preview} />
@@ -412,16 +436,21 @@ export function FourPartnerClient({
             partner={today.label}
             kitsSold={kitsSold}
             cuttersSold={cuttersSold}
-            amountReceived={amountReceived}
+            kitPrice={kitPrice}
+            cutterPrice={cutterPrice}
+            saleTotal={saleTotal}
             paymentMethod={paymentMethod}
             kitStock={kitStock}
             cutterStock={cutterStock}
             kitAfter={kitAfter}
             cutterAfter={cutterAfter}
             saleHasStock={saleHasStock}
+            kitItem={kitItem}
+            cutterItem={cutterItem}
             setKitsSold={setKitsSold}
             setCuttersSold={setCuttersSold}
-            setAmountReceived={setAmountReceived}
+            setKitPrice={setKitPrice}
+            setCutterPrice={setCutterPrice}
             setPaymentMethod={setPaymentMethod}
             submitSale={submitSale}
           />
@@ -480,7 +509,7 @@ function CycleCard({
 
   return (
     <article className={CARD_CLASS}>
-      <CardHeader eyebrow="Cycle 4 jours" title="Cycle partenaire" />
+      <CardHeader icon="🔁" eyebrow="Cycle 4 jours" title="Cycle partenaire" />
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         {steps.map((step, index) => {
@@ -530,7 +559,7 @@ function CycleCard({
 
           <div className="grid items-end gap-2 sm:grid-cols-[1fr_auto]">
             <label className="space-y-1">
-              <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">Date de depart</span>
+              <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">Date de départ</span>
               <input
                 type="date"
                 value={configDraft.cycle_start_date}
@@ -551,7 +580,7 @@ function CycleCard({
         </div>
       ) : (
         <div className="mt-4 rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3 text-sm font-semibold text-[#efcdab]">
-          Depart du cycle : {configDraft.cycle_start_date}
+          Départ du cycle : {configDraft.cycle_start_date}
         </div>
       )}
     </article>
@@ -565,6 +594,8 @@ function TodayCard({
   stockOk,
   nextPartner,
   nextOff,
+  kitItem,
+  cutterItem,
 }: {
   today: ReturnType<typeof getFourPartnerCycleDay>;
   kitStock: number;
@@ -572,6 +603,8 @@ function TodayCard({
   stockOk: boolean;
   nextPartner: ReturnType<typeof getNextPartnerDay>;
   nextOff: ReturnType<typeof getNextOffDay>;
+  kitItem?: Item;
+  cutterItem?: Item;
 }) {
   return (
     <article className={`${CARD_CLASS} relative overflow-hidden`}>
@@ -579,20 +612,20 @@ function TodayCard({
         Aujourd&apos;hui
       </div>
 
-      <CardHeader eyebrow={today.isOff ? 'Repos cycle' : 'Partenaire actif'} title={today.label} />
+      <CardHeader icon={today.isOff ? '🌙' : '🤝'} eyebrow={today.isOff ? 'Repos cycle' : 'Partenaire actif'} title={today.label} />
 
       {today.isOff ? (
         <div className="mt-5 rounded-2xl border border-dashed border-[#f2cc9b]/35 bg-[#2f1d14]/65 p-4">
           <div className="text-sm font-black uppercase text-[#efcdab]">Objectif</div>
-          <p className="mt-2 text-sm font-semibold leading-6 text-[#5f3b22]">
-            Refaire les stocks. Aucune vente partenaire n&apos;est prevue aujourd&apos;hui.
+          <p className="mt-2 text-sm font-semibold leading-6 text-[#ffe8ca]">
+            Refaire les stocks. Aucune vente partenaire n&apos;est prévue aujourd&apos;hui.
           </p>
         </div>
       ) : (
         <>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <StockTile label="Kits a vendre" value="20" footer={`Stock actuel : ${kitStock}`} />
-            <StockTile label="Disqueuses a vendre" value="20" footer={`Stock actuel : ${cutterStock}`} />
+            <StockTile item={kitItem} label="Kits à vendre" value="20" footer={`Stock actuel : ${kitStock}`} />
+            <StockTile item={cutterItem} label="Disqueuses à vendre" value="20" footer={`Stock actuel : ${cutterStock}`} />
           </div>
 
           <div
@@ -620,7 +653,7 @@ function PreviewCard({ preview }: { preview: ReturnType<typeof getFourPartnerPre
 
   return (
     <article className={CARD_CLASS}>
-      <CardHeader eyebrow="Planning" title="7 prochains jours" />
+      <CardHeader icon="🗓️" eyebrow="Planning" title="7 prochains jours" />
       <div className="mt-4 space-y-2">
         {preview.map((day) => (
           <div
@@ -651,38 +684,48 @@ function SaleCard({
   partner,
   kitsSold,
   cuttersSold,
-  amountReceived,
+  kitPrice,
+  cutterPrice,
+  saleTotal,
   paymentMethod,
   kitStock,
   cutterStock,
   kitAfter,
   cutterAfter,
   saleHasStock,
+  kitItem,
+  cutterItem,
   setKitsSold,
   setCuttersSold,
-  setAmountReceived,
+  setKitPrice,
+  setCutterPrice,
   setPaymentMethod,
   submitSale,
 }: {
   partner: string;
   kitsSold: number;
   cuttersSold: number;
-  amountReceived: number;
+  kitPrice: number;
+  cutterPrice: number;
+  saleTotal: number;
   paymentMethod: 'cash' | 'bank';
   kitStock: number;
   cutterStock: number;
   kitAfter: number;
   cutterAfter: number;
   saleHasStock: boolean;
+  kitItem?: Item;
+  cutterItem?: Item;
   setKitsSold: (value: number) => void;
   setCuttersSold: (value: number) => void;
-  setAmountReceived: (value: number) => void;
+  setKitPrice: (value: number) => void;
+  setCutterPrice: (value: number) => void;
   setPaymentMethod: (value: 'cash' | 'bank') => void;
   submitSale: () => void;
 }) {
   return (
     <article className={CARD_CLASS}>
-      <CardHeader eyebrow="Validation" title="Vente partenaire" />
+      <CardHeader icon="🧾" eyebrow="Validation" title="Vente partenaire" />
 
       <div className="mt-4 space-y-3">
         <label className="space-y-1">
@@ -690,20 +733,14 @@ function SaleCard({
           <input value={partner} readOnly className={`${INPUT_CLASS} font-black`} />
         </label>
 
-        <label className="space-y-1">
-          <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">Montant recu</span>
-          <input
-            type="number"
-            min={0}
-            value={amountReceived}
-            onChange={(event) => setAmountReceived(Number(event.target.value))}
-            className={INPUT_CLASS}
-          />
-        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Stepper iconItem={kitItem} label="Kits vendus" value={kitsSold} onChange={setKitsSold} />
+          <Stepper iconItem={cutterItem} label="Disqueuses vendues" value={cuttersSold} onChange={setCuttersSold} />
+        </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Stepper label="Kits vendus" value={kitsSold} onChange={setKitsSold} />
-          <Stepper label="Disqueuses vendues" value={cuttersSold} onChange={setCuttersSold} />
+          <MoneyInput label="Prix kit" value={kitPrice} onChange={setKitPrice} />
+          <MoneyInput label="Prix disqueuse" value={cutterPrice} onChange={setCutterPrice} />
         </div>
 
         <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-1">
@@ -726,11 +763,14 @@ function SaleCard({
         <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
           <div className="text-xs font-black uppercase text-[#efcdab]">Recap vente</div>
           <div className="mt-3 grid gap-2 text-sm font-semibold text-[#ffe8ca] sm:grid-cols-2">
-            <InfoLine label="Kits" value={`${kitStock} -> ${kitAfter}`} />
-            <InfoLine label="Disqueuses" value={`${cutterStock} -> ${cutterAfter}`} />
+            <InfoLine label="Kits vendus" value={`${kitsSold} x ${formatUsd(kitPrice)}`} />
+            <InfoLine label="Disqueuses vendues" value={`${cuttersSold} x ${formatUsd(cutterPrice)}`} />
+            <InfoLine label="Kits avant/après" value={`${kitStock} -> ${kitAfter}`} />
+            <InfoLine label="Disqueuses avant/après" value={`${cutterStock} -> ${cutterAfter}`} />
+            <InfoLine label="Total vente" value={formatUsd(saleTotal)} />
             <InfoLine
-              label={paymentMethod === 'cash' ? 'Argent ajoute' : 'Bank en attente'}
-              value={formatUsd(amountReceived)}
+              label={paymentMethod === 'cash' ? 'Argent ajouté' : 'Bank en attente'}
+              value={formatUsd(saleTotal)}
             />
             <InfoLine label="Stock" value={saleHasStock ? 'OK' : 'Insuffisant'} />
           </div>
@@ -774,7 +814,7 @@ function ReportedItemsCard({
 }) {
   return (
     <article className={CARD_CLASS}>
-      <CardHeader eyebrow="Retours stock" title="Objets rapportes" />
+      <CardHeader icon="🎒" eyebrow="Retours stock" title="Objets rapportés" />
 
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]">
         <input
@@ -796,7 +836,7 @@ function ReportedItemsCard({
         <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-xs font-black uppercase text-[#efcdab]">Liste items</div>
-            <div className="text-xs font-bold text-[#efcdab]">{availableItems.length} resultats</div>
+            <div className="text-xs font-bold text-[#efcdab]">{availableItems.length} résultats</div>
           </div>
           <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
             {availableItems.map((item) => (
@@ -820,14 +860,14 @@ function ReportedItemsCard({
             ))}
             {availableItems.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#f2cc9b]/35 p-4 text-center text-sm font-semibold text-[#efcdab]">
-                Aucun item trouve.
+                Aucun item trouvé.
               </div>
             ) : null}
           </div>
         </div>
 
         <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
-          <div className="mb-3 text-xs font-black uppercase text-[#efcdab]">Objets selectionnes</div>
+          <div className="mb-3 text-xs font-black uppercase text-[#efcdab]">Objets sélectionnés</div>
           <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
             {selectedReported.map((line) => (
               <div
@@ -851,7 +891,7 @@ function ReportedItemsCard({
                 </div>
                 <div className="mt-2">
                   <Stepper
-                    label="Quantite"
+                    label="Quantité"
                     value={line.quantity}
                     min={1}
                     onChange={(value) => changeReportedQuantity(line.item_id, value)}
@@ -861,7 +901,7 @@ function ReportedItemsCard({
             ))}
             {selectedReported.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#f2cc9b]/35 p-4 text-center text-sm font-semibold text-[#efcdab]">
-                Aucun objet selectionne.
+                Aucun objet sélectionné.
               </div>
             ) : null}
           </div>
@@ -884,7 +924,7 @@ function HistoryCard({
 }) {
   return (
     <article className={CARD_CLASS}>
-      <CardHeader eyebrow="Suivi" title="Historique partenaire" />
+      <CardHeader icon="📚" eyebrow="Suivi" title="Historique partenaire" />
 
       <div className="mt-4 space-y-3">
         {sales.slice(0, 10).map((sale) => (
@@ -907,16 +947,16 @@ function HistoryCard({
             </div>
 
             <div className="mt-3 rounded-2xl border border-white/10 bg-[#2b1a12]/70 px-3 py-2 text-xs font-semibold text-[#efcdab]">
-              Objets rapportes :{' '}
+              Objets rapportés :{' '}
               {sale.reported_items?.length
-                ? sale.reported_items.map((item) => `${item.item_name} x${item.quantity}`).join(' Â· ')
+                ? sale.reported_items.map((item) => `${item.item_name} x${item.quantity}`).join(' · ')
                 : 'Aucun'}
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
-              <SmallButton onClick={() => onDetail(sale)}>Voir detail</SmallButton>
+              <SmallButton onClick={() => onDetail(sale)}>Voir détail</SmallButton>
               {sale.status === 'bank_pending' ? (
-                <SmallButton onClick={() => onBankReceived(sale)}>Marquer bank recu</SmallButton>
+                <SmallButton onClick={() => onBankReceived(sale)}>Marquer bank reçu</SmallButton>
               ) : null}
               {sale.status !== 'canceled' ? (
                 <SmallButton danger onClick={() => onCancel(sale)}>
@@ -955,15 +995,15 @@ function StatsCard({
 }) {
   return (
     <article className={CARD_CLASS}>
-      <CardHeader eyebrow="Performance" title="Stats partenaire" />
+      <CardHeader icon="📊" eyebrow="Performance" title="Stats partenaire" />
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <MiniStat label="Cash total" value={formatUsd(stats.cash)} />
         <MiniStat label="Bank total" value={formatUsd(stats.bank)} />
         <MiniStat label="Kits vendus" value={String(stats.kits)} />
         <MiniStat label="Disqueuses" value={String(stats.cutters)} />
-        <MiniStat label="Objets rapportes" value={String(stats.objects)} />
-        <MiniStat label="Cycle respecte" value={`${stats.cycleRespect}%`} />
+        <MiniStat label="Objets rapportés" value={String(stats.objects)} />
+        <MiniStat label="Cycle respecté" value={`${stats.cycleRespect}%`} />
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -979,11 +1019,18 @@ function StatsCard({
   );
 }
 
-function CardHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
+function CardHeader({ eyebrow, title, icon }: { eyebrow: string; title: string; icon?: string }) {
   return (
-    <div>
-      <div className="text-xs font-black uppercase tracking-[0.16em] text-[#f6d7a7]">{eyebrow}</div>
-      <h2 className="mt-1 text-xl font-black text-[#fff1dd]">{title}</h2>
+    <div className="flex items-start gap-3">
+      {icon ? (
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-[#f2cc9b]/18 bg-[#2d1b12]/70 text-lg">
+          {icon}
+        </span>
+      ) : null}
+      <div className="min-w-0">
+        <div className="text-xs font-black uppercase tracking-[0.16em] text-[#f6d7a7]">{eyebrow}</div>
+        <h2 className="mt-1 truncate text-xl font-black text-[#fff1dd]">{title}</h2>
+      </div>
     </div>
   );
 }
@@ -1005,12 +1052,27 @@ function LabeledInput({
   );
 }
 
-function StockTile({ label, value, footer }: { label: string; value: string; footer: string }) {
+function StockTile({
+  label,
+  value,
+  footer,
+  item,
+}: {
+  label: string;
+  value: string;
+  footer: string;
+  item?: Item;
+}) {
   return (
     <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-4">
-      <div className="text-xs font-black uppercase text-[#efcdab]">{label}</div>
-      <div className="mt-2 text-3xl font-black text-[#fff1dd]">{value}</div>
-      <div className="mt-1 text-xs font-semibold text-[#efcdab]">{footer}</div>
+      <div className="flex items-start gap-3">
+        <ItemImage item={item} />
+        <div className="min-w-0">
+          <div className="text-xs font-black uppercase text-[#efcdab]">{label}</div>
+          <div className="mt-2 text-3xl font-black text-[#fff1dd]">{value}</div>
+          <div className="mt-1 text-xs font-semibold text-[#efcdab]">{footer}</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1029,15 +1091,20 @@ function Stepper({
   value,
   onChange,
   min = 0,
+  iconItem,
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
   min?: number;
+  iconItem?: Item;
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
-      <div className="text-xs font-black uppercase tracking-wide text-[#efcdab]">{label}</div>
+      <div className="flex items-center gap-2">
+        {iconItem ? <ItemImage item={iconItem} /> : null}
+        <div className="text-xs font-black uppercase tracking-wide text-[#efcdab]">{label}</div>
+      </div>
       <div className="mt-2 grid grid-cols-[36px_1fr_36px] items-center gap-2">
         <button
           type="button"
@@ -1062,6 +1129,29 @@ function Stepper({
         </button>
       </div>
     </div>
+  );
+}
+
+function MoneyInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="space-y-1">
+      <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">{label}</span>
+      <input
+        type="number"
+        min={0}
+        value={value}
+        onChange={(event) => onChange(Math.max(0, Number(event.target.value)))}
+        className={INPUT_CLASS}
+      />
+    </label>
   );
 }
 
@@ -1161,6 +1251,8 @@ function SaleDetail({ sale, onClose }: { sale: FourPartnerSale; onClose: () => v
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           <InfoLine label="Kits vendus" value={String(sale.kits_sold)} />
           <InfoLine label="Disqueuses vendues" value={String(sale.cutters_sold)} />
+          <InfoLine label="Prix kit" value={formatUsd(Number(sale.kit_unit_price ?? 0))} />
+          <InfoLine label="Prix disqueuse" value={formatUsd(Number(sale.cutter_unit_price ?? 0))} />
           <InfoLine label="Paiement" value={sale.payment_method === 'cash' ? 'Cash' : 'Bank'} />
           <InfoLine label="Montant" value={formatUsd(sale.amount_received)} />
           <InfoLine label="Statut" value={statusLabel(sale.status)} />
@@ -1168,7 +1260,7 @@ function SaleDetail({ sale, onClose }: { sale: FourPartnerSale; onClose: () => v
         </div>
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
-          <div className="text-xs font-black uppercase text-[#efcdab]">Objets rapportes</div>
+          <div className="text-xs font-black uppercase text-[#efcdab]">Objets rapportés</div>
           <div className="mt-2 space-y-2">
             {sale.reported_items?.map((item) => (
               <div key={`${item.item_id}-${item.item_name}`} className="flex items-center gap-3 text-sm font-semibold text-[#ffe8ca]">

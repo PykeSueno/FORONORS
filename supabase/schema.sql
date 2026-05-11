@@ -916,6 +916,8 @@ create table if not exists public.four_partner_sales (
   partner_name text not null,
   kits_sold integer not null default 20 check (kits_sold >= 0),
   cutters_sold integer not null default 20 check (cutters_sold >= 0),
+  kit_unit_price numeric(12,2) not null default 0,
+  cutter_unit_price numeric(12,2) not null default 0,
   amount_received numeric(12,2) not null default 0,
   payment_method text not null default 'cash' check (payment_method in ('cash', 'bank')),
   status text not null default 'validated' check (status in ('validated', 'bank_pending', 'bank_received', 'canceled')),

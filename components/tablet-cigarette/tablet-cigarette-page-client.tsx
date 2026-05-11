@@ -200,7 +200,7 @@ export function TabletCigarettePageClient(props: {
   const historyRangeLabel = useMemo(() => {
     const start = new Date(historyRangeMode === 'custom' ? `${customStartDate}T00:00:00.000Z` : initialHistoryRange.startIso);
     const end = new Date(historyRangeMode === 'custom' ? `${customEndDate}T00:00:00.000Z` : initialHistoryRange.endIso);
-    if (historyRangeMode === 'previous') return 'Semaine passÃ©e';
+    if (historyRangeMode === 'previous') return 'Semaine passée';
     if (historyRangeMode === 'custom') return `${start.toLocaleDateString('fr-FR')} - ${end.toLocaleDateString('fr-FR')}`;
     return 'Semaine actuelle';
   }, [customEndDate, customStartDate, historyRangeMode, initialHistoryRange.endIso, initialHistoryRange.startIso]);
@@ -392,16 +392,16 @@ export function TabletCigarettePageClient(props: {
         id: `t-${entry.id}`,
         title: entry.member_label,
         type: 'Tablette',
-        amount: `DÃ©pensÃ© ${formatUsd(spent)}`,
-        status: `Kits +${kitsAdded} Â· Disqueuses +${cuttersAdded}`,
+        amount: `Dépensé ${formatUsd(spent)}`,
+        status: `Kits +${kitsAdded} · Disqueuses +${cuttersAdded}`,
         meta: new Date(entry.created_at).toLocaleString('fr-FR'),
         items: [
-          ...(kitsAdded > 0 ? [{ label: 'Kits', imageUrl: kitImageUrl, icon: 'ðŸ§°' }] : []),
-          ...(cuttersAdded > 0 ? [{ label: 'Disqueuses', imageUrl: cutterImageUrl, icon: 'ðŸªš' }] : [])
+          ...(kitsAdded > 0 ? [{ label: 'Kits', imageUrl: kitImageUrl, icon: '🧰' }] : []),
+          ...(cuttersAdded > 0 ? [{ label: 'Disqueuses', imageUrl: cutterImageUrl, icon: '🪚' }] : [])
         ],
         lines: [
-          `DÃ©pÃ´t ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`,
-          `Kits ${entry.before_kits} -> ${entry.after_kits} Â· Disqueuses ${entry.before_cutters} -> ${entry.after_cutters}`
+          `Dépôt ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`,
+          `Kits ${entry.before_kits} -> ${entry.after_kits} · Disqueuses ${entry.before_cutters} -> ${entry.after_cutters}`
         ]
       };
     });
@@ -411,12 +411,12 @@ export function TabletCigarettePageClient(props: {
       title: entry.member_label,
       type: 'Cigarette',
       amount: formatUsd(entry.revenue_amount),
-      status: entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reÃ§u' : 'Cash',
+      status: entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reçu' : 'Cash',
       meta: new Date(entry.created_at).toLocaleString('fr-FR'),
-      items: [{ label: 'Paquets cigarette', imageUrl: cigaretteImageUrl, icon: 'ðŸš¬' }],
+      items: [{ label: 'Paquets cigarette', imageUrl: cigaretteImageUrl, icon: '🚬' }],
       lines: [
-        `Paquets ${entry.before_packs} -> ${entry.after_packs} Â· ${formatUsd(entry.revenue_amount)}`,
-        `${entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reÃ§u' : 'Cash'} Â· Groupe ${formatUsd(entry.before_group_cash)} -> ${formatUsd(entry.after_group_cash)}`
+        `Paquets ${entry.before_packs} -> ${entry.after_packs} · ${formatUsd(entry.revenue_amount)}`,
+        `${entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reçu' : 'Cash'} · Groupe ${formatUsd(entry.before_group_cash)} -> ${formatUsd(entry.after_group_cash)}`
       ]
     }));
 
@@ -437,12 +437,12 @@ export function TabletCigarettePageClient(props: {
         title: isSale ? 'Vente' : 'Production',
         type: 'Processeur',
         amount: isSale ? formatUsd(Number(entry.real_received ?? 0)) : `${qty} produits`,
-        status: isSale ? 'Vente validÃ©e' : 'Production validÃ©e',
+        status: isSale ? 'Vente validée' : 'Production validée',
         meta: new Date(String(entry.created_at)).toLocaleString('fr-FR'),
-        items: [{ label: 'Processeur', imageUrl: processorImageUrl, icon: 'âš™ï¸' }],
+        items: [{ label: 'Processeur', imageUrl: processorImageUrl, icon: '⚙️' }],
         lines: [
-          `${participants || '-'} Â· QtÃ© ${qty}`,
-          `${isSale ? 'ReÃ§u' : 'CoÃ»t'} ${formatUsd(isSale ? Number(entry.real_received ?? 0) : Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))} Â· Stock ${stockBefore} -> ${stockAfter}`
+          `${participants || '-'} · Qté ${qty}`,
+          `${isSale ? 'Reçu' : 'Coût'} ${formatUsd(isSale ? Number(entry.real_received ?? 0) : Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))} · Stock ${stockBefore} -> ${stockAfter}`
         ]
       };
     });
@@ -454,10 +454,10 @@ export function TabletCigarettePageClient(props: {
       amount: formatUsd(entry.total_amount),
       status: `${entry.quantity_sold} Saphir Brut vendus`,
       meta: new Date(entry.created_at).toLocaleString('fr-FR'),
-      items: [{ label: 'Saphir Brut', imageUrl: stoneImageUrl, icon: 'ðŸ’Ž' }],
+      items: [{ label: 'Saphir Brut', imageUrl: stoneImageUrl, icon: '💎' }],
       lines: [
-        `Saphir Brut ${entry.stock_before} -> ${entry.stock_after} Â· vendus ${entry.quantity_sold}`,
-        `Cash ${formatUsd(entry.cash_before)} -> ${formatUsd(entry.cash_after)} Â· ${formatUsd(entry.unit_price)} / unitÃ©`
+        `Saphir Brut ${entry.stock_before} -> ${entry.stock_after} · vendus ${entry.quantity_sold}`,
+        `Cash ${formatUsd(entry.cash_before)} -> ${formatUsd(entry.cash_after)} · ${formatUsd(entry.unit_price)} / unité`
       ]
     }));
 
@@ -477,10 +477,10 @@ export function TabletCigarettePageClient(props: {
         createdAt: entry.created_at,
         title: entry.member_label,
         amount: formatUsd(spent),
-        status: 'ValidÃ©',
+        status: 'Validé',
         lines: [
-          `Kits +${kitsAdded} Â· Disqueuses +${cuttersAdded}`,
-          `DÃ©pÃ´t ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`
+          `Kits +${kitsAdded} · Disqueuses +${cuttersAdded}`,
+          `Dépôt ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`
         ],
         tabletPassages: 1,
         tabletKits: kitsAdded,
@@ -491,7 +491,7 @@ export function TabletCigarettePageClient(props: {
 
     const cigaretteEntries = cigaretteStatsPassagesState.map((entry) => {
       const revenue = Number(entry.revenue_amount ?? 0);
-      const statusLabel = entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reÃ§u' : 'Cash reÃ§u';
+      const statusLabel = entry.status === 'pending_bank' ? 'Bank en attente' : entry.status === 'received_bank' ? 'Bank reçu' : 'Cash reçu';
       const mode = entry.status === 'pending_bank' || entry.status === 'received_bank' ? 'Bank' : 'Cash';
       return {
         id: `cigarette-${entry.id}`,
@@ -503,8 +503,8 @@ export function TabletCigarettePageClient(props: {
         amount: formatUsd(revenue),
         status: statusLabel,
         lines: [
-          `Paquets ${entry.before_packs} -> ${entry.after_packs} Â· Vendus ${entry.quantity_sold}`,
-          `Mode ${mode} Â· Groupe ${formatUsd(entry.before_group_cash)} -> ${formatUsd(entry.after_group_cash)}`
+          `Paquets ${entry.before_packs} -> ${entry.after_packs} · Vendus ${entry.quantity_sold}`,
+          `Mode ${mode} · Groupe ${formatUsd(entry.before_group_cash)} -> ${formatUsd(entry.after_group_cash)}`
         ],
         cigarettePassages: 1,
         cigarettePacks: Number(entry.quantity_sold ?? 0),
@@ -534,10 +534,10 @@ export function TabletCigarettePageClient(props: {
         createdAt: String(entry.created_at),
         title: participants || (isSale ? 'Vente processeur' : 'Production processeur'),
         amount: isSale ? formatUsd(Number(entry.real_received ?? 0)) : `${qty} produits`,
-        status: isSale ? 'Vente validÃ©e' : 'Production validÃ©e',
+        status: isSale ? 'Vente validée' : 'Production validée',
         lines: [
-          `${isSale ? 'Vendus' : 'Produits'} ${qty} Â· Stock ${stockBefore} -> ${stockAfter}`,
-          `${isSale ? 'Argent rÃ©el reÃ§u' : 'CoÃ»t'} ${formatUsd(isSale ? Number(entry.real_received ?? 0) : Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))}`
+          `${isSale ? 'Vendus' : 'Produits'} ${qty} · Stock ${stockBefore} -> ${stockAfter}`,
+          `${isSale ? 'Argent réel reçu' : 'Coût'} ${formatUsd(isSale ? Number(entry.real_received ?? 0) : Number(entry.material_cost ?? 0) + Number(entry.boat_fee ?? 0))}`
         ],
         processorProduced: isSale ? 0 : qty,
         processorSold: isSale ? qty : 0,
@@ -553,9 +553,9 @@ export function TabletCigarettePageClient(props: {
       createdAt: entry.created_at,
       title: entry.member_label,
       amount: formatUsd(entry.total_amount),
-      status: 'Cash reÃ§u',
+      status: 'Cash reçu',
       lines: [
-        `Saphir Brut ${entry.stock_before} -> ${entry.stock_after} Â· vendus ${entry.quantity_sold}`,
+        `Saphir Brut ${entry.stock_before} -> ${entry.stock_after} · vendus ${entry.quantity_sold}`,
         `Cash ${formatUsd(entry.cash_before)} -> ${formatUsd(entry.cash_after)}`
       ],
       stoneSold: Number(entry.quantity_sold ?? 0),
@@ -606,7 +606,7 @@ export function TabletCigarettePageClient(props: {
       const weekKey = weekStart.toISOString().slice(0, 10);
       const week = weeks.get(weekKey) ?? {
         key: weekKey,
-        label: historyRangeMode === 'current' ? 'Semaine actuelle' : historyRangeMode === 'previous' ? 'Semaine passÃ©e' : `Semaine du ${weekStart.toLocaleDateString('fr-FR')}`,
+        label: historyRangeMode === 'current' ? 'Semaine actuelle' : historyRangeMode === 'previous' ? 'Semaine passée' : `Semaine du ${weekStart.toLocaleDateString('fr-FR')}`,
         days: JOB_DAY_LABELS.map((label, index) => {
           const dayDate = new Date(weekStart);
           dayDate.setUTCDate(weekStart.getUTCDate() + index);
@@ -729,10 +729,10 @@ export function TabletCigarettePageClient(props: {
   async function saveTabletDeposit() {
     setError('');
     const response = await fetch('/api/tablet/day', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deposited_amount: Number(deposit) }) });
-    if (!response.ok) return setError('DÃ©pÃ´t tablette impossible.');
+    if (!response.ok) return setError('Dépôt tablette impossible.');
     const payload = await response.json() as { day?: TabletDay };
     if (payload.day) setTabletDayState(payload.day);
-    setStatus('DÃ©pÃ´t tablette mis Ã  jour.');
+    setStatus('Dépôt tablette mis à jour.');
   }
 
   async function createTabletPassage() {
@@ -751,7 +751,7 @@ export function TabletCigarettePageClient(props: {
     if (typeof payload.groupCash === 'number') setGroupCashState(payload.groupCash);
     if (typeof payload.kitsInStock === 'number') setKitsState(payload.kitsInStock);
     if (typeof payload.cuttersInStock === 'number') setCuttersState(payload.cuttersInStock);
-    setStatus('Passage tablette validÃ©.');
+    setStatus('Passage tablette validé.');
   }
 
   async function createCigarettePassage() {
@@ -769,7 +769,7 @@ export function TabletCigarettePageClient(props: {
     if (payload.day) setCigaretteDayState(payload.day);
     if (typeof payload.groupCash === 'number') setGroupCashState(payload.groupCash);
     if (typeof payload.packsInStock === 'number') setPacksState(payload.packsInStock);
-    setStatus(cigarettePaymentMode === 'bank' ? 'Passage bank en attente de virement.' : 'Passage cash validÃ©.');
+    setStatus(cigarettePaymentMode === 'bank' ? 'Passage bank en attente de virement.' : 'Passage cash validé.');
   }
 
   async function createProcessorProduction() {
@@ -797,7 +797,7 @@ export function TabletCigarettePageClient(props: {
     }
     if (typeof payload.cashAfter === 'number') setGroupCashState(payload.cashAfter);
     if (typeof payload.processorStock === 'number') setProcessorStockState(payload.processorStock);
-    setStatus('Production processeur validÃ©e.');
+    setStatus('Production processeur validée.');
   }
 
   async function createProcessorSale() {
@@ -823,7 +823,7 @@ export function TabletCigarettePageClient(props: {
     }
     if (typeof payload.cashAfter === 'number') setGroupCashState(payload.cashAfter);
     if (typeof payload.processorStock === 'number') setProcessorStockState(payload.processorStock);
-    setStatus('Vente processeur validÃ©e.');
+    setStatus('Vente processeur validée.');
   }
 
   async function createStoneSale() {
@@ -849,53 +849,53 @@ export function TabletCigarettePageClient(props: {
     }
     if (typeof payload.groupCash === 'number') setGroupCashState(payload.groupCash);
     if (typeof payload.stoneStock === 'number') setStoneStockState(payload.stoneStock);
-    setStatus('Vente Pierre validÃ©e.');
+    setStatus('Vente Pierre validée.');
   }
 
   return (
     <div className="space-y-4">
       <section className="glass-card p-3">
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={`filter-pill ${tab === 'home' ? 'filter-pill-active' : ''}`} onClick={() => setTab('home')}>ðŸ  Accueil</button>
-          {canTabletAccess ? <button type="button" className={`filter-pill ${tab === 'tablet' ? 'filter-pill-active' : ''}`} onClick={() => setTab('tablet')}>ðŸ“± Tablette</button> : null}
-          {canCigaretteAccess ? <button type="button" className={`filter-pill ${tab === 'cigarette' ? 'filter-pill-active' : ''}`} onClick={() => setTab('cigarette')}>ðŸš¬ Cigarette</button> : null}
-          {canProcessorView ? <button type="button" className={`filter-pill ${tab === 'processor' ? 'filter-pill-active' : ''}`} onClick={() => setTab('processor')}>âš™ï¸ Processeur</button> : null}
-          {canStoneView ? <button type="button" className={`filter-pill ${tab === 'stone' ? 'filter-pill-active' : ''}`} onClick={() => setTab('stone')}>&#128142; Pierre</button> : null}
-          {canHistory ? <button type="button" className={`filter-pill ${tab === 'history' ? 'filter-pill-active' : ''}`} onClick={() => setTab('history')}>ðŸ“š Historique</button> : null}
-          {canStats ? <button type="button" className={`filter-pill ${tab === 'stats' ? 'filter-pill-active' : ''}`} onClick={() => setTab('stats')}>ðŸ“Š Stats</button> : null}
+          <button type="button" className={`filter-pill ${tab === 'home' ? 'filter-pill-active' : ''}`} onClick={() => setTab('home')}>🏠 Accueil</button>
+          {canTabletAccess ? <button type="button" className={`filter-pill ${tab === 'tablet' ? 'filter-pill-active' : ''}`} onClick={() => setTab('tablet')}>📱 Tablette</button> : null}
+          {canCigaretteAccess ? <button type="button" className={`filter-pill ${tab === 'cigarette' ? 'filter-pill-active' : ''}`} onClick={() => setTab('cigarette')}>🚬 Cigarette</button> : null}
+          {canProcessorView ? <button type="button" className={`filter-pill ${tab === 'processor' ? 'filter-pill-active' : ''}`} onClick={() => setTab('processor')}>⚙️ Processeur</button> : null}
+          {canStoneView ? <button type="button" className={`filter-pill ${tab === 'stone' ? 'filter-pill-active' : ''}`} onClick={() => setTab('stone')}>💎 Pierre</button> : null}
+          {canHistory ? <button type="button" className={`filter-pill ${tab === 'history' ? 'filter-pill-active' : ''}`} onClick={() => setTab('history')}>📚 Historique</button> : null}
+          {canStats ? <button type="button" className={`filter-pill ${tab === 'stats' ? 'filter-pill-active' : ''}`} onClick={() => setTab('stats')}>📊 Stats</button> : null}
         </div>
       </section>
 
       {tab === 'home' ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <article className="glass-card p-4 space-y-2">
-            <h3 className="font-semibold text-[#ffe8ca]">ðŸ“± Tablette</h3>
+            <h3 className="font-semibold text-[#ffe8ca]">📱 Tablette</h3>
             <MiniStat label="Passages jour" value={String(tabletDayState?.passages_count ?? 0)} />
             <MiniStat label="Stock kits" value={String(kitsState)} />
             <MiniStat label="Stock disqueuses" value={String(cuttersState)} />
-            <MiniStat label="Argent dÃ©pensÃ©" value={formatUsd(tabletSpent)} />
+            <MiniStat label="Argent dépensé" value={formatUsd(tabletSpent)} />
             {canTabletAccess ? <button className="saas-primary-btn w-full" onClick={() => setTab('tablet')}>Ouvrir Tablette</button> : null}
           </article>
           <article className="glass-card p-4 space-y-2">
-            <h3 className="font-semibold text-[#ffe8ca]">ðŸš¬ Cigarette</h3>
+            <h3 className="font-semibold text-[#ffe8ca]">🚬 Cigarette</h3>
             <MiniStat label="Passages jour" value={String(cigaretteDayState?.passages_count ?? 0)} />
             <MiniStat label="Stock paquets" value={String(packsState)} />
-            <MiniStat label="Argent gÃ©nÃ©rÃ©" value={formatUsd(Number(cigaretteDayState?.total_revenue ?? 0))} />
+            <MiniStat label="Argent généré" value={formatUsd(Number(cigaretteDayState?.total_revenue ?? 0))} />
             {canCigaretteAccess ? <button className="saas-primary-btn w-full" onClick={() => setTab('cigarette')}>Ouvrir Cigarette</button> : null}
           </article>
           <article className="glass-card p-4 space-y-2">
-            <h3 className="font-semibold text-[#ffe8ca]">âš™ï¸ Processeur</h3>
+            <h3 className="font-semibold text-[#ffe8ca]">⚙️ Processeur</h3>
             <MiniStat label="Stock actuel" value={String(processorStockState)} />
             <MiniStat label="Produits sem." value={String(processorStatsQuick.produced)} />
-            <MiniStat label="Argent gÃ©nÃ©rÃ©" value={formatUsd(processorStatsQuick.revenue)} />
+            <MiniStat label="Argent généré" value={formatUsd(processorStatsQuick.revenue)} />
             {canProcessorView ? <button className="saas-primary-btn w-full" onClick={() => setTab('processor')}>Ouvrir Processeur</button> : null}
           </article>
           {canStoneView ? (
             <article className="glass-card p-4 space-y-2">
-              <h3 className="font-semibold text-[#ffe8ca]">Pierre</h3>
-              <MiniStat label="Stock Saphir Brut" value={String(stoneStockState)} />
-              <MiniStat label="Vendu aujourd'hui" value={String(stoneSalesState.reduce((sum, row) => sum + Number(row.quantity_sold ?? 0), 0))} />
-              <MiniStat label="Argent genere" value={formatUsd(stoneSalesState.reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0))} />
+              <h3 className="font-semibold text-[#ffe8ca]">💎 Pierre</h3>
+              <MiniStat label="💎 Stock Saphir Brut" value={String(stoneStockState)} />
+              <MiniStat label="🧾 Vendu aujourd'hui" value={String(stoneSalesState.reduce((sum, row) => sum + Number(row.quantity_sold ?? 0), 0))} />
+              <MiniStat label="💵 Argent généré" value={formatUsd(stoneSalesState.reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0))} />
               <button className="saas-primary-btn w-full" onClick={() => setTab('stone')}>Ouvrir Pierre</button>
             </article>
           ) : null}
@@ -905,16 +905,16 @@ export function TabletCigarettePageClient(props: {
       {tab === 'tablet' && canTabletAccess ? (
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
           <article className="glass-card p-5 xl:col-span-2">
-            <h3 className="text-base font-semibold text-[#fff1dd]">Tablette â€” {tabletBusinessDay}</h3>
+            <h3 className="text-base font-semibold text-[#fff1dd]">Tablette — {tabletBusinessDay}</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              <Stat label="DÃ©pÃ´t matin" value={formatUsd(tabletDeposit)} icon="ðŸ’µ" />
-              <Stat label="Coffre dÃ©part" value={formatUsd(tabletInitialCash)} icon="ðŸ¦" />
-              <Stat label="Argent dÃ©pensÃ©" value={formatUsd(tabletSpent)} icon="ðŸ’¸" />
-              <Stat label="Argent restant attendu" value={formatUsd(tabletChest)} icon="ðŸ’°" />
-              <Stat label="Argent coffre actuel" value={formatUsd(groupCashState)} icon="ðŸ¦" />
-              <Stat label="Kits avant / aprÃ¨s" value={`${tabletInitialKits} -> ${kitsState}`} icon="ðŸ§°" />
-              <Stat label="Disqueuses avant / aprÃ¨s" value={`${tabletInitialCutters} -> ${cuttersState}`} icon="ðŸªš" />
-              <Stat label="Passages validÃ©s" value={String(tabletDayState?.passages_count ?? 0)} icon="ðŸ§¾" />
+              <Stat label="Dépôt matin" value={formatUsd(tabletDeposit)} icon="💵" />
+              <Stat label="Coffre départ" value={formatUsd(tabletInitialCash)} icon="🏦" />
+              <Stat label="Argent dépensé" value={formatUsd(tabletSpent)} icon="💸" />
+              <Stat label="Argent restant attendu" value={formatUsd(tabletChest)} icon="💰" />
+              <Stat label="Argent coffre actuel" value={formatUsd(groupCashState)} icon="🏦" />
+              <Stat label="Kits avant / après" value={`${tabletInitialKits} -> ${kitsState}`} icon="🧰" />
+              <Stat label="Disqueuses avant / après" value={`${tabletInitialCutters} -> ${cuttersState}`} icon="🪚" />
+              <Stat label="Passages validés" value={String(tabletDayState?.passages_count ?? 0)} icon="🧾" />
             </div>
             <div className="mt-4 hidden rounded-xl border border-white/10 bg-[#2f1d14]/50 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -929,7 +929,7 @@ export function TabletCigarettePageClient(props: {
                       <span>{new Date(entry.created_at).toLocaleString('fr-FR')}</span>
                     </div>
                     <p>{`Argent ${formatUsd(entry.before_cash)} -> ${formatUsd(entry.after_cash)}`}</p>
-                    <p>{`Kits ${entry.before_kits} -> ${entry.after_kits} Â· Disqueuses ${entry.before_cutters} -> ${entry.after_cutters}`}</p>
+                    <p>{`Kits ${entry.before_kits} -> ${entry.after_kits} · Disqueuses ${entry.before_cutters} -> ${entry.after_cutters}`}</p>
                   </article>
                 ))}
                 {tabletPassagesState.length === 0 ? <p className="text-xs text-[#efcdab]">Aucun passage tablette aujourd&apos;hui.</p> : null}
@@ -939,12 +939,12 @@ export function TabletCigarettePageClient(props: {
 
           <article className="glass-card p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-base font-semibold text-[#fff1dd]">ðŸ“± Passage tablette</h3>
+              <h3 className="text-base font-semibold text-[#fff1dd]">📱 Passage tablette</h3>
               <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">{tabletBusinessDay}</span>
             </div>
 
             <div className="space-y-3">
-              <FieldLabel icon="ðŸ‘¤" label="Membre" />
+              <FieldLabel icon="👤" label="Membre" />
               <select className="saas-input !h-10" value={memberId} onChange={(event) => selectMember(event.target.value)}>
                 {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
               </select>
@@ -952,7 +952,7 @@ export function TabletCigarettePageClient(props: {
               {canTabletManageDaily ? (
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                   <div>
-                    <FieldLabel icon="ðŸ’µ" label="DÃ©pÃ´t" />
+                    <FieldLabel icon="💵" label="Dépôt" />
                     <input className="saas-input !h-10" value={deposit} onChange={(event) => setDeposit(event.target.value)} />
                   </div>
                   <button className="saas-primary-btn self-end !h-10 px-4" onClick={() => void saveTabletDeposit()}>Enregistrer</button>
@@ -962,52 +962,52 @@ export function TabletCigarettePageClient(props: {
               <div className="grid grid-cols-2 gap-2">
                 <MiniStat label="Kits" value={String(kitsState)} />
                 <MiniStat label="Disqueuses" value={String(cuttersState)} />
-                <MiniStat label="CoÃ»t passage" value={formatUsd(400)} />
-                <MiniStat label="Restant aprÃ¨s" value={formatUsd(Math.max(0, tabletChest - 400))} />
+                <MiniStat label="Coût passage" value={formatUsd(400)} />
+                <MiniStat label="Restant après" value={formatUsd(Math.max(0, tabletChest - 400))} />
               </div>
 
               {canTabletCreatePassage ? <button className="saas-primary-btn w-full" onClick={() => void createTabletPassage()}>Valider</button> : null}
             </div>
           </article>
-          <HistoryColumn title="HISTORIQUE TABLETTE" icon="ðŸ“±" rows={historyColumns.tabletRows} empty="Aucun passage tablette." />
+          <HistoryColumn title="HISTORIQUE TABLETTE" icon="📱" rows={historyColumns.tabletRows} empty="Aucun passage tablette." />
         </section>
       ) : null}
 
       {tab === 'cigarette' && canCigaretteAccess ? (
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
           <article className="glass-card p-5 xl:col-span-2">
-            <h3 className="text-base font-semibold text-[#fff1dd]">Cigarette â€” {cigaretteBusinessDay}</h3>
+            <h3 className="text-base font-semibold text-[#fff1dd]">Cigarette — {cigaretteBusinessDay}</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              <Stat label="Paquets vendus" value={String(cigaretteDayState?.packs_sold ?? 0)} icon="ðŸš¬" />
-              <Stat label="Recette" value={formatUsd(Number(cigaretteDayState?.total_revenue ?? 0))} icon="ðŸ’µ" />
-              <Stat label="DÃ©pÃ´t Cigarette" value={formatUsd(Number(cigaretteDayState?.chest_amount ?? 0))} icon="ðŸ¦" />
-              <Stat label="Stock paquets" value={String(packsState)} icon="ðŸ“¦" />
-              <Stat label="Cash reÃ§u" value={formatUsd(cigaretteDayPaymentStats.cash)} icon="ðŸ’µ" />
-              <Stat label="Bank attente / reÃ§u" value={`${formatUsd(cigaretteDayPaymentStats.bankPending)} / ${formatUsd(cigaretteDayPaymentStats.bankReceived)}`} icon="ðŸ§¾" />
-              <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="ðŸ’°" />
+              <Stat label="Paquets vendus" value={String(cigaretteDayState?.packs_sold ?? 0)} icon="🚬" />
+              <Stat label="Recette" value={formatUsd(Number(cigaretteDayState?.total_revenue ?? 0))} icon="💵" />
+              <Stat label="Dépôt Cigarette" value={formatUsd(Number(cigaretteDayState?.chest_amount ?? 0))} icon="🏦" />
+              <Stat label="Stock paquets" value={String(packsState)} icon="📦" />
+              <Stat label="Cash reçu" value={formatUsd(cigaretteDayPaymentStats.cash)} icon="💵" />
+              <Stat label="Bank attente / reçu" value={`${formatUsd(cigaretteDayPaymentStats.bankPending)} / ${formatUsd(cigaretteDayPaymentStats.bankReceived)}`} icon="🧾" />
+              <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="💰" />
             </div>
           </article>
 
           <article className="glass-card p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-base font-semibold text-[#fff1dd]">ðŸš¬ Nouveau passage cigarette</h3>
+              <h3 className="text-base font-semibold text-[#fff1dd]">🚬 Nouveau passage cigarette</h3>
               <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">{packsState} paquets</span>
             </div>
 
             <div className="space-y-3">
-              <FieldLabel icon="ðŸ‘¤" label="Membre" />
+              <FieldLabel icon="👤" label="Membre" />
               <select className="saas-input !h-10" value={memberId} onChange={(event) => selectMember(event.target.value)} disabled={!canCigaretteCreateForAny}>
                 {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
               </select>
 
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" className={`filter-pill justify-center ${cigarettePaymentMode === 'cash' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('cash')}>ðŸ’µ Cash</button>
-                <button type="button" className={`filter-pill justify-center ${cigarettePaymentMode === 'bank' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('bank')}>ðŸ¦ Bank</button>
+                <button type="button" className={`filter-pill justify-center ${cigarettePaymentMode === 'cash' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('cash')}>💵 Cash</button>
+                <button type="button" className={`filter-pill justify-center ${cigarettePaymentMode === 'bank' ? 'filter-pill-active' : ''}`} onClick={() => setCigarettePaymentMode('bank')}>🏦 Bank</button>
               </div>
 
               {cigarettePaymentMode === 'cash' ? (
                 <div className="rounded-xl border border-white/10 bg-[#2f1d14]/60 px-3 py-2 text-sm text-[#ffe8ca]">
-                  <span className="mr-2">âœ…</span>Ajout direct au groupe
+                  <span className="mr-2">✅</span>Ajout direct au groupe
                 </div>
               ) : (
                 <div className="grid gap-2 rounded-xl border border-white/10 bg-[#2f1d14]/60 p-3 text-sm">
@@ -1020,7 +1020,7 @@ export function TabletCigarettePageClient(props: {
               {canCigaretteCreatePassage ? <button className="saas-primary-btn w-full" onClick={() => void createCigarettePassage()}>Valider passage</button> : null}
             </div>
           </article>
-          <HistoryColumn title="HISTORIQUE CIGARETTE" icon="ðŸš¬" rows={historyColumns.cigaretteRows} empty="Aucun passage cigarette." />
+          <HistoryColumn title="HISTORIQUE CIGARETTE" icon="🚬" rows={historyColumns.cigaretteRows} empty="Aucun passage cigarette." />
         </section>
       ) : null}
 
@@ -1029,23 +1029,23 @@ export function TabletCigarettePageClient(props: {
           <article className="glass-card p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h3 className="text-xl font-semibold text-[#ffe8ca]">Processeur â€” {tabletBusinessDay}</h3>
+                <h3 className="text-xl font-semibold text-[#ffe8ca]">Processeur — {tabletBusinessDay}</h3>
                 <p className="text-xs text-[#efcdab]">Vente processeurs</p>
               </div>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
-                <Stat label="Processeurs vendus" value={String(processorStatsQuick.sold)} icon="âš™ï¸" />
-                <Stat label="Recette processeur" value={formatUsd(processorStatsQuick.revenue)} icon="ðŸ’µ" />
-                <Stat label="Stock processeurs" value={String(processorStockState)} icon="ðŸ“¦" />
-                <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="ðŸ’°" />
-                <Stat label="DÃ©jÃ  vendu aujourdâ€™hui" value={String(processorSoldToday)} icon="ðŸ“Š" />
-                <Stat label="Restant possible" value={`${processorRemainingToday}/50`} icon="ðŸŽ¯" />
+                <Stat label="Processeurs vendus" value={String(processorStatsQuick.sold)} icon="⚙️" />
+                <Stat label="Recette processeur" value={formatUsd(processorStatsQuick.revenue)} icon="💵" />
+                <Stat label="Stock processeurs" value={String(processorStockState)} icon="📦" />
+                <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="💰" />
+                <Stat label="Déjà vendu aujourd’hui" value={String(processorSoldToday)} icon="📊" />
+                <Stat label="Restant possible" value={`${processorRemainingToday}/50`} icon="🎯" />
               </div>
             </div>
           </article>
 
           <div className="grid gap-4 xl:grid-cols-2">
             {canProcessorProduction ? <article className="glass-card flex h-full flex-col p-4">
-              <h4 className="text-base font-semibold text-[#fff1dd]">âš™ï¸ Production processeurs</h4>
+              <h4 className="text-base font-semibold text-[#fff1dd]">⚙️ Production processeurs</h4>
               <div className="mt-2 flex flex-wrap gap-2">
                 {[2, 4, 10, 12].map((qty) => (
                   <button key={qty} type="button" className={`filter-pill ${processorBottles === qty ? 'filter-pill-active' : ''}`} onClick={() => setProcessorBottles(qty)}>{qty} bouteilles</button>
@@ -1056,22 +1056,22 @@ export function TabletCigarettePageClient(props: {
                 {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
               </select>
               <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#efcdab]"><input type="checkbox" checked={processorBoatFee || processorBottles >= PROCESSOR_BOAT_FROM_BOTTLES} onChange={(event) => setProcessorBoatFee(event.target.checked)} /> Frais bateau (1500$)</label>
-              <p className="mt-1 text-xs text-[#efcdab]">ðŸš—/ðŸ›¥ï¸ VÃ©hicule conseillÃ©: <span className="font-semibold text-[#ffe8ca]">{processorEstimate.vehicleSuggested === 'boat' ? 'Bateau' : 'Voiture'}</span></p>
+              <p className="mt-1 text-xs text-[#efcdab]">🚗/🛥️ Véhicule conseillé: <span className="font-semibold text-[#ffe8ca]">{processorEstimate.vehicleSuggested === 'boat' ? 'Bateau' : 'Voiture'}</span></p>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <MiniStat label="CoÃ»t matos" value={formatUsd(processorEstimate.materialCost)} />
+                <MiniStat label="Coût matos" value={formatUsd(processorEstimate.materialCost)} />
                 <MiniStat label="Frais bateau" value={formatUsd(processorEstimate.boatFee)} />
                 <MiniStat label="Processeurs" value={String(processorEstimate.processors)} />
-                <MiniStat label="Stock aprÃ¨s" value={String(processorStockState + processorEstimate.processors)} />
+                <MiniStat label="Stock après" value={String(processorStockState + processorEstimate.processors)} />
               </div>
-              <input className="saas-input mt-2 !h-9" placeholder="Frais rÃ©els" value={processorRealFee} onChange={(event) => setProcessorRealFee(event.target.value)} />
+              <input className="saas-input mt-2 !h-9" placeholder="Frais réels" value={processorRealFee} onChange={(event) => setProcessorRealFee(event.target.value)} />
               {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" onClick={() => void createProcessorProduction()}>Valider production</button> : null}
             </article> : null}
 
             {canProcessorSale ? <article className="glass-card flex h-full flex-col p-4">
-              <h4 className="text-base font-semibold text-[#fff1dd]">ðŸ’° Vente processeurs</h4>
+              <h4 className="text-base font-semibold text-[#fff1dd]">💰 Vente processeurs</h4>
               <div className="mt-2 flex items-center gap-3 rounded-xl border border-white/10 bg-[#2f1d14]/55 p-2">
                 <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[#4a2f20]/60 text-lg">
-                  {processorImageUrl ? <Image src={processorImageUrl} alt="Processeur" width={48} height={48} className="h-full w-full object-cover" unoptimized /> : 'âš™ï¸'}
+                  {processorImageUrl ? <Image src={processorImageUrl} alt="Processeur" width={48} height={48} className="h-full w-full object-cover" unoptimized /> : '⚙️'}
                 </div>
                 <div>
                   <p className="text-sm text-[#ffe8ca]">Item Processeur</p>
@@ -1081,20 +1081,20 @@ export function TabletCigarettePageClient(props: {
 
               <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_180px]">
                 <div>
-                  <FieldLabel icon="ðŸ‘¤" label="Vendeur" />
+                  <FieldLabel icon="👤" label="Vendeur" />
                   <select className="saas-input !h-10" value={processorSaleMemberId} onChange={(event) => setProcessorSaleMemberId(event.target.value)}>
                     {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
                   </select>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#2f1d14]/60 px-3 py-2 text-xs text-[#efcdab]">
-                  <p>DÃ©jÃ  vendu aujourdâ€™hui: <b className="text-[#ffe8ca]">{processorSoldToday}</b></p>
+                  <p>Déjà vendu aujourd’hui: <b className="text-[#ffe8ca]">{processorSoldToday}</b></p>
                   <p>Restant possible: <b className="text-[#ffe8ca]">{processorRemainingToday}</b>/50</p>
                 </div>
               </div>
 
               <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_180px]">
                 <div>
-                  <FieldLabel icon="ðŸ“¦" label="QuantitÃ© mise en vente" />
+                  <FieldLabel icon="📦" label="Quantité mise en vente" />
                   <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
                     <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => setProcessorSaleQtySafe(processorSaleQty - 1)}>-</button>
                     <div className="flex h-10 items-center justify-center rounded-lg border border-white/10 bg-[#24160f] text-sm font-semibold text-[#ffe8ca]">{processorSaleQty}</div>
@@ -1102,29 +1102,29 @@ export function TabletCigarettePageClient(props: {
                   </div>
                 </div>
                 <div className="rounded-xl border border-amber-200/20 bg-[#3a2418]/70 px-3 py-2">
-                  <p className="text-[11px] uppercase text-[#efcdab]">Estimation rÃ©cupÃ©rÃ©e</p>
+                  <p className="text-[11px] uppercase text-[#efcdab]">Estimation récupérée</p>
                   <p className="text-lg font-semibold text-[#ffe8ca]">{formatUsd(processorSaleTotalEstimated)}</p>
-                  <p className="text-[11px] text-[#efcdab]">50% Â· 100$ / processeur</p>
+                  <p className="text-[11px] text-[#efcdab]">50% · 100$ / processeur</p>
                 </div>
               </div>
 
               <div className="mt-3">
-                <FieldLabel icon="ðŸ’µ" label="Argent rÃ©el reÃ§u" />
+                <FieldLabel icon="💵" label="Argent réel reçu" />
                 <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
                   <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => stepProcessorRealReceived(-100)}>-</button>
                   <div className="flex h-10 items-center justify-center rounded-lg border border-white/10 bg-[#24160f] text-sm font-semibold text-[#ffe8ca]">{formatUsd(processorSaleTotalReal)}</div>
                   <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => stepProcessorRealReceived(100)}>+</button>
                 </div>
-                <p className="mt-1 text-xs text-[#efcdab]">Ce montant est le seul ajoutÃ© Ã  lâ€™argent groupe.</p>
+                <p className="mt-1 text-xs text-[#efcdab]">Ce montant est le seul ajouté à l’argent groupe.</p>
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <MiniStat label="Argent groupe ajoutÃ©" value={formatUsd(processorSaleTotalReal)} />
-                <MiniStat label="Stock aprÃ¨s" value={String(Math.max(0, processorStockState - processorSaleQty))} />
+                <MiniStat label="Argent groupe ajouté" value={formatUsd(processorSaleTotalReal)} />
+                <MiniStat label="Stock après" value={String(Math.max(0, processorStockState - processorSaleQty))} />
               </div>
               {canProcessorCreate ? <button className="saas-primary-btn mt-3 w-full" disabled={processorSaleQty <= 0 || processorSaleQty > processorRemainingToday || processorSaleQty > processorStockState} onClick={() => void createProcessorSale()}>Valider vente</button> : null}
             </article> : null}
-            <HistoryColumn title="HISTORIQUE PROCESSEUR" icon="âš™ï¸" rows={canProcessorLogs ? historyColumns.processorRows : []} empty={canProcessorLogs ? 'Aucun log processeur.' : 'AccÃ¨s historique processeur requis.'} />
+            <HistoryColumn title="HISTORIQUE PROCESSEUR" icon="⚙️" rows={canProcessorLogs ? historyColumns.processorRows : []} empty={canProcessorLogs ? 'Aucun log processeur.' : 'Accès historique processeur requis.'} />
           </div>
         </section>
       ) : null}
@@ -1133,15 +1133,20 @@ export function TabletCigarettePageClient(props: {
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
           <article className="glass-card p-5 xl:col-span-2">
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-semibold text-[#ffe8ca]">Pierre - Saphir Brut</h3>
-                <p className="text-xs text-[#efcdab]">Cash uniquement - 225$ unitÃ© - limite 8 par jour et par membre</p>
+              <div className="flex items-center gap-3">
+                <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-white/10 bg-[#2f1d14]/65">
+                  {stoneImageUrl ? <Image src={stoneImageUrl} alt="Saphir Brut" fill sizes="64px" className="object-cover" /> : <div className="grid h-full w-full place-items-center text-2xl">💎</div>}
+                </div>
+                <div>
+                <h3 className="text-xl font-semibold text-[#ffe8ca]">💎 Pierre - Saphir Brut</h3>
+                <p className="text-xs text-[#efcdab]">Cash uniquement - 225$ unité - limite 8 par jour et par membre</p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                <Stat label="Stock Saphir Brut" value={String(stoneStockState)} icon="ðŸ’Ž" />
-                <Stat label="Vendu aujourd'hui" value={String(stoneSalesState.reduce((sum, row) => sum + Number(row.quantity_sold ?? 0), 0))} icon="ðŸ“¦" />
-                <Stat label="Argent gÃ©nÃ©rÃ©" value={formatUsd(stoneSalesState.reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0))} icon="ðŸ’µ" />
-                <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="ðŸ’°" />
+                <Stat label="Stock Saphir Brut" value={String(stoneStockState)} icon="💎" />
+                <Stat label="Vendu aujourd'hui" value={String(stoneSalesState.reduce((sum, row) => sum + Number(row.quantity_sold ?? 0), 0))} icon="🧾" />
+                <Stat label="Argent généré" value={formatUsd(stoneSalesState.reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0))} icon="💵" />
+                <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="🏦" />
               </div>
             </div>
           </article>
@@ -1152,20 +1157,20 @@ export function TabletCigarettePageClient(props: {
               <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">Cash</span>
             </div>
             <div className="space-y-3">
-              <FieldLabel icon="ðŸ‘¤" label="Membre vendeur" />
+              <FieldLabel icon="👤" label="Membre vendeur" />
               <select className="saas-input !h-10" value={stoneMemberId} onChange={(event) => setStoneMemberId(event.target.value)}>
                 {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
               </select>
 
               <div className="grid grid-cols-2 gap-2">
-                <MiniStat label="DÃ©jÃ  vendu aujourd'hui" value={String(stoneSoldToday)} />
+                <MiniStat label="Déjà vendu aujourd'hui" value={String(stoneSoldToday)} />
                 <MiniStat label="Restant possible" value={`${stoneRemainingToday}/8`} />
-                <MiniStat label="Stock avant / aprÃ¨s" value={`${stoneStockState} -> ${Math.max(0, stoneStockState - stoneQty)}`} />
-                <MiniStat label="Argent avant / aprÃ¨s" value={`${formatUsd(groupCashState)} -> ${formatUsd(groupCashState + stoneSaleTotal)}`} />
+                <MiniStat label="Stock avant / après" value={`${stoneStockState} -> ${Math.max(0, stoneStockState - stoneQty)}`} />
+                <MiniStat label="Argent avant / après" value={`${formatUsd(groupCashState)} -> ${formatUsd(groupCashState + stoneSaleTotal)}`} />
               </div>
 
               <div>
-                <FieldLabel icon="ðŸ’Ž" label="QuantitÃ© vendue" />
+                <FieldLabel icon="📦" label="Quantité vendue" />
                 <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
                   <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => setStoneQtySafe(stoneQty - 1)}>-</button>
                   <div className="flex h-10 items-center justify-center rounded-lg border border-white/10 bg-[#24160f] text-sm font-semibold text-[#ffe8ca]">{stoneQty}</div>
@@ -1178,17 +1183,17 @@ export function TabletCigarettePageClient(props: {
                 <p className="text-xl font-semibold text-[#ffe8ca]">{formatUsd(stoneSaleTotal)}</p>
               </div>
 
-              {canStoneSell ? <button className="saas-primary-btn w-full" disabled={stoneQty <= 0 || stoneQty > stoneRemainingToday || stoneQty > stoneStockState} onClick={() => void createStoneSale()}>Valider vente Pierre</button> : null}
+              {canStoneSell ? <button className="saas-primary-btn w-full" disabled={stoneQty <= 0 || stoneQty > stoneRemainingToday || stoneQty > stoneStockState} onClick={() => void createStoneSale()}>✅ Valider vente Pierre</button> : null}
             </div>
           </article>
 
-          <HistoryColumn title="HISTORIQUE PIERRE" icon="ðŸ’Ž" rows={canStoneHistory ? historyColumns.stoneRows : []} empty={canStoneHistory ? 'Aucune vente pierre.' : 'AccÃ¨s historique pierre requis.'} />
+          <HistoryColumn title="HISTORIQUE PIERRE" icon="💎" rows={canStoneHistory ? historyColumns.stoneRows : []} empty={canStoneHistory ? 'Aucune vente pierre.' : 'Accès historique pierre requis.'} />
         </section>
       ) : null}
 
       {tab === 'history' && canHistory ? (
         <section className="space-y-4">
-          <JobsFilters title="Historique Jobs" subtitle={`${historyRangeLabel} Â· semaine ${filteredJobsHistoryEntries.length} Â· affichÃ© ${visibleHistoryEntries.length} (${historyDayLabel})`} members={members} rangeMode={historyRangeMode} customStartDate={customStartDate} customEndDate={customEndDate} memberFilter={memberFilter} typeFilter={jobTypeFilter} loading={historyLoading} onRangeMode={setHistoryRangeMode} onCustomStart={setCustomStartDate} onCustomEnd={setCustomEndDate} onMember={setMemberFilter} onType={setJobTypeFilter} />
+          <JobsFilters title="Historique Jobs" subtitle={`${historyRangeLabel} · semaine ${filteredJobsHistoryEntries.length} · affiché ${visibleHistoryEntries.length} (${historyDayLabel})`} members={members} rangeMode={historyRangeMode} customStartDate={customStartDate} customEndDate={customEndDate} memberFilter={memberFilter} typeFilter={jobTypeFilter} loading={historyLoading} onRangeMode={setHistoryRangeMode} onCustomStart={setCustomStartDate} onCustomEnd={setCustomEndDate} onMember={setMemberFilter} onType={setJobTypeFilter} />
           <HistoryDayNavigation rangeLabel={historyRangeLabel} selectedDay={historyDayFilter} counts={historyDayCounts} visibleCount={visibleHistoryEntries.length} totalCount={filteredJobsHistoryEntries.length} onSelect={setHistoryDayFilter} />
           <WeeklyJobsHistory weeks={historyWeeks} selectedDay={historyDayFilter} showProcessor={canProcessorLogs} showStone={canStoneHistory} />
         </section>
@@ -1196,52 +1201,52 @@ export function TabletCigarettePageClient(props: {
 
       {false && tab === 'history' && canHistory ? (
         <section className="grid gap-4 xl:grid-cols-3">
-          <HistoryColumn title="TABLETTE" icon="ðŸ“±" rows={historyColumns.tabletRows} empty="Aucun passage tablette." />
-          <HistoryColumn title="CIGARETTE" icon="ðŸš¬" rows={historyColumns.cigaretteRows} empty="Aucun passage cigarette." />
-          <HistoryColumn title="PROCESSEUR" icon="âš™ï¸" rows={canProcessorLogs ? historyColumns.processorRows : []} empty={canProcessorLogs ? 'Aucun log processeur.' : 'AccÃ¨s historique processeur requis.'} />
+          <HistoryColumn title="TABLETTE" icon="📱" rows={historyColumns.tabletRows} empty="Aucun passage tablette." />
+          <HistoryColumn title="CIGARETTE" icon="🚬" rows={historyColumns.cigaretteRows} empty="Aucun passage cigarette." />
+          <HistoryColumn title="PROCESSEUR" icon="⚙️" rows={canProcessorLogs ? historyColumns.processorRows : []} empty={canProcessorLogs ? 'Aucun log processeur.' : 'Accès historique processeur requis.'} />
         </section>
       ) : null}
 
       {tab === 'stats' && canStats ? (
         <section className="space-y-4">
-          <JobsFilters title="Stats Jobs" subtitle={`${historyRangeLabel} Â· ${jobStatsTotals.totalActivities} activitÃ©(s)`} members={members} rangeMode={historyRangeMode} customStartDate={customStartDate} customEndDate={customEndDate} memberFilter={memberFilter} typeFilter={jobTypeFilter} loading={historyLoading} onRangeMode={setHistoryRangeMode} onCustomStart={setCustomStartDate} onCustomEnd={setCustomEndDate} onMember={setMemberFilter} onType={setJobTypeFilter} />
+          <JobsFilters title="Stats Jobs" subtitle={`${historyRangeLabel} · ${jobStatsTotals.totalActivities} activité(s)`} members={members} rangeMode={historyRangeMode} customStartDate={customStartDate} customEndDate={customEndDate} memberFilter={memberFilter} typeFilter={jobTypeFilter} loading={historyLoading} onRangeMode={setHistoryRangeMode} onCustomStart={setCustomStartDate} onCustomEnd={setCustomEndDate} onMember={setMemberFilter} onType={setJobTypeFilter} />
           <article className="glass-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-[#fff1dd]">Stats globales semaine</h4>
               <select className="saas-input !h-9 w-48" value={statsSort} onChange={(event) => setStatsSort(event.target.value as 'activity' | 'member')}>
-                <option value="activity">Tri total activitÃ©</option>
+                <option value="activity">Tri total activité</option>
                 <option value="member">Tri membre</option>
               </select>
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
-              <Stat label="Passages tablette" value={String(jobStatsTotals.tabletPassages)} icon="ðŸ“±" />
-              <Stat label="Kits / disqueuses" value={`${jobStatsTotals.tabletKits} / ${jobStatsTotals.tabletCutters}`} icon="ðŸ§°" />
-              <Stat label="Argent tablette" value={formatUsd(jobStatsTotals.tabletMoney)} icon="ðŸ’¸" />
-              <Stat label="Passages cigarette" value={String(jobStatsTotals.cigarettePassages)} icon="ðŸš¬" />
-              <Stat label="Paquets vendus" value={String(jobStatsTotals.cigarettePacks)} icon="ðŸ“¦" />
-              <Stat label="Cash cigarette" value={formatUsd(jobStatsTotals.cigaretteCash)} icon="ðŸ’µ" />
-              <Stat label="Bank attente" value={formatUsd(jobStatsTotals.cigaretteBankPending)} icon="ðŸ¦" />
-              <Stat label="Bank reÃ§u" value={formatUsd(jobStatsTotals.cigaretteBankReceived)} icon="âœ…" />
-              <Stat label="Processeurs produits" value={String(jobStatsTotals.processorProduced)} icon="âš™ï¸" />
-              <Stat label="Processeurs vendus" value={String(jobStatsTotals.processorSold)} icon="ðŸ“¦" />
-              <Stat label="Argent processeur" value={formatUsd(jobStatsTotals.processorMoney)} icon="ðŸ’°" />
-              <Stat label="Saphirs vendus" value={String(jobStatsTotals.stoneSold)} icon="?" />
-              <Stat label="Argent pierre" value={formatUsd(jobStatsTotals.stoneMoney)} icon="?" />
-              <Stat label="Total activitÃ©s" value={String(jobStatsTotals.totalActivities)} icon="ðŸ“Š" />
+              <Stat label="Passages tablette" value={String(jobStatsTotals.tabletPassages)} icon="📱" />
+              <Stat label="Kits / disqueuses" value={`${jobStatsTotals.tabletKits} / ${jobStatsTotals.tabletCutters}`} icon="🧰" />
+              <Stat label="Argent tablette" value={formatUsd(jobStatsTotals.tabletMoney)} icon="💸" />
+              <Stat label="Passages cigarette" value={String(jobStatsTotals.cigarettePassages)} icon="🚬" />
+              <Stat label="Paquets vendus" value={String(jobStatsTotals.cigarettePacks)} icon="📦" />
+              <Stat label="Cash cigarette" value={formatUsd(jobStatsTotals.cigaretteCash)} icon="💵" />
+              <Stat label="Bank attente" value={formatUsd(jobStatsTotals.cigaretteBankPending)} icon="🏦" />
+              <Stat label="Bank reçu" value={formatUsd(jobStatsTotals.cigaretteBankReceived)} icon="✅" />
+              <Stat label="Processeurs produits" value={String(jobStatsTotals.processorProduced)} icon="⚙️" />
+              <Stat label="Processeurs vendus" value={String(jobStatsTotals.processorSold)} icon="📦" />
+              <Stat label="Argent processeur" value={formatUsd(jobStatsTotals.processorMoney)} icon="💰" />
+              <Stat label="Saphirs vendus" value={String(jobStatsTotals.stoneSold)} icon="💎" />
+              <Stat label="Argent pierre" value={formatUsd(jobStatsTotals.stoneMoney)} icon="💵" />
+              <Stat label="Total activités" value={String(jobStatsTotals.totalActivities)} icon="📊" />
             </div>
           </article>
           {canStoneStats ? (
             <article className="glass-card p-5">
               <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Pierre</h4>
               <div className="mt-2 grid gap-2 md:grid-cols-4">
-                <Stat label="Saphirs vendus" value={String(stoneStatsTotals.sold)} icon="?" />
-                <Stat label="Argent genere" value={formatUsd(stoneStatsTotals.revenue)} icon="?" />
-                <Stat label="Derniere activite" value={stoneStatsTotals.last ? new Date(stoneStatsTotals.last).toLocaleString('fr-FR') : '-'} icon="?" />
-                <Stat label="Limite jour" value="8 / membre" icon="?" />
+                <Stat label="Saphirs vendus" value={String(stoneStatsTotals.sold)} icon="💎" />
+                <Stat label="Argent généré" value={formatUsd(stoneStatsTotals.revenue)} icon="💵" />
+                <Stat label="Dernière activité" value={stoneStatsTotals.last ? new Date(stoneStatsTotals.last).toLocaleString('fr-FR') : '-'} icon="📊" />
+                <Stat label="Limite jour" value="8 / membre" icon="🎯" />
               </div>
               <div className="mt-4 overflow-x-auto">
                 <table className="min-w-full text-left text-xs text-[#efcdab]">
-                  <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Saphirs vendus</th><th className="px-2 py-1">Argent genere</th><th className="px-2 py-1">Limite utilisee</th><th className="px-2 py-1">Derniere activite</th></tr></thead>
+                  <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Saphirs vendus</th><th className="px-2 py-1">Argent généré</th><th className="px-2 py-1">Limite utilisée</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
                   <tbody>
                     {stoneStatsByMember.map((row) => (
                       <tr key={row.key} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.sold}</td><td className="px-2 py-1">{formatUsd(row.revenue)}</td><td className="px-2 py-1">{row.limitUsed}%</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
@@ -1261,15 +1266,15 @@ export function TabletCigarettePageClient(props: {
           <article className="glass-card p-5">
             <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Tablette</h4>
             <div className="mt-2 grid gap-2 md:grid-cols-5">
-              <Stat label="Passages tablette" value={String(tabletStatsTotals.passages)} icon="ðŸ“±" />
-              <Stat label="Argent dÃ©pensÃ©" value={formatUsd(tabletStatsTotals.money)} icon="ðŸ’¸" />
-              <Stat label="Kits rÃ©cupÃ©rÃ©s" value={String(tabletStatsTotals.kits)} icon="ðŸ§°" />
-              <Stat label="Disqueuses rÃ©cupÃ©rÃ©es" value={String(tabletStatsTotals.cutters)} icon="ðŸªš" />
-              <Stat label="DerniÃ¨re activitÃ©" value={tabletStatsTotals.last ? new Date(tabletStatsTotals.last).toLocaleDateString('fr-FR') : '-'} icon="ðŸ•’" />
+              <Stat label="Passages tablette" value={String(tabletStatsTotals.passages)} icon="📱" />
+              <Stat label="Argent dépensé" value={formatUsd(tabletStatsTotals.money)} icon="💸" />
+              <Stat label="Kits récupérés" value={String(tabletStatsTotals.kits)} icon="🧰" />
+              <Stat label="Disqueuses récupérées" value={String(tabletStatsTotals.cutters)} icon="🪚" />
+              <Stat label="Dernière activité" value={tabletStatsTotals.last ? new Date(tabletStatsTotals.last).toLocaleDateString('fr-FR') : '-'} icon="🕒" />
             </div>
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-left text-xs text-[#efcdab]">
-                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent dÃ©pensÃ©</th><th className="px-2 py-1">Kits</th><th className="px-2 py-1">Disqueuses</th><th className="px-2 py-1">DerniÃ¨re activitÃ©</th></tr></thead>
+                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Argent dépensé</th><th className="px-2 py-1">Kits</th><th className="px-2 py-1">Disqueuses</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
                 <tbody>
                   {tabletStatsByMember.map((row) => (
                     <tr key={row.key} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{row.kits}</td><td className="px-2 py-1">{row.cutters}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
@@ -1282,15 +1287,15 @@ export function TabletCigarettePageClient(props: {
           <article className="glass-card p-5">
             <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Cigarette</h4>
             <div className="mt-2 grid gap-2 md:grid-cols-5">
-              <Stat label="Passages cigarette" value={String(cigaretteStatsTotals.passages)} icon="ðŸš¬" />
-              <Stat label="Paquets vendus" value={String(cigaretteStatsTotals.packs)} icon="ðŸ“¦" />
-              <Stat label="Argent gÃ©nÃ©rÃ©" value={formatUsd(cigaretteStatsTotals.revenue)} icon="ðŸ’µ" />
-              <Stat label="Cash reÃ§u" value={formatUsd(cigaretteStatsTotals.cash)} icon="ðŸ¦" />
-              <Stat label="Bank attente / reÃ§u" value={`${formatUsd(cigaretteStatsTotals.bankPending)} / ${formatUsd(cigaretteStatsTotals.bankReceived)}`} icon="ðŸ§¾" />
+              <Stat label="Passages cigarette" value={String(cigaretteStatsTotals.passages)} icon="🚬" />
+              <Stat label="Paquets vendus" value={String(cigaretteStatsTotals.packs)} icon="📦" />
+              <Stat label="Argent généré" value={formatUsd(cigaretteStatsTotals.revenue)} icon="💵" />
+              <Stat label="Cash reçu" value={formatUsd(cigaretteStatsTotals.cash)} icon="🏦" />
+              <Stat label="Bank attente / reçu" value={`${formatUsd(cigaretteStatsTotals.bankPending)} / ${formatUsd(cigaretteStatsTotals.bankReceived)}`} icon="🧾" />
             </div>
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-left text-xs text-[#efcdab]">
-                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Paquets</th><th className="px-2 py-1">Argent gÃ©nÃ©rÃ©</th><th className="px-2 py-1">Cash</th><th className="px-2 py-1">Bank attente / reÃ§u</th><th className="px-2 py-1">DerniÃ¨re activitÃ©</th></tr></thead>
+                <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Passages</th><th className="px-2 py-1">Paquets</th><th className="px-2 py-1">Argent généré</th><th className="px-2 py-1">Cash</th><th className="px-2 py-1">Bank attente / reçu</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
                 <tbody>
                   {cigaretteStatsByMember.map((row) => (
                     <tr key={row.key} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.count}</td><td className="px-2 py-1">{row.packs}</td><td className="px-2 py-1">{formatUsd(row.revenue)}</td><td className="px-2 py-1">{formatUsd(row.cash)}</td><td className="px-2 py-1">{formatUsd(row.bankPending)} / {formatUsd(row.bankReceived)}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
@@ -1304,11 +1309,11 @@ export function TabletCigarettePageClient(props: {
             <article className="glass-card p-5">
               <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Processeur</h4>
               <div className="mt-2 grid gap-2 md:grid-cols-5">
-                <Stat label="Processeurs produits" value={String(processorStatsTotals.produced)} icon="âš™ï¸" />
-                <Stat label="Processeurs vendus" value={String(processorStatsTotals.sold)} icon="ðŸ“¦" />
-                <Stat label="Argent gÃ©nÃ©rÃ©" value={formatUsd(processorStatsTotals.revenue)} icon="ðŸ’µ" />
-                <Stat label="BÃ©nÃ©fice net" value={formatUsd(processorStatsTotals.net)} icon="ðŸ“ˆ" />
-                <Stat label="Sessions processeur" value={String(processorStatsTotals.sessions)} icon="ðŸ§¾" />
+                <Stat label="Processeurs produits" value={String(processorStatsTotals.produced)} icon="⚙️" />
+                <Stat label="Processeurs vendus" value={String(processorStatsTotals.sold)} icon="📦" />
+                <Stat label="Argent généré" value={formatUsd(processorStatsTotals.revenue)} icon="💵" />
+                <Stat label="Bénéfice net" value={formatUsd(processorStatsTotals.net)} icon="📈" />
+                <Stat label="Sessions processeur" value={String(processorStatsTotals.sessions)} icon="🧾" />
               </div>
               <div className="mt-4 overflow-x-auto">
                 <table className="min-w-full text-left text-xs text-[#efcdab]">
@@ -1316,7 +1321,7 @@ export function TabletCigarettePageClient(props: {
                     <tr>
                       <th className="px-2 py-1">Membre</th>
                       <th className="px-2 py-1">Processeurs vendus</th>
-                      <th className="px-2 py-1">Argent gÃ©nÃ©rÃ©</th>
+                      <th className="px-2 py-1">Argent généré</th>
                       <th className="px-2 py-1">Sessions processeur</th>
                     </tr>
                   </thead>
@@ -1397,14 +1402,14 @@ function JobsFilters({
     <article className="glass-card p-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold text-[#fff1dd]">ðŸ“š {title}</h3>
-          <p className="text-xs text-[#efcdab]">{subtitle}{loading ? ' Â· chargement...' : ''}</p>
+          <h3 className="text-base font-semibold text-[#fff1dd]">📚 {title}</h3>
+          <p className="text-xs text-[#efcdab]">{subtitle}{loading ? ' · chargement...' : ''}</p>
         </div>
         <div className="grid w-full gap-2 md:w-auto md:grid-cols-[150px_150px_150px_150px]">
           <select className="saas-input !h-9" value={rangeMode} onChange={(event) => onRangeMode(event.target.value as HistoryRangeMode)}>
             <option value="current">Semaine actuelle</option>
-            <option value="previous">Semaine passÃ©e</option>
-            <option value="custom">PÃ©riode personnalisÃ©e</option>
+            <option value="previous">Semaine passée</option>
+            <option value="custom">Période personnalisée</option>
           </select>
           <select className="saas-input !h-9" value={memberFilter} onChange={(event) => onMember(event.target.value)}>
             <option value="all">Tous membres</option>
@@ -1452,7 +1457,7 @@ function HistoryDayNavigation({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-[#fff1dd]">Jours de semaine</h3>
-          <p className="text-xs text-[#efcdab]">{visibleCount} activitÃ©(s) affichÃ©e(s)</p>
+          <p className="text-xs text-[#efcdab]">{visibleCount} activité(s) affichée(s)</p>
         </div>
         <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-3 py-1 text-xs font-semibold text-[#ffe8ca]">{rangeLabel}</span>
       </div>
@@ -1485,7 +1490,7 @@ function WeeklyJobsHistory({
   showStone: boolean;
 }) {
   if (weeks.length === 0) {
-    return <article className="glass-card p-4 text-sm text-[#efcdab]">Aucune activitÃ© Jobs sur cette pÃ©riode.</article>;
+    return <article className="glass-card p-4 text-sm text-[#efcdab]">Aucune activité Jobs sur cette période.</article>;
   }
 
   return (
@@ -1501,9 +1506,9 @@ function WeeklyJobsHistory({
                   <span className="text-xs text-[#efcdab]">{new Date(`${day.dateKey}T00:00:00.000Z`).toLocaleDateString('fr-FR')}</span>
                 </div>
                 <div className={`grid gap-3 ${showProcessor && showStone ? 'xl:grid-cols-4' : showProcessor || showStone ? 'xl:grid-cols-3' : 'xl:grid-cols-2'}`}>
-                  <JobsDayColumn title="ðŸ“± Tablette" entries={day.tablet} empty="Aucun passage tablette." />
-                  <JobsDayColumn title="ðŸš¬ Cigarette" entries={day.cigarette} empty="Aucun passage cigarette." />
-                  {showProcessor ? <JobsDayColumn title="âš™ï¸ Processeur" entries={day.processor} empty="Aucune activitÃ© processeur." /> : null}
+                  <JobsDayColumn title="📱 Tablette" entries={day.tablet} empty="Aucun passage tablette." />
+                  <JobsDayColumn title="🚬 Cigarette" entries={day.cigarette} empty="Aucun passage cigarette." />
+                  {showProcessor ? <JobsDayColumn title="⚙️ Processeur" entries={day.processor} empty="Aucune activité processeur." /> : null}
                   {showStone ? <JobsDayColumn title="Pierre" entries={day.stone} empty="Aucune vente pierre." /> : null}
                 </div>
               </div>
@@ -1550,10 +1555,10 @@ function JobsStatsTable({ rows }: { rows: MemberJobStats[] }) {
           <thead className="text-[#ffe8ca]">
             <tr>
               <th className="px-2 py-2">Membre</th>
-              <th className="px-2 py-2" colSpan={4}>ðŸ“± Tablette</th>
-              <th className="px-2 py-2" colSpan={5}>ðŸš¬ Cigarette</th>
-              <th className="px-2 py-2" colSpan={3}>âš™ï¸ Processeur</th>
-              <th className="px-2 py-2" colSpan={2}>ðŸ“Š Total</th>
+              <th className="px-2 py-2" colSpan={4}>📱 Tablette</th>
+              <th className="px-2 py-2" colSpan={5}>🚬 Cigarette</th>
+              <th className="px-2 py-2" colSpan={3}>⚙️ Processeur</th>
+              <th className="px-2 py-2" colSpan={2}>📊 Total</th>
             </tr>
             <tr className="border-t border-white/10 text-[11px] text-[#d9b48f]">
               <th className="px-2 py-1"></th>
@@ -1565,12 +1570,12 @@ function JobsStatsTable({ rows }: { rows: MemberJobStats[] }) {
               <th className="px-2 py-1">Paquets</th>
               <th className="px-2 py-1">Cash</th>
               <th className="px-2 py-1">Bank attente</th>
-              <th className="px-2 py-1">Bank reÃ§u</th>
+              <th className="px-2 py-1">Bank reçu</th>
               <th className="px-2 py-1">Produits</th>
               <th className="px-2 py-1">Vendus</th>
               <th className="px-2 py-1">Argent</th>
-              <th className="px-2 py-1">ActivitÃ©s</th>
-              <th className="px-2 py-1">DerniÃ¨re activitÃ©</th>
+              <th className="px-2 py-1">Activités</th>
+              <th className="px-2 py-1">Dernière activité</th>
             </tr>
           </thead>
           <tbody>
@@ -1594,7 +1599,7 @@ function JobsStatsTable({ rows }: { rows: MemberJobStats[] }) {
               </tr>
             ))}
             {rows.length === 0 ? (
-              <tr className="border-t border-white/10"><td className="px-2 py-3" colSpan={15}>Aucune stat Jobs sur cette pÃ©riode.</td></tr>
+              <tr className="border-t border-white/10"><td className="px-2 py-3" colSpan={15}>Aucune stat Jobs sur cette période.</td></tr>
             ) : null}
           </tbody>
         </table>

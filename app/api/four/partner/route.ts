@@ -110,6 +110,8 @@ export async function POST(request: Request) {
     partner_name?: string;
     kits_sold?: number;
     cutters_sold?: number;
+    kit_unit_price?: number;
+    cutter_unit_price?: number;
     amount_received?: number;
     payment_method?: 'cash' | 'bank';
     reported_items?: ReportedItemInput[];
@@ -123,7 +125,10 @@ export async function POST(request: Request) {
   const partnerName = body.partner_name?.trim() || cycleDay.label;
   const kitsSold = Math.max(0, Number(body.kits_sold ?? 20));
   const cuttersSold = Math.max(0, Number(body.cutters_sold ?? 20));
-  const amountReceived = Math.max(0, Number(body.amount_received ?? 0));
+  const kitUnitPrice = Math.max(0, Number(body.kit_unit_price ?? 0));
+  const cutterUnitPrice = Math.max(0, Number(body.cutter_unit_price ?? 0));
+  const calculatedAmount = kitsSold * kitUnitPrice + cuttersSold * cutterUnitPrice;
+  const amountReceived = calculatedAmount > 0 ? calculatedAmount : Math.max(0, Number(body.amount_received ?? 0));
   const paymentMethod = body.payment_method === 'bank' ? 'bank' : 'cash';
   if (kitsSold <= 0 && cuttersSold <= 0) return NextResponse.json({ message: 'Aucune quantité vendue.' }, { status: 400 });
 
@@ -203,6 +208,8 @@ export async function POST(request: Request) {
         partner_name: partnerName,
         kits_sold: kitsSold,
         cutters_sold: cuttersSold,
+        kit_unit_price: kitUnitPrice,
+        cutter_unit_price: cutterUnitPrice,
         amount_received: amountReceived,
         payment_method: paymentMethod,
         status,
@@ -225,7 +232,16 @@ export async function POST(request: Request) {
       entityType: 'four_partner_sale',
       entityId: sale.id,
       summary: `Vente partenaire FOUR ${partnerName} · ${kitsSold} kits · ${cuttersSold} disqueuses · ${formatUsd(amountReceived)} ${paymentMethod}`,
-      newValues: sale
+      newValues: {
+        ...sale,
+        kit_unit_price: kitUnitPrice,
+        cutter_unit_price: cutterUnitPrice,
+        total_calculated: amountReceived,
+        stock_before_after: {
+          kits: { before: Number(kit.quantity), after: kitAfter },
+          cutters: { before: Number(cutter.quantity), after: cutterAfter }
+        }
+      }
     });
     return NextResponse.json({ ok: true, sale, itemUpdates: [{ id: kit.id, quantity: kitAfter }, { id: cutter.id, quantity: cutterAfter }, ...reportedItems.map((item) => ({ id: item.item_id, quantity: item.after }))], cash: { before: cashBefore, after: cashAfter } });
   } catch (error) {
