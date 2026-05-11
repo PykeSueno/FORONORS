@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   SIMPLE_PERMISSION_MODULES,
   SIMPLE_ROLE_PRESETS,
@@ -547,21 +547,21 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
   })), [permissionIdByName]);
   const simplePermissionByKey = useMemo(() => new Map(simpleModules.flatMap((module) => module.permissions.map((permission) => [permission.key, permission]))), [simpleModules]);
 
-  function simpleKeysFromRoles(roles: Role[]) {
+  const simpleKeysFromRoles = useCallback((roles: Role[]) => {
     return new Set(simpleModules.flatMap((module) => module.permissions.filter((permission) => (
       permission.permissionIds.length > 0 &&
       roles.length > 0 &&
       roles.every((role) => permission.permissionIds.every((permissionId) => role.permission_ids.includes(permissionId)))
     )).map((permission) => permission.key)));
-  }
+  }, [simpleModules]);
 
-  function partialSimpleKeysFromRoles(roles: Role[]) {
+  const partialSimpleKeysFromRoles = useCallback((roles: Role[]) => {
     return new Set(simpleModules.flatMap((module) => module.permissions.filter((permission) => {
       if (permission.permissionIds.length === 0 || roles.length === 0) return false;
       const enabledCount = permission.permissionIds.filter((permissionId) => roles.every((role) => role.permission_ids.includes(permissionId))).length;
       return enabledCount > 0 && enabledCount < permission.permissionIds.length;
     }).map((permission) => permission.key)));
-  }
+  }, [simpleModules]);
 
   const [checkedSimpleKeys, setCheckedSimpleKeys] = useState<Set<string>>(() => simpleKeysFromRoles(selectedRoles));
   const [partialSimpleKeys, setPartialSimpleKeys] = useState<Set<string>>(() => partialSimpleKeysFromRoles(selectedRoles));
@@ -571,7 +571,7 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
     setCheckedSimpleKeys(simpleKeysFromRoles(selectedRoles));
     setPartialSimpleKeys(partialSimpleKeysFromRoles(selectedRoles));
     setExactPermissionIds(null);
-  }, [selectedRoles, simpleModules]);
+  }, [partialSimpleKeysFromRoles, selectedRoles, simpleKeysFromRoles]);
 
   useEffect(() => {
     if (simpleModules.length === 0) return;
