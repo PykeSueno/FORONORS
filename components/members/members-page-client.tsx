@@ -327,6 +327,7 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
       {isRoleModalOpen && selectedRoles.length > 0 ? (
         <RoleManageModal
           selectedRoles={selectedRoles}
+          roles={sortedRoles}
           permissions={permissions}
           canManageRoles={canManageRoles}
           canRenameRole={canRenameRole}
@@ -509,7 +510,7 @@ function isCriticalRoleName(name?: string) {
   return ['patron', 'lead', 'admin', 'administrateur'].includes((name ?? '').trim().toLowerCase());
 }
 
-function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRenameRole, onClose, onSaved, onError }: { selectedRoles: Role[]; permissions: Permission[]; canManageRoles: boolean; canRenameRole: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
+function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, canRenameRole, onClose, onSaved, onError }: { selectedRoles: Role[]; roles: Role[]; permissions: Permission[]; canManageRoles: boolean; canRenameRole: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
   const displayPermissions = useMemo(() => {
     const byCanonical = new Map<string, Permission>();
     for (const permission of permissions) {
@@ -527,6 +528,7 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
   const [criticalConfirmChecked, setCriticalConfirmChecked] = useState(false);
   const [criticalConfirmName, setCriticalConfirmName] = useState('');
   const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
+  const [copySourceRoleId, setCopySourceRoleId] = useState('');
   const renameIsCritical = Boolean(renameTarget && (isCriticalRoleName(renameTarget.name) || isCriticalRoleName(roleNameDraft)));
   const renameConfirmed = !renameIsCritical || (criticalConfirmChecked && criticalConfirmName.trim() === renameTarget?.name);
 
@@ -546,6 +548,7 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
     }))
   })), [permissionIdByName]);
   const simplePermissionByKey = useMemo(() => new Map(simpleModules.flatMap((module) => module.permissions.map((permission) => [permission.key, permission]))), [simpleModules]);
+  const allSimpleKeys = useMemo(() => simpleModules.flatMap((module) => module.permissions.map((permission) => permission.key)), [simpleModules]);
 
   const simpleKeysFromRoles = useCallback((roles: Role[]) => {
     return new Set(simpleModules.flatMap((module) => module.permissions.filter((permission) => (
@@ -675,11 +678,12 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
   }
 
   function copyFromRole(roleId: number) {
-    const source = selectedRoles.find((role) => role.id === roleId);
+    const source = roles.find((role) => role.id === roleId);
     if (!source) return;
     setExactPermissionIds(new Set(source.permission_ids));
     setCheckedSimpleKeys(simpleKeysFromRoles([source]));
     setPartialSimpleKeys(partialSimpleKeysFromRoles([source]));
+    setCopySourceRoleId(String(roleId));
   }
 
   async function duplicateRole() {
@@ -769,27 +773,34 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
                     <p className="text-xs text-[#efcba8]">Copie rapide, duplication et reset sécurisé.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <button type="button" className="saas-ghost-btn !h-8 !px-3 !text-xs" onClick={() => applySimpleKeys(allSimpleKeys)}>
+                      Tout cocher
+                    </button>
+                    <button type="button" className="saas-ghost-btn !h-8 !px-3 !text-xs" onClick={() => applySimpleKeys([])}>
+                      Tout decocher
+                    </button>
                     {(Object.keys(SIMPLE_ROLE_PRESETS) as Array<keyof typeof SIMPLE_ROLE_PRESETS>).map((preset) => (
                       <button key={preset} type="button" className="saas-ghost-btn !h-8 !px-3 !text-xs" onClick={() => applySimpleKeys(SIMPLE_ROLE_PRESETS[preset])}>
-                        Reset {preset}
+                        Reinitialiser {preset}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedRoles.map((role) => (
-                    <button key={role.id} type="button" className="filter-pill" onClick={() => copyFromRole(role.id)}>
-                      Copier {role.name}
-                    </button>
-                  ))}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <select className="saas-input !h-9 min-w-[220px] !py-1 text-xs" value={copySourceRoleId} onChange={(event) => setCopySourceRoleId(event.target.value)}>
+                    <option value="">Copier permissions d'un role</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="filter-pill" disabled={!copySourceRoleId} onClick={() => copyFromRole(Number(copySourceRoleId))}>
+                    Copier
+                  </button>
                   {selectedRoles.length === 1 ? (
                     <button type="button" className="filter-pill" onClick={() => void duplicateRole()}>
                       Dupliquer rôle
                     </button>
                   ) : null}
-                  <button type="button" className="filter-pill" onClick={() => applySimpleKeys([])}>
-                    Tout retirer
-                  </button>
                 </div>
               </section>
 
@@ -811,19 +822,19 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
                             <p className="truncate text-xs text-[#efcba8]">{module.description}</p>
                           </div>
                         </div>
-                        <span className="text-xs text-[#efcba8]">{openModules[module.key] ? '-' : '+'}</span>
+                        <span className="text-xs text-[#efcba8]">{openModules[module.key] ? 'Masquer' : 'Details'}</span>
                       </button>
 
                       {openModules[module.key] ? (
                         <div className="mt-3 space-y-2">
                           <label className="flex items-center justify-between rounded-lg border border-white/10 bg-[#3b2418]/55 px-3 py-2 text-sm text-[#fff1de]">
-                            <span className="font-semibold">Tout le module</span>
+                            <span className="flex items-center gap-2 font-semibold">
+                              Tout le module
+                              {state.mixed && !state.checked ? <span className="rounded-full border border-amber-200/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-100">Partiel</span> : null}
+                            </span>
                             <input
                               type="checkbox"
                               checked={state.checked}
-                              ref={(el) => {
-                                if (el) el.indeterminate = state.mixed;
-                              }}
                               onChange={(event) => toggleModule(moduleSimpleKeys, event.target.checked)}
                             />
                           </label>
@@ -833,14 +844,14 @@ function RoleManageModal({ selectedRoles, permissions, canManageRoles, canRename
                               const state = simpleKeyState(simplePermission.key);
                               return (
                                 <label key={simplePermission.key} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#5c3b26]/45 px-3 py-2 text-sm text-[#fff1de]">
-                                  <span className="font-medium">{simplePermission.label}</span>
+                                  <span className="flex min-w-0 items-center gap-2">
+                                    <span className="truncate font-medium">{simplePermission.label}</span>
+                                    {state.mixed && !state.checked ? <span className="shrink-0 rounded-full border border-amber-200/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-100">Partiel</span> : null}
+                                  </span>
                                   <input
                                     type="checkbox"
                                     checked={state.checked}
                                     disabled={simplePermission.permissionIds.length === 0}
-                                    ref={(el) => {
-                                      if (el) el.indeterminate = state.mixed;
-                                    }}
                                     onChange={(event) => toggleSimplePermission(simplePermission.key, event.target.checked)}
                                   />
                                 </label>

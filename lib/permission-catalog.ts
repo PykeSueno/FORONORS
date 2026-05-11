@@ -132,6 +132,7 @@ export function permissionOrder(permissionName: string) {
 }
 
 export type PermissionModuleKey =
+  | 'dashboard'
   | 'stock'
   | 'money'
   | 'activity'
@@ -160,15 +161,28 @@ export type PermissionModule = {
 
 export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
   {
+    key: 'dashboard',
+    icon: '🏠',
+    title: 'DASHBOARD',
+    description: 'Accueil, bulles et widgets.',
+    permissions: [
+      { key: 'dashboard.view', label: 'Voir', permissions: ['dashboard.access', 'dashboard.preview', 'dashboard.view'] }
+    ]
+  },
+  {
     key: 'stock',
     icon: '📦',
     title: 'STOCK',
     description: 'Items, stock et mouvements.',
     permissions: [
-      { key: 'stock.view', label: 'Voir', partnerSafe: true, permissions: ['items.access', 'items.preview', 'items.movements.view', 'dashboard.stock.movements.preview', 'dashboard.stock.movements.access'] },
-      { key: 'stock.edit', label: 'Modifier', permissions: ['items.create', 'items.edit', 'items.delete'] },
+      { key: 'stock.view', label: 'Voir', partnerSafe: true, permissions: ['items.access', 'items.preview', 'dashboard.stock.movements.preview', 'dashboard.stock.movements.access'] },
+      { key: 'stock.create', label: 'CrÃ©er', permissions: ['items.create'] },
+      { key: 'stock.edit', label: 'Modifier', permissions: ['items.edit'] },
+      { key: 'stock.delete', label: 'Supprimer', permissions: ['items.delete'] },
+      { key: 'stock.history', label: 'Historique', permissions: ['items.movements.view'] },
       { key: 'stock.transactions', label: 'Transactions', permissions: ['transactions.access', 'transactions.create', 'transactions.edit.own', 'transactions.edit.any', 'transactions.cancel.own', 'transactions.cancel.any', 'transactions.manage.own', 'transactions.manage.any', 'transactions.preview', 'transactions.recent.access', 'transactions.recent.edit.own', 'transactions.recent.edit.any', 'transactions.recent.cancel.own', 'transactions.recent.cancel.any', 'transactions.recent.manage.own', 'transactions.recent.manage.any', 'transactions.recent.preview'] },
-      { key: 'stock.sales', label: 'Vente objets', permissions: ['sale.objects.preview', 'sale.objects.access', 'sale.objects.create', 'sale.objects.receive', 'sale.objects.edit.own', 'sale.objects.edit.any', 'sale.objects.cancel.own', 'sale.objects.cancel.any', 'sale.objects.history.view', 'sale_objects.routing.view', 'sale_objects.routing.edit', 'money.quick_sale.access', 'money.quick_sale.preview', 'money.quick_sale.create', 'money.quick_sale.history.view', 'money.quick_sale.details.view', 'money.quick_sale.logs.view'] }
+      { key: 'stock.sales', label: 'Vente objets', permissions: ['sale.objects.preview', 'sale.objects.access', 'sale.objects.create', 'sale.objects.receive', 'sale.objects.edit.own', 'sale.objects.edit.any', 'sale.objects.cancel.own', 'sale.objects.cancel.any', 'sale.objects.history.view', 'sale_objects.routing.view', 'sale_objects.routing.edit', 'money.quick_sale.access', 'money.quick_sale.preview', 'money.quick_sale.create', 'money.quick_sale.history.view', 'money.quick_sale.details.view'] },
+      { key: 'stock.logs', label: 'Logs', permissions: ['money.quick_sale.logs.view'] }
     ]
   },
   {
@@ -190,7 +204,11 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
     permissions: [
       { key: 'activity.view', label: 'Voir', partnerSafe: true, permissions: ['activity.access', 'activity.view', 'activity.preview', 'activity.processor.view', 'drugs.access', 'drugs.preview', 'drugs.transfo.view', 'drugs.sales.view', 'drugs.sales.preview', 'drugs.production.access', 'drugs.gofast.view'] },
       { key: 'activity.create', label: 'Créer activité', permissions: ['activity.create', 'activity.processor.create', 'drugs.transfo.create', 'drugs.transfo.receive.validate', 'drugs.sales.create', 'drugs.production.create', 'drugs.production.coke.create', 'drugs.production.meth.create', 'drugs.gofast.create'] },
-      { key: 'activity.stats', label: 'Stats', permissions: ['activity.stats.view', 'activity.logs.view', 'activity.edit.own', 'activity.edit.any', 'activity.cancel.own', 'activity.cancel.any', 'activity.manage.own', 'activity.manage.any', 'activity.processor.edit', 'activity.processor.cancel', 'drugs.stats.view', 'drugs.logs.view', 'drugs.transfo.stats.view', 'drugs.transfo.logs.view', 'drugs.transfo.edit', 'drugs.transfo.edit.own', 'drugs.transfo.edit.any', 'drugs.transfo.cancel', 'drugs.transfo.cancel.own', 'drugs.transfo.cancel.any', 'drugs.sales.stats.view', 'drugs.sales.logs.view', 'drugs.sales.edit', 'drugs.sales.edit.own', 'drugs.sales.edit.any', 'drugs.sales.cancel', 'drugs.sales.cancel.own', 'drugs.sales.cancel.any', 'drugs.production.history', 'drugs.production.history.view', 'drugs.production.edit', 'drugs.production.edit.own', 'drugs.production.edit.any', 'drugs.production.cancel', 'drugs.production.cancel.own', 'drugs.production.cancel.any', 'drugs.gofast.stats', 'drugs.gofast.stats.view', 'drugs.gofast.logs', 'drugs.gofast.logs.view', 'drugs.gofast.cancel', 'drugs.gofast.arrested'] }
+      { key: 'activity.edit', label: 'Modifier', permissions: ['activity.edit.own', 'activity.edit.any', 'activity.manage.own', 'activity.manage.any', 'activity.processor.edit', 'drugs.transfo.edit', 'drugs.transfo.edit.own', 'drugs.transfo.edit.any', 'drugs.sales.edit', 'drugs.sales.edit.own', 'drugs.sales.edit.any', 'drugs.production.edit', 'drugs.production.edit.own', 'drugs.production.edit.any'] },
+      { key: 'activity.delete', label: 'Supprimer', permissions: ['activity.cancel.own', 'activity.cancel.any', 'activity.processor.cancel', 'drugs.transfo.cancel', 'drugs.transfo.cancel.own', 'drugs.transfo.cancel.any', 'drugs.sales.cancel', 'drugs.sales.cancel.own', 'drugs.sales.cancel.any', 'drugs.production.cancel', 'drugs.production.cancel.own', 'drugs.production.cancel.any', 'drugs.gofast.cancel'] },
+      { key: 'activity.history', label: 'Historique', permissions: ['drugs.production.history', 'drugs.production.history.view'] },
+      { key: 'activity.stats', label: 'Stats', permissions: ['activity.stats.view', 'drugs.stats.view', 'drugs.transfo.stats.view', 'drugs.sales.stats.view', 'drugs.gofast.stats', 'drugs.gofast.stats.view'] },
+      { key: 'activity.logs', label: 'Logs', permissions: ['activity.logs.view', 'drugs.logs.view', 'drugs.transfo.logs.view', 'drugs.sales.logs.view', 'drugs.gofast.logs', 'drugs.gofast.logs.view', 'drugs.gofast.arrested'] }
     ]
   },
   {
@@ -213,12 +231,14 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
     description: 'Tablette, cigarette, processeur et pierre.',
     permissions: [
       { key: 'jobs.view', label: 'Voir', partnerSafe: true, permissions: ['tablet.access', 'tablet.preview', 'cigarette.access', 'cigarette.preview', 'tobacco.processor.view', 'tobacco.processor.sale.view', 'jobs.stone.view'] },
-      { key: 'jobs.tablet', label: 'Tablette', permissions: ['tablet.passage.create', 'tablet.daily.manage', 'tablet.stats.view', 'tablet.logs.view', 'jobs.tablet.webhook.view', 'jobs.tablet.webhook.edit'] },
-      { key: 'jobs.cigarette', label: 'Cigarette', permissions: ['cigarette.passage.create', 'cigarette.passage.create.any', 'cigarette.daily.manage', 'cigarette.edit.own', 'cigarette.edit.any', 'cigarette.history.view', 'cigarette.stats.view', 'cigarette.logs.view'] },
-      { key: 'jobs.processor', label: 'Processeur', permissions: ['tobacco.processor.create', 'tobacco.processor.production', 'tobacco.processor.sale', 'tobacco.processor.sale.validate', 'tobacco.processor.sale.edit', 'tobacco.processor.sale.cancel', 'tobacco.processor.stats', 'tobacco.processor.logs'] },
-      { key: 'jobs.stone', label: 'Pierre', permissions: ['jobs.stone.sell', 'jobs.stone.history.view', 'jobs.stone.stats.view', 'jobs.stone.logs'] },
-      { key: 'jobs.history', label: 'Historique', partnerSafe: true, permissions: ['tablet.logs.view', 'cigarette.history.view', 'tobacco.processor.logs', 'tobacco.processor.sale.view', 'jobs.stone.history.view'] },
-      { key: 'jobs.stats', label: 'Stats', permissions: ['tablet.stats.view', 'cigarette.stats.view', 'tobacco.processor.stats', 'jobs.stone.stats.view'] }
+      { key: 'jobs.tablet', label: 'Tablette', permissions: ['tablet.passage.create', 'jobs.tablet.webhook.view'] },
+      { key: 'jobs.cigarette', label: 'Cigarette', permissions: ['cigarette.passage.create', 'cigarette.passage.create.any'] },
+      { key: 'jobs.processor', label: 'Processeur', permissions: ['tobacco.processor.create', 'tobacco.processor.production', 'tobacco.processor.sale', 'tobacco.processor.sale.validate'] },
+      { key: 'jobs.stone', label: 'Pierre', permissions: ['jobs.stone.sell'] },
+      { key: 'jobs.edit', label: 'Modifier', permissions: ['tablet.daily.manage', 'jobs.tablet.webhook.edit', 'cigarette.daily.manage', 'cigarette.edit.own', 'cigarette.edit.any', 'tobacco.processor.sale.edit', 'tobacco.processor.sale.cancel'] },
+      { key: 'jobs.history', label: 'Historique', partnerSafe: true, permissions: ['cigarette.history.view', 'tobacco.processor.sale.view', 'jobs.stone.history.view'] },
+      { key: 'jobs.stats', label: 'Stats', permissions: ['tablet.stats.view', 'cigarette.stats.view', 'tobacco.processor.stats', 'jobs.stone.stats.view'] },
+      { key: 'jobs.logs', label: 'Logs', permissions: ['tablet.logs.view', 'cigarette.logs.view', 'tobacco.processor.logs', 'jobs.stone.logs'] }
     ]
   },
   {
@@ -228,11 +248,13 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
     description: 'Transactions, partenaire, messages et stats.',
     permissions: [
       { key: 'four.view', label: 'Voir', partnerSafe: true, permissions: ['four.access', 'four.preview'] },
-      { key: 'four.transactions', label: 'Transactions', permissions: ['four.transaction.validate', 'four.transaction.edit.own', 'four.transaction.edit.any', 'four.transaction.cancel.own', 'four.transaction.cancel.any', 'four.transaction.manage', 'four.transaction.manage.own', 'four.transaction.manage.any', 'four.transaction.recent.edit.own', 'four.transaction.recent.edit.any'] },
+      { key: 'four.transactions', label: 'Transactions', permissions: ['four.transaction.validate'] },
       { key: 'four.partner', label: 'Partenaire', partnerSafe: true, permissions: ['four.partner.view', 'four.partner.sell', 'four.partner.history.view', 'four.partner.stats.view'] },
-      { key: 'four.messages', label: 'Messages', partnerSafe: true, permissions: ['four.messages.view', 'four.messages.manage'] },
-      { key: 'four.history', label: 'Historique', permissions: ['four.history.view', 'four.logs.view'] },
-      { key: 'four.stats', label: 'Stats', permissions: ['four.stats.view'] }
+      { key: 'four.messages', label: 'Messages', partnerSafe: true, permissions: ['four.messages.view'] },
+      { key: 'four.edit', label: 'Modifier', permissions: ['four.transaction.edit.own', 'four.transaction.edit.any', 'four.transaction.cancel.own', 'four.transaction.cancel.any', 'four.transaction.manage', 'four.transaction.manage.own', 'four.transaction.manage.any', 'four.transaction.recent.edit.own', 'four.transaction.recent.edit.any', 'four.partner.config', 'four.messages.manage'] },
+      { key: 'four.history', label: 'Historique', permissions: ['four.history.view'] },
+      { key: 'four.stats', label: 'Stats', permissions: ['four.stats.view'] },
+      { key: 'four.logs', label: 'Logs', permissions: ['four.logs.view', 'four.partner.logs'] }
     ]
   },
   {
@@ -245,7 +267,8 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
       { key: 'robberies.create', label: 'Créer braquage', permissions: ['robberies.create', 'robberies.arrested', 'robberies.fleeca.multi_roles', 'robberies.fleeca.verify_no_consume'] },
       { key: 'robberies.history', label: 'Historique', permissions: ['robberies.view'] },
       { key: 'robberies.stats', label: 'Stats', permissions: ['robberies.stats'] },
-      { key: 'robberies.logs', label: 'Logs', permissions: ['robberies.logs', 'robberies.cancel'] }
+      { key: 'robberies.logs', label: 'Logs', permissions: ['robberies.logs'] },
+      { key: 'robberies.delete', label: 'Supprimer', permissions: ['robberies.cancel'] }
     ]
   },
   {
@@ -255,7 +278,9 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
     description: 'Membres, grades et identifiants.',
     permissions: [
       { key: 'members.view', label: 'Voir', permissions: ['members.access', 'members.view', 'members.preview', 'members.activities.view'] },
-      { key: 'members.edit', label: 'Modifier', permissions: ['members.create', 'members.edit', 'members.delete', 'members.password.view', 'members.password.copy', 'members.password.edit', 'members.credentials.copy', 'account.password.update'] },
+      { key: 'members.create', label: 'Creer', permissions: ['members.create'] },
+      { key: 'members.edit', label: 'Modifier', permissions: ['members.edit', 'members.password.view', 'members.password.copy', 'members.password.edit', 'members.credentials.copy', 'account.password.update'] },
+      { key: 'members.delete', label: 'Supprimer', permissions: ['members.delete'] },
       { key: 'members.grades', label: 'Grades', permissions: ['roles.rename'] }
     ]
   },
@@ -292,16 +317,25 @@ export const SIMPLE_ROLE_PRESETS: Record<string, string[]> = {
   ADMIN: SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => permission.key)),
   PATRON: SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => permission.key)).filter((key) => key !== 'admin.sql'),
   GESTION: [
+    'dashboard.view',
     'stock.view',
+    'stock.create',
     'stock.edit',
+    'stock.delete',
+    'stock.history',
     'stock.transactions',
     'stock.sales',
+    'stock.logs',
     'money.view',
     'money.edit',
     'money.history',
     'activity.view',
     'activity.create',
+    'activity.edit',
+    'activity.delete',
+    'activity.history',
     'activity.stats',
+    'activity.logs',
     'member_ops.view',
     'member_ops.payroll',
     'member_ops.expenses',
@@ -312,22 +346,32 @@ export const SIMPLE_ROLE_PRESETS: Record<string, string[]> = {
     'jobs.cigarette',
     'jobs.processor',
     'jobs.stone',
+    'jobs.edit',
     'jobs.history',
     'jobs.stats',
+    'jobs.logs',
     'four.view',
     'four.transactions',
     'four.partner',
     'four.messages',
+    'four.edit',
     'four.history',
     'four.stats',
+    'four.logs',
     'robberies.view',
     'robberies.create',
     'robberies.stats',
+    'robberies.logs',
+    'robberies.delete',
     'members.view',
+    'members.create',
     'members.edit',
+    'members.delete',
+    'members.grades',
     'logs.view'
   ],
   MEMBRE: [
+    'dashboard.view',
     'stock.view',
     'activity.view',
     'activity.create',
