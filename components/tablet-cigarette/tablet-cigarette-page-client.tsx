@@ -1134,9 +1134,7 @@ export function TabletCigarettePageClient(props: {
           <article className="glass-card p-5 xl:col-span-2">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-white/10 bg-[#2f1d14]/65">
-                  {stoneImageUrl ? <Image src={stoneImageUrl} alt="Saphir Brut" fill sizes="64px" className="object-cover" /> : <div className="grid h-full w-full place-items-center text-2xl">💎</div>}
-                </div>
+                <JobItemImage src={stoneImageUrl} alt="Saphir Brut" fallback="💎" size={64} />
                 <div>
                 <h3 className="text-xl font-semibold text-[#ffe8ca]">💎 Pierre - Saphir Brut</h3>
                 <p className="text-xs text-[#efcdab]">Cash uniquement - 225$ unité - limite 8 par jour et par membre</p>
@@ -1153,7 +1151,10 @@ export function TabletCigarettePageClient(props: {
 
           <article className="glass-card p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h4 className="text-base font-semibold text-[#fff1dd]">Vente Saphir Brut</h4>
+              <div className="flex items-center gap-3">
+                <JobItemImage src={stoneImageUrl} alt="Saphir Brut" fallback="💎" size={44} />
+                <h4 className="text-base font-semibold text-[#fff1dd]">Vente Saphir Brut</h4>
+              </div>
               <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">Cash</span>
             </div>
             <div className="space-y-3">
@@ -1237,7 +1238,10 @@ export function TabletCigarettePageClient(props: {
           </article>
           {canStoneStats ? (
             <article className="glass-card p-5">
-              <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Pierre</h4>
+              <div className="flex items-center gap-3">
+                <JobItemImage src={stoneImageUrl} alt="Saphir Brut" fallback="💎" size={40} />
+                <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Pierre</h4>
+              </div>
               <div className="mt-2 grid gap-2 md:grid-cols-4">
                 <Stat label="Saphirs vendus" value={String(stoneStatsTotals.sold)} icon="💎" />
                 <Stat label="Argent généré" value={formatUsd(stoneStatsTotals.revenue)} icon="💵" />
@@ -1605,6 +1609,31 @@ function JobsStatsTable({ rows }: { rows: MemberJobStats[] }) {
         </table>
       </div>
     </article>
+  );
+}
+
+function JobItemImage({
+  src,
+  alt,
+  fallback = '📦',
+  size = 40,
+}: {
+  src?: string | null;
+  alt: string;
+  fallback?: string;
+  size?: number;
+}) {
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#24160f] text-xl"
+      style={{ width: size, height: size }}
+    >
+      {src ? (
+        <Image src={src} alt={alt} width={size} height={size} className="h-full w-full object-cover" unoptimized />
+      ) : (
+        <span aria-hidden="true">{fallback}</span>
+      )}
+    </div>
   );
 }
 

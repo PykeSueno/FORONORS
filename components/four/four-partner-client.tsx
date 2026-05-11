@@ -20,6 +20,8 @@ type Item = {
   category_key?: string | null;
   type_key?: string | null;
   image_url?: string | null;
+  image?: string | null;
+  icon_url?: string | null;
 };
 
 export type FourPartnerSale = {
@@ -38,6 +40,8 @@ export type FourPartnerSale = {
     item_name: string;
     quantity: number;
     image_url?: string | null;
+    image?: string | null;
+    icon_url?: string | null;
     before?: number;
     after?: number;
   }>;
@@ -119,6 +123,10 @@ function categoryKey(value?: string | null) {
   if (['drugs', 'produits', 'product', 'products'].includes(normalized)) return 'drugs';
   if (['other', 'others', 'misc', 'autres'].includes(normalized)) return 'other';
   return 'other';
+}
+
+function itemImageUrl(item?: Pick<Item, 'image_url' | 'image' | 'icon_url'> | null) {
+  return item?.image_url || item?.image || item?.icon_url || null;
 }
 
 function formatDate(value?: string | null) {
@@ -624,8 +632,8 @@ function TodayCard({
       ) : (
         <>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <StockTile item={kitItem} label="Kits à vendre" value="20" footer={`Stock actuel : ${kitStock}`} />
-            <StockTile item={cutterItem} label="Disqueuses à vendre" value="20" footer={`Stock actuel : ${cutterStock}`} />
+            <StockTile item={kitItem} fallback="🧰" label="Kits à vendre" value="20" footer={`Stock actuel : ${kitStock}`} />
+            <StockTile item={cutterItem} fallback="🛠️" label="Disqueuses à vendre" value="20" footer={`Stock actuel : ${cutterStock}`} />
           </div>
 
           <div
@@ -734,8 +742,8 @@ function SaleCard({
         </label>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Stepper iconItem={kitItem} label="Kits vendus" value={kitsSold} onChange={setKitsSold} />
-          <Stepper iconItem={cutterItem} label="Disqueuses vendues" value={cuttersSold} onChange={setCuttersSold} />
+          <Stepper iconItem={kitItem} iconFallback="🧰" label="Kits vendus" value={kitsSold} onChange={setKitsSold} />
+          <Stepper iconItem={cutterItem} iconFallback="🛠️" label="Disqueuses vendues" value={cuttersSold} onChange={setCuttersSold} />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -763,10 +771,10 @@ function SaleCard({
         <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
           <div className="text-xs font-black uppercase text-[#efcdab]">Recap vente</div>
           <div className="mt-3 grid gap-2 text-sm font-semibold text-[#ffe8ca] sm:grid-cols-2">
-            <InfoLine label="Kits vendus" value={`${kitsSold} x ${formatUsd(kitPrice)}`} />
-            <InfoLine label="Disqueuses vendues" value={`${cuttersSold} x ${formatUsd(cutterPrice)}`} />
-            <InfoLine label="Kits avant/après" value={`${kitStock} -> ${kitAfter}`} />
-            <InfoLine label="Disqueuses avant/après" value={`${cutterStock} -> ${cutterAfter}`} />
+            <ItemInfoLine item={kitItem} fallback="🧰" label="Kits vendus" value={`${kitsSold} x ${formatUsd(kitPrice)}`} />
+            <ItemInfoLine item={cutterItem} fallback="🛠️" label="Disqueuses vendues" value={`${cuttersSold} x ${formatUsd(cutterPrice)}`} />
+            <ItemInfoLine item={kitItem} fallback="🧰" label="Kits avant/après" value={`${kitStock} -> ${kitAfter}`} />
+            <ItemInfoLine item={cutterItem} fallback="🛠️" label="Disqueuses avant/après" value={`${cutterStock} -> ${cutterAfter}`} />
             <InfoLine label="Total vente" value={formatUsd(saleTotal)} />
             <InfoLine
               label={paymentMethod === 'cash' ? 'Argent ajouté' : 'Bank en attente'}
@@ -844,7 +852,7 @@ function ReportedItemsCard({
                 key={item.id}
                 className="grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-2xl border border-white/10 bg-[#2b1a12]/70 p-2"
               >
-                <ItemImage item={item} />
+                <ItemImage item={item} fallback="📦" />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-black text-[#fff1dd]">{item.name}</div>
                   <div className="text-xs font-semibold text-[#efcdab]">Stock actuel : {item.quantity}</div>
@@ -875,7 +883,7 @@ function ReportedItemsCard({
                 className="rounded-2xl border border-white/10 bg-[#2b1a12]/70 p-2"
               >
                 <div className="grid grid-cols-[40px_1fr_auto] items-center gap-3">
-                  <ItemImage item={line.item} />
+                  <ItemImage item={line.item} fallback="📦" />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-black text-[#fff1dd]">{line.item?.name}</div>
                     <div className="text-xs font-semibold text-[#efcdab]">Stock : {line.item?.quantity ?? 0}</div>
@@ -947,10 +955,22 @@ function HistoryCard({
             </div>
 
             <div className="mt-3 rounded-2xl border border-white/10 bg-[#2b1a12]/70 px-3 py-2 text-xs font-semibold text-[#efcdab]">
-              Objets rapportés :{' '}
-              {sale.reported_items?.length
-                ? sale.reported_items.map((item) => `${item.item_name} x${item.quantity}`).join(' · ')
-                : 'Aucun'}
+              <div className="mb-2 text-[11px] font-black uppercase text-[#f6d7a7]">Objets rapportés</div>
+              {sale.reported_items?.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {sale.reported_items.map((item) => (
+                    <span
+                      key={`${sale.id}-${item.item_id}-${item.item_name}`}
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#2f1d14]/65 px-2 py-1 text-[#ffe8ca]"
+                    >
+                      <ItemImage item={{ name: item.item_name, image_url: item.image_url, image: item.image, icon_url: item.icon_url }} fallback="📦" />
+                      <span>{item.item_name} x{item.quantity}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span>Aucun</span>
+              )}
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -1057,16 +1077,18 @@ function StockTile({
   value,
   footer,
   item,
+  fallback = '📦',
 }: {
   label: string;
   value: string;
   footer: string;
   item?: Item;
+  fallback?: string;
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-4">
       <div className="flex items-start gap-3">
-        <ItemImage item={item} />
+        <ItemImage item={item} fallback={fallback} />
         <div className="min-w-0">
           <div className="text-xs font-black uppercase text-[#efcdab]">{label}</div>
           <div className="mt-2 text-3xl font-black text-[#fff1dd]">{value}</div>
@@ -1086,23 +1108,47 @@ function InfoLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ItemInfoLine({
+  label,
+  value,
+  item,
+  fallback = '📦',
+}: {
+  label: string;
+  value: string;
+  item?: Item;
+  fallback?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#2b1a12]/70 px-3 py-2">
+      <ItemImage item={item} fallback={fallback} />
+      <div className="min-w-0">
+        <div className="text-[11px] font-black uppercase text-[#f6d7a7]">{label}</div>
+        <div className="mt-1 truncate text-sm font-black text-[#fff1dd]">{value}</div>
+      </div>
+    </div>
+  );
+}
+
 function Stepper({
   label,
   value,
   onChange,
   min = 0,
   iconItem,
+  iconFallback = '📦',
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
   min?: number;
   iconItem?: Item;
+  iconFallback?: string;
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
       <div className="flex items-center gap-2">
-        {iconItem ? <ItemImage item={iconItem} /> : null}
+        {iconItem ? <ItemImage item={iconItem} fallback={iconFallback} /> : null}
         <div className="text-xs font-black uppercase tracking-wide text-[#efcdab]">{label}</div>
       </div>
       <div className="mt-2 grid grid-cols-[36px_1fr_36px] items-center gap-2">
@@ -1155,15 +1201,20 @@ function MoneyInput({
   );
 }
 
-function ItemImage({ item }: { item?: Pick<Item, 'name' | 'image_url'> }) {
+function ItemImage({
+  item,
+  fallback = '📦',
+}: {
+  item?: Pick<Item, 'name' | 'image_url' | 'image' | 'icon_url'>;
+  fallback?: string;
+}) {
+  const src = itemImageUrl(item);
   return (
-    <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-white/10 bg-[#3f281b]/70">
-      {item?.image_url ? (
-        <Image src={item.image_url} alt={item.name} fill sizes="40px" className="object-cover" />
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#3f281b]/70 text-lg">
+      {src ? (
+        <Image src={src} alt={item?.name ?? 'Item'} width={40} height={40} className="h-full w-full object-cover" unoptimized />
       ) : (
-        <div className="grid h-full w-full place-items-center text-xs font-black text-[#efcdab]">
-          {(item?.name ?? '?').slice(0, 2).toUpperCase()}
-        </div>
+        <span aria-hidden="true">{fallback}</span>
       )}
     </div>
   );
@@ -1264,7 +1315,7 @@ function SaleDetail({ sale, onClose }: { sale: FourPartnerSale; onClose: () => v
           <div className="mt-2 space-y-2">
             {sale.reported_items?.map((item) => (
               <div key={`${item.item_id}-${item.item_name}`} className="flex items-center gap-3 text-sm font-semibold text-[#ffe8ca]">
-                <ItemImage item={{ name: item.item_name, image_url: item.image_url }} />
+                <ItemImage item={{ name: item.item_name, image_url: item.image_url, image: item.image, icon_url: item.icon_url }} fallback="📦" />
                 <span className="min-w-0 flex-1 truncate">{item.item_name}</span>
                 <span className="font-black">x{item.quantity}</span>
               </div>
