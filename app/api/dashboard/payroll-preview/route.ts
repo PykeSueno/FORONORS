@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, weekWindow } from '@/lib/payroll';
+import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, previousPayrollWindow } from '@/lib/payroll';
 
 export async function GET() {
   const session = await getSession();
@@ -16,7 +16,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const now = new Date();
   const displayWindow = payrollDisplayWindow(now);
-  const previousWeek = weekWindow(new Date(displayWindow.startIso), -1);
+  const previousWeek = previousPayrollWindow(now);
   const [currentPreview, previousPreview, activeCustomRun] = await Promise.all([
     buildPayrollPreview(supabase, { weekStartIso: displayWindow.startIso, weekEndIso: displayWindow.endIso, config: DEFAULT_PAYROLL_CONFIG }),
     buildPayrollPreview(supabase, { weekStartIso: previousWeek.startIso, weekEndIso: previousWeek.endIso, config: DEFAULT_PAYROLL_CONFIG }),

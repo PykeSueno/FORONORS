@@ -6,7 +6,7 @@ import { SessionMemberSelector } from '@/components/shared/session-member-select
 import { RemoveLineButton } from '@/components/shared/line-controls';
 import { PROCESSOR_UNITS_PER_BOTTLE } from '@/lib/processor';
 
-type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'garage';
+type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'garage' | 'stone';
 type ActivityDisplayType = ActivityType | 'drug_sale';
 type Item = { id: number; name: string; image_url: string | null; quantity: number; category_key: string; type_key: string | null };
 type RecentActivity = {
@@ -50,10 +50,11 @@ const ACTIVITY_META: Record<string, { label: string; icon: string; subtitle: str
   burglary: { label: 'Cambriolage', icon: '🏠', subtitle: 'Consomme des Kits' },
   container: { label: 'Conteneur', icon: '📦', subtitle: 'Consomme des Disqueuses' },
   cargo: { label: 'Cargo', icon: '🚚', subtitle: 'Perceuse Laser requise, non consommee' },
+  stone: { label: 'Pierre', icon: '🪨', subtitle: 'Récupération de Pierre' },
   drug_sale: { label: 'Vente drogue', icon: '🧪', subtitle: 'Session de vente validée' }
 };
 
-const CREATE_ACTIVITY_TYPES: ActivityType[] = ['mailbox', 'burglary', 'container', 'cargo', 'garage', 'processor'];
+const CREATE_ACTIVITY_TYPES: ActivityType[] = ['mailbox', 'burglary', 'container', 'cargo', 'garage', 'stone', 'processor'];
 ACTIVITY_META.garage = { label: 'Garage', icon: '🔧', subtitle: 'Pince a Couper requise, non consommee' };
 
 function normalizeItemName(value: string) {
@@ -81,6 +82,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   const availableItems = useMemo(() => items.filter((item) => {
     if (activityType === 'processor') return item.name === 'Processeur';
     if (activityType === 'cargo') return CARGO_LOOT_NAMES.has(item.name);
+    if (activityType === 'stone') return normalizeItemName(item.name) === 'pierre';
     const qOk = item.name.toLowerCase().includes(query.toLowerCase());
     const categoryOk = !categoryFilter || item.category_key === categoryFilter;
     const typeOk = !typeFilter || item.type_key === typeFilter;
@@ -105,7 +107,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
   function setType(type: ActivityType) {
     setActivityType(type);
     setError('');
-    if (type === 'mailbox' || type === 'cargo' || type === 'garage') setEquipmentUsed(0);
+    if (type === 'mailbox' || type === 'cargo' || type === 'garage' || type === 'stone') setEquipmentUsed(0);
     if (type === 'processor') {
       setEquipmentUsed((current) => Math.max(1, current));
       setProcessorRecoveredQty(null);
@@ -184,7 +186,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
       return;
     }
 
-    if (activityType !== 'mailbox' && activityType !== 'cargo' && activityType !== 'garage' && equipmentUsed <= 0) {
+    if (activityType !== 'mailbox' && activityType !== 'cargo' && activityType !== 'garage' && activityType !== 'stone' && equipmentUsed <= 0) {
       setError(activityType === 'burglary' ? 'Pour un cambriolage, indique le nombre de Kits pris.' : activityType === 'container' ? 'Pour un conteneur, indique le nombre de Disqueuses prises.' : 'Pour un Processeur, indique le nombre de Bouteilles de Plongée prises.');
       return;
     }
@@ -227,7 +229,7 @@ export function ActivityPageClient({ items, members, activities, defaultMemberId
         member_user_ids: memberIds,
         member_labels: memberLabels,
         member_label: mergedLabel,
-        equipment_used: activityType === 'mailbox' || activityType === 'cargo' || activityType === 'garage' ? 0 : equipmentUsed,
+        equipment_used: activityType === 'mailbox' || activityType === 'cargo' || activityType === 'garage' || activityType === 'stone' ? 0 : equipmentUsed,
         proof_image_url: proofImageUrl || null,
         lines
       })

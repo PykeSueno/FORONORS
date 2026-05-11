@@ -6,14 +6,15 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
-type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'garage';
+type ActivityType = 'mailbox' | 'burglary' | 'container' | 'processor' | 'cargo' | 'garage' | 'stone';
 const ACTIVITY_LABELS: Record<ActivityType, string> = {
   mailbox: 'Boîte aux lettres',
   burglary: 'Cambriolage',
   container: 'Conteneur',
   processor: 'Processeur',
   cargo: 'Cargo',
-  garage: 'Garage'
+  garage: 'Garage',
+  stone: 'Pierre'
 };
 
 const CARGO_LOOT_NAMES = new Set(['Argent', 'Tableau & Peinture', 'Pochon de Cocaïne', 'Marteau', 'Pied de biche']);
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
     lines?: Array<{ item_id: number; quantity: number }>;
   };
 
-  if (!body.activity_type || !['mailbox', 'burglary', 'container', 'processor', 'cargo', 'garage'].includes(body.activity_type)) {
+  if (!body.activity_type || !['mailbox', 'burglary', 'container', 'processor', 'cargo', 'garage', 'stone'].includes(body.activity_type)) {
     return NextResponse.json({ message: 'Type activité invalide.' }, { status: 400 });
   }
   if (body.activity_type === 'processor') {
@@ -98,8 +99,8 @@ export async function POST(request: Request) {
   if (lines.length === 0) return NextResponse.json({ message: 'Ajoutez au moins un item récupéré.' }, { status: 400 });
 
   const equipmentUsed = Math.max(0, Number(body.equipment_used ?? 0));
-  if (body.activity_type === 'mailbox' && equipmentUsed > 0) {
-    return NextResponse.json({ message: 'Boîte aux lettres ne consomme aucun équipement.' }, { status: 400 });
+  if ((body.activity_type === 'mailbox' || body.activity_type === 'stone') && equipmentUsed > 0) {
+    return NextResponse.json({ message: `${ACTIVITY_LABELS[body.activity_type]} ne consomme aucun équipement.` }, { status: 400 });
   }
 
   const uniqueMemberIds = Array.from(new Set((body.member_user_ids ?? []).map((entry) => entry.trim()).filter(Boolean)));
@@ -117,7 +118,7 @@ export async function POST(request: Request) {
 
   let equipmentRow: EquipmentRow | null = null;
   let shouldConsumeEquipment = false;
-  if (body.activity_type !== 'mailbox') {
+  if (body.activity_type !== 'mailbox' && body.activity_type !== 'stone') {
     const keyword = body.activity_type === 'burglary'
       ? 'kit'
       : body.activity_type === 'container'
@@ -158,6 +159,9 @@ export async function POST(request: Request) {
     }
     if (body.activity_type === 'cargo' && !CARGO_LOOT_NAMES.has(item.name)) {
       return NextResponse.json({ message: `Item non autorisé pour Cargo: ${item.name}.` }, { status: 400 });
+    }
+    if (body.activity_type === 'stone' && normalizeEquipmentName(item.name) !== 'pierre') {
+      return NextResponse.json({ message: `Item non autorisé pour Pierre: ${item.name}.` }, { status: 400 });
     }
 
     const before = Number(item.quantity);

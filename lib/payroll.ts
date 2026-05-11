@@ -95,6 +95,10 @@ export function payrollDisplayWindow(now: Date) {
   };
 }
 
+export function previousPayrollWindow(now: Date) {
+  return weekWindow(now, -1);
+}
+
 function roundMoney(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.round(value));
@@ -211,7 +215,7 @@ export async function buildPayrollPreview(supabase: SupabaseClient, args: {
     supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle(),
     supabase.from('transactions').select('member_user_id, actor_user_id, member_label, total_money_in, total_money_out, reason, summary, transaction_type, created_at').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
     supabase.from('four_transactions').select('created_by, profit_loss, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
-    supabase.from('sale_object_orders').select('created_by, total_amount, created_at, status').in('status', ['pending_receipt', 'received']).gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
+    supabase.from('sale_object_orders').select('created_by, total_amount, created_at, status').in('status', ['pending_receipt', 'received', 'paid']).gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
     supabase.from('drug_sales').select('created_by, actual_amount, member_user_ids, created_at, status').eq('status', 'validated').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(5000),
     supabase.from('gofast_runs').select('user_id, user_name, money_amount, participants, created_at, status').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),
     supabase.from('robbery_runs').select('user_id, user_name, money_amount, participants, created_at, status').gte('created_at', args.weekStartIso).lt('created_at', args.weekEndIso).limit(3000),

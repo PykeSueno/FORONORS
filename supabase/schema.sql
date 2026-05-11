@@ -245,8 +245,11 @@ where not exists (select 1 from public.group_cash);
 
 create index if not exists idx_money_item_sales_created_at on public.money_item_sales(created_at desc);
 create index if not exists idx_cash_movements_created_at on public.cash_movements(created_at desc);
+create index if not exists idx_cash_movements_user_created_at on public.cash_movements(user_id, created_at desc);
+create index if not exists idx_cash_movements_type_created_at on public.cash_movements(type, created_at desc);
 create index if not exists idx_sale_object_orders_created_at on public.sale_object_orders(created_at desc);
 create index if not exists idx_sale_object_orders_status on public.sale_object_orders(status, buyer_type);
+create index if not exists idx_sale_object_orders_status_created_by_created_at on public.sale_object_orders(status, created_by, created_at desc);
 
 create table if not exists public.items (
   id bigint generated always as identity primary key,
@@ -281,11 +284,14 @@ create table if not exists public.audit_logs (
 );
 
 create index if not exists idx_items_category_type on public.items(category_key, type_key);
+create index if not exists idx_items_category_created_at on public.items(category_key, created_at desc);
+create index if not exists idx_items_type_created_at on public.items(type_key, created_at desc);
 create index if not exists idx_items_name on public.items(name);
 create index if not exists idx_users_active on public.users(is_active) where is_active = true;
 create index if not exists idx_audit_logs_action_created_at on public.audit_logs(action, created_at desc);
 create index if not exists idx_audit_logs_created_at on public.audit_logs(created_at desc);
 create index if not exists idx_audit_logs_entity on public.audit_logs(entity_type, entity_id);
+create index if not exists idx_audit_logs_entity_created_at on public.audit_logs(entity_type, created_at desc);
 
 alter table public.items enable row level security;
 alter table public.audit_logs enable row level security;
@@ -347,6 +353,7 @@ using (true)
 with check (true);
 
 alter table public.items add column if not exists is_money_item boolean not null default false;
+create index if not exists idx_app_settings_key on public.app_settings(key);
 
 create table if not exists public.transactions (
   id bigint generated always as identity primary key,
@@ -391,9 +398,12 @@ create table if not exists public.item_stock_movements (
 );
 
 create index if not exists idx_transactions_created_at on public.transactions(created_at desc);
+create index if not exists idx_transactions_member_created_at on public.transactions(member_user_id, created_at desc);
+create index if not exists idx_transactions_actor_created_at on public.transactions(actor_user_id, created_at desc);
 create index if not exists idx_transaction_lines_transaction on public.transaction_lines(transaction_id);
 create index if not exists idx_item_stock_movements_created_at on public.item_stock_movements(created_at desc);
 create index if not exists idx_item_stock_movements_item_created_at on public.item_stock_movements(item_id, created_at desc);
+create index if not exists idx_item_stock_movements_type_created_at on public.item_stock_movements(transaction_type, created_at desc);
 
 alter table public.transactions enable row level security;
 alter table public.transaction_lines enable row level security;
@@ -675,8 +685,13 @@ create table if not exists public.activity_members (
 );
 
 create index if not exists idx_activities_created_at on public.activities(created_at desc);
+create index if not exists idx_activities_type_created_at on public.activities(activity_type, created_at desc);
+create index if not exists idx_activities_member_created_at on public.activities(member_user_id, created_at desc);
+create index if not exists idx_activities_created_by_created_at on public.activities(created_by, created_at desc);
 create index if not exists idx_activity_items_activity on public.activity_items(activity_id);
+create index if not exists idx_activity_items_item_activity on public.activity_items(item_id, activity_id);
 create index if not exists idx_activity_members_activity on public.activity_members(activity_id);
+create index if not exists idx_activity_members_member_activity on public.activity_members(member_user_id, activity_id);
 
 alter table public.activities enable row level security;
 alter table public.activity_items enable row level security;
@@ -977,6 +992,10 @@ insert into public.items (name, image_url, buy_price, sell_price, quantity, cate
 select 'Pack Meth', null, 0, 0, 0, 'drugs', 'Drogues', 'seeds', 'Graines'
 where not exists (select 1 from public.items where lower(name) = 'pack meth');
 
+insert into public.items (name, image_url, buy_price, sell_price, quantity, category_key, category_label, type_key, type_label)
+select 'Pierre', null, 0, 0, 0, 'objects', 'Objets', 'production', 'Production'
+where not exists (select 1 from public.items where lower(name) = 'pierre');
+
 create index if not exists idx_drug_transfos_status_sent_at on public.drug_transfos(status, sent_at desc);
 create index if not exists idx_drug_sales_type_created_at on public.drug_sales(drug_type, created_at desc);
 create index if not exists idx_drug_sale_lines_sale_id on public.drug_sale_lines(sale_id, created_at desc);
@@ -1259,6 +1278,8 @@ create table if not exists public.expenses (
 
 create index if not exists idx_expenses_status_created_at on public.expenses(status, created_at desc);
 create index if not exists idx_expenses_member on public.expenses(member_id);
+create index if not exists idx_expenses_member_status_created_at on public.expenses(member_id, status, created_at desc);
+create index if not exists idx_expenses_category_status_created_at on public.expenses(category, status, created_at desc);
 create index if not exists idx_expenses_reimbursed_at on public.expenses(reimbursed_at desc);
 
 alter table public.expenses enable row level security;

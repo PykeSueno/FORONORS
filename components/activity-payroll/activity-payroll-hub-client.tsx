@@ -85,7 +85,6 @@ type Props = {
   activities: MemberActivityRow[];
   currentPreview: PayrollPreview;
   previousPreview: PayrollPreview;
-  customPreview: PayrollPreview;
   customDefaultStart: string;
   customDefaultEnd: string;
   initialPaidMembers: Record<string, number>;
@@ -628,6 +627,10 @@ function PayrollPage(props: {
   }), [periodPayments, props.excludedIds, props.paidMembers, props.reportedIds, props.selectedPreview.members]);
   const payrollToDo = useMemo(() => payrollRows.filter((row) => !row.isPaid), [payrollRows]);
   const payrollDone = useMemo(() => payrollRows.filter((row) => row.isPaid), [payrollRows]);
+  const previousPaidTotal = useMemo(() => props.history
+    .filter((row) => periodsOverlap(row.week_start, row.week_end, props.previousPreview.weekStartIso, props.previousPreview.weekEndIso))
+    .reduce((sum, row) => sum + Number(row.amount ?? 0), 0), [props.history, props.previousPreview.weekEndIso, props.previousPreview.weekStartIso]);
+  const previousRemaining = Math.max(0, Number(props.previousPreview.totalProposed ?? 0) - previousPaidTotal);
 
   return (
     <div className="space-y-4">
@@ -661,7 +664,7 @@ function PayrollPage(props: {
         ) : null}
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           <Compare title="Période active" preview={props.selectedPreview} paid={props.paidTotal} remaining={props.remainingPayroll} />
-          <Compare title="Semaine passée" preview={props.previousPreview} paid={0} remaining={props.previousPreview.totalProposed} />
+          <Compare title="Semaine passée" preview={props.previousPreview} paid={previousPaidTotal} remaining={previousRemaining} />
         </div>
       </section>
 

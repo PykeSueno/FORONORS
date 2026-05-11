@@ -4,7 +4,7 @@ import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
 import { ActivityPayrollHubClient } from '@/components/activity-payroll/activity-payroll-hub-client';
-import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, weekWindow, type PayrollConfig } from '@/lib/payroll';
+import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, previousPayrollWindow, type PayrollConfig, type PayrollPreview } from '@/lib/payroll';
 import { getMemberActivities } from '@/lib/payroll-service';
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +79,29 @@ async function periodState(supabase: Supabase, start: string, end: string) {
   };
 }
 
+function emptyPeriodState() {
+  return { adjustments: {}, excluded: [], reported: [], paid: {} };
+}
+
+function emptyPayrollPreview(startIso: string, endIso: string, config: PayrollConfig, balance = 0): PayrollPreview {
+  return {
+    weekStartIso: startIso,
+    weekEndIso: endIso,
+    generatedAtIso: new Date().toISOString(),
+    config,
+    balance,
+    reserveKept: config.reserveMinimum,
+    fundsAvailable: 0,
+    envelope: 0,
+    totalProposed: 0,
+    balanceAfter: balance,
+    eligibleCount: 0,
+    ineligibleCount: 0,
+    members: [],
+    periodMode: 'weekly'
+  };
+}
+
 export default async function ActivityPayrollPage() {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -106,20 +129,19 @@ export default async function ActivityPayrollPage() {
   const supabase = getSupabaseAdmin();
   const now = new Date();
   const current = payrollDisplayWindow(now);
-  const previous = weekWindow(new Date(current.startIso), -1);
+  const previous = previousPayrollWindow(now);
   const customStart = current.startIso;
   const customEnd = current.endIso;
   const activityStart = new Date(current.startIso);
   activityStart.setUTCDate(activityStart.getUTCDate() - 70);
 
-  const [{ data: membersData }, { data: allUsers }, { data: cfgSetting }, { data: cash }, currentState, previousState, customState, activities, historyRes, pendingExpensesRes, reimbursedExpensesRes, statsExpensesRes, logsRes] = await Promise.all([
+  const [{ data: membersData }, { data: allUsers }, { data: cfgSetting }, { data: cash }, currentState, previousState, activities, historyRes, pendingExpensesRes, reimbursedExpensesRes, statsExpensesRes, logsRes] = await Promise.all([
     supabase.from('users').select('id, name, username, is_active').eq('is_active', true).order('username', { ascending: true }),
     supabase.from('users').select('id, name, username').order('username', { ascending: true }),
     supabase.from('app_settings').select('value').eq('key', CONFIG_KEY).maybeSingle(),
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
-    periodState(supabase, current.startIso, current.endIso),
-    periodState(supabase, previous.startIso, previous.endIso),
-    periodState(supabase, customStart, customEnd),
+    canPayroll ? periodState(supabase, current.startIso, current.endIso) : Promise.resolve(emptyPeriodState()),
+    canPayroll ? periodState(supabase, previous.startIso, previous.endIso) : Promise.resolve(emptyPeriodState()),
     canActivities || canSummary || canHistory ? getMemberActivities(supabase, { startIso: activityStart.toISOString(), endIso: now.toISOString(), limit: 1500 }) : Promise.resolve([]),
     canPayroll || canHistory ? supabase.from('activity_payroll_payments').select('id, week_start, week_end, member_user_id, member_label, amount, paid_by, group_balance_before, group_balance_after, created_at').order('created_at', { ascending: false }).limit(120) : Promise.resolve({ data: [] }),
     canExpenses || canSummary || canHistory ? supabase.from('expenses').select('*').eq('status', 'pending').order('created_at', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
@@ -129,11 +151,16 @@ export default async function ActivityPayrollPage() {
   ]);
 
   const config = readPayrollConfig(cfgSetting?.value ?? null);
-  const [currentPreview, previousPreview, customPreview] = await Promise.all([
-    canPayroll ? buildPayrollPreview(supabase, { weekStartIso: current.startIso, weekEndIso: current.endIso, config, excludedMemberIds: currentState.excluded, manualAdjustments: currentState.adjustments }) : buildPayrollPreview(supabase, { weekStartIso: current.startIso, weekEndIso: current.endIso, config }),
-    canPayroll ? buildPayrollPreview(supabase, { weekStartIso: previous.startIso, weekEndIso: previous.endIso, config, excludedMemberIds: previousState.excluded, manualAdjustments: previousState.adjustments }) : buildPayrollPreview(supabase, { weekStartIso: previous.startIso, weekEndIso: previous.endIso, config }),
-    canPayroll ? buildPayrollPreview(supabase, { weekStartIso: customStart, weekEndIso: customEnd, config, excludedMemberIds: customState.excluded, manualAdjustments: customState.adjustments, periodMode: 'custom' }) : buildPayrollPreview(supabase, { weekStartIso: customStart, weekEndIso: customEnd, config })
-  ]);
+  const cashBalance = Number(cash?.balance ?? 0);
+  const [currentPreview, previousPreview] = canPayroll
+    ? await Promise.all([
+        buildPayrollPreview(supabase, { weekStartIso: current.startIso, weekEndIso: current.endIso, config, excludedMemberIds: currentState.excluded, manualAdjustments: currentState.adjustments }),
+        buildPayrollPreview(supabase, { weekStartIso: previous.startIso, weekEndIso: previous.endIso, config, excludedMemberIds: previousState.excluded, manualAdjustments: previousState.adjustments })
+      ])
+    : [
+        emptyPayrollPreview(current.startIso, current.endIso, config, cashBalance),
+        emptyPayrollPreview(previous.startIso, previous.endIso, config, cashBalance)
+      ];
 
   const activityByMember = new Map<string, { count: number; money: number; last: string | null }>();
   for (const activity of activities) {
@@ -184,7 +211,6 @@ export default async function ActivityPayrollPage() {
         activities={activities}
         currentPreview={currentPreview}
         previousPreview={previousPreview}
-        customPreview={customPreview}
         customDefaultStart={customStart}
         customDefaultEnd={customEnd}
         initialPaidMembers={currentState.paid}
