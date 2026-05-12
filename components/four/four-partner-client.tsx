@@ -985,24 +985,28 @@ function ReportedItemsCard({
                     </button>
                   </div>
 
-                  <div className="mt-3 grid gap-2 sm:grid-cols-[8.5rem_minmax(0,1fr)_8rem]">
+                  <div className="mt-3 grid gap-2 min-[760px]:grid-cols-[8.75rem_minmax(10.5rem,1fr)_9.75rem] min-[760px]:items-end">
                     <CompactQuantityControl
                       value={line.quantity}
                       onDecrease={() => changeReportedQuantity(line.item_id, Math.max(1, line.quantity - 1))}
                       onIncrease={() => changeReportedQuantity(line.item_id, line.quantity + 1)}
                     />
                     <label className="min-w-0 space-y-1">
-                      <span className="block text-[10px] font-black uppercase text-[#efcdab]">Prix achat</span>
+                      <span className="block h-4 whitespace-nowrap text-[10px] font-black uppercase leading-4 text-[#efcdab]">
+                        Prix achat
+                      </span>
                       <input
                         value={line.purchase_unit_price}
                         inputMode="decimal"
                         onChange={(event) => changeReportedPrice(line.item_id, moneyValue(event.target.value))}
-                        className={`${INPUT_CLASS} !h-9 px-2 py-1 text-sm`}
+                        className={`${INPUT_CLASS} !h-9 w-full px-3 py-0 text-sm font-bold tabular-nums`}
                       />
                     </label>
                     <div className="min-w-0 space-y-1">
-                      <span className="block text-[10px] font-black uppercase text-[#efcdab]">Total ligne</span>
-                      <div className="flex h-9 items-center rounded-lg border border-white/10 bg-[#2f1d14]/65 px-2 text-sm font-black text-[#fff1dd]">
+                      <span className="block h-4 whitespace-nowrap text-[10px] font-black uppercase leading-4 text-[#efcdab]">
+                        Total ligne
+                      </span>
+                      <div className="flex h-9 w-full items-center justify-end rounded-lg border border-white/10 bg-[#2f1d14]/65 px-3 text-sm font-black tabular-nums text-[#fff1dd]">
                         {formatUsd(lineTotal)}
                       </div>
                     </div>
@@ -1297,11 +1301,11 @@ function CompactQuantityControl({
 }) {
   return (
     <div className="min-w-0 space-y-1">
-      <span className="block text-[10px] font-black uppercase text-[#efcdab]">Quantité</span>
-      <div className="grid h-8 grid-cols-[1.75rem_1fr_1.75rem] items-center gap-1">
-        <button type="button" onClick={onDecrease} className="h-8 rounded-lg border border-white/15 bg-[#5b3924]/75 text-sm font-black text-[#ffe8ca] transition hover:bg-[#6b452d]/85">-</button>
-        <div className="flex h-8 items-center justify-center rounded-lg border border-white/10 bg-[#2f1d14]/65 text-sm font-black text-[#fff1dd]">{value}</div>
-        <button type="button" onClick={onIncrease} className="h-8 rounded-lg border border-white/15 bg-[#5b3924]/75 text-sm font-black text-[#ffe8ca] transition hover:bg-[#6b452d]/85">+</button>
+      <span className="block h-4 whitespace-nowrap text-[10px] font-black uppercase leading-4 text-[#efcdab]">Quantité</span>
+      <div className="grid h-9 grid-cols-[2rem_minmax(2.75rem,1fr)_2rem] items-center gap-1.5">
+        <button type="button" onClick={onDecrease} className="h-9 rounded-lg border border-white/15 bg-[#5b3924]/75 text-sm font-black text-[#ffe8ca] transition hover:bg-[#6b452d]/85">-</button>
+        <div className="flex h-9 items-center justify-center rounded-lg border border-white/10 bg-[#2f1d14]/65 text-sm font-black tabular-nums text-[#fff1dd]">{value}</div>
+        <button type="button" onClick={onIncrease} className="h-9 rounded-lg border border-white/15 bg-[#5b3924]/75 text-sm font-black text-[#ffe8ca] transition hover:bg-[#6b452d]/85">+</button>
       </div>
     </div>
   );
