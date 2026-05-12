@@ -239,7 +239,7 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
       { key: 'jobs.tablet', label: 'Tablette', permissions: ['tablet.passage.create', 'jobs.tablet.webhook.view'] },
       { key: 'jobs.cigarette', label: 'Cigarette', permissions: ['cigarette.passage.create', 'cigarette.passage.create.any'] },
       { key: 'jobs.processor', label: 'Processeur', permissions: ['tobacco.processor.create', 'tobacco.processor.production', 'tobacco.processor.sale', 'tobacco.processor.sale.validate'] },
-      { key: 'jobs.stone', label: 'Pierre', permissions: ['jobs.stone.sell'] },
+      { key: 'jobs.stone', label: 'Pierre', permissions: ['jobs.stone.view', 'jobs.stone.sell'] },
       { key: 'jobs.edit', label: 'Modifier', permissions: ['tablet.daily.manage', 'jobs.tablet.webhook.edit', 'cigarette.daily.manage', 'cigarette.edit.own', 'cigarette.edit.any', 'tobacco.processor.sale.edit', 'tobacco.processor.sale.cancel'] },
       { key: 'jobs.history', label: 'Historique', partnerSafe: true, permissions: ['jobs.history.view', 'tablet.history.view', 'cigarette.history.view', 'tobacco.processor.sale.view', 'jobs.stone.history.view'] },
       { key: 'jobs.stats', label: 'Stats', permissions: ['tablet.stats.view', 'cigarette.stats.view', 'tobacco.processor.stats', 'jobs.stone.stats.view'] },

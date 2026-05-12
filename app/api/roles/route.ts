@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { clearPermissionCache, hasUserPermission } from '@/lib/permissions';
-import { ALL_SIMPLE_PERMISSION_NAMES } from '@/lib/permission-catalog';
+import { ALL_SIMPLE_PERMISSION_NAMES, permissionsForSimpleKeys, SIMPLE_PERMISSION_BY_KEY } from '@/lib/permission-catalog';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizePermissionNames, toCanonicalPermission } from '@/lib/permission-normalization';
 
@@ -11,12 +11,18 @@ type RolePermissionRow = { permission_id: number; permissions: PermissionRow | P
 type RoleRow = { id: number; name: string; display_order: number; role_permissions: RolePermissionRow[] };
 
 async function ensureSimplePermissions(supabase: ReturnType<typeof getSupabaseAdmin>) {
-  await supabase
+  const { error } = await supabase
     .from('permissions')
     .upsert(
       ALL_SIMPLE_PERMISSION_NAMES.map((name) => ({ name: toCanonicalPermission(name) })),
       { onConflict: 'name', ignoreDuplicates: true }
     );
+  if (error) throw error;
+}
+
+function validSimpleKeys(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  return Array.from(new Set(value.map((key) => String(key)).filter((key) => Boolean(SIMPLE_PERMISSION_BY_KEY[key]))));
 }
 
 export async function GET() {
@@ -122,13 +128,18 @@ export async function PATCH(request: Request) {
   const canManageRoles = await hasUserPermission(session.userId, 'roles.manage');
   if (!canManageRoles) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
-  const body = (await request.json()) as { role_ids?: number[]; permission_ids?: number[] };
+  const body = (await request.json()) as { role_ids?: number[]; permission_ids?: number[]; simple_keys?: string[] };
   const roleIds = Array.from(new Set((body.role_ids ?? []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)));
   if (roleIds.length === 0) return NextResponse.json({ message: 'Sélectionnez au moins un rôle.' }, { status: 400 });
 
   const requestedPermissionIds = Array.from(new Set((body.permission_ids ?? []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)));
+  const requestedSimpleKeys = validSimpleKeys(body.simple_keys);
   const supabase = getSupabaseAdmin();
-  await ensureSimplePermissions(supabase);
+  try {
+    await ensureSimplePermissions(supabase);
+  } catch {
+    return NextResponse.json({ message: 'Synchronisation des permissions impossible.' }, { status: 500 });
+  }
   const [{ data: roles }, { data: allPermissions }, { data: previousRolePermissions }] = await Promise.all([
     supabase.from('roles').select('id, name').in('id', roleIds),
     supabase.from('permissions').select('id, name'),
@@ -143,8 +154,17 @@ export async function PATCH(request: Request) {
     if (!canonicalByName.has(canonical) || permission.name === canonical) canonicalByName.set(canonical, permission.id);
     permissionNameById.set(permission.id, permission.name);
   }
-  const selectedCanonical = normalizePermissionNames(requestedPermissionIds.map((permissionId) => permissionNameById.get(permissionId)).filter((name): name is string => Boolean(name)));
+  const selectedCanonical = requestedSimpleKeys
+    ? normalizePermissionNames(permissionsForSimpleKeys(requestedSimpleKeys))
+    : normalizePermissionNames(requestedPermissionIds.map((permissionId) => permissionNameById.get(permissionId)).filter((name): name is string => Boolean(name)));
   const permissionIds = Array.from(new Set(selectedCanonical.map((name) => canonicalByName.get(name)).filter((id): id is number => Number.isInteger(id))));
+  const unknownPermissions = selectedCanonical.filter((name) => !canonicalByName.has(name));
+  if (unknownPermissions.length > 0) {
+    return NextResponse.json({
+      message: 'Certaines permissions sont inconnues en base.',
+      unknown_permissions: unknownPermissions
+    }, { status: 400 });
+  }
   const previousByRole = new Map<number, string[]>();
   for (const row of (previousRolePermissions ?? []) as Array<{ role_id: number; permissions: { name: string } | { name: string }[] | null }>) {
     const permissionName = Array.isArray(row.permissions) ? row.permissions[0]?.name : row.permissions?.name;
@@ -183,11 +203,17 @@ export async function PATCH(request: Request) {
       roleNames: roles.map((role) => role.name),
       permissionIds,
       permissionNames: selectedCanonical,
+      simpleKeys: requestedSimpleKeys,
       addedPermissions: Array.from(new Set(roleChanges.flatMap((change) => change.added))),
       removedPermissions: Array.from(new Set(roleChanges.flatMap((change) => change.removed))),
       roleChanges
     }
   });
 
-  return NextResponse.json({ ok: true, updated_role_ids: roles.map((role) => role.id) });
+  return NextResponse.json({
+    ok: true,
+    updated_role_ids: roles.map((role) => role.id),
+    received_simple_keys_count: requestedSimpleKeys?.length ?? null,
+    saved_permissions_count: permissionIds.length
+  });
 }

@@ -592,21 +592,35 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
     if (!canManageRoles) return;
     if (isSaving) return;
     setIsSaving(true);
+    const simpleKeys = Array.from(checkedSimpleKeys);
+    const expectedPermissionNames = permissionsForSimpleKeys(simpleKeys).map((permissionName) => toCanonicalPermission(permissionName));
     const permissionIds = Array.from(new Set(
-        permissionsForSimpleKeys(Array.from(checkedSimpleKeys))
+        expectedPermissionNames
           .map((permissionName) => permissionIdByName.get(toCanonicalPermission(permissionName)))
           .filter((id): id is number => Number.isInteger(id))
       ));
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[FORONORS permissions]', {
+        simpleKeys: simpleKeys.length,
+        expectedPermissions: expectedPermissionNames.length,
+        knownPermissionIds: permissionIds.length,
+        missingPermissions: expectedPermissionNames.filter((permissionName) => !permissionIdByName.has(permissionName))
+      });
+    }
     const response = await fetch('/api/roles', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role_ids: selectedRoles.map((role) => role.id), permission_ids: permissionIds })
+      body: JSON.stringify({ role_ids: selectedRoles.map((role) => role.id), simple_keys: simpleKeys, permission_ids: permissionIds })
     });
 
     setIsSaving(false);
     if (!response.ok) {
       const data = (await response.json().catch(() => ({}))) as { message?: string };
       return onError(data.message ?? 'Enregistrement rôle impossible.');
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      const data = (await response.clone().json().catch(() => ({}))) as { saved_permissions_count?: number };
+      console.info('[FORONORS permissions]', { savedPermissions: data.saved_permissions_count });
     }
     await onSaved();
   }

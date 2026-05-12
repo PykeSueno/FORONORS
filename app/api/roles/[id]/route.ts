@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { clearPermissionCache, hasUserPermission } from '@/lib/permissions';
-import { ALL_SIMPLE_PERMISSION_NAMES } from '@/lib/permission-catalog';
+import { ALL_SIMPLE_PERMISSION_NAMES, permissionsForSimpleKeys, SIMPLE_PERMISSION_BY_KEY } from '@/lib/permission-catalog';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizePermissionNames, toCanonicalPermission } from '@/lib/permission-normalization';
 
@@ -18,12 +18,18 @@ function isCriticalRoleName(name?: string | null) {
 }
 
 async function ensureSimplePermissions(supabase: ReturnType<typeof getSupabaseAdmin>) {
-  await supabase
+  const { error } = await supabase
     .from('permissions')
     .upsert(
       ALL_SIMPLE_PERMISSION_NAMES.map((name) => ({ name: toCanonicalPermission(name) })),
       { onConflict: 'name', ignoreDuplicates: true }
     );
+  if (error) throw error;
+}
+
+function validSimpleKeys(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  return Array.from(new Set(value.map((key) => String(key)).filter((key) => Boolean(SIMPLE_PERMISSION_BY_KEY[key]))));
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -32,10 +38,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const roleId = Number(id);
-  const body = (await request.json()) as { permission_ids?: number[]; name?: string; display_order?: number; confirm_critical?: boolean };
+  const body = (await request.json()) as { permission_ids?: number[]; simple_keys?: string[]; name?: string; display_order?: number; confirm_critical?: boolean };
   const supabase = getSupabaseAdmin();
   const wantsRename = body.name !== undefined;
-  const wantsManage = body.permission_ids !== undefined || body.display_order !== undefined;
+  const wantsManage = body.permission_ids !== undefined || body.simple_keys !== undefined || body.display_order !== undefined;
 
   if (wantsRename) {
     const canRenameRole = await hasUserPermission(access.session.userId, 'roles.rename');
@@ -104,10 +110,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
-  if (body.permission_ids !== undefined) {
-    await ensureSimplePermissions(supabase);
+  if (body.permission_ids !== undefined || body.simple_keys !== undefined) {
+    try {
+      await ensureSimplePermissions(supabase);
+    } catch {
+      return NextResponse.json({ message: 'Synchronisation des permissions impossible.' }, { status: 500 });
+    }
+    const requestedSimpleKeys = validSimpleKeys(body.simple_keys);
     const [{ data: selectedPermissions }, { data: allPermissions }] = await Promise.all([
-      supabase.from('permissions').select('id, name').in('id', body.permission_ids),
+      body.permission_ids !== undefined
+        ? supabase.from('permissions').select('id, name').in('id', body.permission_ids)
+        : Promise.resolve({ data: [] as Array<{ id: number; name: string }> }),
       supabase.from('permissions').select('id, name')
     ]);
     const canonicalByName = new Map<string, number>();
@@ -115,8 +128,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const canonical = toCanonicalPermission(permission.name);
       if (!canonicalByName.has(canonical) || permission.name === canonical) canonicalByName.set(canonical, permission.id);
     }
-    const canonicalNames = normalizePermissionNames(((selectedPermissions ?? []) as Array<{ id: number; name: string }>).map((permission) => permission.name));
+    const canonicalNames = requestedSimpleKeys
+      ? normalizePermissionNames(permissionsForSimpleKeys(requestedSimpleKeys))
+      : normalizePermissionNames(((selectedPermissions ?? []) as Array<{ id: number; name: string }>).map((permission) => permission.name));
     const permissionIds = canonicalNames.map((name) => canonicalByName.get(name)).filter((id): id is number => Number.isInteger(id));
+    const unknownPermissions = canonicalNames.filter((name) => !canonicalByName.has(name));
+    if (unknownPermissions.length > 0) {
+      return NextResponse.json({
+        message: 'Certaines permissions sont inconnues en base.',
+        unknown_permissions: unknownPermissions
+      }, { status: 400 });
+    }
 
     const { error: deleteError } = await supabase.from('role_permissions').delete().eq('role_id', roleId);
     if (deleteError) return NextResponse.json({ message: 'Mise à jour impossible.' }, { status: 400 });
@@ -133,17 +155,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     clearPermissionCache();
   }
 
-  if (body.permission_ids !== undefined || body.display_order !== undefined) {
+  if (body.permission_ids !== undefined || body.simple_keys !== undefined || body.display_order !== undefined) {
     const beforePermissionNames = normalizePermissionNames(
       ((before.role_permissions ?? []) as Array<{ permissions: { name: string } | { name: string }[] | null }>)
         .map((row) => (Array.isArray(row.permissions) ? row.permissions[0]?.name : row.permissions?.name))
         .filter((name): name is string => Boolean(name))
     );
-    const afterPermissionNames = body.permission_ids !== undefined
-      ? normalizePermissionNames(
-        ((await supabase.from('permissions').select('id, name').in('id', body.permission_ids)).data ?? [])
-          .map((permission) => permission.name)
-      )
+    const afterPermissionNames = body.simple_keys !== undefined
+      ? normalizePermissionNames(permissionsForSimpleKeys(validSimpleKeys(body.simple_keys) ?? []))
+      : body.permission_ids !== undefined
+        ? normalizePermissionNames(
+          ((await supabase.from('permissions').select('id, name').in('id', body.permission_ids)).data ?? [])
+            .map((permission) => permission.name)
+        )
       : beforePermissionNames;
     const addedPermissions = afterPermissionNames.filter((permission) => !beforePermissionNames.includes(permission));
     const removedPermissions = beforePermissionNames.filter((permission) => !afterPermissionNames.includes(permission));
@@ -165,6 +189,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         roleName: newRoleName ?? before.name,
         displayOrder: body.display_order ?? before.display_order,
         permissionIds: body.permission_ids,
+        simpleKeys: validSimpleKeys(body.simple_keys),
         permissions: afterPermissionNames,
         addedPermissions,
         removedPermissions,
