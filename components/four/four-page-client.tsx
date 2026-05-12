@@ -61,6 +61,7 @@ export function FourPageClient({ items, initialTransactions, initialCashBalance,
   const [draftLines, setDraftLines] = useState<FourLine[]>([]);
   const [editingTxId, setEditingTxId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const availableItems = useMemo(
     () => currentItems
@@ -114,19 +115,30 @@ export function FourPageClient({ items, initialTransactions, initialCashBalance,
   }
 
   async function submit() {
+    if (isSubmitting) return;
     setError('');
     if (draftLines.length === 0) return setError('Ajoute au moins une ligne.');
+    setIsSubmitting(true);
     const payload = { counterparty, lines: draftLines.map((line) => ({ item_id: line.item_id, movement_kind: line.movement_kind, quantity: line.quantity, unit_price: line.unit_price })) };
-    const res = await fetch('/api/four/transactions', {
-      method: editingTxId ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editingTxId ? { transaction_id: editingTxId, ...payload } : payload)
-    });
-    if (!res.ok) return setError((await res.json()).message ?? 'Validation impossible.');
-    applyMutationPayload(await res.json());
-    setDraftLines([]);
-    setCounterparty('');
-    setEditingTxId(null);
+    try {
+      const res = await fetch('/api/four/transactions', {
+        method: editingTxId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingTxId ? { transaction_id: editingTxId, ...payload } : payload)
+      });
+      if (!res.ok) {
+        setError((await res.json()).message ?? 'Validation impossible.');
+        return;
+      }
+      applyMutationPayload(await res.json());
+      setDraftLines([]);
+      setCounterparty('');
+      setEditingTxId(null);
+    } catch {
+      setError('Validation impossible.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   async function cancelTx(txId: number) {
@@ -238,7 +250,7 @@ export function FourPageClient({ items, initialTransactions, initialCashBalance,
               <p className="mt-1 text-base font-semibold text-[#ffe8ca]">{formatUsd(draftTotals.profit)}</p>
             </div>
           </div>
-          {canCreate ? <button className="saas-primary-btn w-full" onClick={() => void submit()}>{editingTxId ? 'Enregistrer modification' : 'Valider transaction'}</button> : null}
+          {canCreate ? <button className="saas-primary-btn w-full disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} onClick={() => void submit()}>{isSubmitting ? 'Validation...' : editingTxId ? 'Enregistrer modification' : 'Valider transaction'}</button> : null}
           {error ? <p className="text-sm text-red-200">{error}</p> : null}
         </article>
       </section>

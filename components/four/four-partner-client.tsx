@@ -201,6 +201,7 @@ export function FourPartnerClient({
   const [category, setCategory] = useState('objects');
   const [error, setError] = useState<string | null>(null);
   const [detailSale, setDetailSale] = useState<FourPartnerSale | null>(null);
+  const [isSubmittingSale, setIsSubmittingSale] = useState(false);
 
   const today = useMemo(() => getFourPartnerCycleDay(config), [config]);
   const preview = useMemo(() => getFourPartnerPreview(config, 7), [config]);
@@ -388,35 +389,47 @@ export function FourPartnerClient({
   }
 
   async function submitSale() {
+    if (isSubmittingSale) return;
     setError(null);
-    const response = await fetch('/api/four/partner', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        partner_name: today.label,
-        sale_date: toDateKey(new Date()),
-        kits_sold: kitsSold,
-        cutters_sold: cuttersSold,
-        kit_unit_price: kitPrice,
-        cutter_unit_price: cutterPrice,
-        amount_received: saleTotal,
-        payment_method: paymentMethod,
-        reported_items: reported
-          .filter((line) => line.quantity > 0)
-          .map((line) => ({
-            ...line,
-            item_name: itemById.get(line.item_id)?.name,
-            total_purchase: reportedLineTotal(line),
-          })),
-      }),
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.message ?? payload.error ?? 'Vente impossible.');
+    if (!saleHasStock) {
+      setError(`Stock insuffisant: kits ${kitStock}/${kitsSold}, disqueuses ${cutterStock}/${cuttersSold}.`);
       return;
     }
-    setReported([]);
-    applyPayload(payload);
+    setIsSubmittingSale(true);
+    try {
+      const response = await fetch('/api/four/partner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partner_name: today.label,
+          sale_date: toDateKey(new Date()),
+          kits_sold: kitsSold,
+          cutters_sold: cuttersSold,
+          kit_unit_price: kitPrice,
+          cutter_unit_price: cutterPrice,
+          amount_received: saleTotal,
+          payment_method: paymentMethod,
+          reported_items: reported
+            .filter((line) => line.quantity > 0)
+            .map((line) => ({
+              ...line,
+              item_name: itemById.get(line.item_id)?.name,
+              total_purchase: reportedLineTotal(line),
+            })),
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.message ?? payload.error ?? 'Vente impossible.');
+        return;
+      }
+      setReported([]);
+      applyPayload(payload);
+    } catch {
+      setError('Vente impossible.');
+    } finally {
+      setIsSubmittingSale(false);
+    }
   }
 
   async function markBankReceived(sale: FourPartnerSale) {
@@ -501,6 +514,7 @@ export function FourPartnerClient({
             kitAfter={kitAfter}
             cutterAfter={cutterAfter}
             saleHasStock={saleHasStock}
+            isSubmitting={isSubmittingSale}
             kitItem={kitItem}
             cutterItem={cutterItem}
             setKitsSold={setKitsSold}
@@ -753,6 +767,7 @@ function SaleCard({
   kitAfter,
   cutterAfter,
   saleHasStock,
+  isSubmitting,
   kitItem,
   cutterItem,
   setKitsSold,
@@ -777,6 +792,7 @@ function SaleCard({
   kitAfter: number;
   cutterAfter: number;
   saleHasStock: boolean;
+  isSubmitting: boolean;
   kitItem?: Item;
   cutterItem?: Item;
   setKitsSold: (value: number) => void;
@@ -786,6 +802,9 @@ function SaleCard({
   setPaymentMethod: (value: 'cash' | 'bank') => void;
   submitSale: () => void;
 }) {
+  const clampKitsSold = (value: number) => setKitsSold(Math.max(0, Math.min(kitStock, value)));
+  const clampCuttersSold = (value: number) => setCuttersSold(Math.max(0, Math.min(cutterStock, value)));
+
   return (
     <article className={CARD_CLASS}>
       <CardHeader icon="🧾" eyebrow="Validation" title="Vente partenaire" />
@@ -797,8 +816,8 @@ function SaleCard({
         </label>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Stepper iconItem={kitItem} iconFallback="🧰" label="Kits vendus" value={kitsSold} onChange={setKitsSold} />
-          <Stepper iconItem={cutterItem} iconFallback="🛠️" label="Disqueuses vendues" value={cuttersSold} onChange={setCuttersSold} />
+          <Stepper iconItem={kitItem} iconFallback="🧰" label="Kits vendus" value={kitsSold} onChange={clampKitsSold} />
+          <Stepper iconItem={cutterItem} iconFallback="🛠️" label="Disqueuses vendues" value={cuttersSold} onChange={clampCuttersSold} />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -844,13 +863,18 @@ function SaleCard({
         <button
           type="button"
           onClick={submitSale}
-          disabled={!saleHasStock}
+          disabled={!saleHasStock || isSubmitting}
           className={`w-full rounded-2xl px-4 py-3 text-sm font-black text-[#fff7e8] shadow-sm transition ${
-            saleHasStock ? 'bg-[#6b3f1d] hover:bg-[#4b2a15]' : 'cursor-not-allowed bg-[#9f8669] opacity-60'
+            saleHasStock && !isSubmitting ? 'bg-[#6b3f1d] hover:bg-[#4b2a15]' : 'cursor-not-allowed bg-[#9f8669] opacity-60'
           }`}
         >
-          Valider vente partenaire
+          {isSubmitting ? 'Validation...' : 'Valider vente partenaire'}
         </button>
+        {!saleHasStock ? (
+          <div className="rounded-2xl border border-amber-300/35 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100">
+            Stock insuffisant: kits {kitStock}/{kitsSold}, disqueuses {cutterStock}/{cuttersSold}.
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -899,13 +923,13 @@ function ReportedItemsCard({
         </select>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_.92fr]">
-        <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
+      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_.98fr]">
+        <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-2">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-xs font-black uppercase text-[#efcdab]">Liste items</div>
             <div className="text-xs font-bold text-[#efcdab]">{availableItems.length} résultats</div>
           </div>
-          <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+          <div className="max-h-[440px] space-y-1.5 overflow-x-auto overflow-y-auto pr-1">
             {availableItems.map((item) => (
               <div
                 key={item.id}
@@ -933,51 +957,50 @@ function ReportedItemsCard({
           </div>
         </div>
 
-        <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-3">
+        <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-2">
           <div className="mb-3 text-xs font-black uppercase text-[#efcdab]">Objets sélectionnés</div>
-          <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-            {selectedReported.map((line) => (
-              <div
-                key={line.item_id}
-                className="rounded-2xl border border-white/10 bg-[#2b1a12]/70 p-2"
-              >
-                <div className="grid grid-cols-[40px_1fr_auto] items-center gap-3">
-                  <ItemImage item={line.item} fallback="📦" />
+          <div className="max-h-[440px] space-y-1.5 overflow-x-auto overflow-y-auto pr-1">
+            {selectedReported.map((line) => {
+              const lineTotal = reportedLineTotal(line);
+              return (
+                <div
+                  key={line.item_id}
+                  className="grid min-w-[620px] grid-cols-[36px_minmax(0,1fr)_8.25rem_7.5rem_7rem_2rem] items-center gap-2 rounded-xl border border-white/10 bg-[#2b1a12]/70 p-2"
+                >
+                  <ItemImage item={line.item} fallback="Item" compact />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-black text-[#fff1dd]">{line.item?.name}</div>
-                    <div className="text-xs font-semibold text-[#efcdab]">Stock : {line.item?.quantity ?? 0}</div>
+                    <div className="text-[11px] font-semibold text-[#efcdab]">Stock {line.item?.quantity ?? 0}</div>
+                  </div>
+                  <CompactQuantityControl
+                    value={line.quantity}
+                    onDecrease={() => changeReportedQuantity(line.item_id, Math.max(1, line.quantity - 1))}
+                    onIncrease={() => changeReportedQuantity(line.item_id, line.quantity + 1)}
+                  />
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-[10px] font-black uppercase text-[#efcdab]">Prix achat</span>
+                    <input
+                      value={line.purchase_unit_price}
+                      inputMode="decimal"
+                      onChange={(event) => changeReportedPrice(line.item_id, moneyValue(event.target.value))}
+                      className={`${INPUT_CLASS} !h-8 px-2 py-1 text-sm`}
+                    />
+                  </label>
+                  <div className="min-w-0 space-y-1">
+                    <span className="block text-[10px] font-black uppercase text-[#efcdab]">Total</span>
+                    <div className="flex h-8 items-center rounded-lg border border-white/10 bg-[#2f1d14]/65 px-2 text-sm font-black text-[#fff1dd]">{formatUsd(lineTotal)}</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => changeReportedQuantity(line.item_id, 0)}
-                    className="h-8 w-8 rounded-full border border-white/10 bg-[#2f1d14]/65 text-sm font-black text-[#efcdab] transition hover:bg-red-500/15 hover:text-red-100"
+                    className="h-8 w-8 rounded-lg border border-white/10 bg-[#2f1d14]/65 text-sm font-black text-[#efcdab] transition hover:bg-red-500/15 hover:text-red-100"
                     aria-label="Retirer"
                   >
                     x
                   </button>
                 </div>
-                <div className="mt-2">
-                  <Stepper
-                    label="Quantité"
-                    value={line.quantity}
-                    min={1}
-                    onChange={(value) => changeReportedQuantity(line.item_id, value)}
-                  />
-                </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr]">
-                  <label className="space-y-1">
-                    <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">Prix achat unitaire</span>
-                    <input
-                      value={line.purchase_unit_price}
-                      inputMode="decimal"
-                      onChange={(event) => changeReportedPrice(line.item_id, moneyValue(event.target.value))}
-                      className={INPUT_CLASS}
-                    />
-                  </label>
-                  <InfoLine label="Total ligne" value={formatUsd(reportedLineTotal(line))} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {selectedReported.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#f2cc9b]/35 p-4 text-center text-sm font-semibold text-[#efcdab]">
                 Aucun objet sélectionné.
@@ -1254,6 +1277,27 @@ function Stepper({
   );
 }
 
+function CompactQuantityControl({
+  value,
+  onDecrease,
+  onIncrease,
+}: {
+  value: number;
+  onDecrease: () => void;
+  onIncrease: () => void;
+}) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <span className="block text-[10px] font-black uppercase text-[#efcdab]">Quantité</span>
+      <div className="grid h-8 grid-cols-[1.75rem_1fr_1.75rem] items-center gap-1">
+        <button type="button" onClick={onDecrease} className="h-8 rounded-lg border border-white/15 bg-[#5b3924]/75 text-sm font-black text-[#ffe8ca] transition hover:bg-[#6b452d]/85">-</button>
+        <div className="flex h-8 items-center justify-center rounded-lg border border-white/10 bg-[#2f1d14]/65 text-sm font-black text-[#fff1dd]">{value}</div>
+        <button type="button" onClick={onIncrease} className="h-8 rounded-lg border border-white/15 bg-[#5b3924]/75 text-sm font-black text-[#ffe8ca] transition hover:bg-[#6b452d]/85">+</button>
+      </div>
+    </div>
+  );
+}
+
 function MoneyInput({
   label,
   value,
@@ -1279,15 +1323,17 @@ function MoneyInput({
 function ItemImage({
   item,
   fallback = '📦',
+  compact = false,
 }: {
   item?: Pick<Item, 'name' | 'image_url' | 'image' | 'icon_url'>;
   fallback?: string;
+  compact?: boolean;
 }) {
   const src = itemImageUrl(item);
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#3f281b]/70 text-lg">
+    <div className={`flex shrink-0 items-center justify-center overflow-hidden border border-white/10 bg-[#3f281b]/70 text-lg ${compact ? 'h-8 w-8 rounded-lg text-xs' : 'h-10 w-10 rounded-xl'}`}>
       {src ? (
-        <Image src={src} alt={item?.name ?? 'Item'} width={40} height={40} className="h-full w-full object-cover" unoptimized />
+        <Image src={src} alt={item?.name ?? 'Item'} width={compact ? 32 : 40} height={compact ? 32 : 40} className="h-full w-full object-cover" unoptimized />
       ) : (
         <span aria-hidden="true">{fallback}</span>
       )}
