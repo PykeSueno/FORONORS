@@ -12,6 +12,14 @@ export default async function FourMessagesPage() {
 
   const permissions = await getUserPermissions(session.userId);
   if (!permissions.includes('four.access') || !permissions.includes('four.messages.view')) redirect('/dashboard');
+  const canSeeTransactions = permissions.includes('four.transaction.validate')
+    || permissions.includes('four.transaction.edit.own')
+    || permissions.includes('four.transaction.edit.any')
+    || permissions.includes('four.transaction.cancel.own')
+    || permissions.includes('four.transaction.cancel.any')
+    || permissions.includes('four.transaction.manage')
+    || permissions.includes('four.transaction.manage.own')
+    || permissions.includes('four.transaction.manage.any');
 
   const supabase = getSupabaseAdmin();
   const { data: messages } = await supabase.from('four_messages').select('id, title, content, display_order').order('display_order', { ascending: true }).order('id', { ascending: true });
@@ -19,7 +27,7 @@ export default async function FourMessagesPage() {
   return (
     <div className="space-y-5">
       <InternalPageHeader title="Messages FOUR" subtitle="Messages prédéfinis avec copie, modification et suppression" />
-      <FourTabs active="messages" canSeeHistory={permissions.includes('four.history.view')} canSeeStats={permissions.includes('four.stats.view')} canSeeMessages canSeePartner={permissions.includes('four.partner.view')} />
+      <FourTabs active="messages" canSeeTransactions={canSeeTransactions} canSeeHistory={permissions.includes('four.history.view')} canSeeStats={permissions.includes('four.stats.view')} canSeeMessages canSeePartner={permissions.includes('four.partner.view')} />
       <FourMessagesClient initialMessages={messages ?? []} canManage={permissions.includes('four.messages.manage')} />
     </div>
   );

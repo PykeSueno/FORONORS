@@ -27,6 +27,7 @@ export default async function RobberyPage() {
 
   const canCreate = permissions.includes('robberies.create');
   const canArrested = permissions.includes('robberies.arrested');
+  const canHistory = permissions.includes('robberies.history.view');
   const canStats = permissions.includes('robberies.stats');
   const canLogs = permissions.includes('robberies.logs');
 
@@ -48,6 +49,7 @@ export default async function RobberyPage() {
         members={(members ?? []).map((entry) => ({ id: entry.id, label: entry.name || entry.username || 'Membre' }))}
         canCreate={canCreate}
         canArrested={canArrested}
+        canHistory={canHistory}
         canStats={canStats}
         canLogs={canLogs}
       />

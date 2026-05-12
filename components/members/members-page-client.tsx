@@ -568,12 +568,10 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
 
   const [checkedSimpleKeys, setCheckedSimpleKeys] = useState<Set<string>>(() => simpleKeysFromRoles(selectedRoles));
   const [partialSimpleKeys, setPartialSimpleKeys] = useState<Set<string>>(() => partialSimpleKeysFromRoles(selectedRoles));
-  const [exactPermissionIds, setExactPermissionIds] = useState<Set<number> | null>(null);
 
   useEffect(() => {
     setCheckedSimpleKeys(simpleKeysFromRoles(selectedRoles));
     setPartialSimpleKeys(partialSimpleKeysFromRoles(selectedRoles));
-    setExactPermissionIds(null);
   }, [partialSimpleKeysFromRoles, selectedRoles, simpleKeysFromRoles]);
 
   useEffect(() => {
@@ -594,9 +592,7 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
     if (!canManageRoles) return;
     if (isSaving) return;
     setIsSaving(true);
-    const permissionIds = exactPermissionIds
-      ? Array.from(exactPermissionIds)
-      : Array.from(new Set(
+    const permissionIds = Array.from(new Set(
         permissionsForSimpleKeys(Array.from(checkedSimpleKeys))
           .map((permissionName) => permissionIdByName.get(toCanonicalPermission(permissionName)))
           .filter((id): id is number => Number.isInteger(id))
@@ -640,7 +636,6 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
   }
 
   function toggleSimplePermission(simpleKey: string, next: boolean) {
-    setExactPermissionIds(null);
     setCheckedSimpleKeys((current) => {
       const updated = new Set(current);
       if (next) updated.add(simpleKey);
@@ -655,7 +650,6 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
   }
 
   function toggleModule(simpleKeys: string[], next: boolean) {
-    setExactPermissionIds(null);
     setCheckedSimpleKeys((current) => {
       const updated = new Set(current);
       for (const simpleKey of simpleKeys) {
@@ -672,7 +666,6 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
   }
 
   function applySimpleKeys(simpleKeys: string[]) {
-    setExactPermissionIds(null);
     setCheckedSimpleKeys(new Set(simpleKeys));
     setPartialSimpleKeys(new Set());
   }
@@ -680,7 +673,6 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
   function copyFromRole(roleId: number) {
     const source = roles.find((role) => role.id === roleId);
     if (!source) return;
-    setExactPermissionIds(new Set(source.permission_ids));
     setCheckedSimpleKeys(simpleKeysFromRoles([source]));
     setPartialSimpleKeys(partialSimpleKeysFromRoles([source]));
     setCopySourceRoleId(String(roleId));

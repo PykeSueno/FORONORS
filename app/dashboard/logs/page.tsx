@@ -26,7 +26,7 @@ export default async function LogsPage() {
       .select('id, actor_name, actor_username, actor_role, action, entity_type, entity_id, summary, created_at', { count: 'exact' })
       .order('created_at', { ascending: false })
       .limit(50),
-    supabase.from('app_settings').select('value').eq('key', 'discord.log_webhook_url').maybeSingle(),
+    canManageWebhook ? supabase.from('app_settings').select('value').eq('key', 'discord.log_webhook_url').maybeSingle() : Promise.resolve({ data: null }),
     canViewTabletWebhook ? getTabletWebhookStatus(supabase) : Promise.resolve({ configured: false })
   ]);
 

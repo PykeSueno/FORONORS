@@ -193,7 +193,9 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
     permissions: [
       { key: 'money.view', label: 'Voir', permissions: ['money.access', 'money.preview', 'dashboard.money.movements.preview', 'dashboard.money.movements.access'] },
       { key: 'money.edit', label: 'Modifier', permissions: ['money.edit'] },
-      { key: 'money.history', label: 'Historique', permissions: ['money.history.view', 'money.movements.view'] }
+      { key: 'money.movement', label: 'Ajouter mouvement', permissions: ['money.movement.create'] },
+      { key: 'money.history', label: 'Historique', permissions: ['money.history.view', 'money.movements.view'] },
+      { key: 'money.logs', label: 'Logs', permissions: ['money.logs.view'] }
     ]
   },
   {
@@ -218,8 +220,11 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
     description: 'Payes, dépenses et logs opérationnels.',
     permissions: [
       { key: 'member_ops.view', label: 'Voir', permissions: ['member_ops.view', 'member_ops.activities.view', 'member_ops.payroll.view', 'member_ops.expenses.view', 'activity_payroll.view', 'activity_payroll.global.view', 'activity_payroll.activities.view', 'activity_payroll.payroll.view', 'expenses.view', 'money.pay.access', 'payroll.view', 'payroll.preview'] },
+      { key: 'member_ops.activities', label: 'Gérer activités', permissions: ['member_ops.activities.view', 'activity_payroll.activities.view'] },
       { key: 'member_ops.payroll', label: 'Gérer payes', permissions: ['member_ops.payroll.pay', 'member_ops.payroll.adjust', 'member_ops.payroll.report', 'member_ops.payroll.exclude', 'activity_payroll.payroll.configure', 'activity_payroll.payroll.pay', 'activity_payroll.payroll.adjust', 'activity_payroll.payroll.exclude', 'money.pay.create', 'money.pay.history', 'money.pay.history.view', 'money.pay.logs', 'money.pay.logs.view', 'payroll.configure', 'payroll.adjust', 'payroll.validate'] },
       { key: 'member_ops.expenses', label: 'Gérer dépenses', permissions: ['member_ops.expenses.create', 'member_ops.expenses.edit', 'member_ops.expenses.reimburse', 'member_ops.expenses.cancel', 'expenses.create', 'expenses.edit', 'expenses.reimburse', 'expenses.delete', 'expenses.stats.view'] },
+      { key: 'member_ops.edit', label: 'Modifier', permissions: ['member_ops.payroll.adjust', 'member_ops.expenses.edit', 'activity_payroll.payroll.configure', 'activity_payroll.payroll.adjust', 'expenses.edit', 'payroll.adjust'] },
+      { key: 'member_ops.delete', label: 'Supprimer', permissions: ['member_ops.payroll.exclude', 'member_ops.expenses.cancel', 'activity_payroll.payroll.exclude', 'expenses.delete'] },
       { key: 'member_ops.history', label: 'Historique', permissions: ['member_ops.history.view', 'activity_payroll.history.view', 'expenses.history.view', 'payroll.history'] },
       { key: 'member_ops.logs', label: 'Logs', permissions: ['member_ops.activities.logs', 'member_ops.payroll.logs', 'member_ops.expenses.logs', 'member_ops.logs.view', 'activity_payroll.logs.view', 'expenses.logs.view', 'payroll.logs'] }
     ]
@@ -236,7 +241,7 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
       { key: 'jobs.processor', label: 'Processeur', permissions: ['tobacco.processor.create', 'tobacco.processor.production', 'tobacco.processor.sale', 'tobacco.processor.sale.validate'] },
       { key: 'jobs.stone', label: 'Pierre', permissions: ['jobs.stone.sell'] },
       { key: 'jobs.edit', label: 'Modifier', permissions: ['tablet.daily.manage', 'jobs.tablet.webhook.edit', 'cigarette.daily.manage', 'cigarette.edit.own', 'cigarette.edit.any', 'tobacco.processor.sale.edit', 'tobacco.processor.sale.cancel'] },
-      { key: 'jobs.history', label: 'Historique', partnerSafe: true, permissions: ['cigarette.history.view', 'tobacco.processor.sale.view', 'jobs.stone.history.view'] },
+      { key: 'jobs.history', label: 'Historique', partnerSafe: true, permissions: ['jobs.history.view', 'tablet.history.view', 'cigarette.history.view', 'tobacco.processor.sale.view', 'jobs.stone.history.view'] },
       { key: 'jobs.stats', label: 'Stats', permissions: ['tablet.stats.view', 'cigarette.stats.view', 'tobacco.processor.stats', 'jobs.stone.stats.view'] },
       { key: 'jobs.logs', label: 'Logs', permissions: ['tablet.logs.view', 'cigarette.logs.view', 'tobacco.processor.logs', 'jobs.stone.logs'] }
     ]
@@ -265,10 +270,11 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
     permissions: [
       { key: 'robberies.view', label: 'Voir', permissions: ['robberies.view'] },
       { key: 'robberies.create', label: 'Créer braquage', permissions: ['robberies.create', 'robberies.arrested', 'robberies.fleeca.multi_roles', 'robberies.fleeca.verify_no_consume'] },
-      { key: 'robberies.history', label: 'Historique', permissions: ['robberies.view'] },
+      { key: 'robberies.edit', label: 'Modifier', permissions: ['robberies.edit'] },
+      { key: 'robberies.delete', label: 'Supprimer', permissions: ['robberies.cancel'] },
+      { key: 'robberies.history', label: 'Historique', permissions: ['robberies.history.view'] },
       { key: 'robberies.stats', label: 'Stats', permissions: ['robberies.stats'] },
-      { key: 'robberies.logs', label: 'Logs', permissions: ['robberies.logs'] },
-      { key: 'robberies.delete', label: 'Supprimer', permissions: ['robberies.cancel'] }
+      { key: 'robberies.logs', label: 'Logs', permissions: ['robberies.logs'] }
     ]
   },
   {
@@ -303,7 +309,7 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
     permissions: [
       { key: 'admin.permissions', label: 'Permissions', permissions: ['roles.manage', 'roles.rename'] },
       { key: 'admin.config', label: 'Configuration', permissions: ['roles.manage', 'four.partner.config', 'four.partner.logs'] },
-      { key: 'admin.sql', label: 'SQL', permissions: ['roles.manage'] },
+      { key: 'admin.sql', label: 'SQL', permissions: ['admin.sql.access'] },
       { key: 'admin.webhooks', label: 'Webhooks', permissions: ['logs.webhook.manage', 'logs.webhooks.tablet.edit', 'jobs.tablet.webhook.edit'] }
     ]
   }
@@ -328,7 +334,9 @@ export const SIMPLE_ROLE_PRESETS: Record<string, string[]> = {
     'stock.logs',
     'money.view',
     'money.edit',
+    'money.movement',
     'money.history',
+    'money.logs',
     'activity.view',
     'activity.create',
     'activity.edit',
@@ -337,8 +345,11 @@ export const SIMPLE_ROLE_PRESETS: Record<string, string[]> = {
     'activity.stats',
     'activity.logs',
     'member_ops.view',
+    'member_ops.activities',
     'member_ops.payroll',
     'member_ops.expenses',
+    'member_ops.edit',
+    'member_ops.delete',
     'member_ops.history',
     'member_ops.logs',
     'jobs.view',
@@ -360,9 +371,10 @@ export const SIMPLE_ROLE_PRESETS: Record<string, string[]> = {
     'four.logs',
     'robberies.view',
     'robberies.create',
+    'robberies.edit',
+    'robberies.delete',
     'robberies.stats',
     'robberies.logs',
-    'robberies.delete',
     'members.view',
     'members.create',
     'members.edit',
@@ -394,3 +406,7 @@ export function permissionsForSimpleKeys(simpleKeys: string[]) {
     )
   );
 }
+
+export const ALL_SIMPLE_PERMISSION_NAMES = permissionsForSimpleKeys(
+  SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => permission.key))
+);

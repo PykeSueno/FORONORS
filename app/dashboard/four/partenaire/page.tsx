@@ -13,6 +13,14 @@ export default async function FourPartnerPage() {
 
   const permissions = await getUserPermissions(session.userId);
   if (!permissions.includes('four.access') || !permissions.includes('four.partner.view')) redirect('/dashboard');
+  const canSeeTransactions = permissions.includes('four.transaction.validate')
+    || permissions.includes('four.transaction.edit.own')
+    || permissions.includes('four.transaction.edit.any')
+    || permissions.includes('four.transaction.cancel.own')
+    || permissions.includes('four.transaction.cancel.any')
+    || permissions.includes('four.transaction.manage')
+    || permissions.includes('four.transaction.manage.own')
+    || permissions.includes('four.transaction.manage.any');
 
   const supabase = getSupabaseAdmin();
   const [{ data: configRow }, { data: items }, { data: sales }] = await Promise.all([
@@ -28,6 +36,7 @@ export default async function FourPartnerPage() {
       <InternalPageHeader title="FOUR Partenaire" subtitle="Cycle partenaire, ventes, objets rapportés et suivi bank" />
       <FourTabs
         active="partner"
+        canSeeTransactions={canSeeTransactions}
         canSeeHistory={permissions.includes('four.history.view')}
         canSeeStats={permissions.includes('four.stats.view')}
         canSeeMessages={permissions.includes('four.messages.view')}

@@ -1,6 +1,6 @@
 import { getSupabaseAdmin } from './supabase';
 import { expandPermissionAliases, normalizePermissionNames } from './permission-normalization';
-import { PERMISSION_LABELS } from './permission-catalog';
+import { ALL_SIMPLE_PERMISSION_NAMES, PERMISSION_LABELS } from './permission-catalog';
 
 type PermissionRelation = { permissions: { name: string } | { name: string }[] | null };
 
@@ -72,9 +72,12 @@ export async function getUserPermissions(userId: string) {
 
   if (roleName === 'patron') {
     const { data: allPermissions } = await supabase.from('permissions').select('name');
-    const builtinPermissions = Object.keys(PERMISSION_LABELS);
+    const builtinPermissions = [...Object.keys(PERMISSION_LABELS), ...ALL_SIMPLE_PERMISSION_NAMES];
     const canonical = normalizePermissionNames([...(allPermissions ?? []).map((item) => item.name), ...builtinPermissions]);
-    const permissions = enforcePartnerSafety(roleName, Array.from(new Set(canonical.flatMap((permission) => expandPermissionAliases(permission)))));
+    const permissions = enforcePartnerSafety(
+      roleName,
+      Array.from(new Set(canonical.filter((permission) => permission !== 'admin.sql.access').flatMap((permission) => expandPermissionAliases(permission))))
+    );
     permissionCache.set(userId, { expiresAt: Date.now() + CACHE_TTL_MS, permissions });
     return permissions;
   }

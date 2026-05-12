@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getUserPermissions } from '@/lib/permissions';
+import { ALL_SIMPLE_PERMISSION_NAMES } from '@/lib/permission-catalog';
+import { toCanonicalPermission } from '@/lib/permission-normalization';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { sortMembersByGrade } from '@/lib/members';
 import { InternalPageHeader } from '@/components/dashboard/internal-page-header';
@@ -33,6 +35,14 @@ export default async function MembersPage() {
   }
 
   const supabase = getSupabaseAdmin();
+  if (userPermissions.includes('roles.manage')) {
+    await supabase
+      .from('permissions')
+      .upsert(
+        ALL_SIMPLE_PERMISSION_NAMES.map((name) => ({ name: toCanonicalPermission(name) })),
+        { onConflict: 'name', ignoreDuplicates: true }
+      );
+  }
 
   const [{ data: members }, { data: roles }, permsResult, { data: expenseRows }] = await Promise.all([
     supabase.from('users').select('id, name, username, iban_rib, role_id, is_active, roles(name)').order('username', { ascending: true }),

@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
   const permissions = await getUserPermissions(session.userId);
-  const canTablet = permissions.includes('tablet.access') || permissions.includes('tablet.stats.view');
+  const canTablet = permissions.includes('jobs.history.view') || permissions.includes('tablet.history.view') || permissions.includes('tablet.stats.view');
   const canCigarette = permissions.includes('cigarette.history.view') || permissions.includes('cigarette.stats.view');
   const canProcessor = permissions.includes('tobacco.processor.logs') || permissions.includes('tobacco.processor.stats');
   const canStone = permissions.includes('jobs.stone.history.view') || permissions.includes('jobs.stone.stats.view');

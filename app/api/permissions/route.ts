@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
+import { ALL_SIMPLE_PERMISSION_NAMES } from '@/lib/permission-catalog';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { toCanonicalPermission } from '@/lib/permission-normalization';
 
@@ -13,6 +14,12 @@ export async function GET() {
   if (!canManageRoles) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
+  await supabase
+    .from('permissions')
+    .upsert(
+      ALL_SIMPLE_PERMISSION_NAMES.map((name) => ({ name: toCanonicalPermission(name) })),
+      { onConflict: 'name', ignoreDuplicates: true }
+    );
   const { data, error } = await supabase.from('permissions').select('id, name').order('name', { ascending: true });
 
   if (error) {

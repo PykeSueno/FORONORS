@@ -70,10 +70,12 @@ function moneyIconShape(name: MoneyIconName) {
 
 export function MoneyPageClient({
   canEdit,
+  canAddMovement,
   initialBalance,
   initialMovements
 }: {
   canEdit: boolean;
+  canAddMovement: boolean;
   initialBalance: number;
   initialMovements: Movement[];
 }) {
@@ -144,15 +146,15 @@ export function MoneyPageClient({
 
       {error ? <p className="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p> : null}
 
-      {canEdit ? (
+      {(canEdit || canAddMovement) ? (
         <section className="grid gap-4 lg:grid-cols-2">
-          <form onSubmit={saveBalance} className="glass-card space-y-3 p-5">
+          {canEdit ? <form onSubmit={saveBalance} className="glass-card space-y-3 p-5">
             <h2 className="inline-flex items-center gap-2 text-lg font-semibold text-[#fff1db]"><MoneyIcon name="edit" />Modifier le montant</h2>
             <input className="saas-input w-full" value={balance} onChange={(e) => setBalance(e.target.value)} />
             <button className="saas-primary-btn inline-flex items-center gap-2" type="submit"><MoneyIcon name="edit" />Enregistrer le montant</button>
-          </form>
+          </form> : null}
 
-          <form onSubmit={addMovement} className="glass-card space-y-3 p-5">
+          {canAddMovement ? <form onSubmit={addMovement} className="glass-card space-y-3 p-5">
             <h2 className="inline-flex items-center gap-2 text-lg font-semibold text-[#fff1db]"><MoneyIcon name="add" />Ajouter un mouvement</h2>
             <select className="saas-input w-full" value={type} onChange={(e) => setType(e.target.value)}>
               <option value="entry">Entrée</option>
@@ -169,7 +171,7 @@ export function MoneyPageClient({
             <input className="saas-input w-full" placeholder="Montant" value={amount} onChange={(e) => setAmount(e.target.value)} required />
             <input className="saas-input w-full" placeholder={type === 'laundering' ? 'Blanchiment — ajout banque' : 'Libellé'} value={label} onChange={(e) => setLabel(e.target.value)} required={type !== 'laundering'} />
             <button className="saas-primary-btn inline-flex items-center gap-2" type="submit"><MoneyIcon name="add" />Ajouter</button>
-          </form>
+          </form> : null}
         </section>
       ) : null}
 

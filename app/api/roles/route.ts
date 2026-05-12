@@ -2,12 +2,22 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { clearPermissionCache, hasUserPermission } from '@/lib/permissions';
+import { ALL_SIMPLE_PERMISSION_NAMES } from '@/lib/permission-catalog';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizePermissionNames, toCanonicalPermission } from '@/lib/permission-normalization';
 
 type PermissionRow = { id: number; name: string };
 type RolePermissionRow = { permission_id: number; permissions: PermissionRow | PermissionRow[] | null };
 type RoleRow = { id: number; name: string; display_order: number; role_permissions: RolePermissionRow[] };
+
+async function ensureSimplePermissions(supabase: ReturnType<typeof getSupabaseAdmin>) {
+  await supabase
+    .from('permissions')
+    .upsert(
+      ALL_SIMPLE_PERMISSION_NAMES.map((name) => ({ name: toCanonicalPermission(name) })),
+      { onConflict: 'name', ignoreDuplicates: true }
+    );
+}
 
 export async function GET() {
   const session = await getSession();
@@ -18,6 +28,7 @@ export async function GET() {
   if (!canManageRoles && !canAccessMembers) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const supabase = getSupabaseAdmin();
+  await ensureSimplePermissions(supabase);
   const [{ data, error }, { data: allPermissions }] = await Promise.all([
     supabase
       .from('roles')
@@ -117,6 +128,7 @@ export async function PATCH(request: Request) {
 
   const requestedPermissionIds = Array.from(new Set((body.permission_ids ?? []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)));
   const supabase = getSupabaseAdmin();
+  await ensureSimplePermissions(supabase);
   const [{ data: roles }, { data: allPermissions }, { data: previousRolePermissions }] = await Promise.all([
     supabase.from('roles').select('id, name').in('id', roleIds),
     supabase.from('permissions').select('id, name'),

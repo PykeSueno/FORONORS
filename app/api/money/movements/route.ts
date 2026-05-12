@@ -11,8 +11,8 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
 
-  const canEdit = await hasUserPermission(session.userId, 'money.edit');
-  if (!canEdit) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  const canCreateMovement = await hasUserPermission(session.userId, 'money.movement.create');
+  if (!canCreateMovement) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as { type?: string; amount?: number; label?: string };
   if (!body.type || !body.amount || (body.type !== 'laundering' && !body.label)) {

@@ -121,12 +121,13 @@ function suggest(rows: RoleStats[], role: RoleKey, limit: number): Suggestion['n
     .map(({ row, score }) => ({ name: row.name, score: Math.round(score), reason: rotationReason(row, role) }));
 }
 
-export function RobberiesPageClient({ runs, items, members, canCreate, canArrested, canStats, canLogs }: {
+export function RobberiesPageClient({ runs, items, members, canCreate, canArrested, canHistory, canStats, canLogs }: {
   runs: Run[];
   items: Item[];
   members: Array<{ id: string; label: string }>;
   canCreate: boolean;
   canArrested: boolean;
+  canHistory: boolean;
   canStats: boolean;
   canLogs: boolean;
 }) {
@@ -265,7 +266,7 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
       </section>
 
       {canStats ? <div className="grid gap-2 md:grid-cols-5 xl:grid-cols-10"><Stat label="Total" value={String(computedStats.total)} icon="🧾" /><Stat label="Fleeca" value={String(computedStats.fleeca)} icon="🏦" /><Stat label="Bijouterie" value={String(computedStats.bijouterie)} icon="💎" /><Stat label="Morgue" value={String(computedStats.morgue)} icon="🟥" /><Stat label="Réussis" value={String(computedStats.success)} icon="✅" /><Stat label="Arrêtés" value={String(computedStats.arrested)} icon="🚔" /><Stat label="Argent rentré" value={formatUsd(computedStats.moneyIn)} icon="💵" /><Stat label="Coûts mission" value={formatUsd(computedStats.missionCosts)} icon="🤝" /><Stat label="Bénéfice net" value={formatUsd(computedStats.moneyIn - computedStats.moneyLost - computedStats.missionCosts)} icon="📈" /><Stat label="Ressources" value={String(computedStats.resources.reduce((sum, row) => sum + row.qty, 0))} icon="📦" /></div> : null}
-      {canStats || canLogs ? <RobberyInsights active={insightPanel} setActive={setInsightPanel} canStats={canStats} canLogs={canLogs} suggestions={rotationSuggestions} runs={selectedRuns} roleStats={roleStats} playerStats={computedPlayerStats} resources={computedStats.resources} /> : null}
+      {canStats || canHistory ? <RobberyInsights active={insightPanel} setActive={setInsightPanel} canStats={canStats} canHistory={canHistory} canLogs={canLogs} suggestions={rotationSuggestions} runs={selectedRuns} roleStats={roleStats} playerStats={computedPlayerStats} resources={computedStats.resources} /> : null}
     </div>
   );
 }
@@ -293,10 +294,10 @@ function MissionBox({ title, mission, setMission }: { title: string; mission: Mi
   );
 }
 
-function RobberyInsights(props: { active: InsightPanel; setActive: Dispatch<SetStateAction<InsightPanel>>; canStats: boolean; canLogs: boolean; suggestions: Suggestion[]; runs: Run[]; roleStats: RoleStats[]; playerStats: Array<{ name: string; total: number; fleeca: number; bijouterie: number; morgue: number; money: number; avg: number; last: string }>; resources: Array<{ name: string; qty: number }> }) {
+function RobberyInsights(props: { active: InsightPanel; setActive: Dispatch<SetStateAction<InsightPanel>>; canStats: boolean; canHistory: boolean; canLogs: boolean; suggestions: Suggestion[]; runs: Run[]; roleStats: RoleStats[]; playerStats: Array<{ name: string; total: number; fleeca: number; bijouterie: number; morgue: number; money: number; avg: number; last: string }>; resources: Array<{ name: string; qty: number }> }) {
   const tabs = [
     props.canStats ? { key: 'suggestions' as const, label: '🔁 Suggestions' } : null,
-    props.canLogs ? { key: 'history' as const, label: '📜 Historique' } : null,
+    props.canHistory ? { key: 'history' as const, label: '📜 Historique' } : null,
     props.canStats ? { key: 'weekly' as const, label: '🏆 Classement semaine' } : null,
     props.canStats ? { key: 'braqueurs' as const, label: '🎯 Classement braqueurs' } : null,
     props.canStats ? { key: 'mules' as const, label: '🚗 Classement mule/récup' } : null,

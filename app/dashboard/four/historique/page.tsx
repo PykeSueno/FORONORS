@@ -12,6 +12,14 @@ export default async function FourHistoryPage() {
 
   const permissions = await getUserPermissions(session.userId);
   if (!permissions.includes('four.access') || !permissions.includes('four.history.view')) redirect('/dashboard');
+  const canSeeTransactions = permissions.includes('four.transaction.validate')
+    || permissions.includes('four.transaction.edit.own')
+    || permissions.includes('four.transaction.edit.any')
+    || permissions.includes('four.transaction.cancel.own')
+    || permissions.includes('four.transaction.cancel.any')
+    || permissions.includes('four.transaction.manage')
+    || permissions.includes('four.transaction.manage.own')
+    || permissions.includes('four.transaction.manage.any');
   const { history } = await buildFourStats();
 
   return (
@@ -19,6 +27,7 @@ export default async function FourHistoryPage() {
       <InternalPageHeader title="Historique FOUR" subtitle="Transactions validées, achats, ventes et lignes détaillées" />
       <FourTabs
         active="history"
+        canSeeTransactions={canSeeTransactions}
         canSeeHistory
         canSeeStats={permissions.includes('four.stats.view')}
         canSeeMessages={permissions.includes('four.messages.view')}

@@ -25,6 +25,7 @@ export default async function TabletCigarettePage() {
   const canProcessorLogs = permissions.includes('tobacco.processor.logs');
   const canStoneStats = permissions.includes('jobs.stone.stats.view');
   const canStoneHistory = permissions.includes('jobs.stone.history.view');
+  const canJobsHistory = permissions.includes('jobs.history.view') || permissions.includes('tablet.history.view') || permissions.includes('cigarette.history.view') || canProcessorLogs || canStoneHistory;
   if (!canTabletAccess && !canCigaretteAccess && !canProcessorView && !canStoneView) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
@@ -66,7 +67,7 @@ export default async function TabletCigarettePage() {
   const jobsHistory = await fetchJobsHistoryData(supabase, {
     startIso: statsWeek.startIso,
     endIso: statsWeek.endIso,
-    includeTablet: canTabletAccess || canTabletStats,
+    includeTablet: permissions.includes('jobs.history.view') || permissions.includes('tablet.history.view') || canTabletStats,
     includeCigarette: permissions.includes('cigarette.history.view') || canCigaretteStats,
     includeProcessor: canProcessorLogs || canProcessorStats,
     includeStone: canStoneHistory || canStoneStats
@@ -106,7 +107,7 @@ export default async function TabletCigarettePage() {
         canCigaretteCreatePassage={permissions.includes('cigarette.passage.create')}
         canCigaretteCreateForAny={permissions.includes('cigarette.passage.create.any')}
         initialHistoryRange={statsWeek}
-        canHistory={permissions.includes('tablet.access') || permissions.includes('cigarette.history.view') || canProcessorLogs || canStoneHistory}
+        canHistory={canJobsHistory}
         canStats={canTabletStats || canCigaretteStats || canProcessorStats || canStoneStats}
         canProcessorView={canProcessorView}
         canProcessorCreate={permissions.includes('tobacco.processor.create') || permissions.includes('tobacco.processor.sale.validate')}
