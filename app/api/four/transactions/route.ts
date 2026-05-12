@@ -6,10 +6,15 @@ import { createAuditLog } from '@/lib/audit-log';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
 
+type PaymentMode = 'cash' | 'bank';
 type TxLine = { item_id: number; movement_kind: 'buy' | 'sell'; quantity: number; unit_price: number };
 type ResolvedLine = { itemId: number; itemName: string; movementKind: 'buy' | 'sell'; quantity: number; unitPrice: number; totalAmount: number };
 type ItemEffect = { itemId: number; itemName: string; before: number; after: number; delta: number };
 type CashEffect = { before: number; after: number; delta: number };
+
+function attachCashEffect<T extends Record<string, unknown> | null>(transaction: T, cashEffect: CashEffect): T | (Record<string, unknown> & { cash_before: number; cash_after: number; cash_delta: number }) {
+  return transaction ? { ...transaction, cash_before: cashEffect.before, cash_after: cashEffect.after, cash_delta: cashEffect.delta } : transaction;
+}
 
 function canManageTx(actorId: string, txOwnerId: string | null, canOwn: boolean, canAny: boolean) {
   if (canAny) return true;
@@ -27,7 +32,17 @@ function isAllowedFourItem(item: { name: string; category_key: string | null; ty
 }
 
 function isValidatedStatus(status: string | null | undefined) {
-  return !status || status === 'validated';
+  return !status || status === 'validated' || status === 'pending_bank';
+}
+
+function paymentModeFromStatus(status: string | null | undefined): PaymentMode {
+  return status === 'pending_bank' ? 'bank' : 'cash';
+}
+
+function cashDeltaForLines(lines: ResolvedLine[], paymentMode: PaymentMode) {
+  const totalPurchases = lines.filter((line) => line.movementKind === 'buy').reduce((sum, line) => sum + line.totalAmount, 0);
+  const totalSales = lines.filter((line) => line.movementKind === 'sell').reduce((sum, line) => sum + line.totalAmount, 0);
+  return paymentMode === 'bank' ? -totalPurchases : totalSales - totalPurchases;
 }
 
 async function parseResolvedLines(lines: TxLine[]) {
@@ -75,16 +90,14 @@ async function getItemUpdates(supabase: ReturnType<typeof getSupabaseAdmin>, ite
   return (data ?? []).map((item) => ({ id: Number(item.id), quantity: Number(item.quantity ?? 0) }));
 }
 
-async function applyTransactionEffect(args: { sessionId: number | null; transactionId: number | null; actorUserId: string; lines: ResolvedLine[]; multiplier: 1 | -1; label: string }) {
+async function applyTransactionEffect(args: { sessionId: number | null; transactionId: number | null; actorUserId: string; lines: ResolvedLine[]; multiplier: 1 | -1; label: string; paymentMode: PaymentMode }) {
   const supabase = getSupabaseAdmin();
   const itemEffects: ItemEffect[] = [];
-  let cashDelta = 0;
+  const cashDelta = cashDeltaForLines(args.lines, args.paymentMode) * args.multiplier;
 
   for (const line of args.lines) {
     const direction = line.movementKind === 'buy' ? 1 : -1;
     const stockDelta = direction * line.quantity * args.multiplier;
-    const money = (line.movementKind === 'sell' ? line.totalAmount : -line.totalAmount) * args.multiplier;
-    cashDelta += money;
     if (!stockDelta) continue;
     const { data: item } = await supabase.from('items').select('id, name, quantity').eq('id', line.itemId).maybeSingle();
     if (!item) throw new Error(`Item #${line.itemId} introuvable.`);
@@ -151,7 +164,8 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
   const canCreate = await hasUserPermission(session.userId, 'four.transaction.validate');
   if (!canCreate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
-  const body = (await request.json()) as { counterparty?: string; lines?: TxLine[] };
+  const body = (await request.json()) as { counterparty?: string; payment_mode?: PaymentMode; lines?: TxLine[] };
+  const paymentMode: PaymentMode = body.payment_mode === 'bank' ? 'bank' : 'cash';
 
   try {
     const supabase = getSupabaseAdmin();
@@ -168,6 +182,7 @@ export async function POST(request: Request) {
         closed_at: nowIso,
         summary: {
           mode: 'direct',
+          paymentMode,
           counterparty: body.counterparty?.trim() || null
         }
       })
@@ -182,7 +197,7 @@ export async function POST(request: Request) {
       .insert({
         session_id: directSession.id,
         counterparty: body.counterparty?.trim() || null,
-        status: 'validated',
+        status: paymentMode === 'bank' ? 'pending_bank' : 'validated',
         created_by: session.userId,
         total_purchases: totalPurchases,
         total_sales: totalSales,
@@ -201,7 +216,7 @@ export async function POST(request: Request) {
       total_amount: line.totalAmount
     })));
     if (lineError) return NextResponse.json({ message: 'Enregistrement des lignes FOUR impossible.' }, { status: 400 });
-    const effects = await applyTransactionEffect({ sessionId: directSession.id, transactionId: tx.id, actorUserId: session.userId, lines: resolved, multiplier: 1, label: `FOUR transaction #${tx.id}` });
+    const effects = await applyTransactionEffect({ sessionId: directSession.id, transactionId: tx.id, actorUserId: session.userId, lines: resolved, multiplier: 1, label: `FOUR transaction #${tx.id} (${paymentMode === 'bank' ? 'Bank' : 'Cash'})`, paymentMode });
     const [transaction, itemUpdates] = await Promise.all([
       getFourTransaction(supabase, tx.id),
       getItemUpdates(supabase, effects.itemEffects.map((effect) => effect.itemId))
@@ -212,9 +227,9 @@ export async function POST(request: Request) {
       entityType: 'four_transaction',
       entityId: tx.id,
       summary: `FOUR direct · transaction #${tx.id}`,
-      newValues: { counterparty: body.counterparty ?? null, totalPurchases, totalSales, profitLoss, lines: resolved, stockEffects: effects.itemEffects, cashEffect: effects.cashEffect }
+      newValues: { counterparty: body.counterparty ?? null, paymentMode, totalPurchases, totalSales, profitLoss, cashApplied: effects.cashEffect.delta, lines: resolved, stockEffects: effects.itemEffects, cashEffect: effects.cashEffect }
     });
-    return NextResponse.json({ ok: true, transaction, itemUpdates, cash: effects.cashEffect });
+    return NextResponse.json({ ok: true, transaction: attachCashEffect(transaction, effects.cashEffect), itemUpdates, cash: effects.cashEffect });
   } catch (error) {
     if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Validation impossible.' }, { status: 400 });
@@ -235,7 +250,8 @@ export async function PATCH(request: Request) {
   const anyAccess = canAny || canLegacyAny;
   if (!ownAccess && !anyAccess) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
-  const body = (await request.json()) as { transaction_id?: number; counterparty?: string; lines?: TxLine[] };
+  const body = (await request.json()) as { transaction_id?: number; counterparty?: string; payment_mode?: PaymentMode; lines?: TxLine[] };
+  const paymentMode: PaymentMode = body.payment_mode === 'bank' ? 'bank' : 'cash';
   const txId = Number(body.transaction_id);
   if (!txId) return NextResponse.json({ message: 'Transaction invalide.' }, { status: 400 });
 
@@ -259,12 +275,14 @@ export async function PATCH(request: Request) {
       unitPrice: Number(line.unit_price ?? 0),
       totalAmount: Number(line.total_amount ?? 0)
     }));
+    const previousPaymentMode = paymentModeFromStatus(tx.status);
     const { resolved, totalPurchases, totalSales, profitLoss } = await parseResolvedLines(body.lines ?? []);
-    const rollbackEffects = await applyTransactionEffect({ sessionId: Number(tx.session_id ?? 0) || null, transactionId: txId, actorUserId: session.userId, lines: previousLines, multiplier: -1, label: `FOUR edit rollback #${txId}` });
-    const applyEffects = await applyTransactionEffect({ sessionId: Number(tx.session_id ?? 0) || null, transactionId: txId, actorUserId: session.userId, lines: resolved, multiplier: 1, label: `FOUR edit apply #${txId}` });
+    const rollbackEffects = await applyTransactionEffect({ sessionId: Number(tx.session_id ?? 0) || null, transactionId: txId, actorUserId: session.userId, lines: previousLines, multiplier: -1, label: `FOUR edit rollback #${txId} (${previousPaymentMode === 'bank' ? 'Bank' : 'Cash'})`, paymentMode: previousPaymentMode });
+    const applyEffects = await applyTransactionEffect({ sessionId: Number(tx.session_id ?? 0) || null, transactionId: txId, actorUserId: session.userId, lines: resolved, multiplier: 1, label: `FOUR edit apply #${txId} (${paymentMode === 'bank' ? 'Bank' : 'Cash'})`, paymentMode });
 
     await supabase.from('four_transactions').update({
       counterparty: body.counterparty?.trim() || null,
+      status: paymentMode === 'bank' ? 'pending_bank' : 'validated',
       total_purchases: totalPurchases,
       total_sales: totalSales,
       profit_loss: profitLoss,
@@ -286,12 +304,12 @@ export async function PATCH(request: Request) {
       entityType: 'four_transaction',
       entityId: txId,
       summary: `Modification transaction FOUR #${txId}`,
-      oldValues: { lines: previousLines, stockEffects: rollbackEffects.itemEffects, cashEffect: rollbackEffects.cashEffect },
-      newValues: { counterparty: body.counterparty?.trim() || null, totalPurchases, totalSales, profitLoss, lines: resolved, stockEffects: applyEffects.itemEffects, cashEffect: applyEffects.cashEffect }
+      oldValues: { paymentMode: previousPaymentMode, lines: previousLines, stockEffects: rollbackEffects.itemEffects, cashEffect: rollbackEffects.cashEffect },
+      newValues: { counterparty: body.counterparty?.trim() || null, paymentMode, totalPurchases, totalSales, profitLoss, cashApplied: applyEffects.cashEffect.delta, lines: resolved, stockEffects: applyEffects.itemEffects, cashEffect: applyEffects.cashEffect }
     });
     const touchedItemIds = [...previousLines.map((line) => line.itemId), ...resolved.map((line) => line.itemId)];
     const [transaction, itemUpdates] = await Promise.all([getFourTransaction(supabase, txId), getItemUpdates(supabase, touchedItemIds)]);
-    return NextResponse.json({ ok: true, transaction, itemUpdates, cash: applyEffects.cashEffect });
+    return NextResponse.json({ ok: true, transaction: attachCashEffect(transaction, applyEffects.cashEffect), itemUpdates, cash: applyEffects.cashEffect });
   } catch (error) {
     if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Modification impossible.' }, { status: 400 });
@@ -335,7 +353,8 @@ export async function DELETE(request: Request) {
       unitPrice: Number(line.unit_price ?? 0),
       totalAmount: Number(line.total_amount ?? 0)
     }));
-    const effects = await applyTransactionEffect({ sessionId: Number(tx.session_id ?? 0) || null, transactionId: txId, actorUserId: session.userId, lines: previousLines, multiplier: -1, label: `FOUR annulation #${txId}` });
+    const previousPaymentMode = paymentModeFromStatus(tx.status);
+    const effects = await applyTransactionEffect({ sessionId: Number(tx.session_id ?? 0) || null, transactionId: txId, actorUserId: session.userId, lines: previousLines, multiplier: -1, label: `FOUR annulation #${txId} (${previousPaymentMode === 'bank' ? 'Bank' : 'Cash'})`, paymentMode: previousPaymentMode });
     await supabase.from('four_transactions').update({
       status: 'canceled',
       cancel_reason: body.reason?.trim() || null,
@@ -349,11 +368,11 @@ export async function DELETE(request: Request) {
       entityType: 'four_transaction',
       entityId: txId,
       summary: `Annulation transaction FOUR #${txId}`,
-      oldValues: { lines: previousLines },
+      oldValues: { paymentMode: previousPaymentMode, lines: previousLines },
       newValues: { reason: body.reason?.trim() || null, stockEffects: effects.itemEffects, cashEffect: effects.cashEffect }
     });
     const [transaction, itemUpdates] = await Promise.all([getFourTransaction(supabase, txId), getItemUpdates(supabase, previousLines.map((line) => line.itemId))]);
-    return NextResponse.json({ ok: true, transaction, itemUpdates, cash: effects.cashEffect });
+    return NextResponse.json({ ok: true, transaction: attachCashEffect(transaction, effects.cashEffect), itemUpdates, cash: effects.cashEffect });
   } catch (error) {
     if (error instanceof InactiveMemberUsageError) return NextResponse.json({ message: error.message }, { status: error.status });
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Annulation impossible.' }, { status: 400 });
