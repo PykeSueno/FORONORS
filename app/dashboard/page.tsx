@@ -3,7 +3,7 @@ import { getUserPermissions } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { DashboardShellClient } from '@/components/dashboard/dashboard-shell-client';
 
-const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'activity_payroll', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
+const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'members', 'activity_payroll', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -11,21 +11,21 @@ export default async function DashboardPage() {
   const has = (perm: string) => permissions.includes(perm);
 
   const canMoneyAccess = has('money.access');
-  const canMoneyPreview = canMoneyAccess || has('money.preview');
+  const canMoneyPreview = has('money.preview');
   const canItemsAccess = has('items.access');
-  const canItemsPreview = canItemsAccess || has('items.preview');
+  const canItemsPreview = has('items.preview');
   const canTransactionsAccess = has('transactions.access');
-  const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
-  const canTransactionsRecentAccess = has('transactions.recent.access');
-  const canTransactionsRecentPreview = canTransactionsRecentAccess || has('transactions.recent.preview');
+  const canTransactionsPreview = has('transactions.preview');
+  const canTransactionsRecentAccess = false;
+  const canTransactionsRecentPreview = false;
   const canMembersAccess = has('members.access');
-  const canMembersPreview = canMembersAccess || has('members.preview');
+  const canMembersPreview = has('members.preview');
   const canActivityPayrollAccess = has('member_ops.view') || has('activity_payroll.view');
   const canActivityPayrollPreview = canActivityPayrollAccess;
   const canExpensesAccess = false;
   const canExpensesPreview = false;
   const canLogsAccess = has('logs.access');
-  const canLogsPreview = canLogsAccess || has('logs.preview');
+  const canLogsPreview = has('logs.preview');
   const canTabletAccess = has('tablet.access');
   const canTabletPreview = canTabletAccess || has('tablet.preview');
   const canCigaretteAccess = has('cigarette.access');
@@ -35,13 +35,13 @@ export default async function DashboardPage() {
   const canTabletCigaretteAccess = canTabletAccess || canCigaretteAccess || canProcessorAccess || canStoneAccess;
   const canTabletCigarettePreview = canTabletPreview || canCigarettePreview || canProcessorAccess || canStoneAccess;
   const canActivityAccess = has('activity.access');
-  const canActivityPreview = canActivityAccess || has('activity.preview');
+  const canActivityPreview = has('activity.preview');
   const canFourAccess = has('four.access');
-  const canFourPreview = canFourAccess || has('four.preview');
+  const canFourPreview = has('four.preview');
   const canDrugsAccess = has('drugs.access');
-  const canDrugsPreview = canDrugsAccess || has('drugs.preview');
+  const canDrugsPreview = has('drugs.preview');
   const canSaleObjectsAccess = has('sale.objects.access');
-  const canSaleObjectsPreview = canSaleObjectsAccess || has('sale.objects.preview');
+  const canSaleObjectsPreview = has('sale.objects.preview');
   const canRobberiesAccess = has('robberies.view');
   const canRobberiesPreview = canRobberiesAccess;
   const canUpdatePassword = has('account.password.update');

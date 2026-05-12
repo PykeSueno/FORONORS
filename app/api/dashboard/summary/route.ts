@@ -13,35 +13,35 @@ export async function GET() {
   const has = (perm: string) => permissions.includes(perm);
 
   const canMoneyAccess = has('money.access');
-  const canMoneyPreview = canMoneyAccess || has('money.preview');
+  const canMoneyPreview = has('money.preview');
 
   const canItemsAccess = has('items.access');
-  const canItemsPreview = canItemsAccess || has('items.preview');
+  const canItemsPreview = has('items.preview');
 
   const canTransactionsAccess = has('transactions.access');
-  const canTransactionsPreview = canTransactionsAccess || has('transactions.preview');
+  const canTransactionsPreview = has('transactions.preview');
 
   const canMembersAccess = has('members.access');
-  const canMembersPreview = canMembersAccess || has('members.preview');
+  const canMembersPreview = has('members.preview');
   const canExpensesPreview = has('expenses.view');
 
   const canLogsAccess = has('logs.access');
-  const canLogsPreview = canLogsAccess || has('logs.preview');
+  const canLogsPreview = has('logs.preview');
 
   const canSaleObjectsAccess = has('sale.objects.access');
-  const canSaleObjectsPreview = canSaleObjectsAccess || has('sale.objects.preview');
+  const canSaleObjectsPreview = has('sale.objects.preview');
   const canCigaretteAccess = has('cigarette.access');
   const canCigarettePreview = canCigaretteAccess || has('cigarette.preview');
   const canTabletAccess = has('tablet.access');
   const canTabletPreview = canTabletAccess || has('tablet.preview');
   const canProcessorPreview = has('tobacco.processor.view');
   const canActivityAccess = has('activity.access');
-  const canActivityPreview = canActivityAccess || has('activity.preview') || has('member_ops.activities.view');
+  const canActivityPreview = has('activity.preview');
   const canFourAccess = has('four.access');
-  const canFourPreview = canFourAccess || has('four.preview');
+  const canFourPreview = has('four.preview');
 
-  const canShowMoneyMovements = has('dashboard.money.movements.access') || has('dashboard.money.movements.preview') || canMoneyPreview;
-  const canShowStockMovements = has('dashboard.stock.movements.access') || has('dashboard.stock.movements.preview') || canItemsPreview;
+  const canShowMoneyMovements = has('dashboard.money.movements.access') || has('dashboard.money.movements.preview');
+  const canShowStockMovements = has('dashboard.stock.movements.access') || has('dashboard.stock.movements.preview');
   const cigaretteBusinessDay = getCigaretteBusinessDate();
   const tabletBusinessDay = getTabletBusinessDate();
   const activityDayStart = new Date();

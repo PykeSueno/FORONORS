@@ -568,10 +568,12 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
 
   const [checkedSimpleKeys, setCheckedSimpleKeys] = useState<Set<string>>(() => simpleKeysFromRoles(selectedRoles));
   const [partialSimpleKeys, setPartialSimpleKeys] = useState<Set<string>>(() => partialSimpleKeysFromRoles(selectedRoles));
+  const [exactPermissionIds, setExactPermissionIds] = useState<Set<number> | null>(null);
 
   useEffect(() => {
     setCheckedSimpleKeys(simpleKeysFromRoles(selectedRoles));
     setPartialSimpleKeys(partialSimpleKeysFromRoles(selectedRoles));
+    setExactPermissionIds(null);
   }, [partialSimpleKeysFromRoles, selectedRoles, simpleKeysFromRoles]);
 
   useEffect(() => {
@@ -592,35 +594,23 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
     if (!canManageRoles) return;
     if (isSaving) return;
     setIsSaving(true);
-    const simpleKeys = Array.from(checkedSimpleKeys);
-    const expectedPermissionNames = permissionsForSimpleKeys(simpleKeys).map((permissionName) => toCanonicalPermission(permissionName));
-    const permissionIds = Array.from(new Set(
-        expectedPermissionNames
+    const permissionIds = exactPermissionIds
+      ? Array.from(exactPermissionIds)
+      : Array.from(new Set(
+        permissionsForSimpleKeys(Array.from(checkedSimpleKeys))
           .map((permissionName) => permissionIdByName.get(toCanonicalPermission(permissionName)))
           .filter((id): id is number => Number.isInteger(id))
       ));
-    if (process.env.NODE_ENV !== 'production') {
-      console.info('[FORONORS permissions]', {
-        simpleKeys: simpleKeys.length,
-        expectedPermissions: expectedPermissionNames.length,
-        knownPermissionIds: permissionIds.length,
-        missingPermissions: expectedPermissionNames.filter((permissionName) => !permissionIdByName.has(permissionName))
-      });
-    }
     const response = await fetch('/api/roles', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role_ids: selectedRoles.map((role) => role.id), simple_keys: simpleKeys, permission_ids: permissionIds })
+      body: JSON.stringify({ role_ids: selectedRoles.map((role) => role.id), permission_ids: permissionIds })
     });
 
     setIsSaving(false);
     if (!response.ok) {
       const data = (await response.json().catch(() => ({}))) as { message?: string };
       return onError(data.message ?? 'Enregistrement rôle impossible.');
-    }
-    if (process.env.NODE_ENV !== 'production') {
-      const data = (await response.clone().json().catch(() => ({}))) as { saved_permissions_count?: number };
-      console.info('[FORONORS permissions]', { savedPermissions: data.saved_permissions_count });
     }
     await onSaved();
   }
@@ -650,6 +640,7 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
   }
 
   function toggleSimplePermission(simpleKey: string, next: boolean) {
+    setExactPermissionIds(null);
     setCheckedSimpleKeys((current) => {
       const updated = new Set(current);
       if (next) updated.add(simpleKey);
@@ -664,6 +655,7 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
   }
 
   function toggleModule(simpleKeys: string[], next: boolean) {
+    setExactPermissionIds(null);
     setCheckedSimpleKeys((current) => {
       const updated = new Set(current);
       for (const simpleKey of simpleKeys) {
@@ -680,6 +672,7 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
   }
 
   function applySimpleKeys(simpleKeys: string[]) {
+    setExactPermissionIds(null);
     setCheckedSimpleKeys(new Set(simpleKeys));
     setPartialSimpleKeys(new Set());
   }
@@ -687,6 +680,7 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
   function copyFromRole(roleId: number) {
     const source = roles.find((role) => role.id === roleId);
     if (!source) return;
+    setExactPermissionIds(null);
     setCheckedSimpleKeys(simpleKeysFromRoles([source]));
     setPartialSimpleKeys(partialSimpleKeysFromRoles([source]));
     setCopySourceRoleId(String(roleId));
@@ -783,18 +777,18 @@ function RoleManageModal({ selectedRoles, roles, permissions, canManageRoles, ca
                       Tout cocher
                     </button>
                     <button type="button" className="saas-ghost-btn !h-8 !px-3 !text-xs" onClick={() => applySimpleKeys([])}>
-                      Tout decocher
+                      Tout décocher
                     </button>
                     {(Object.keys(SIMPLE_ROLE_PRESETS) as Array<keyof typeof SIMPLE_ROLE_PRESETS>).map((preset) => (
                       <button key={preset} type="button" className="saas-ghost-btn !h-8 !px-3 !text-xs" onClick={() => applySimpleKeys(SIMPLE_ROLE_PRESETS[preset])}>
-                        Reinitialiser {preset}
+                        Réinitialiser {preset}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <select className="saas-input !h-9 min-w-[220px] !py-1 text-xs" value={copySourceRoleId} onChange={(event) => setCopySourceRoleId(event.target.value)}>
-                    <option value="">Copier permissions depuis un role</option>
+                    <option value="">Copier permissions depuis un rôle</option>
                     {roles.map((role) => (
                       <option key={role.id} value={role.id}>{role.name}</option>
                     ))}

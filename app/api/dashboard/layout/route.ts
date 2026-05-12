@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'transactions_recent', 'members', 'activity_payroll', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
+const DEFAULT_ORDER = ['money', 'sale_objects', 'items', 'transactions', 'members', 'activity_payroll', 'logs', 'tablet_cigarette', 'activity', 'four', 'drugs', 'robberies'];
 
 function normalizeOrder(value: unknown) {
   const entries = Array.isArray(value) ? value : [];
