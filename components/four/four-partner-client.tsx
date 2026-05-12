@@ -903,6 +903,10 @@ function ReportedItemsCard({
   changeReportedQuantity: (itemId: number, quantity: number) => void;
   changeReportedPrice: (itemId: number, purchaseUnitPrice: number) => void;
 }) {
+  const selectedCount = selectedReported.length;
+  const selectedQuantityTotal = selectedReported.reduce((sum, line) => sum + line.quantity, 0);
+  const selectedPurchaseTotal = selectedReported.reduce((sum, line) => sum + reportedLineTotal(line), 0);
+
   return (
     <article className={CARD_CLASS}>
       <CardHeader icon="🎒" eyebrow="Retours stock" title="Objets rapportés" />
@@ -923,13 +927,13 @@ function ReportedItemsCard({
         </select>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,.82fr)_minmax(0,1.18fr)]">
-        <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-2">
+      <div className="mt-4 grid items-stretch gap-3 lg:grid-cols-[minmax(0,.82fr)_minmax(0,1.18fr)]">
+        <div className="flex min-h-[520px] flex-col rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-2">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-xs font-black uppercase text-[#efcdab]">Liste items</div>
             <div className="text-xs font-bold text-[#efcdab]">{availableItems.length} résultats</div>
           </div>
-          <div className="max-h-[440px] space-y-1.5 overflow-y-auto pr-1">
+          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
             {availableItems.map((item) => (
               <div
                 key={item.id}
@@ -957,9 +961,9 @@ function ReportedItemsCard({
           </div>
         </div>
 
-        <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-2">
+        <div className="flex min-h-[520px] flex-col rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-2">
           <div className="mb-3 text-xs font-black uppercase text-[#efcdab]">Objets sélectionnés</div>
-          <div className="max-h-[440px] space-y-2 overflow-y-auto pr-1">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {selectedReported.map((line) => {
               const lineTotal = reportedLineTotal(line);
               return (
@@ -1019,6 +1023,12 @@ function ReportedItemsCard({
                 Aucun objet sélectionné.
               </div>
             ) : null}
+          </div>
+
+          <div className="mt-3 grid gap-2 rounded-xl border border-white/10 bg-[#2b1a12]/85 p-2 sm:grid-cols-3">
+            <SummaryPill label="Objets sélectionnés" value={selectedCount.toLocaleString('fr-FR')} />
+            <SummaryPill label="Quantité totale" value={selectedQuantityTotal.toLocaleString('fr-FR')} />
+            <SummaryPill label="Total achat" value={formatUsd(selectedPurchaseTotal)} highlight />
           </div>
         </div>
       </div>
@@ -1214,6 +1224,17 @@ function InfoLine({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-white/10 bg-[#2b1a12]/70 px-3 py-2">
       <div className="text-[11px] font-black uppercase text-[#f6d7a7]">{label}</div>
       <div className="mt-1 truncate text-sm font-black text-[#fff1dd]">{value}</div>
+    </div>
+  );
+}
+
+function SummaryPill({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-white/10 bg-[#21140d]/70 px-3 py-2">
+      <div className="truncate text-[10px] font-black uppercase leading-4 text-[#efcdab]">{label}</div>
+      <div className={`mt-0.5 truncate text-sm font-black tabular-nums ${highlight ? 'text-[#ffd99f]' : 'text-[#fff1dd]'}`}>
+        {value}
+      </div>
     </div>
   );
 }
