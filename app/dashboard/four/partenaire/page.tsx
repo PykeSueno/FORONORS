@@ -17,7 +17,7 @@ export default async function FourPartnerPage() {
   const supabase = getSupabaseAdmin();
   const [{ data: configRow }, { data: items }, { data: sales }] = await Promise.all([
     supabase.from('four_partner_config').select('*').eq('id', 1).maybeSingle(),
-    supabase.from('items').select('id, name, image_url, quantity, category_key, type_key').order('name', { ascending: true }),
+    supabase.from('items').select('id, name, image_url, quantity, buy_price, category_key, type_key').order('name', { ascending: true }),
     supabase.from('four_partner_sales').select('*').order('created_at', { ascending: false }).limit(200)
   ]);
 

@@ -7,7 +7,7 @@ import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-type ReportedItemInput = { item_id: number; quantity: number };
+type ReportedItemInput = { item_id: number; quantity: number; purchase_unit_price?: number; total_purchase?: number };
 
 function normalizeName(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -19,6 +19,22 @@ function isKitName(name: string) {
 
 function isCutterName(name: string) {
   return normalizeName(name).includes('disqueuse');
+}
+
+function moneyValue(value: unknown) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+function getReportedPurchaseTotal(reportedItems: Array<{ quantity?: number; purchase_unit_price?: number; total_purchase?: number }>) {
+  return reportedItems.reduce((sum, item) => {
+    const explicitTotal = typeof item.total_purchase === 'number' ? Number(item.total_purchase) : null;
+    return sum + (explicitTotal ?? Number(item.quantity ?? 0) * moneyValue(item.purchase_unit_price));
+  }, 0);
+}
+
+function cashMovementType(delta: number) {
+  return delta >= 0 ? 'entry' : 'exit';
 }
 
 async function getConfig(supabase: ReturnType<typeof getSupabaseAdmin>) {
@@ -138,7 +154,11 @@ export async function POST(request: Request) {
   if (Number(cutter.quantity) < cuttersSold) return NextResponse.json({ message: 'Stock insuffisant en disqueuses.' }, { status: 400 });
 
   const reportedInputs = (body.reported_items ?? [])
-    .map((entry) => ({ item_id: Number(entry.item_id), quantity: Math.max(0, Number(entry.quantity)) }))
+    .map((entry) => ({
+      item_id: Number(entry.item_id),
+      quantity: Math.max(0, Number(entry.quantity)),
+      purchase_unit_price: moneyValue(entry.purchase_unit_price),
+    }))
     .filter((entry) => entry.item_id > 0 && entry.quantity > 0);
   const reportedIds = Array.from(new Set(reportedInputs.map((entry) => entry.item_id)));
   const { data: reportedRows } = reportedIds.length > 0
@@ -154,6 +174,8 @@ export async function POST(request: Request) {
       item_name: item.name,
       image_url: item.image_url ?? null,
       quantity: entry.quantity,
+      purchase_unit_price: entry.purchase_unit_price,
+      total_purchase: entry.quantity * entry.purchase_unit_price,
       before: Number(item.quantity ?? 0),
       after: Number(item.quantity ?? 0) + entry.quantity
     });
@@ -161,10 +183,14 @@ export async function POST(request: Request) {
 
   const kitAfter = Number(kit.quantity) - kitsSold;
   const cutterAfter = Number(cutter.quantity) - cuttersSold;
+  const reportedPurchaseTotal = getReportedPurchaseTotal(reportedItems);
+  const netResult = amountReceived - reportedPurchaseTotal;
   const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
   if (!cash) return NextResponse.json({ message: 'Caisse groupe introuvable.' }, { status: 404 });
   const cashBefore = Number(cash.balance ?? 0);
-  const cashAfter = paymentMethod === 'cash' ? cashBefore + amountReceived : cashBefore;
+  const cashDelta = paymentMethod === 'cash' ? netResult : -reportedPurchaseTotal;
+  const cashAfter = cashBefore + cashDelta;
+  if (cashAfter < 0) return NextResponse.json({ message: 'Solde groupe insuffisant pour acheter les objets rapportÃ©s.' }, { status: 400 });
   const now = new Date().toISOString();
 
   try {
@@ -186,12 +212,14 @@ export async function POST(request: Request) {
       });
     }
 
-    if (paymentMethod === 'cash' && amountReceived > 0) {
+    if (cashDelta !== 0) {
       await supabase.from('group_cash').update({ balance: cashAfter, updated_at: now }).eq('id', cash.id);
       await supabase.from('cash_movements').insert({
-        type: 'entry',
-        amount: amountReceived,
-        label: `Vente partenaire FOUR cash — ${partnerName}`,
+        type: cashMovementType(cashDelta),
+        amount: Math.abs(cashDelta),
+        label: paymentMethod === 'cash'
+          ? `Vente partenaire FOUR cash net - ${partnerName}`
+          : `Achat objets rapportes FOUR bank - ${partnerName}`,
         user_id: session.userId,
         before_amount: cashBefore,
         after_amount: cashAfter
@@ -216,7 +244,13 @@ export async function POST(request: Request) {
         reported_items: reportedItems,
         stock_snapshot: {
           kits: { item_id: kit.id, item_name: kit.name, before: Number(kit.quantity), after: kitAfter, sold: kitsSold },
-          cutters: { item_id: cutter.id, item_name: cutter.name, before: Number(cutter.quantity), after: cutterAfter, sold: cuttersSold }
+          cutters: { item_id: cutter.id, item_name: cutter.name, before: Number(cutter.quantity), after: cutterAfter, sold: cuttersSold },
+          sale_summary: {
+            total_sale: amountReceived,
+            total_reported_purchase: reportedPurchaseTotal,
+            net_result: netResult,
+            cash_delta: cashDelta
+          }
         },
         cash_before: cashBefore,
         cash_after: cashAfter,
@@ -231,15 +265,20 @@ export async function POST(request: Request) {
       action: 'four.partner.sale.create',
       entityType: 'four_partner_sale',
       entityId: sale.id,
-      summary: `Vente partenaire FOUR ${partnerName} · ${kitsSold} kits · ${cuttersSold} disqueuses · ${formatUsd(amountReceived)} ${paymentMethod}`,
+      summary: `Vente partenaire FOUR ${partnerName} - vente ${formatUsd(amountReceived)} - achat objets ${formatUsd(reportedPurchaseTotal)} - net ${formatUsd(netResult)} ${paymentMethod}`,
       newValues: {
         ...sale,
         kit_unit_price: kitUnitPrice,
         cutter_unit_price: cutterUnitPrice,
-        total_calculated: amountReceived,
+        total_sale: amountReceived,
+        total_reported_purchase: reportedPurchaseTotal,
+        net_result: netResult,
+        cash_delta: cashDelta,
+        reported_items: reportedItems,
         stock_before_after: {
           kits: { before: Number(kit.quantity), after: kitAfter },
-          cutters: { before: Number(cutter.quantity), after: cutterAfter }
+          cutters: { before: Number(cutter.quantity), after: cutterAfter },
+          reported_items: reportedItems.map((item) => ({ item_id: item.item_id, item_name: item.item_name, before: item.before, after: item.after, quantity: item.quantity, purchase_unit_price: item.purchase_unit_price, total_purchase: item.total_purchase }))
         }
       }
     });
@@ -262,9 +301,36 @@ export async function PATCH(request: Request) {
   if (!sale) return NextResponse.json({ message: 'Vente introuvable.' }, { status: 404 });
   if (sale.status !== 'bank_pending') return NextResponse.json({ message: 'Cette vente bank n’est pas en attente.' }, { status: 400 });
 
+  const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
+  if (!cash) return NextResponse.json({ message: 'Caisse groupe introuvable.' }, { status: 404 });
+  const before = Number(cash.balance ?? 0);
+  const amount = moneyValue(sale.amount_received);
+  const after = before + amount;
+  const now = new Date().toISOString();
+  await supabase.from('group_cash').update({ balance: after, updated_at: now }).eq('id', cash.id);
+  if (amount > 0) {
+    await supabase.from('cash_movements').insert({
+      type: 'entry',
+      amount,
+      label: `Bank recue vente partenaire FOUR #${saleId}`,
+      user_id: session.userId,
+      before_amount: before,
+      after_amount: after
+    });
+    await syncMoneyItemToGroupCash(supabase);
+  }
+
+  const stockSnapshot = typeof sale.stock_snapshot === 'object' && sale.stock_snapshot ? sale.stock_snapshot : {};
   const { data } = await supabase
     .from('four_partner_sales')
-    .update({ status: 'bank_received', bank_received_by: session.userId, bank_received_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .update({
+      status: 'bank_received',
+      bank_received_by: session.userId,
+      bank_received_at: now,
+      updated_at: now,
+      cash_after: after,
+      stock_snapshot: { ...stockSnapshot, bank_received_cash: { before, after, amount } }
+    })
     .eq('id', saleId)
     .select('*')
     .maybeSingle();
@@ -321,17 +387,22 @@ export async function DELETE(request: Request) {
   }
 
   let cashPayload = null;
-  if (sale.payment_method === 'cash' && Number(sale.amount_received ?? 0) > 0) {
+  const reportedPurchaseTotal = getReportedPurchaseTotal(reportedItems);
+  const grossSaleTotal = moneyValue(sale.amount_received);
+  const cashDelta = sale.payment_method === 'bank' && sale.status === 'bank_pending'
+    ? reportedPurchaseTotal
+    : reportedPurchaseTotal - grossSaleTotal;
+  if (cashDelta !== 0) {
     const { data: cash } = await supabase.from('group_cash').select('id, balance').order('id').limit(1).maybeSingle();
     if (!cash) return NextResponse.json({ message: 'Caisse groupe introuvable.' }, { status: 404 });
     const before = Number(cash.balance ?? 0);
-    const after = before - Number(sale.amount_received ?? 0);
+    const after = before + cashDelta;
     if (after < 0) return NextResponse.json({ message: 'Solde groupe insuffisant pour annuler.' }, { status: 400 });
     await supabase.from('group_cash').update({ balance: after, updated_at: now }).eq('id', cash.id);
     await supabase.from('cash_movements').insert({
-      type: 'exit',
-      amount: Number(sale.amount_received ?? 0),
-      label: `Annulation vente partenaire FOUR — #${saleId}`,
+      type: cashMovementType(cashDelta),
+      amount: Math.abs(cashDelta),
+      label: `Annulation vente partenaire FOUR #${saleId}`,
       user_id: session.userId,
       before_amount: before,
       after_amount: after

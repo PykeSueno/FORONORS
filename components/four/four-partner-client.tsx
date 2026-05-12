@@ -17,6 +17,7 @@ type Item = {
   id: number;
   name: string;
   quantity: number;
+  buy_price?: number | null;
   category_key?: string | null;
   type_key?: string | null;
   image_url?: string | null;
@@ -44,6 +45,8 @@ export type FourPartnerSale = {
     icon_url?: string | null;
     before?: number;
     after?: number;
+    purchase_unit_price?: number;
+    total_purchase?: number;
   }>;
   stock_snapshot?: {
     kits?: { item_id: number; item_name: string; before: number; after: number; sold: number };
@@ -57,6 +60,7 @@ export type FourPartnerSale = {
 type ReportedDraft = {
   item_id: number;
   quantity: number;
+  purchase_unit_price: number;
 };
 
 type PartnerClientProps = {
@@ -148,6 +152,32 @@ function compactDate(value: string) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
+function moneyValue(value: unknown) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+function reportedLineTotal(line: Pick<ReportedDraft, 'quantity' | 'purchase_unit_price'>) {
+  return Math.max(0, Number(line.quantity ?? 0)) * moneyValue(line.purchase_unit_price);
+}
+
+function saleReportedPurchaseTotal(sale: FourPartnerSale) {
+  return (sale.reported_items ?? []).reduce((sum, item) => {
+    const explicitTotal = typeof item.total_purchase === 'number' ? Number(item.total_purchase) : null;
+    return sum + (explicitTotal ?? Number(item.quantity ?? 0) * moneyValue(item.purchase_unit_price));
+  }, 0);
+}
+
+function saleNetResult(sale: FourPartnerSale) {
+  return Number(sale.amount_received ?? 0) - saleReportedPurchaseTotal(sale);
+}
+
+function saleCashImpact(sale: FourPartnerSale) {
+  if (sale.status === 'canceled') return 0;
+  if (sale.payment_method === 'bank' && sale.status === 'bank_pending') return -saleReportedPurchaseTotal(sale);
+  return saleNetResult(sale);
+}
+
 export function FourPartnerClient({
   config: initialConfig,
   items,
@@ -200,6 +230,12 @@ export function FourPartnerClient({
   const saleHasStock = kitStock >= kitsSold && cutterStock >= cuttersSold;
   const stockOk = kitStock >= 20 && cutterStock >= 20;
   const saleTotal = Math.max(0, kitsSold * kitPrice + cuttersSold * cutterPrice);
+  const reportedPurchaseTotal = useMemo(
+    () => reported.reduce((sum, line) => sum + reportedLineTotal(line), 0),
+    [reported],
+  );
+  const netResult = saleTotal - reportedPurchaseTotal;
+  const cashImpact = paymentMethod === 'cash' ? netResult : -reportedPurchaseTotal;
 
   const categories = useMemo(() => {
     const values = new Set(currentItems.map((item) => categoryKey(item.category_key)));
@@ -284,7 +320,7 @@ export function FourPartnerClient({
           line.item_id === item.id ? { ...line, quantity: line.quantity + 1 } : line,
         );
       }
-      return [...current, { item_id: item.id, quantity: 1 }];
+      return [...current, { item_id: item.id, quantity: 1, purchase_unit_price: moneyValue(item.buy_price) }];
     });
   }
 
@@ -293,6 +329,14 @@ export function FourPartnerClient({
       current
         .map((line) => (line.item_id === itemId ? { ...line, quantity: Math.max(0, quantity) } : line))
         .filter((line) => line.quantity > 0),
+    );
+  }
+
+  function changeReportedPrice(itemId: number, purchaseUnitPrice: number) {
+    setReported((current) =>
+      current.map((line) =>
+        line.item_id === itemId ? { ...line, purchase_unit_price: moneyValue(purchaseUnitPrice) } : line,
+      ),
     );
   }
 
@@ -362,6 +406,7 @@ export function FourPartnerClient({
           .map((line) => ({
             ...line,
             item_name: itemById.get(line.item_id)?.name,
+            total_purchase: reportedLineTotal(line),
           })),
       }),
     });
@@ -447,6 +492,9 @@ export function FourPartnerClient({
             kitPrice={kitPrice}
             cutterPrice={cutterPrice}
             saleTotal={saleTotal}
+            reportedPurchaseTotal={reportedPurchaseTotal}
+            netResult={netResult}
+            cashImpact={cashImpact}
             paymentMethod={paymentMethod}
             kitStock={kitStock}
             cutterStock={cutterStock}
@@ -473,6 +521,7 @@ export function FourPartnerClient({
             selectedReported={selectedReported}
             addReportedItem={addReportedItem}
             changeReportedQuantity={changeReportedQuantity}
+            changeReportedPrice={changeReportedPrice}
           />
         </section>
       ) : null}
@@ -695,6 +744,9 @@ function SaleCard({
   kitPrice,
   cutterPrice,
   saleTotal,
+  reportedPurchaseTotal,
+  netResult,
+  cashImpact,
   paymentMethod,
   kitStock,
   cutterStock,
@@ -716,6 +768,9 @@ function SaleCard({
   kitPrice: number;
   cutterPrice: number;
   saleTotal: number;
+  reportedPurchaseTotal: number;
+  netResult: number;
+  cashImpact: number;
   paymentMethod: 'cash' | 'bank';
   kitStock: number;
   cutterStock: number;
@@ -775,10 +830,12 @@ function SaleCard({
             <ItemInfoLine item={cutterItem} fallback="🛠️" label="Disqueuses vendues" value={`${cuttersSold} x ${formatUsd(cutterPrice)}`} />
             <ItemInfoLine item={kitItem} fallback="🧰" label="Kits avant/après" value={`${kitStock} -> ${kitAfter}`} />
             <ItemInfoLine item={cutterItem} fallback="🛠️" label="Disqueuses avant/après" value={`${cutterStock} -> ${cutterAfter}`} />
-            <InfoLine label="Total vente" value={formatUsd(saleTotal)} />
+            <InfoLine label="Total vente kits/disqueuses" value={formatUsd(saleTotal)} />
+            <InfoLine label="Total achat objets rapportés" value={formatUsd(reportedPurchaseTotal)} />
+            <InfoLine label="Résultat net" value={formatUsd(netResult)} />
             <InfoLine
-              label={paymentMethod === 'cash' ? 'Argent ajouté' : 'Bank en attente'}
-              value={formatUsd(saleTotal)}
+              label={paymentMethod === 'cash' ? 'Impact cash' : 'Impact bank'}
+              value={formatUsd(cashImpact)}
             />
             <InfoLine label="Stock" value={saleHasStock ? 'OK' : 'Insuffisant'} />
           </div>
@@ -809,6 +866,7 @@ function ReportedItemsCard({
   selectedReported,
   addReportedItem,
   changeReportedQuantity,
+  changeReportedPrice,
 }: {
   query: string;
   setQuery: (value: string) => void;
@@ -819,6 +877,7 @@ function ReportedItemsCard({
   selectedReported: Array<ReportedDraft & { item?: Item }>;
   addReportedItem: (item: Item) => void;
   changeReportedQuantity: (itemId: number, quantity: number) => void;
+  changeReportedPrice: (itemId: number, purchaseUnitPrice: number) => void;
 }) {
   return (
     <article className={CARD_CLASS}>
@@ -905,6 +964,18 @@ function ReportedItemsCard({
                     onChange={(value) => changeReportedQuantity(line.item_id, value)}
                   />
                 </div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr]">
+                  <label className="space-y-1">
+                    <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">Prix achat unitaire</span>
+                    <input
+                      value={line.purchase_unit_price}
+                      inputMode="decimal"
+                      onChange={(event) => changeReportedPrice(line.item_id, moneyValue(event.target.value))}
+                      className={INPUT_CLASS}
+                    />
+                  </label>
+                  <InfoLine label="Total ligne" value={formatUsd(reportedLineTotal(line))} />
+                </div>
               </div>
             ))}
             {selectedReported.length === 0 ? (
@@ -951,7 +1022,10 @@ function HistoryCard({
               <InfoLine label="Kits" value={String(sale.kits_sold)} />
               <InfoLine label="Disqueuses" value={String(sale.cutters_sold)} />
               <InfoLine label="Mode" value={sale.payment_method === 'cash' ? 'Cash' : 'Bank'} />
-              <InfoLine label="Montant" value={formatUsd(sale.amount_received)} />
+              <InfoLine label="Total vente" value={formatUsd(sale.amount_received)} />
+              <InfoLine label="Achat objets" value={formatUsd(saleReportedPurchaseTotal(sale))} />
+              <InfoLine label="Résultat net" value={formatUsd(saleNetResult(sale))} />
+              <InfoLine label="Impact caisse" value={formatUsd(saleCashImpact(sale))} />
             </div>
 
             <div className="mt-3 rounded-2xl border border-white/10 bg-[#2b1a12]/70 px-3 py-2 text-xs font-semibold text-[#efcdab]">
@@ -964,7 +1038,7 @@ function HistoryCard({
                       className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#2f1d14]/65 px-2 py-1 text-[#ffe8ca]"
                     >
                       <ItemImage item={{ name: item.item_name, image_url: item.image_url, image: item.image, icon_url: item.icon_url }} fallback="📦" />
-                      <span>{item.item_name} x{item.quantity}</span>
+                      <span>{item.item_name} x{item.quantity} · {formatUsd(moneyValue(item.purchase_unit_price))}</span>
                     </span>
                   ))}
                 </div>
@@ -1160,10 +1234,12 @@ function Stepper({
           -
         </button>
         <input
-          type="number"
-          min={min}
+          inputMode="numeric"
           value={value}
-          onChange={(event) => onChange(Math.max(min, Number(event.target.value)))}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            onChange(Number.isFinite(next) ? Math.max(min, next) : min);
+          }}
           className={`${INPUT_CLASS} px-2 text-center font-black`}
         />
         <button
@@ -1191,10 +1267,9 @@ function MoneyInput({
     <label className="space-y-1">
       <span className="text-xs font-black uppercase tracking-wide text-[#efcdab]">{label}</span>
       <input
-        type="number"
-        min={0}
+        inputMode="decimal"
         value={value}
-        onChange={(event) => onChange(Math.max(0, Number(event.target.value)))}
+        onChange={(event) => onChange(moneyValue(event.target.value))}
         className={INPUT_CLASS}
       />
     </label>
@@ -1305,7 +1380,11 @@ function SaleDetail({ sale, onClose }: { sale: FourPartnerSale; onClose: () => v
           <InfoLine label="Prix kit" value={formatUsd(Number(sale.kit_unit_price ?? 0))} />
           <InfoLine label="Prix disqueuse" value={formatUsd(Number(sale.cutter_unit_price ?? 0))} />
           <InfoLine label="Paiement" value={sale.payment_method === 'cash' ? 'Cash' : 'Bank'} />
-          <InfoLine label="Montant" value={formatUsd(sale.amount_received)} />
+          <InfoLine label="Total vente" value={formatUsd(sale.amount_received)} />
+          <InfoLine label="Achat objets" value={formatUsd(saleReportedPurchaseTotal(sale))} />
+          <InfoLine label="Résultat net" value={formatUsd(saleNetResult(sale))} />
+          <InfoLine label="Impact caisse" value={formatUsd(saleCashImpact(sale))} />
+          <InfoLine label="Argent groupe" value={`${sale.cash_before != null ? formatUsd(Number(sale.cash_before)) : '-'} -> ${sale.cash_after != null ? formatUsd(Number(sale.cash_after)) : '-'}`} />
           <InfoLine label="Statut" value={statusLabel(sale.status)} />
           <InfoLine label="Date cycle" value={sale.sale_date} />
         </div>
@@ -1317,7 +1396,7 @@ function SaleDetail({ sale, onClose }: { sale: FourPartnerSale; onClose: () => v
               <div key={`${item.item_id}-${item.item_name}`} className="flex items-center gap-3 text-sm font-semibold text-[#ffe8ca]">
                 <ItemImage item={{ name: item.item_name, image_url: item.image_url, image: item.image, icon_url: item.icon_url }} fallback="📦" />
                 <span className="min-w-0 flex-1 truncate">{item.item_name}</span>
-                <span className="font-black">x{item.quantity}</span>
+                <span className="font-black">x{item.quantity} · {formatUsd(moneyValue(item.purchase_unit_price))} · {formatUsd(Number(item.total_purchase ?? Number(item.quantity ?? 0) * moneyValue(item.purchase_unit_price)))}</span>
               </div>
             ))}
             {!sale.reported_items?.length ? (
