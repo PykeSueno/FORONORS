@@ -923,13 +923,13 @@ function ReportedItemsCard({
         </select>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_.98fr]">
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,.82fr)_minmax(0,1.18fr)]">
         <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-2">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-xs font-black uppercase text-[#efcdab]">Liste items</div>
             <div className="text-xs font-bold text-[#efcdab]">{availableItems.length} résultats</div>
           </div>
-          <div className="max-h-[440px] space-y-1.5 overflow-x-auto overflow-y-auto pr-1">
+          <div className="max-h-[440px] space-y-1.5 overflow-y-auto pr-1">
             {availableItems.map((item) => (
               <div
                 key={item.id}
@@ -959,45 +959,54 @@ function ReportedItemsCard({
 
         <div className="min-h-[280px] rounded-2xl border border-white/10 bg-[#2f1d14]/65 p-2">
           <div className="mb-3 text-xs font-black uppercase text-[#efcdab]">Objets sélectionnés</div>
-          <div className="max-h-[440px] space-y-1.5 overflow-x-auto overflow-y-auto pr-1">
+          <div className="max-h-[440px] space-y-2 overflow-y-auto pr-1">
             {selectedReported.map((line) => {
               const lineTotal = reportedLineTotal(line);
               return (
                 <div
                   key={line.item_id}
-                  className="grid min-w-[620px] grid-cols-[36px_minmax(0,1fr)_8.25rem_7.5rem_7rem_2rem] items-center gap-2 rounded-xl border border-white/10 bg-[#2b1a12]/70 p-2"
+                  className="w-full rounded-xl border border-white/10 bg-[#2b1a12]/70 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 >
-                  <ItemImage item={line.item} fallback="Item" compact />
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-black text-[#fff1dd]">{line.item?.name}</div>
-                    <div className="text-[11px] font-semibold text-[#efcdab]">Stock {line.item?.quantity ?? 0}</div>
+                  <div className="flex items-start gap-3">
+                    <ItemImage item={line.item} fallback="Item" compact />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-black text-[#fff1dd]">{line.item?.name}</div>
+                      <div className="text-[11px] font-semibold text-[#efcdab]">
+                        Stock actuel : {line.item?.quantity ?? 0}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => changeReportedQuantity(line.item_id, 0)}
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-[#2f1d14]/65 text-sm font-black text-[#efcdab] transition hover:bg-red-500/15 hover:text-red-100"
+                      aria-label="Retirer"
+                    >
+                      x
+                    </button>
                   </div>
-                  <CompactQuantityControl
-                    value={line.quantity}
-                    onDecrease={() => changeReportedQuantity(line.item_id, Math.max(1, line.quantity - 1))}
-                    onIncrease={() => changeReportedQuantity(line.item_id, line.quantity + 1)}
-                  />
-                  <label className="min-w-0 space-y-1">
-                    <span className="block text-[10px] font-black uppercase text-[#efcdab]">Prix achat</span>
-                    <input
-                      value={line.purchase_unit_price}
-                      inputMode="decimal"
-                      onChange={(event) => changeReportedPrice(line.item_id, moneyValue(event.target.value))}
-                      className={`${INPUT_CLASS} !h-8 px-2 py-1 text-sm`}
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[8.5rem_minmax(0,1fr)_8rem]">
+                    <CompactQuantityControl
+                      value={line.quantity}
+                      onDecrease={() => changeReportedQuantity(line.item_id, Math.max(1, line.quantity - 1))}
+                      onIncrease={() => changeReportedQuantity(line.item_id, line.quantity + 1)}
                     />
-                  </label>
-                  <div className="min-w-0 space-y-1">
-                    <span className="block text-[10px] font-black uppercase text-[#efcdab]">Total</span>
-                    <div className="flex h-8 items-center rounded-lg border border-white/10 bg-[#2f1d14]/65 px-2 text-sm font-black text-[#fff1dd]">{formatUsd(lineTotal)}</div>
+                    <label className="min-w-0 space-y-1">
+                      <span className="block text-[10px] font-black uppercase text-[#efcdab]">Prix achat</span>
+                      <input
+                        value={line.purchase_unit_price}
+                        inputMode="decimal"
+                        onChange={(event) => changeReportedPrice(line.item_id, moneyValue(event.target.value))}
+                        className={`${INPUT_CLASS} !h-9 px-2 py-1 text-sm`}
+                      />
+                    </label>
+                    <div className="min-w-0 space-y-1">
+                      <span className="block text-[10px] font-black uppercase text-[#efcdab]">Total ligne</span>
+                      <div className="flex h-9 items-center rounded-lg border border-white/10 bg-[#2f1d14]/65 px-2 text-sm font-black text-[#fff1dd]">
+                        {formatUsd(lineTotal)}
+                      </div>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => changeReportedQuantity(line.item_id, 0)}
-                    className="h-8 w-8 rounded-lg border border-white/10 bg-[#2f1d14]/65 text-sm font-black text-[#efcdab] transition hover:bg-red-500/15 hover:text-red-100"
-                    aria-label="Retirer"
-                  >
-                    x
-                  </button>
                 </div>
               );
             })}
