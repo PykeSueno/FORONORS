@@ -29,6 +29,7 @@ export default async function ActivityStatsPage() {
     supabase
       .from('activities')
       .select('member_user_id, member_label, activity_type, equipment_item_id, equipment_item_name, equipment_used, activity_items(item_id, item_name, quantity_added), activity_members(member_user_id, member_label)')
+      .neq('activity_type', 'stone')
       .order('created_at', { ascending: false })
       .limit(4000),
     supabase.from('items').select('id, image_url'),

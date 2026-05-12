@@ -18,11 +18,15 @@ export default async function TabletCigarettePage() {
   const canTabletAccess = permissions.includes('tablet.access');
   const canCigaretteAccess = permissions.includes('cigarette.access');
   const canProcessorView = permissions.includes('tobacco.processor.view');
+  const canStoneView = permissions.includes('jobs.stone.view');
   const canTabletStats = permissions.includes('tablet.stats.view');
   const canCigaretteStats = permissions.includes('cigarette.stats.view');
   const canProcessorStats = permissions.includes('tobacco.processor.stats');
   const canProcessorLogs = permissions.includes('tobacco.processor.logs');
-  if (!canTabletAccess && !canCigaretteAccess && !canProcessorView) redirect('/dashboard');
+  const canStoneStats = permissions.includes('jobs.stone.stats.view');
+  const canStoneHistory = permissions.includes('jobs.stone.history.view');
+  const canJobsHistory = permissions.includes('jobs.history.view') || permissions.includes('tablet.history.view') || permissions.includes('cigarette.history.view') || canProcessorLogs || canStoneHistory;
+  if (!canTabletAccess && !canCigaretteAccess && !canProcessorView && !canStoneView) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const tabletBusinessDay = getTabletBusinessDate();
@@ -33,7 +37,7 @@ export default async function TabletCigarettePage() {
     await ensureTabletMorningDeposit(supabase, { actorUserId: session.userId, onlyAfterCutoff: true });
   }
 
-  const [membersRes, cashRes, tabletDayRes, cigaretteDayRes, kitItemRes, cutterItemRes, cigaretteItemRes, processorItemRes] = await Promise.all([
+  const [membersRes, cashRes, tabletDayRes, cigaretteDayRes, kitItemRes, cutterItemRes, cigaretteItemRes, processorItemRes, stoneItemRes] = await Promise.all([
     supabase.from('users').select('id, name, username').eq('is_active', true).order('username', { ascending: true }),
     supabase.from('group_cash').select('balance').order('id').limit(1).maybeSingle(),
     supabase.from('tablet_days').select('*').eq('business_day', tabletBusinessDay).maybeSingle(),
@@ -41,7 +45,8 @@ export default async function TabletCigarettePage() {
     supabase.from('items').select('name, quantity, image_url').ilike('name', '%kit%').limit(1).maybeSingle(),
     supabase.from('items').select('name, quantity, image_url').ilike('name', '%disqueuse%').limit(1).maybeSingle(),
     supabase.from('items').select('id, quantity, image_url').eq('name', CIGARETTE_ITEM_NAME).maybeSingle(),
-    supabase.from('items').select('id, quantity, image_url').eq('name', 'Processeur').maybeSingle()
+    supabase.from('items').select('id, quantity, image_url').eq('name', 'Processeur').maybeSingle(),
+    supabase.from('items').select('id, quantity, image_url').eq('name', 'Saphir Brut').maybeSingle()
   ]);
 
   const tabletPassages = tabletDayRes.data?.id
@@ -55,19 +60,23 @@ export default async function TabletCigarettePage() {
   const processorSessions = canProcessorView
     ? await supabase.from('processor_sessions').select('*').order('created_at', { ascending: false }).limit(100).then((res) => res.data ?? [])
     : [];
+  const stoneSalesToday = canStoneView
+    ? await supabase.from('stone_sales').select('id, member_user_id, member_label, item_id, item_name, quantity_sold, unit_price, total_amount, stock_before, stock_after, cash_before, cash_after, created_at').gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()).lt('created_at', new Date(new Date(new Date().setHours(0, 0, 0, 0)).getTime() + 86400000).toISOString()).order('created_at', { ascending: false }).then((res) => res.data ?? [])
+    : [];
 
   const jobsHistory = await fetchJobsHistoryData(supabase, {
     startIso: statsWeek.startIso,
     endIso: statsWeek.endIso,
-    includeTablet: canTabletAccess || canTabletStats,
+    includeTablet: permissions.includes('jobs.history.view') || permissions.includes('tablet.history.view') || canTabletStats,
     includeCigarette: permissions.includes('cigarette.history.view') || canCigaretteStats,
-    includeProcessor: canProcessorLogs || canProcessorStats
+    includeProcessor: canProcessorLogs || canProcessorStats,
+    includeStone: canStoneHistory || canStoneStats
   });
   const currentMember = (membersRes.data ?? []).find((member) => member.id === session.userId);
 
   return (
     <div className="space-y-5">
-      <InternalPageHeader title="Jobs" subtitle="Tablette / Cigarette / Processeur" />
+      <InternalPageHeader title="Jobs" subtitle="Tablette / Cigarette / Processeur / Pierre" />
       <TabletCigarettePageClient
         members={membersRes.data ?? []}
         tabletBusinessDay={tabletBusinessDay}
@@ -87,6 +96,10 @@ export default async function TabletCigarettePage() {
         cigaretteImageUrl={String(cigaretteItemRes.data?.image_url ?? '')}
         processorInStock={Number(processorItemRes.data?.quantity ?? 0)}
         processorImageUrl={String(processorItemRes.data?.image_url ?? '')}
+        stoneInStock={Number(stoneItemRes.data?.quantity ?? 0)}
+        stoneImageUrl={String(stoneItemRes.data?.image_url ?? '')}
+        stoneSales={stoneSalesToday as Parameters<typeof TabletCigarettePageClient>[0]['stoneSales']}
+        stoneStatsSales={jobsHistory.stoneSales as Parameters<typeof TabletCigarettePageClient>[0]['stoneStatsSales']}
         canTabletAccess={canTabletAccess}
         canCigaretteAccess={canCigaretteAccess}
         canTabletManageDaily={permissions.includes('tablet.daily.manage')}
@@ -94,14 +107,18 @@ export default async function TabletCigarettePage() {
         canCigaretteCreatePassage={permissions.includes('cigarette.passage.create')}
         canCigaretteCreateForAny={permissions.includes('cigarette.passage.create.any')}
         initialHistoryRange={statsWeek}
-        canHistory={permissions.includes('tablet.access') || permissions.includes('cigarette.history.view') || canProcessorLogs}
-        canStats={canTabletStats || canCigaretteStats || canProcessorStats}
+        canHistory={canJobsHistory}
+        canStats={canTabletStats || canCigaretteStats || canProcessorStats || canStoneStats}
         canProcessorView={canProcessorView}
         canProcessorCreate={permissions.includes('tobacco.processor.create') || permissions.includes('tobacco.processor.sale.validate')}
         canProcessorProduction={false}
         canProcessorSale={permissions.includes('tobacco.processor.sale') || permissions.includes('tobacco.processor.sale.view') || permissions.includes('tobacco.processor.create')}
         canProcessorStats={canProcessorStats}
         canProcessorLogs={canProcessorLogs}
+        canStoneView={canStoneView}
+        canStoneSell={permissions.includes('jobs.stone.sell')}
+        canStoneHistory={canStoneHistory}
+        canStoneStats={canStoneStats}
         processorSessions={processorSessions as Array<Record<string, unknown>>}
         processorStatsSessions={jobsHistory.processorSessions as Array<Record<string, unknown>>}
         defaultMemberId={session.userId}

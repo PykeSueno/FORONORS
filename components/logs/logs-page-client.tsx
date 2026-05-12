@@ -60,12 +60,18 @@ export function LogsPageClient({
   initialLogs,
   initialTotal,
   initialWebhookUrl,
-  canManageWebhook
+  canManageWebhook,
+  canViewTabletWebhook,
+  canEditTabletWebhook,
+  initialTabletWebhookConfigured
 }: {
   initialLogs: LogEntry[];
   initialTotal: number;
   initialWebhookUrl: string;
   canManageWebhook: boolean;
+  canViewTabletWebhook: boolean;
+  canEditTabletWebhook: boolean;
+  initialTabletWebhookConfigured: boolean;
 }) {
   const [logs, setLogs] = useState(initialLogs);
   const [total, setTotal] = useState(initialTotal);
@@ -79,6 +85,10 @@ export function LogsPageClient({
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [webhookUrl, setWebhookUrl] = useState(initialWebhookUrl);
+  const [tabletWebhookUrl, setTabletWebhookUrl] = useState('');
+  const [tabletWebhookConfigured, setTabletWebhookConfigured] = useState(initialTabletWebhookConfigured);
+  const [tabletWebhookMessage, setTabletWebhookMessage] = useState('');
+  const [tabletWebhookBusy, setTabletWebhookBusy] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -153,6 +163,39 @@ export function LogsPageClient({
     setError('');
   }
 
+  async function saveTabletWebhook() {
+    setTabletWebhookBusy(true);
+    setTabletWebhookMessage('');
+    const response = await fetch('/api/logs/webhooks/tablet', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhookUrl: tabletWebhookUrl })
+    });
+    setTabletWebhookBusy(false);
+    if (!response.ok) {
+      const data = (await response.json()) as { message?: string };
+      setTabletWebhookMessage(data.message ?? 'Mise a jour webhook tablette impossible.');
+      return;
+    }
+    const data = (await response.json()) as { configured?: boolean };
+    setTabletWebhookConfigured(Boolean(data.configured));
+    setTabletWebhookUrl('');
+    setTabletWebhookMessage('Webhook tablette enregistré.');
+  }
+
+  async function testTabletWebhook() {
+    setTabletWebhookBusy(true);
+    setTabletWebhookMessage('');
+    const response = await fetch('/api/logs/webhooks/tablet/test', { method: 'POST' });
+    setTabletWebhookBusy(false);
+    if (!response.ok) {
+      const data = (await response.json()) as { message?: string };
+      setTabletWebhookMessage(data.message ?? 'Test webhook tablette impossible.');
+      return;
+    }
+    setTabletWebhookMessage('Test webhook tablette envoyé.');
+  }
+
   return (
     <div className="space-y-5">
       <section className="glass-card p-6">
@@ -218,6 +261,34 @@ export function LogsPageClient({
             <input className="saas-input w-full" placeholder="https://discord.com/api/webhooks/..." value={webhookUrl} onChange={(event) => setWebhookUrl(event.target.value)} />
             <button className="saas-primary-btn" onClick={() => void saveWebhook()}>Enregistrer</button>
           </div>
+        </section>
+      ) : null}
+
+      {canViewTabletWebhook ? (
+        <section className="glass-card border border-[#e8b979]/30 bg-[#3b2418]/75 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-[#fff1dd]">📱 Webhook Tablette</h2>
+              <p className="mt-1 text-xs text-[#f2cfa8]">Configuration Discord dédiée aux messages Tablette.</p>
+              <p className="mt-2 text-xs text-[#efcdab]">
+                Statut : <span className={tabletWebhookConfigured ? 'font-semibold text-emerald-200' : 'font-semibold text-red-200'}>{tabletWebhookConfigured ? '✅ Configuré' : '❌ Non configuré'}</span>
+              </p>
+            </div>
+            {canEditTabletWebhook ? <button className="saas-ghost-btn" disabled={!tabletWebhookConfigured || tabletWebhookBusy} onClick={() => void testTabletWebhook()}>Tester</button> : null}
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
+            <input
+              className="saas-input w-full"
+              type={canEditTabletWebhook ? 'password' : 'text'}
+              placeholder={tabletWebhookConfigured ? 'URL webhook Discord Tablette - coller une nouvelle URL pour remplacer' : 'URL webhook Discord Tablette'}
+              value={canEditTabletWebhook ? tabletWebhookUrl : (tabletWebhookConfigured ? 'Webhook configuré' : 'Aucun webhook configuré')}
+              onChange={(event) => setTabletWebhookUrl(event.target.value)}
+              readOnly={!canEditTabletWebhook}
+              autoComplete="off"
+            />
+            {canEditTabletWebhook ? <button className="saas-primary-btn" disabled={tabletWebhookBusy} onClick={() => void saveTabletWebhook()}>Enregistrer</button> : null}
+          </div>
+          {tabletWebhookMessage ? <p className="mt-2 text-xs text-[#efcdab]">{tabletWebhookMessage}</p> : null}
         </section>
       ) : null}
 

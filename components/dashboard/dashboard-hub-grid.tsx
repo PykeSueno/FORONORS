@@ -15,12 +15,13 @@ type HubCardItem = {
 };
 
 export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]; initialOrder: string[] }) {
+  const visibleCards = useMemo(() => cards.filter((card) => card.enabled), [cards]);
   const initialNormalizedOrder = useMemo(() => {
-    const cardIds = cards.map((card) => card.id);
+    const cardIds = visibleCards.map((card) => card.id);
     const validStored = initialOrder.filter((id) => cardIds.includes(id));
     const missing = cardIds.filter((id) => !validStored.includes(id));
     return [...validStored, ...missing];
-  }, [cards, initialOrder]);
+  }, [visibleCards, initialOrder]);
 
   const [dragging, setDragging] = useState<string | null>(null);
   const [draftOrder, setDraftOrder] = useState<string[]>(initialNormalizedOrder);
@@ -37,11 +38,11 @@ export function DashboardHubGrid({ cards, initialOrder }: { cards: HubCardItem[]
   }, [initialNormalizedOrder]);
 
   const orderedCards = useMemo(() => {
-    const map = new Map(cards.map((card) => [card.id, card]));
+    const map = new Map(visibleCards.map((card) => [card.id, card]));
     const listed = draftOrder.map((id) => map.get(id)).filter(Boolean) as HubCardItem[];
-    const missing = cards.filter((card) => !draftOrder.includes(card.id));
+    const missing = visibleCards.filter((card) => !draftOrder.includes(card.id));
     return [...listed, ...missing];
-  }, [cards, draftOrder]);
+  }, [visibleCards, draftOrder]);
 
   async function persist(nextOrder: string[]) {
     orderRef.current = nextOrder;

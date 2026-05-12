@@ -58,6 +58,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('activities')
     .select('id, activity_type, member_label, proof_image_url, equipment_item_name, equipment_used, equipment_before, equipment_after, created_at, activity_items(item_name, quantity_added, before_quantity, after_quantity), activity_members(member_user_id, member_label)')
+    .neq('activity_type', 'stone')
     .order('created_at', { ascending: false })
     .limit(100);
 
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
 
   const equipmentUsed = Math.max(0, Number(body.equipment_used ?? 0));
   if (body.activity_type === 'mailbox' && equipmentUsed > 0) {
-    return NextResponse.json({ message: 'Boîte aux lettres ne consomme aucun équipement.' }, { status: 400 });
+    return NextResponse.json({ message: `${ACTIVITY_LABELS[body.activity_type]} ne consomme aucun équipement.` }, { status: 400 });
   }
 
   const uniqueMemberIds = Array.from(new Set((body.member_user_ids ?? []).map((entry) => entry.trim()).filter(Boolean)));
@@ -159,7 +160,6 @@ export async function POST(request: Request) {
     if (body.activity_type === 'cargo' && !CARGO_LOOT_NAMES.has(item.name)) {
       return NextResponse.json({ message: `Item non autorisé pour Cargo: ${item.name}.` }, { status: 400 });
     }
-
     const before = Number(item.quantity);
     const after = before + quantity;
     resolvedItems.push({ item_id: item.id, item_name: item.name, quantity, before, after, isMoneyItem: Boolean(item.is_money_item) });

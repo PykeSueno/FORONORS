@@ -125,6 +125,7 @@ export function TabletPageClient({ day, businessDay, members, passages, groupCas
           ))}
         </div>
       </section>
+
     </div>
   );
 }

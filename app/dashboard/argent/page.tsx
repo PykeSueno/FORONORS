@@ -12,7 +12,9 @@ export default async function MoneyPage() {
   const permissions = await getUserPermissions(session.userId);
   if (!permissions.includes('money.access')) redirect('/dashboard');
   const canHistoryView = permissions.includes('money.history.view');
-  if (!canHistoryView && !permissions.includes('money.edit')) redirect('/dashboard');
+  const canEdit = permissions.includes('money.edit');
+  const canAddMovement = permissions.includes('money.movement.create');
+  if (!canHistoryView && !canEdit && !canAddMovement) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
   const [{ data: cash }, { data: movements }] = await Promise.all([
@@ -24,7 +26,8 @@ export default async function MoneyPage() {
     <>
       <InternalPageHeader title="Argent" subtitle="Suivi de la caisse du groupe" />
       <MoneyPageClient
-        canEdit={permissions.includes('money.edit')}
+        canEdit={canEdit}
+        canAddMovement={canAddMovement}
         initialBalance={Number(cash?.balance ?? 0)}
         initialMovements={movements ?? []}
       />

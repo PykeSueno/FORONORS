@@ -20,11 +20,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     is_active?: boolean;
     name?: string;
     username?: string;
+    iban_rib?: string | null;
     password?: string;
   };
 
   const supabase = getSupabaseAdmin();
-  const { data: before } = await supabase.from('users').select('id, name, username, role_id, role, is_active').eq('id', id).maybeSingle();
+  const { data: before } = await supabase.from('users').select('id, name, username, iban_rib, role_id, role, is_active').eq('id', id).maybeSingle();
 
   let roleName = '';
   if (body.role_id) {
@@ -37,7 +38,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     role: roleName,
     is_active: body.is_active ?? true,
     ...(body.name !== undefined ? { name: body.name.trim() } : {}),
-    ...(body.username !== undefined ? { username: body.username.trim() } : {})
+    ...(body.username !== undefined ? { username: body.username.trim() } : {}),
+    ...(body.iban_rib !== undefined ? { iban_rib: body.iban_rib?.trim() || null } : {})
   };
 
   if (body.password) {

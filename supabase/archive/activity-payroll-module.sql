@@ -56,6 +56,8 @@ with check (true);
 
 create index if not exists idx_activity_payroll_payments_period on public.activity_payroll_payments(week_start, week_end, created_at desc);
 create index if not exists idx_activity_payroll_payments_member on public.activity_payroll_payments(member_user_id, created_at desc);
+create index if not exists idx_activity_payroll_payments_member_period on public.activity_payroll_payments(member_user_id, week_start, week_end);
+create index if not exists idx_activity_payroll_payments_created_at on public.activity_payroll_payments(created_at desc);
 create index if not exists idx_activity_payroll_payments_paid_by on public.activity_payroll_payments(paid_by, created_at desc);
 
 -- Permissions propres du module Activites & Payes & Depenses.

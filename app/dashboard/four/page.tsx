@@ -12,6 +12,21 @@ export default async function FourPage() {
 
   const permissions = await getUserPermissions(session.userId);
   if (!permissions.includes('four.access')) redirect('/dashboard');
+  const canSeeTransactions = permissions.includes('four.transaction.validate')
+    || permissions.includes('four.transaction.edit.own')
+    || permissions.includes('four.transaction.edit.any')
+    || permissions.includes('four.transaction.cancel.own')
+    || permissions.includes('four.transaction.cancel.any')
+    || permissions.includes('four.transaction.manage')
+    || permissions.includes('four.transaction.manage.own')
+    || permissions.includes('four.transaction.manage.any');
+  if (!canSeeTransactions) {
+    if (permissions.includes('four.partner.view')) redirect('/dashboard/four/partenaire');
+    if (permissions.includes('four.history.view')) redirect('/dashboard/four/historique');
+    if (permissions.includes('four.stats.view')) redirect('/dashboard/four/stats');
+    if (permissions.includes('four.messages.view')) redirect('/dashboard/four/messages');
+    redirect('/dashboard');
+  }
 
   const supabase = getSupabaseAdmin();
   const [{ data: items }, { data: transactions }, { data: cash }] = await Promise.all([
@@ -29,8 +44,11 @@ export default async function FourPage() {
       <InternalPageHeader title="FOUR" subtitle="Transactions stock + argent" />
       <FourTabs
         active="four"
+        canSeeTransactions={canSeeTransactions}
+        canSeeHistory={permissions.includes('four.history.view')}
         canSeeStats={permissions.includes('four.stats.view')}
         canSeeMessages={permissions.includes('four.messages.view')}
+        canSeePartner={permissions.includes('four.partner.view')}
       />
       <FourPageClient
         items={items ?? []}

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
-import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, weekWindow, type PayrollConfig } from '@/lib/payroll';
+import { buildPayrollPreview, DEFAULT_PAYROLL_CONFIG, payrollDisplayWindow, previousPayrollWindow, type PayrollConfig } from '@/lib/payroll';
 import { syncMoneyItemToGroupCash } from '@/lib/money-item';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { assertActiveMemberIds, InactiveMemberUsageError } from '@/lib/active-members';
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
   const customEnd = url.searchParams.get('end');
   const display = payrollDisplayWindow(new Date());
   const currentWindow = { startIso: display.startIso, endIso: display.endIso, mode: 'weekly' as const };
-  const previousWindow = { ...weekWindow(new Date(display.startIso), -1), mode: 'weekly' as const };
+  const previousWindow = { ...previousPayrollWindow(new Date()), mode: 'weekly' as const };
   const selectedWindow = period === 'custom' && customStart && customEnd
     ? { startIso: new Date(customStart).toISOString(), endIso: new Date(customEnd).toISOString(), mode: 'custom' as const }
     : period === 'previous'

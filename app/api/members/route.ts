@@ -8,6 +8,7 @@ type MemberRow = {
   id: string;
   username: string;
   name: string;
+  iban_rib: string | null;
   role: string | null;
   role_id: number | null;
   is_active: boolean;
@@ -24,7 +25,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, name, role, role_id, is_active, roles(name)')
+    .select('id, username, name, iban_rib, role, role_id, is_active, roles(name)')
     .order('username', { ascending: true });
 
   if (error) return NextResponse.json({ message: 'Erreur de lecture.' }, { status: 500 });
@@ -33,6 +34,7 @@ export async function GET() {
     id: member.id,
     name: member.name,
     username: member.username,
+    iban_rib: member.iban_rib,
     role_id: member.role_id,
     role_name: (Array.isArray(member.roles) ? member.roles[0]?.name : member.roles?.name) ?? member.role ?? '',
     is_active: member.is_active
@@ -54,6 +56,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     username?: string;
     name?: string;
+    iban_rib?: string | null;
     password?: string;
     role_id?: number | null;
     is_active?: boolean;
@@ -75,6 +78,7 @@ export async function POST(request: Request) {
   const payload = {
     username: body.username.trim(),
     name: body.name.trim(),
+    iban_rib: body.iban_rib?.trim() || null,
     password_hash: passwordHash,
     password_plain: body.password,
     role_id: body.role_id ?? null,

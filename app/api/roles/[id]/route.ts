@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
-import { hasUserPermission } from '@/lib/permissions';
+import { clearPermissionCache, hasUserPermission } from '@/lib/permissions';
+import { ALL_SIMPLE_PERMISSION_NAMES } from '@/lib/permission-catalog';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizePermissionNames, toCanonicalPermission } from '@/lib/permission-normalization';
 
@@ -14,6 +15,15 @@ async function getAuthenticatedSession() {
 function isCriticalRoleName(name?: string | null) {
   const normalized = (name ?? '').trim().toLowerCase();
   return ['patron', 'lead', 'admin', 'administrateur'].includes(normalized);
+}
+
+async function ensureSimplePermissions(supabase: ReturnType<typeof getSupabaseAdmin>) {
+  await supabase
+    .from('permissions')
+    .upsert(
+      ALL_SIMPLE_PERMISSION_NAMES.map((name) => ({ name: toCanonicalPermission(name) })),
+      { onConflict: 'name', ignoreDuplicates: true }
+    );
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -39,7 +49,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { data: before } = await supabase
     .from('roles')
-    .select('id, name, display_order, role_permissions(permission_id)')
+    .select('id, name, display_order, role_permissions(permission_id, permissions(name))')
     .eq('id', roleId)
     .maybeSingle();
   if (!before) return NextResponse.json({ message: 'Rôle introuvable.' }, { status: 404 });
@@ -95,6 +105,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (body.permission_ids !== undefined) {
+    await ensureSimplePermissions(supabase);
     const [{ data: selectedPermissions }, { data: allPermissions }] = await Promise.all([
       supabase.from('permissions').select('id, name').in('id', body.permission_ids),
       supabase.from('permissions').select('id, name')
@@ -119,17 +130,47 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ message: 'Attribution des permissions impossible.' }, { status: 400 });
       }
     }
+    clearPermissionCache();
   }
 
   if (body.permission_ids !== undefined || body.display_order !== undefined) {
+    const beforePermissionNames = normalizePermissionNames(
+      ((before.role_permissions ?? []) as Array<{ permissions: { name: string } | { name: string }[] | null }>)
+        .map((row) => (Array.isArray(row.permissions) ? row.permissions[0]?.name : row.permissions?.name))
+        .filter((name): name is string => Boolean(name))
+    );
+    const afterPermissionNames = body.permission_ids !== undefined
+      ? normalizePermissionNames(
+        ((await supabase.from('permissions').select('id, name').in('id', body.permission_ids)).data ?? [])
+          .map((permission) => permission.name)
+      )
+      : beforePermissionNames;
+    const addedPermissions = afterPermissionNames.filter((permission) => !beforePermissionNames.includes(permission));
+    const removedPermissions = beforePermissionNames.filter((permission) => !afterPermissionNames.includes(permission));
+
     await createAuditLog({
       actorUserId: access.session.userId,
       action: 'roles.edit',
       entityType: 'role',
       entityId: roleId,
       summary: `Modification du rôle ${newRoleName ?? before.name ?? roleId}`,
-      oldValues: before as Record<string, unknown> | null,
-      newValues: body as Record<string, unknown>
+      oldValues: {
+        roleId,
+        roleName: before.name,
+        displayOrder: before.display_order,
+        permissions: beforePermissionNames
+      },
+      newValues: {
+        roleId,
+        roleName: newRoleName ?? before.name,
+        displayOrder: body.display_order ?? before.display_order,
+        permissionIds: body.permission_ids,
+        permissions: afterPermissionNames,
+        addedPermissions,
+        removedPermissions,
+        adminUserId: access.session.userId,
+        modifiedAt: new Date().toISOString()
+      }
     });
   }
 

@@ -22,12 +22,13 @@ type CigaretteDay = { id: number; business_day: string; chest_amount: number; pa
 
 type TabletPassage = { id: number; member_user_id?: string | null; member_label: string; before_cash: number; after_cash: number; before_kits: number; after_kits: number; before_cutters: number; after_cutters: number; created_at: string };
 type CigarettePassage = { id: number; member_user_id?: string | null; member_label: string; quantity_sold: number; revenue_amount: number; before_packs: number; after_packs: number; before_deposit_packs?: number | null; after_deposit_packs?: number | null; before_chest: number; after_chest: number; before_group_cash: number; after_group_cash: number; status?: string | null; created_at: string };
+type StoneSale = { id: number; member_user_id?: string | null; member_label: string; item_id?: number | null; item_name?: string | null; quantity_sold: number; unit_price: number; total_amount: number; stock_before: number; stock_after: number; cash_before: number; cash_after: number; created_at: string };
 
-type Tab = 'home' | 'tablet' | 'cigarette' | 'processor' | 'history' | 'stats';
+type Tab = 'home' | 'tablet' | 'cigarette' | 'processor' | 'stone' | 'history' | 'stats';
 type HistoryCard = { id: string; title: string; meta: string; type: string; amount: string; status: string; lines: string[]; items: Array<{ label: string; imageUrl?: string; icon: string }> };
 type HistoryRangeMode = 'current' | 'previous' | 'custom';
 type HistoryDayFilter = 'all' | '0' | '1' | '2' | '3' | '4' | '5' | '6';
-type JobTypeFilter = 'all' | 'tablet' | 'cigarette' | 'processor';
+type JobTypeFilter = 'all' | 'tablet' | 'cigarette' | 'processor' | 'stone';
 type JobHistoryEntry = {
   id: string;
   type: Exclude<JobTypeFilter, 'all'>;
@@ -50,6 +51,8 @@ type JobHistoryEntry = {
   processorProduced?: number;
   processorSold?: number;
   processorMoney?: number;
+  stoneSold?: number;
+  stoneMoney?: number;
 };
 type MemberJobStats = {
   key: string;
@@ -66,6 +69,8 @@ type MemberJobStats = {
   processorProduced: number;
   processorSold: number;
   processorMoney: number;
+  stoneSold: number;
+  stoneMoney: number;
   totalActivities: number;
   lastActivity: string;
 };
@@ -97,6 +102,10 @@ export function TabletCigarettePageClient(props: {
   cigaretteImageUrl: string;
   processorInStock: number;
   processorImageUrl: string;
+  stoneInStock: number;
+  stoneImageUrl: string;
+  stoneSales: StoneSale[];
+  stoneStatsSales: StoneSale[];
   initialHistoryRange: { startIso: string; endIso: string };
   canTabletAccess: boolean;
   canCigaretteAccess: boolean;
@@ -112,15 +121,19 @@ export function TabletCigarettePageClient(props: {
   canProcessorSale: boolean;
   canProcessorStats: boolean;
   canProcessorLogs: boolean;
+  canStoneView: boolean;
+  canStoneSell: boolean;
+  canStoneHistory: boolean;
+  canStoneStats: boolean;
   processorSessions: Array<Record<string, unknown>>;
   processorStatsSessions: Array<Record<string, unknown>>;
   defaultMemberId: string;
   defaultMemberLabel: string;
 }) {
   const {
-    members, tabletBusinessDay, cigaretteBusinessDay, tabletDay, cigaretteDay, tabletPassages, cigarettePassages, tabletStatsPassages, cigaretteStatsPassages, groupCash, kitsInStock, cuttersInStock, packsInStock, kitImageUrl, cutterImageUrl, cigaretteImageUrl, processorInStock, processorImageUrl, initialHistoryRange,
+    members, tabletBusinessDay, cigaretteBusinessDay, tabletDay, cigaretteDay, tabletPassages, cigarettePassages, tabletStatsPassages, cigaretteStatsPassages, groupCash, kitsInStock, cuttersInStock, packsInStock, kitImageUrl, cutterImageUrl, cigaretteImageUrl, processorInStock, processorImageUrl, stoneInStock, stoneImageUrl, stoneSales, stoneStatsSales, initialHistoryRange,
     canTabletAccess, canCigaretteAccess, canTabletManageDaily, canTabletCreatePassage, canCigaretteCreatePassage, canCigaretteCreateForAny, canHistory, canStats,
-    canProcessorView, canProcessorCreate, canProcessorProduction, canProcessorSale, canProcessorStats, canProcessorLogs, processorSessions, processorStatsSessions,
+    canProcessorView, canProcessorCreate, canProcessorProduction, canProcessorSale, canProcessorStats, canProcessorLogs, canStoneView, canStoneSell, canStoneHistory, canStoneStats, processorSessions, processorStatsSessions,
     defaultMemberId, defaultMemberLabel
   } = props;
 
@@ -152,6 +165,11 @@ export function TabletCigarettePageClient(props: {
   const [processorSaleQty, setProcessorSaleQty] = useState(10);
   const [processorRealReceived, setProcessorRealReceived] = useState('500');
   const [processorStockState, setProcessorStockState] = useState(processorInStock);
+  const [stoneSalesState, setStoneSalesState] = useState(stoneSales);
+  const [stoneStatsSalesState, setStoneStatsSalesState] = useState(stoneStatsSales);
+  const [stoneStockState, setStoneStockState] = useState(stoneInStock);
+  const [stoneMemberId, setStoneMemberId] = useState(defaultMemberId);
+  const [stoneQty, setStoneQty] = useState(1);
   const [cigarettePaymentMode, setCigarettePaymentMode] = useState<'cash' | 'bank'>('cash');
   const [historyRangeMode, setHistoryRangeMode] = useState<HistoryRangeMode>('current');
   const [historyDayFilter, setHistoryDayFilter] = useState<HistoryDayFilter>('all');
@@ -202,10 +220,38 @@ export function TabletCigarettePageClient(props: {
     .reduce((sum, row) => sum + Number(row.processors_count ?? 0), 0), [processorSessionsState, processorSaleMemberId]);
   const processorRemainingToday = Math.max(0, 50 - processorSoldToday);
   const processorSaleMax = Math.max(0, Math.min(50, processorRemainingToday, processorStockState));
+  const stoneSoldToday = useMemo(() => stoneSalesState
+    .filter((row) => row.member_user_id === stoneMemberId)
+    .reduce((sum, row) => sum + Number(row.quantity_sold ?? 0), 0), [stoneMemberId, stoneSalesState]);
+  const stoneRemainingToday = Math.max(0, 8 - stoneSoldToday);
+  const stoneSaleMax = Math.max(0, Math.min(8, stoneRemainingToday, stoneStockState));
+  const stoneSaleTotal = stoneQty * 225;
+  const stoneStatsTotals = useMemo(() => ({
+    sold: stoneStatsSalesState.reduce((sum, row) => sum + Number(row.quantity_sold ?? 0), 0),
+    revenue: stoneStatsSalesState.reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0),
+    last: stoneStatsSalesState.reduce((last, row) => !last || new Date(row.created_at).getTime() > new Date(last).getTime() ? row.created_at : last, '')
+  }), [stoneStatsSalesState]);
+  const stoneStatsByMember = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; sold: number; revenue: number; limitUsed: number; last: string }>();
+    for (const row of stoneStatsSalesState) {
+      const key = memberStatsKey(row.member_user_id, row.member_label);
+      const current = map.get(key) ?? { key, label: memberStatsLabel(row.member_user_id, row.member_label), sold: 0, revenue: 0, limitUsed: 0, last: row.created_at };
+      current.sold += Number(row.quantity_sold ?? 0);
+      current.revenue += Number(row.total_amount ?? 0);
+      current.limitUsed = Math.max(current.limitUsed, Math.min(100, Math.round((current.sold / 8) * 100)));
+      if (new Date(row.created_at).getTime() > new Date(current.last).getTime()) current.last = row.created_at;
+      map.set(key, current);
+    }
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.sold - a.sold);
+  }, [memberStatsKey, memberStatsLabel, stoneStatsSalesState]);
 
   useEffect(() => {
     setProcessorSaleQty((current) => Math.max(0, Math.min(processorSaleMax, current)));
   }, [processorSaleMax]);
+
+  useEffect(() => {
+    setStoneQty((current) => Math.max(0, Math.min(stoneSaleMax, current)));
+  }, [stoneSaleMax]);
 
   useEffect(() => {
     if (!canHistory && !canStats) return;
@@ -226,12 +272,13 @@ export function TabletCigarettePageClient(props: {
     fetch(`/api/jobs/history?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error((await response.json().catch(() => ({ message: 'Chargement historique impossible.' }))).message);
-        return response.json() as Promise<{ tabletPassages?: TabletPassage[]; cigarettePassages?: CigarettePassage[]; processorSessions?: Array<Record<string, unknown>> }>;
+        return response.json() as Promise<{ tabletPassages?: TabletPassage[]; cigarettePassages?: CigarettePassage[]; processorSessions?: Array<Record<string, unknown>>; stoneSales?: StoneSale[] }>;
       })
       .then((payload) => {
         setTabletStatsPassagesState(payload.tabletPassages ?? []);
         setCigaretteStatsPassagesState(payload.cigarettePassages ?? []);
         setProcessorStatsSessionsState(payload.processorSessions ?? []);
+        setStoneStatsSalesState(payload.stoneSales ?? []);
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Chargement historique impossible.');
@@ -400,8 +447,22 @@ export function TabletCigarettePageClient(props: {
       };
     });
 
-    return { tabletRows, cigaretteRows, processorRows };
-  }, [cigaretteImageUrl, cigarettePassagesState, cutterImageUrl, kitImageUrl, membersById, processorImageUrl, processorSessionsState, tabletPassagesState]);
+    const stoneRows: HistoryCard[] = stoneSalesState.map((entry) => ({
+      id: `s-${entry.id}`,
+      title: entry.member_label,
+      type: 'Pierre',
+      amount: formatUsd(entry.total_amount),
+      status: `${entry.quantity_sold} Saphir Brut vendus`,
+      meta: new Date(entry.created_at).toLocaleString('fr-FR'),
+      items: [{ label: 'Saphir Brut', imageUrl: stoneImageUrl, icon: '💎' }],
+      lines: [
+        `Saphir Brut ${entry.stock_before} -> ${entry.stock_after} · vendus ${entry.quantity_sold}`,
+        `Cash ${formatUsd(entry.cash_before)} -> ${formatUsd(entry.cash_after)} · ${formatUsd(entry.unit_price)} / unité`
+      ]
+    }));
+
+    return { tabletRows, cigaretteRows, processorRows, stoneRows };
+  }, [cigaretteImageUrl, cigarettePassagesState, cutterImageUrl, kitImageUrl, membersById, processorImageUrl, processorSessionsState, stoneImageUrl, stoneSalesState, tabletPassagesState]);
 
   const jobsHistoryEntries = useMemo<JobHistoryEntry[]>(() => {
     const tabletEntries = tabletStatsPassagesState.map((entry) => {
@@ -484,9 +545,26 @@ export function TabletCigarettePageClient(props: {
       };
     });
 
-    return [...tabletEntries, ...cigaretteEntries, ...processorEntries]
+    const stoneEntries = stoneStatsSalesState.map((entry) => ({
+      id: `stone-${entry.id}`,
+      type: 'stone' as const,
+      memberIds: entry.member_user_id ? [entry.member_user_id] : [],
+      memberLabel: entry.member_label,
+      createdAt: entry.created_at,
+      title: entry.member_label,
+      amount: formatUsd(entry.total_amount),
+      status: 'Cash reçu',
+      lines: [
+        `Saphir Brut ${entry.stock_before} -> ${entry.stock_after} · vendus ${entry.quantity_sold}`,
+        `Cash ${formatUsd(entry.cash_before)} -> ${formatUsd(entry.cash_after)}`
+      ],
+      stoneSold: Number(entry.quantity_sold ?? 0),
+      stoneMoney: Number(entry.total_amount ?? 0)
+    }));
+
+    return [...tabletEntries, ...cigaretteEntries, ...processorEntries, ...stoneEntries]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [activeProcessorStatsSessions, cigaretteStatsPassagesState, membersById, processorParticipantIds, tabletStatsPassagesState]);
+  }, [activeProcessorStatsSessions, cigaretteStatsPassagesState, membersById, processorParticipantIds, stoneStatsSalesState, tabletStatsPassagesState]);
 
   const filteredJobsHistoryEntries = useMemo(() => jobsHistoryEntries.filter((entry) => {
     if (jobTypeFilter !== 'all' && entry.type !== jobTypeFilter) return false;
@@ -512,7 +590,7 @@ export function TabletCigarettePageClient(props: {
   const historyDayLabel = historyDayFilter === 'all' ? 'Tous les jours' : JOB_DAY_LABELS[Number(historyDayFilter)];
 
   const historyWeeks = useMemo(() => {
-    const weeks = new Map<string, { key: string; label: string; days: Array<{ label: string; dateKey: string; tablet: JobHistoryEntry[]; cigarette: JobHistoryEntry[]; processor: JobHistoryEntry[] }> }>();
+    const weeks = new Map<string, { key: string; label: string; days: Array<{ label: string; dateKey: string; tablet: JobHistoryEntry[]; cigarette: JobHistoryEntry[]; processor: JobHistoryEntry[]; stone: JobHistoryEntry[] }> }>();
 
     function mondayStart(date: Date) {
       const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -532,7 +610,7 @@ export function TabletCigarettePageClient(props: {
         days: JOB_DAY_LABELS.map((label, index) => {
           const dayDate = new Date(weekStart);
           dayDate.setUTCDate(weekStart.getUTCDate() + index);
-          return { label, dateKey: dayDate.toISOString().slice(0, 10), tablet: [], cigarette: [], processor: [] };
+          return { label, dateKey: dayDate.toISOString().slice(0, 10), tablet: [], cigarette: [], processor: [], stone: [] };
         })
       };
       const dayIndex = (date.getUTCDay() + 6) % 7;
@@ -556,6 +634,8 @@ export function TabletCigarettePageClient(props: {
     processorProduced: totals.processorProduced + Number(entry.processorProduced ?? 0),
     processorSold: totals.processorSold + Number(entry.processorSold ?? 0),
     processorMoney: totals.processorMoney + Number(entry.processorMoney ?? 0),
+    stoneSold: totals.stoneSold + Number(entry.stoneSold ?? 0),
+    stoneMoney: totals.stoneMoney + Number(entry.stoneMoney ?? 0),
     totalActivities: totals.totalActivities + 1
   }), {
     tabletPassages: 0,
@@ -570,6 +650,8 @@ export function TabletCigarettePageClient(props: {
     processorProduced: 0,
     processorSold: 0,
     processorMoney: 0,
+    stoneSold: 0,
+    stoneMoney: 0,
     totalActivities: 0
   }), [filteredJobsHistoryEntries]);
 
@@ -595,6 +677,8 @@ export function TabletCigarettePageClient(props: {
           processorProduced: 0,
           processorSold: 0,
           processorMoney: 0,
+          stoneSold: 0,
+          stoneMoney: 0,
           totalActivities: 0,
           lastActivity: entry.createdAt
         };
@@ -610,6 +694,8 @@ export function TabletCigarettePageClient(props: {
         current.processorProduced += Number(entry.processorProduced ?? 0);
         current.processorSold += Number(entry.processorSold ?? 0);
         current.processorMoney += Number(entry.processorMoney ?? 0);
+        current.stoneSold += Number(entry.stoneSold ?? 0);
+        current.stoneMoney += Number(entry.stoneMoney ?? 0);
         current.totalActivities += 1;
         if (new Date(entry.createdAt).getTime() > new Date(current.lastActivity).getTime()) current.lastActivity = entry.createdAt;
         map.set(key, current);
@@ -630,6 +716,10 @@ export function TabletCigarettePageClient(props: {
 
   function setProcessorSaleQtySafe(value: number) {
     setProcessorSaleQty(Math.max(0, Math.min(processorSaleMax, Number.isFinite(value) ? value : 0)));
+  }
+
+  function setStoneQtySafe(value: number) {
+    setStoneQty(Math.max(0, Math.min(stoneSaleMax, Number.isFinite(value) ? value : 0)));
   }
 
   function stepProcessorRealReceived(delta: number) {
@@ -736,6 +826,32 @@ export function TabletCigarettePageClient(props: {
     setStatus('Vente processeur validée.');
   }
 
+  async function createStoneSale() {
+    setError('');
+    const member = membersById.get(stoneMemberId);
+    const response = await fetch('/api/jobs/stone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        member_user_id: stoneMemberId,
+        member_label: member ? (member.name || member.username) : defaultMemberLabel,
+        quantity: stoneQty
+      })
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ message: 'Vente pierre impossible.' }));
+      return setError(payload.message ?? 'Vente pierre impossible.');
+    }
+    const payload = await response.json() as { sale?: StoneSale; groupCash?: number; stoneStock?: number };
+    if (payload.sale) {
+      setStoneSalesState((cur) => [payload.sale as StoneSale, ...cur]);
+      setStoneStatsSalesState((cur) => [payload.sale as StoneSale, ...cur]);
+    }
+    if (typeof payload.groupCash === 'number') setGroupCashState(payload.groupCash);
+    if (typeof payload.stoneStock === 'number') setStoneStockState(payload.stoneStock);
+    setStatus('Vente Pierre validée.');
+  }
+
   return (
     <div className="space-y-4">
       <section className="glass-card p-3">
@@ -744,13 +860,14 @@ export function TabletCigarettePageClient(props: {
           {canTabletAccess ? <button type="button" className={`filter-pill ${tab === 'tablet' ? 'filter-pill-active' : ''}`} onClick={() => setTab('tablet')}>📱 Tablette</button> : null}
           {canCigaretteAccess ? <button type="button" className={`filter-pill ${tab === 'cigarette' ? 'filter-pill-active' : ''}`} onClick={() => setTab('cigarette')}>🚬 Cigarette</button> : null}
           {canProcessorView ? <button type="button" className={`filter-pill ${tab === 'processor' ? 'filter-pill-active' : ''}`} onClick={() => setTab('processor')}>⚙️ Processeur</button> : null}
+          {canStoneView ? <button type="button" className={`filter-pill ${tab === 'stone' ? 'filter-pill-active' : ''}`} onClick={() => setTab('stone')}>💎 Pierre</button> : null}
           {canHistory ? <button type="button" className={`filter-pill ${tab === 'history' ? 'filter-pill-active' : ''}`} onClick={() => setTab('history')}>📚 Historique</button> : null}
           {canStats ? <button type="button" className={`filter-pill ${tab === 'stats' ? 'filter-pill-active' : ''}`} onClick={() => setTab('stats')}>📊 Stats</button> : null}
         </div>
       </section>
 
       {tab === 'home' ? (
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <article className="glass-card p-4 space-y-2">
             <h3 className="font-semibold text-[#ffe8ca]">📱 Tablette</h3>
             <MiniStat label="Passages jour" value={String(tabletDayState?.passages_count ?? 0)} />
@@ -773,6 +890,15 @@ export function TabletCigarettePageClient(props: {
             <MiniStat label="Argent généré" value={formatUsd(processorStatsQuick.revenue)} />
             {canProcessorView ? <button className="saas-primary-btn w-full" onClick={() => setTab('processor')}>Ouvrir Processeur</button> : null}
           </article>
+          {canStoneView ? (
+            <article className="glass-card p-4 space-y-2">
+              <h3 className="font-semibold text-[#ffe8ca]">💎 Pierre</h3>
+              <MiniStat label="💎 Stock Saphir Brut" value={String(stoneStockState)} />
+              <MiniStat label="🧾 Vendu aujourd'hui" value={String(stoneSalesState.reduce((sum, row) => sum + Number(row.quantity_sold ?? 0), 0))} />
+              <MiniStat label="💵 Argent généré" value={formatUsd(stoneSalesState.reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0))} />
+              <button className="saas-primary-btn w-full" onClick={() => setTab('stone')}>Ouvrir Pierre</button>
+            </article>
+          ) : null}
         </section>
       ) : null}
 
@@ -1003,11 +1129,74 @@ export function TabletCigarettePageClient(props: {
         </section>
       ) : null}
 
+      {tab === 'stone' && canStoneView ? (
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <article className="glass-card p-5 xl:col-span-2">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <JobItemImage src={stoneImageUrl} alt="Saphir Brut" fallback="💎" size={64} />
+                <div>
+                <h3 className="text-xl font-semibold text-[#ffe8ca]">💎 Pierre - Saphir Brut</h3>
+                <p className="text-xs text-[#efcdab]">Cash uniquement - 225$ unité - limite 8 par jour et par membre</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <Stat label="Stock Saphir Brut" value={String(stoneStockState)} icon="💎" />
+                <Stat label="Vendu aujourd'hui" value={String(stoneSalesState.reduce((sum, row) => sum + Number(row.quantity_sold ?? 0), 0))} icon="🧾" />
+                <Stat label="Argent généré" value={formatUsd(stoneSalesState.reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0))} icon="💵" />
+                <Stat label="Argent groupe" value={formatUsd(groupCashState)} icon="🏦" />
+              </div>
+            </div>
+          </article>
+
+          <article className="glass-card p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <JobItemImage src={stoneImageUrl} alt="Saphir Brut" fallback="💎" size={44} />
+                <h4 className="text-base font-semibold text-[#fff1dd]">Vente Saphir Brut</h4>
+              </div>
+              <span className="rounded-full border border-white/10 bg-[#3f281b]/60 px-2 py-1 text-[11px] text-[#efcdab]">Cash</span>
+            </div>
+            <div className="space-y-3">
+              <FieldLabel icon="👤" label="Membre vendeur" />
+              <select className="saas-input !h-10" value={stoneMemberId} onChange={(event) => setStoneMemberId(event.target.value)}>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.name || member.username}</option>)}
+              </select>
+
+              <div className="grid grid-cols-2 gap-2">
+                <MiniStat label="Déjà vendu aujourd'hui" value={String(stoneSoldToday)} />
+                <MiniStat label="Restant possible" value={`${stoneRemainingToday}/8`} />
+                <MiniStat label="Stock avant / après" value={`${stoneStockState} -> ${Math.max(0, stoneStockState - stoneQty)}`} />
+                <MiniStat label="Argent avant / après" value={`${formatUsd(groupCashState)} -> ${formatUsd(groupCashState + stoneSaleTotal)}`} />
+              </div>
+
+              <div>
+                <FieldLabel icon="📦" label="Quantité vendue" />
+                <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
+                  <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => setStoneQtySafe(stoneQty - 1)}>-</button>
+                  <div className="flex h-10 items-center justify-center rounded-lg border border-white/10 bg-[#24160f] text-sm font-semibold text-[#ffe8ca]">{stoneQty}</div>
+                  <button type="button" className="saas-ghost-btn !h-10 !px-0" onClick={() => setStoneQtySafe(stoneQty + 1)}>+</button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-[#2f1d14]/60 px-3 py-2">
+                <p className="text-xs text-[#efcdab]">Total vente</p>
+                <p className="text-xl font-semibold text-[#ffe8ca]">{formatUsd(stoneSaleTotal)}</p>
+              </div>
+
+              {canStoneSell ? <button className="saas-primary-btn w-full" disabled={stoneQty <= 0 || stoneQty > stoneRemainingToday || stoneQty > stoneStockState} onClick={() => void createStoneSale()}>✅ Valider vente Pierre</button> : null}
+            </div>
+          </article>
+
+          <HistoryColumn title="HISTORIQUE PIERRE" icon="💎" rows={canStoneHistory ? historyColumns.stoneRows : []} empty={canStoneHistory ? 'Aucune vente pierre.' : 'Accès historique pierre requis.'} />
+        </section>
+      ) : null}
+
       {tab === 'history' && canHistory ? (
         <section className="space-y-4">
           <JobsFilters title="Historique Jobs" subtitle={`${historyRangeLabel} · semaine ${filteredJobsHistoryEntries.length} · affiché ${visibleHistoryEntries.length} (${historyDayLabel})`} members={members} rangeMode={historyRangeMode} customStartDate={customStartDate} customEndDate={customEndDate} memberFilter={memberFilter} typeFilter={jobTypeFilter} loading={historyLoading} onRangeMode={setHistoryRangeMode} onCustomStart={setCustomStartDate} onCustomEnd={setCustomEndDate} onMember={setMemberFilter} onType={setJobTypeFilter} />
           <HistoryDayNavigation rangeLabel={historyRangeLabel} selectedDay={historyDayFilter} counts={historyDayCounts} visibleCount={visibleHistoryEntries.length} totalCount={filteredJobsHistoryEntries.length} onSelect={setHistoryDayFilter} />
-          <WeeklyJobsHistory weeks={historyWeeks} selectedDay={historyDayFilter} showProcessor={canProcessorLogs} />
+          <WeeklyJobsHistory weeks={historyWeeks} selectedDay={historyDayFilter} showProcessor={canProcessorLogs} showStone={canStoneHistory} />
         </section>
       ) : null}
 
@@ -1042,9 +1231,36 @@ export function TabletCigarettePageClient(props: {
               <Stat label="Processeurs produits" value={String(jobStatsTotals.processorProduced)} icon="⚙️" />
               <Stat label="Processeurs vendus" value={String(jobStatsTotals.processorSold)} icon="📦" />
               <Stat label="Argent processeur" value={formatUsd(jobStatsTotals.processorMoney)} icon="💰" />
+              <Stat label="Saphirs vendus" value={String(jobStatsTotals.stoneSold)} icon="💎" />
+              <Stat label="Argent pierre" value={formatUsd(jobStatsTotals.stoneMoney)} icon="💵" />
               <Stat label="Total activités" value={String(jobStatsTotals.totalActivities)} icon="📊" />
             </div>
           </article>
+          {canStoneStats ? (
+            <article className="glass-card p-5">
+              <div className="flex items-center gap-3">
+                <JobItemImage src={stoneImageUrl} alt="Saphir Brut" fallback="💎" size={40} />
+                <h4 className="text-sm font-semibold text-[#fff1dd]">Stats Pierre</h4>
+              </div>
+              <div className="mt-2 grid gap-2 md:grid-cols-4">
+                <Stat label="Saphirs vendus" value={String(stoneStatsTotals.sold)} icon="💎" />
+                <Stat label="Argent généré" value={formatUsd(stoneStatsTotals.revenue)} icon="💵" />
+                <Stat label="Dernière activité" value={stoneStatsTotals.last ? new Date(stoneStatsTotals.last).toLocaleString('fr-FR') : '-'} icon="📊" />
+                <Stat label="Limite jour" value="8 / membre" icon="🎯" />
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full text-left text-xs text-[#efcdab]">
+                  <thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Membre</th><th className="px-2 py-1">Saphirs vendus</th><th className="px-2 py-1">Argent généré</th><th className="px-2 py-1">Limite utilisée</th><th className="px-2 py-1">Dernière activité</th></tr></thead>
+                  <tbody>
+                    {stoneStatsByMember.map((row) => (
+                      <tr key={row.key} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.label}</td><td className="px-2 py-1">{row.sold}</td><td className="px-2 py-1">{formatUsd(row.revenue)}</td><td className="px-2 py-1">{row.limitUsed}%</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>
+                    ))}
+                    {stoneStatsByMember.length === 0 ? <tr className="border-t border-white/10"><td className="px-2 py-2" colSpan={5}>Aucune stat pierre.</td></tr> : null}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          ) : null}
           <JobsStatsTable rows={jobStatsByMember} />
         </section>
       ) : null}
@@ -1208,6 +1424,7 @@ function JobsFilters({
             <option value="tablet">Tablette</option>
             <option value="cigarette">Cigarette</option>
             <option value="processor">Processeur</option>
+            <option value="stone">Pierre</option>
           </select>
           <div className="grid grid-cols-2 gap-2">
             <input className="saas-input !h-9" type="date" value={customStartDate} disabled={rangeMode !== 'custom'} onChange={(event) => onCustomStart(event.target.value)} />
@@ -1268,11 +1485,13 @@ function HistoryDayNavigation({
 function WeeklyJobsHistory({
   weeks,
   selectedDay,
-  showProcessor
+  showProcessor,
+  showStone
 }: {
-  weeks: Array<{ key: string; label: string; days: Array<{ label: string; dateKey: string; tablet: JobHistoryEntry[]; cigarette: JobHistoryEntry[]; processor: JobHistoryEntry[] }> }>;
+  weeks: Array<{ key: string; label: string; days: Array<{ label: string; dateKey: string; tablet: JobHistoryEntry[]; cigarette: JobHistoryEntry[]; processor: JobHistoryEntry[]; stone: JobHistoryEntry[] }> }>;
   selectedDay: HistoryDayFilter;
   showProcessor: boolean;
+  showStone: boolean;
 }) {
   if (weeks.length === 0) {
     return <article className="glass-card p-4 text-sm text-[#efcdab]">Aucune activité Jobs sur cette période.</article>;
@@ -1290,10 +1509,11 @@ function WeeklyJobsHistory({
                   <h4 className="text-sm font-semibold text-[#ffe8ca]">{day.label}</h4>
                   <span className="text-xs text-[#efcdab]">{new Date(`${day.dateKey}T00:00:00.000Z`).toLocaleDateString('fr-FR')}</span>
                 </div>
-                <div className={`grid gap-3 ${showProcessor ? 'xl:grid-cols-3' : 'xl:grid-cols-2'}`}>
+                <div className={`grid gap-3 ${showProcessor && showStone ? 'xl:grid-cols-4' : showProcessor || showStone ? 'xl:grid-cols-3' : 'xl:grid-cols-2'}`}>
                   <JobsDayColumn title="📱 Tablette" entries={day.tablet} empty="Aucun passage tablette." />
                   <JobsDayColumn title="🚬 Cigarette" entries={day.cigarette} empty="Aucun passage cigarette." />
                   {showProcessor ? <JobsDayColumn title="⚙️ Processeur" entries={day.processor} empty="Aucune activité processeur." /> : null}
+                  {showStone ? <JobsDayColumn title="Pierre" entries={day.stone} empty="Aucune vente pierre." /> : null}
                 </div>
               </div>
             ))}
@@ -1389,6 +1609,31 @@ function JobsStatsTable({ rows }: { rows: MemberJobStats[] }) {
         </table>
       </div>
     </article>
+  );
+}
+
+function JobItemImage({
+  src,
+  alt,
+  fallback = '📦',
+  size = 40,
+}: {
+  src?: string | null;
+  alt: string;
+  fallback?: string;
+  size?: number;
+}) {
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#24160f] text-xl"
+      style={{ width: size, height: size }}
+    >
+      {src ? (
+        <Image src={src} alt={alt} width={size} height={size} className="h-full w-full object-cover" unoptimized />
+      ) : (
+        <span aria-hidden="true">{fallback}</span>
+      )}
+    </div>
   );
 }
 

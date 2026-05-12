@@ -51,10 +51,27 @@ export type JobsProcessorSession = Record<string, unknown> & {
   created_at: string;
 };
 
+export type JobsStoneSale = {
+  id: number;
+  member_user_id: string | null;
+  member_label: string;
+  item_id: number | null;
+  item_name: string;
+  quantity_sold: number;
+  unit_price: number;
+  total_amount: number;
+  stock_before: number;
+  stock_after: number;
+  cash_before: number;
+  cash_after: number;
+  created_at: string;
+};
+
 export type JobsHistoryData = {
   tabletPassages: JobsTabletPassage[];
   cigarettePassages: JobsCigarettePassage[];
   processorSessions: JobsProcessorSession[];
+  stoneSales: JobsStoneSale[];
 };
 
 export async function fetchJobsHistoryData(
@@ -65,11 +82,12 @@ export async function fetchJobsHistoryData(
     includeTablet: boolean;
     includeCigarette: boolean;
     includeProcessor: boolean;
+    includeStone?: boolean;
   }
 ): Promise<JobsHistoryData> {
-  const { startIso, endIso, includeTablet, includeCigarette, includeProcessor } = options;
+  const { startIso, endIso, includeTablet, includeCigarette, includeProcessor, includeStone = false } = options;
 
-  const [tabletRes, cigaretteRes, processorRes] = await Promise.all([
+  const [tabletRes, cigaretteRes, processorRes, stoneRes] = await Promise.all([
     includeTablet
       ? supabase
         .from('tablet_passages')
@@ -97,12 +115,22 @@ export async function fetchJobsHistoryData(
         .lt('created_at', endIso)
         .order('created_at', { ascending: false })
         .limit(5000)
+      : Promise.resolve({ data: [] }),
+    includeStone
+      ? supabase
+        .from('stone_sales')
+        .select('id, member_user_id, member_label, item_id, item_name, quantity_sold, unit_price, total_amount, stock_before, stock_after, cash_before, cash_after, created_at')
+        .gte('created_at', startIso)
+        .lt('created_at', endIso)
+        .order('created_at', { ascending: false })
+        .limit(5000)
       : Promise.resolve({ data: [] })
   ]);
 
   return {
     tabletPassages: (tabletRes.data ?? []) as JobsTabletPassage[],
     cigarettePassages: (cigaretteRes.data ?? []) as JobsCigarettePassage[],
-    processorSessions: (processorRes.data ?? []) as JobsProcessorSession[]
+    processorSessions: (processorRes.data ?? []) as JobsProcessorSession[],
+    stoneSales: (stoneRes.data ?? []) as JobsStoneSale[]
   };
 }

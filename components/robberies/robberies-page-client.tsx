@@ -14,6 +14,9 @@ type Run = {
   status?: 'success' | 'arrested';
   money_amount: number;
   lost_money?: number | null;
+  mission_costs?: Array<{ role: RoleKey; groupName?: string; group_name?: string; amount: number; note?: string }>;
+  mission_total?: number | null;
+  net_profit?: number | null;
   money_after: number | null;
   consumed_items: Array<{ itemName: string; required: number }>;
   participants: Array<{ id?: string; label: string; role?: string }>;
@@ -23,6 +26,7 @@ type RobberyType = 'fleeca' | 'bijouterie' | 'morgue';
 type RoleStats = { memberId: string; name: string; total: number; braqueur: number; braqueurMoney: number; braqueurLast: string | null; mule: number; muleSuccess: number; muleLast: string | null; hostage: number; hostageLast: string | null; recentBraqueur: number; recentMule: number; recentHostage: number };
 type Suggestion = { title: string; icon: string; names: Array<{ name: string; reason: string; score: number }> };
 type InsightPanel = 'suggestions' | 'history' | 'weekly' | 'braqueurs' | 'mules' | 'hostages';
+type MissionState = { enabled: boolean; groupName: string; amount: number; note: string };
 
 const ROBBERY_DEFS: Array<{ key: RobberyType; title: string; icon: string; stockResources: Array<{ label: string; qty: number }>; optionalStockResources?: Array<{ label: string; defaultQty: number }>; nonStockPrereqs?: string[] }> = [
   { key: 'fleeca', title: 'Fleeca', icon: '🏦', stockResources: [{ label: 'Pétoire', qty: 1 }, { label: 'Munition de Pistolet', qty: 1 }, { label: 'Perceuse', qty: 1 }, { label: 'Foret', qty: 4 }, { label: 'Clé USB', qty: 1 }], optionalStockResources: [{ label: 'Menu', defaultQty: 0 }] },
@@ -117,12 +121,13 @@ function suggest(rows: RoleStats[], role: RoleKey, limit: number): Suggestion['n
     .map(({ row, score }) => ({ name: row.name, score: Math.round(score), reason: rotationReason(row, role) }));
 }
 
-export function RobberiesPageClient({ runs, items, members, canCreate, canArrested, canStats, canLogs }: {
+export function RobberiesPageClient({ runs, items, members, canCreate, canArrested, canHistory, canStats, canLogs }: {
   runs: Run[];
   items: Item[];
   members: Array<{ id: string; label: string }>;
   canCreate: boolean;
   canArrested: boolean;
+  canHistory: boolean;
   canStats: boolean;
   canLogs: boolean;
 }) {
@@ -133,6 +138,8 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
   const [braqueurIds, setBraqueurIds] = useState<string[]>([]);
   const [hostageIds, setHostageIds] = useState<string[]>([]);
   const [muleIds, setMuleIds] = useState<string[]>([]);
+  const [hostageMission, setHostageMission] = useState<MissionState>({ enabled: false, groupName: '', amount: 0, note: '' });
+  const [muleMission, setMuleMission] = useState<MissionState>({ enabled: false, groupName: '', amount: 0, note: '' });
   const [moneyAmount, setMoneyAmount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -189,6 +196,7 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
       arrested: weekRuns.filter((run) => (run.status ?? 'success') === 'arrested').length,
       moneyIn: weekRuns.reduce((sum, run) => sum + Number(run.money_amount ?? 0), 0),
       moneyLost: weekRuns.reduce((sum, run) => sum + Number(run.lost_money ?? 0), 0),
+      missionCosts: weekRuns.reduce((sum, run) => sum + Number(run.mission_total ?? 0), 0),
       resources: Array.from(resources.entries()).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty).slice(0, 8)
     };
   }, [weekRuns]);
@@ -214,7 +222,13 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
     if (action === 'success' && !canValidate) return setError('Validation impossible: vérifie participants, stock et montant.');
     if (action === 'success' && menuAvailability && menuAvailability.qty > menuAvailability.stock) return setError('Stock Menu insuffisant.');
     const optional_resources = menuAvailability ? [{ name: 'Menu', item_id: menuAvailability.itemId ?? undefined, quantity: menuAvailability.qty }] : [];
-    const payload = { action, robbery_type: robberyType, money_amount: Math.max(0, moneyAmount), lost_money: Math.max(0, lostMoney), participant_ids: selectedMembers, braqueur_ids: braqueurIds, hostage_ids: hostageIds, mule_ids: muleIds, optional_resources, seized_resources: seizedRows.filter((row) => row.item_id > 0 && row.quantity > 0), note: seizedNote };
+    if (action === 'success' && hostageMission.enabled && !hostageMission.groupName.trim()) return setError('Nom du groupe missionné requis pour les otages.');
+    if (action === 'success' && muleMission.enabled && !muleMission.groupName.trim()) return setError('Nom du groupe missionné requis pour mule/récup.');
+    const missions = [
+      hostageMission.enabled ? { role: 'otage_apporte', group_name: hostageMission.groupName, amount: Math.max(0, hostageMission.amount), note: hostageMission.note } : null,
+      muleMission.enabled ? { role: 'plan_mule_recup', group_name: muleMission.groupName, amount: Math.max(0, muleMission.amount), note: muleMission.note } : null
+    ].filter(Boolean);
+    const payload = { action, robbery_type: robberyType, money_amount: Math.max(0, moneyAmount), lost_money: Math.max(0, lostMoney), participant_ids: selectedMembers, braqueur_ids: braqueurIds, hostage_ids: hostageIds, mule_ids: muleIds, missions, optional_resources, seized_resources: seizedRows.filter((row) => row.item_id > 0 && row.quantity > 0), note: seizedNote };
     setSaving(true);
     const res = await fetch('/api/robberies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     setSaving(false);
@@ -225,7 +239,7 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
       return update ? { ...item, quantity: update.quantity } : item;
     }));
     if (data?.run) setCurrentRuns((cur) => [data.run as Run, ...cur]);
-    setMoneyAmount(0); setLostMoney(0); setSeizedNote(''); setSeizedRows([]); setSelectedMembers([]); setBraqueurIds([]); setHostageIds([]); setMuleIds([]); setArrestedOpen(false); setOptionalMenuQtyByType((cur) => ({ ...cur, [robberyType]: 0 }));
+    setMoneyAmount(0); setLostMoney(0); setSeizedNote(''); setSeizedRows([]); setSelectedMembers([]); setBraqueurIds([]); setHostageIds([]); setMuleIds([]); setHostageMission({ enabled: false, groupName: '', amount: 0, note: '' }); setMuleMission({ enabled: false, groupName: '', amount: 0, note: '' }); setArrestedOpen(false); setOptionalMenuQtyByType((cur) => ({ ...cur, [robberyType]: 0 }));
   }
 
   return (
@@ -241,6 +255,8 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
           <h3 className="text-base font-semibold text-[#fff1dd]">Participants par rôle</h3>
           {roleBlocks.map(({ title, values, setValues }) => <div key={title}><p className="mb-1 text-xs text-[#efcdab]">{title}</p><div className="max-h-32 space-y-1 overflow-auto rounded-xl border border-white/10 bg-[#2f1d14]/45 p-2">{members.map((member) => { const checked = values.includes(member.id); return <label key={`${title}-${member.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#4f3220]/55 px-2 py-1.5 text-sm text-[#f8e2c6]"><span className="truncate pr-2">{member.label}</span><input type="checkbox" className="h-4 w-4 accent-[#ffcf9a]" checked={checked} onChange={(event) => { if (event.target.checked) { setSelectedMembers((cur) => cur.includes(member.id) ? cur : [...cur, member.id]); setValues((cur) => cur.includes(member.id) ? cur : [...cur, member.id]); } else { setValues((cur) => cur.filter((id) => id !== member.id)); } }} /></label>; })}</div></div>)}
           <p className="text-xs text-[#efcdab]">Récap: Braqueurs {braqueurIds.length} · Otages {hostageIds.length} · Plan Mule/Récup {muleIds.length}</p>
+          <MissionBox title="Otages apportés" mission={hostageMission} setMission={setHostageMission} />
+          <MissionBox title="Plan Mule / Récup" mission={muleMission} setMission={setMuleMission} />
           <label className="text-xs text-[#efcdab]">Argent rapporté</label><input className="saas-input" value={moneyAmount} onChange={(event) => setMoneyAmount(Math.max(0, Number(event.target.value || 0)))} />
           <div className="grid grid-cols-2 gap-2">{canCreate ? <button type="button" className="saas-primary-btn" disabled={!canValidate} onClick={() => void submit('success')}>✅ Valider</button> : <p className="rounded-lg border border-white/10 bg-[#3f281b]/50 px-3 py-2 text-sm text-[#efcdab]">Permission manquante</p>}<button type="button" className="saas-ghost-btn" onClick={() => { setMoneyAmount(0); setSelectedMembers([]); setBraqueurIds([]); setHostageIds([]); setMuleIds([]); setError(''); }}>Annuler</button></div>
           {canArrested ? <button type="button" className="saas-ghost-btn w-full" onClick={() => setArrestedOpen((cur) => !cur)}>🚔 Braquage arrêté</button> : null}
@@ -249,8 +265,8 @@ export function RobberiesPageClient({ runs, items, members, canCreate, canArrest
         </article>
       </section>
 
-      {canStats ? <div className="grid gap-2 md:grid-cols-5 xl:grid-cols-10"><Stat label="Total" value={String(computedStats.total)} icon="🧾" /><Stat label="Fleeca" value={String(computedStats.fleeca)} icon="🏦" /><Stat label="Bijouterie" value={String(computedStats.bijouterie)} icon="💎" /><Stat label="Morgue" value={String(computedStats.morgue)} icon="🟥" /><Stat label="Réussis" value={String(computedStats.success)} icon="✅" /><Stat label="Arrêtés" value={String(computedStats.arrested)} icon="🚔" /><Stat label="Argent rentré" value={formatUsd(computedStats.moneyIn)} icon="💵" /><Stat label="Argent perdu" value={formatUsd(computedStats.moneyLost)} icon="💸" /><Stat label="Bénéfice net" value={formatUsd(computedStats.moneyIn - computedStats.moneyLost)} icon="📈" /><Stat label="Ressources" value={String(computedStats.resources.reduce((sum, row) => sum + row.qty, 0))} icon="📦" /></div> : null}
-      {canStats || canLogs ? <RobberyInsights active={insightPanel} setActive={setInsightPanel} canStats={canStats} canLogs={canLogs} suggestions={rotationSuggestions} runs={selectedRuns} roleStats={roleStats} playerStats={computedPlayerStats} resources={computedStats.resources} /> : null}
+      {canStats ? <div className="grid gap-2 md:grid-cols-5 xl:grid-cols-10"><Stat label="Total" value={String(computedStats.total)} icon="🧾" /><Stat label="Fleeca" value={String(computedStats.fleeca)} icon="🏦" /><Stat label="Bijouterie" value={String(computedStats.bijouterie)} icon="💎" /><Stat label="Morgue" value={String(computedStats.morgue)} icon="🟥" /><Stat label="Réussis" value={String(computedStats.success)} icon="✅" /><Stat label="Arrêtés" value={String(computedStats.arrested)} icon="🚔" /><Stat label="Argent rentré" value={formatUsd(computedStats.moneyIn)} icon="💵" /><Stat label="Coûts mission" value={formatUsd(computedStats.missionCosts)} icon="🤝" /><Stat label="Bénéfice net" value={formatUsd(computedStats.moneyIn - computedStats.moneyLost - computedStats.missionCosts)} icon="📈" /><Stat label="Ressources" value={String(computedStats.resources.reduce((sum, row) => sum + row.qty, 0))} icon="📦" /></div> : null}
+      {canStats || canHistory ? <RobberyInsights active={insightPanel} setActive={setInsightPanel} canStats={canStats} canHistory={canHistory} canLogs={canLogs} suggestions={rotationSuggestions} runs={selectedRuns} roleStats={roleStats} playerStats={computedPlayerStats} resources={computedStats.resources} /> : null}
     </div>
   );
 }
@@ -260,10 +276,28 @@ function QuantityMiniStepper({ value, max, onChange }: { value: number; max: num
   return <div className="grid grid-cols-[2.2rem_minmax(2.4rem,1fr)_2.2rem] items-center gap-1"><button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-0 !py-0" disabled={safeValue <= 0} onClick={() => onChange(Math.max(0, safeValue - 1))}>−</button><div className="flex h-9 items-center justify-center rounded-lg border border-white/10 bg-[#24160f] px-2 text-sm font-semibold text-[#ffe8ca]">{safeValue}</div><button type="button" className="saas-ghost-btn !h-9 !min-h-9 !px-0 !py-0" disabled={safeValue >= max} onClick={() => onChange(Math.min(max, safeValue + 1))}>+</button></div>;
 }
 
-function RobberyInsights(props: { active: InsightPanel; setActive: Dispatch<SetStateAction<InsightPanel>>; canStats: boolean; canLogs: boolean; suggestions: Suggestion[]; runs: Run[]; roleStats: RoleStats[]; playerStats: Array<{ name: string; total: number; fleeca: number; bijouterie: number; morgue: number; money: number; avg: number; last: string }>; resources: Array<{ name: string; qty: number }> }) {
+function MissionBox({ title, mission, setMission }: { title: string; mission: MissionState; setMission: Dispatch<SetStateAction<MissionState>> }) {
+  return (
+    <section className="rounded-xl border border-white/10 bg-[#2f1d14]/45 p-3">
+      <label className="flex items-center justify-between gap-2 text-sm text-[#ffe8ca]">
+        <span>{title} · Missionner</span>
+        <input type="checkbox" className="h-4 w-4 accent-[#ffcf9a]" checked={mission.enabled} onChange={(event) => setMission((cur) => ({ ...cur, enabled: event.target.checked }))} />
+      </label>
+      {mission.enabled ? (
+        <div className="mt-2 grid gap-2">
+          <input className="saas-input" placeholder="Nom du groupe missionné" value={mission.groupName} onChange={(event) => setMission((cur) => ({ ...cur, groupName: event.target.value }))} />
+          <input className="saas-input" placeholder="Montant payé" value={mission.amount} onChange={(event) => setMission((cur) => ({ ...cur, amount: Math.max(0, Number(event.target.value || 0)) }))} />
+          <input className="saas-input" placeholder="Note optionnelle" value={mission.note} onChange={(event) => setMission((cur) => ({ ...cur, note: event.target.value }))} />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function RobberyInsights(props: { active: InsightPanel; setActive: Dispatch<SetStateAction<InsightPanel>>; canStats: boolean; canHistory: boolean; canLogs: boolean; suggestions: Suggestion[]; runs: Run[]; roleStats: RoleStats[]; playerStats: Array<{ name: string; total: number; fleeca: number; bijouterie: number; morgue: number; money: number; avg: number; last: string }>; resources: Array<{ name: string; qty: number }> }) {
   const tabs = [
     props.canStats ? { key: 'suggestions' as const, label: '🔁 Suggestions' } : null,
-    props.canLogs ? { key: 'history' as const, label: '📜 Historique' } : null,
+    props.canHistory ? { key: 'history' as const, label: '📜 Historique' } : null,
     props.canStats ? { key: 'weekly' as const, label: '🏆 Classement semaine' } : null,
     props.canStats ? { key: 'braqueurs' as const, label: '🎯 Classement braqueurs' } : null,
     props.canStats ? { key: 'mules' as const, label: '🚗 Classement mule/récup' } : null,
@@ -301,6 +335,29 @@ function RoleRanking({ title, icon, rows, role }: { title: string; icon: string;
 
 function LegacyRanking({ rows, resources }: { rows: Array<{ name: string; total: number; fleeca: number; bijouterie: number; morgue: number; money: number; avg: number; last: string }>; resources: Array<{ name: string; qty: number }> }) { return <article><h3 className="text-base font-semibold text-[#fff1dd]">🏆 Classement semaine</h3><div className="mt-3 overflow-x-auto"><table className="min-w-full text-left text-xs text-[#efcdab]"><thead className="text-[#ffe8ca]"><tr><th className="px-2 py-1">Joueur</th><th className="px-2 py-1">Braquages</th><th className="px-2 py-1">Fleeca</th><th className="px-2 py-1">Bijouterie</th><th className="px-2 py-1">Morgue</th><th className="px-2 py-1">Argent total</th><th className="px-2 py-1">Moyenne</th><th className="px-2 py-1">Dernière</th></tr></thead><tbody>{rows.map((row, idx) => <tr key={`${row.name}-${idx}`} className="border-t border-white/10"><td className="px-2 py-1 text-[#ffe8ca]">{row.name}</td><td className="px-2 py-1">{row.total}</td><td className="px-2 py-1">{row.fleeca}</td><td className="px-2 py-1">{row.bijouterie}</td><td className="px-2 py-1">{row.morgue}</td><td className="px-2 py-1">{formatUsd(row.money)}</td><td className="px-2 py-1">{formatUsd(row.avg)}</td><td className="px-2 py-1">{new Date(row.last).toLocaleString('fr-FR')}</td></tr>)}</tbody></table></div>{resources.length > 0 ? <p className="mt-2 text-xs text-[#efcdab]">Ressources les plus consommées: {resources.map((row) => `${row.name} x${row.qty}`).join(' · ')}</p> : null}</article>; }
 
-function HistoryCard({ run }: { run: Run }) { const success = isSuccess(run); return <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-sm text-[#f1d2ad]"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-[#ffe8ca]">{success ? '✅' : '🚔'} {run.robbery_type.toUpperCase()} — {success ? formatUsd(run.money_amount) : `Perte ${formatUsd(Number(run.lost_money ?? 0))}`}</p><p className="text-xs">{run.user_name || 'Groupe'} · {new Date(run.created_at).toLocaleString('fr-FR')}</p></div><div className="flex flex-wrap gap-1">{(run.participants ?? []).map((entry, idx) => <RoleBadge key={`${run.id}-${entry.label}-${idx}`} role={entry.role} label={entry.label} />)}</div></div><p className="mt-2 text-xs">Ressources: {(run.consumed_items ?? []).map((entry) => `${entry.itemName} x${entry.required}`).join(' · ') || '—'}</p><p className="text-xs">Solde après: {run.money_after != null ? formatUsd(run.money_after) : '—'}</p>{run.note ? <p className="text-xs">Note: {run.note}</p> : null}</article>; }
+function HistoryCard({ run }: { run: Run }) {
+  const success = isSuccess(run);
+  const missions = run.mission_costs ?? [];
+  const missionTotal = Number(run.mission_total ?? missions.reduce((sum, mission) => sum + Number(mission.amount ?? 0), 0));
+  const netProfit = Number(run.net_profit ?? Number(run.money_amount ?? 0) - Number(run.lost_money ?? 0) - missionTotal);
+  return (
+    <article className="rounded-xl border border-white/10 bg-[#3f281b]/55 p-3 text-sm text-[#f1d2ad]">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-semibold text-[#ffe8ca]">{success ? '✅' : '🚔'} {run.robbery_type.toUpperCase()} — {success ? formatUsd(run.money_amount) : `Perte ${formatUsd(Number(run.lost_money ?? 0))}`}</p>
+          <p className="text-xs">{run.user_name || 'Groupe'} · {new Date(run.created_at).toLocaleString('fr-FR')}</p>
+        </div>
+        <div className="flex flex-wrap gap-1">{(run.participants ?? []).map((entry, idx) => <RoleBadge key={`${run.id}-${entry.label}-${idx}`} role={entry.role} label={entry.label} />)}</div>
+      </div>
+      <p className="mt-2 text-xs">Ressources: {(run.consumed_items ?? []).map((entry) => `${entry.itemName} x${entry.required}`).join(' · ') || '—'}</p>
+      {missions.length > 0 ? (
+        <p className="text-xs">Missions: {missions.map((mission) => `${mission.role === 'otage_apporte' ? 'Otages' : 'Mule/Récup'} · ${mission.groupName ?? mission.group_name ?? 'Groupe'} · ${formatUsd(Number(mission.amount ?? 0))}`).join(' · ')}</p>
+      ) : null}
+      <p className="text-xs">Coûts missionnés: {formatUsd(missionTotal)} · Bénéfice net: {formatUsd(netProfit)}</p>
+      <p className="text-xs">Solde après: {run.money_after != null ? formatUsd(run.money_after) : '—'}</p>
+      {run.note ? <p className="text-xs">Note: {run.note}</p> : null}
+    </article>
+  );
+}
 function RoleBadge({ role, label }: { role?: string; label?: string }) { return <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#2f1d14]/70 px-2 py-1 text-[11px] text-[#ffe8ca]">{roleIcon(role)} {label ? `${label} · ` : ''}{roleLabel(role)}</span>; }
 function Stat({ label, value, icon }: { label: string; value: string; icon: string }) { return <article className="rounded-xl border border-white/10 bg-[#3f281b]/50 p-3"><p className="text-xs text-[#efcdab]">{icon} {label}</p><p className="mt-1 text-lg font-semibold text-[#ffe8ca]">{value}</p></article>; }
