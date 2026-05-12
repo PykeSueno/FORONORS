@@ -70,8 +70,8 @@ export function CompactLineGrid({ type, children }: { type: 'transaction' | 'fou
     }
     : type === 'four'
       ? {
-        cols: 'grid-cols-[7.5rem_8.25rem_7rem_1.75rem]',
-        gap: 'gap-x-1.5',
+        cols: 'grid-cols-[9rem_10.5rem_9.5rem_2rem]',
+        gap: 'gap-x-2',
       }
       : {
         cols: 'grid-cols-[8.25rem_3rem_6.875rem_6.875rem_1.75rem]',
