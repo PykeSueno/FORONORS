@@ -12,32 +12,24 @@ export async function GET() {
   const permissions = await getUserPermissions(session.userId);
   const has = (perm: string) => permissions.includes(perm);
 
-  const canMoneyAccess = has('money.access');
   const canMoneyPreview = has('money.preview');
 
-  const canItemsAccess = has('items.access');
   const canItemsPreview = has('items.preview');
 
-  const canTransactionsAccess = has('transactions.access');
   const canTransactionsPreview = has('transactions.preview');
 
-  const canMembersAccess = has('members.access');
   const canMembersPreview = has('members.preview');
   const canExpensesPreview = has('expenses.view');
 
-  const canLogsAccess = has('logs.access');
   const canLogsPreview = has('logs.preview');
 
-  const canSaleObjectsAccess = has('sale.objects.access');
   const canSaleObjectsPreview = has('sale.objects.preview');
   const canCigaretteAccess = has('cigarette.access');
   const canCigarettePreview = canCigaretteAccess || has('cigarette.preview');
   const canTabletAccess = has('tablet.access');
   const canTabletPreview = canTabletAccess || has('tablet.preview');
   const canProcessorPreview = has('tobacco.processor.view');
-  const canActivityAccess = has('activity.access');
   const canActivityPreview = has('activity.preview');
-  const canFourAccess = has('four.access');
   const canFourPreview = has('four.preview');
 
   const canShowMoneyMovements = has('dashboard.money.movements.access') || has('dashboard.money.movements.preview');

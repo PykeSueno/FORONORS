@@ -306,6 +306,10 @@ export const SIMPLE_PERMISSION_BY_KEY = Object.fromEntries(
   SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => [permission.key, permission]))
 ) as Record<string, SimplePermission>;
 
+export const ALL_SIMPLE_PERMISSION_NAMES = Array.from(
+  new Set(SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.flatMap((permission) => permission.permissions)))
+);
+
 export const SIMPLE_ROLE_PRESETS: Record<string, string[]> = {
   ADMIN: SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => permission.key)),
   PATRON: SIMPLE_PERMISSION_MODULES.flatMap((module) => module.permissions.map((permission) => permission.key)).filter((key) => key !== 'admin.sql'),
