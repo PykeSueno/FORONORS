@@ -26,10 +26,7 @@ const PARTNER_BLOCKED_EXACT = new Set([
   'four.transaction.cancel.any',
   'four.transaction.recent.edit.own',
   'four.transaction.recent.edit.any',
-  'members.password.view',
-  'members.password.copy',
-  'members.password.edit',
-  'members.credentials.copy'
+  'members.password.edit'
 ]);
 
 const PARTNER_ALLOWED_EXACT = new Set([

@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit-log';
 import { hasUserPermission } from '@/lib/permissions';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { normalizeDiscordWebhookUrl } from '@/lib/discord-webhook';
 
 const KEY = 'discord.log_webhook_url';
 
@@ -16,7 +17,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase.from('app_settings').select('value').eq('key', KEY).maybeSingle();
 
-  return NextResponse.json({ webhookUrl: data?.value ?? '' });
+  return NextResponse.json({ configured: Boolean(data?.value) });
 }
 
 export async function PATCH(request: Request) {
@@ -30,7 +31,11 @@ export async function PATCH(request: Request) {
   if (!canAccess || !canManage) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
 
   const body = (await request.json()) as { webhookUrl?: string };
-  const normalized = body.webhookUrl?.trim() ?? '';
+  const rawUrl = body.webhookUrl?.trim() ?? '';
+  const normalized = rawUrl ? normalizeDiscordWebhookUrl(rawUrl) : '';
+  if (rawUrl && !normalized) {
+    return NextResponse.json({ message: 'URL webhook Discord invalide.' }, { status: 400 });
+  }
 
   const supabase = getSupabaseAdmin();
   const { error } = await supabase.from('app_settings').upsert({ key: KEY, value: normalized }, { onConflict: 'key' });

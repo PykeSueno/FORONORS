@@ -66,6 +66,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Nom, user et mot de passe requis.' }, { status: 400 });
   }
 
+  if (body.password.length < 12) {
+    return NextResponse.json({ message: 'Le mot de passe doit contenir au moins 12 caracteres.' }, { status: 400 });
+  }
+
   const passwordHash = await hashPassword(body.password);
   const supabase = getSupabaseAdmin();
 
@@ -80,7 +84,6 @@ export async function POST(request: Request) {
     name: body.name.trim(),
     iban_rib: body.iban_rib?.trim() || null,
     password_hash: passwordHash,
-    password_plain: body.password,
     role_id: body.role_id ?? null,
     role: roleName,
     is_active: body.is_active ?? true

@@ -25,13 +25,6 @@ export function WelcomeCardActions({ canUpdatePassword }: { canUpdatePassword: b
 
   async function logout() {
     await fetch('/api/logout', { method: 'POST' });
-    try {
-      localStorage.removeItem('foronors_session_token');
-      sessionStorage.removeItem('foronors_session_token');
-    } catch {
-      // ignore storage errors
-    }
-    document.cookie = 'foronors_session=; Path=/; Max-Age=0; SameSite=Lax';
     window.location.assign('/login');
   }
 
@@ -44,6 +37,10 @@ export function WelcomeCardActions({ canUpdatePassword }: { canUpdatePassword: b
     }
     if (newPassword !== confirmPassword) {
       setError('La confirmation du nouveau mot de passe ne correspond pas.');
+      return;
+    }
+    if (newPassword.length < 12) {
+      setError('Le nouveau mot de passe doit contenir au moins 12 caractères.');
       return;
     }
     const response = await fetch('/api/account/password', {
@@ -87,9 +84,9 @@ export function WelcomeCardActions({ canUpdatePassword }: { canUpdatePassword: b
           <div className="glass-card w-full max-w-md p-6 shadow-[0_24px_60px_rgba(0,0,0,0.45)]" onClick={(event) => event.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[#fff1dd]">Modifier le mot de passe</h3>
             <div className="mt-3 space-y-3">
-              <label className="block text-xs text-[#efcdab]">Ancien mot de passe<input type="password" className="saas-input mt-1 w-full" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} /></label>
-              <label className="block text-xs text-[#efcdab]">Nouveau mot de passe<input type="password" className="saas-input mt-1 w-full" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
-              <label className="block text-xs text-[#efcdab]">Confirmation<input type="password" className="saas-input mt-1 w-full" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
+              <label className="block text-xs text-[#efcdab]">Ancien mot de passe<input type="password" autoComplete="current-password" className="saas-input mt-1 w-full" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} /></label>
+              <label className="block text-xs text-[#efcdab]">Nouveau mot de passe<input type="password" autoComplete="new-password" minLength={12} className="saas-input mt-1 w-full" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
+              <label className="block text-xs text-[#efcdab]">Confirmation<input type="password" autoComplete="new-password" minLength={12} className="saas-input mt-1 w-full" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
               {error ? <p className="text-sm text-red-100">{error}</p> : null}
               {success ? <p className="text-sm text-emerald-200">{success}</p> : null}
             </div>

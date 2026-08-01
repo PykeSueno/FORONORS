@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAuditLog } from './audit-log';
 import { formatParisDate, formatParisDateTime, getTabletBusinessDate } from './tablet';
+import { normalizeDiscordWebhookUrl } from './discord-webhook';
 
 export const TABLET_WEBHOOK_KEY = 'discord.tablet_webhook_url';
 const TABLET_PASSAGE_SENT_PREFIX = 'tablet_passage_discord_sent';
@@ -44,20 +45,6 @@ function markerKey(prefix: string, id: string | number) {
   return `${prefix}:${id}`;
 }
 
-function sanitizeWebhookUrl(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  try {
-    const url = new URL(trimmed);
-    const allowedHost = url.hostname === 'discord.com' || url.hostname.endsWith('.discord.com') || url.hostname === 'discordapp.com' || url.hostname.endsWith('.discordapp.com');
-    if (url.protocol !== 'https:' || !allowedHost) return '';
-    if (!url.pathname.startsWith('/api/webhooks/')) return '';
-    return trimmed;
-  } catch {
-    return '';
-  }
-}
-
 async function getSetting(supabase: SupabaseClient, key: string) {
   const { data } = await supabase.from('app_settings').select('value').eq('key', key).maybeSingle();
   return typeof data?.value === 'string' ? data.value : '';
@@ -68,7 +55,7 @@ async function setSetting(supabase: SupabaseClient, key: string, value: string) 
 }
 
 async function getTabletWebhookUrl(supabase: SupabaseClient) {
-  return sanitizeWebhookUrl(await getSetting(supabase, TABLET_WEBHOOK_KEY));
+  return normalizeDiscordWebhookUrl(await getSetting(supabase, TABLET_WEBHOOK_KEY));
 }
 
 async function postToDiscord(webhookUrl: string, content: string) {
@@ -91,7 +78,7 @@ export async function getTabletWebhookStatus(supabase: SupabaseClient) {
 }
 
 export async function saveTabletWebhookUrl(supabase: SupabaseClient, rawUrl: string) {
-  const normalized = rawUrl.trim() ? sanitizeWebhookUrl(rawUrl) : '';
+  const normalized = rawUrl.trim() ? normalizeDiscordWebhookUrl(rawUrl) : '';
   if (rawUrl.trim() && !normalized) return { ok: false, message: 'URL webhook Discord invalide.' };
   await setSetting(supabase, TABLET_WEBHOOK_KEY, normalized);
   return { ok: true, configured: Boolean(normalized) };

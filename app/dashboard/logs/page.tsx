@@ -20,13 +20,12 @@ export default async function LogsPage() {
   if (!canAccess || !canView) redirect('/dashboard');
 
   const supabase = getSupabaseAdmin();
-  const [{ data: logs, count }, { data: webhook }, tabletWebhookStatus] = await Promise.all([
+  const [{ data: logs, count }, tabletWebhookStatus] = await Promise.all([
     supabase
       .from('audit_logs')
       .select('id, actor_name, actor_username, actor_role, action, entity_type, entity_id, summary, created_at', { count: 'exact' })
       .order('created_at', { ascending: false })
       .limit(50),
-    canManageWebhook ? supabase.from('app_settings').select('value').eq('key', 'discord.log_webhook_url').maybeSingle() : Promise.resolve({ data: null }),
     canViewTabletWebhook ? getTabletWebhookStatus(supabase) : Promise.resolve({ configured: false })
   ]);
 
@@ -36,7 +35,7 @@ export default async function LogsPage() {
       <LogsPageClient
         initialLogs={logs ?? []}
         initialTotal={count ?? 0}
-        initialWebhookUrl={webhook?.value ?? ''}
+        initialWebhookUrl=""
         canManageWebhook={canManageWebhook}
         canViewTabletWebhook={canViewTabletWebhook}
         canEditTabletWebhook={canEditTabletWebhook}
