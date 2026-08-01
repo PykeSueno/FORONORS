@@ -2,13 +2,11 @@ import { NextResponse } from 'next/server';
 import { ensureTabletMorningDeposit } from '@/lib/tablet-deposit';
 import { getTabletParisHour } from '@/lib/tablet';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getCronAuthError } from '@/lib/cron-auth';
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const authorization = request.headers.get('authorization') ?? '';
-    if (authorization !== `Bearer ${secret}`) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
-  }
+  const authError = getCronAuthError(request);
+  if (authError) return authError;
 
   const parisHour = getTabletParisHour(new Date());
   if (parisHour < 8) return NextResponse.json({ ok: true, skipped: true, reason: 'before_8h_paris', parisHour });

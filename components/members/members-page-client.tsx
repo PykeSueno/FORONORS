@@ -71,16 +71,11 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [error, setError] = useState('');
-  const [copyFeedback, setCopyFeedback] = useState('');
-  const [copyFallbackText, setCopyFallbackText] = useState('');
 
   const canCreateMember = userPermissions.includes('members.create');
   const canEditMembers = userPermissions.includes('members.edit');
   const canDeleteMembers = userPermissions.includes('members.delete');
   const canManageRoles = userPermissions.includes('roles.manage');
-  const canViewMemberPassword = userPermissions.includes('members.password.view');
-  const canCopyMemberPassword = userPermissions.includes('members.password.copy');
-  const canCopyCredentials = userPermissions.includes('members.credentials.copy');
   const canEditMemberPassword = userPermissions.includes('members.password.edit');
   const canRenameRole = userPermissions.includes('roles.rename');
   const canViewExpenses = userPermissions.includes('expenses.view');
@@ -168,43 +163,6 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
     await refreshAll();
   }
 
-  async function copyMemberCredentials(member: Member) {
-    setCopyFallbackText('');
-    setCopyFeedback('');
-    const response = await fetch(`/api/members/${member.id}/password`, { cache: 'no-store' });
-    if (!response.ok) {
-      setCopyFeedback('Impossible de récupérer les identifiants.');
-      setTimeout(() => setCopyFeedback(''), 2000);
-      return;
-    }
-    const data = (await response.json()) as { password?: string };
-    const password = data.password ?? '';
-    if (!member.username || !password) {
-      setCopyFeedback('Identifiants incomplets.');
-      setTimeout(() => setCopyFeedback(''), 1800);
-      return;
-    }
-
-    const text = buildCredentialsMessage(member.username, password);
-    const copied = await tryCopyText(text);
-    if (copied) {
-      setCopyFeedback('Identifiants copiés');
-      setTimeout(() => setCopyFeedback(''), 1600);
-      return;
-    }
-
-    setCopyFallbackText(text);
-    setCopyFeedback('Copie directe impossible, texte affiché ci-dessous');
-    setTimeout(() => setCopyFeedback(''), 2400);
-  }
-
-  function selectAllFallbackText() {
-    const el = document.getElementById('member-credentials-fallback') as HTMLTextAreaElement | null;
-    if (!el) return;
-    el.focus();
-    el.select();
-  }
-
   return (
     <div className="space-y-6">
       <div className="glass-card p-5">
@@ -215,17 +173,6 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
       </div>
 
       {error ? <p className="rounded-xl border border-red-300/45 bg-red-500/10 px-4 py-2 text-sm text-red-100">{error}</p> : null}
-      {copyFeedback ? <p className="rounded-xl border border-white/10 bg-[#4a2f20]/45 px-4 py-2 text-sm text-[#efcdab]">{copyFeedback}</p> : null}
-      {copyFallbackText ? (
-        <section className="glass-card p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs text-[#efcdab]">Copie manuelle</p>
-            <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={selectAllFallbackText}>Sélectionner tout</button>
-          </div>
-          <textarea id="member-credentials-fallback" className="saas-input h-36 w-full resize-none text-xs leading-relaxed" readOnly value={copyFallbackText} />
-        </section>
-      ) : null}
-
       <section className="glass-card p-5">
         <h2 className="text-lg font-semibold text-[#fff0d9]">Membres</h2>
         <div className="mt-3 space-y-2">
@@ -244,7 +191,6 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
                 </div>
               ) : null}
               <div className="flex items-center gap-2">
-                {canCopyCredentials ? <button className="saas-ghost-btn" onClick={() => void copyMemberCredentials(member)}>Copier</button> : null}
                 {(canEditMembers || canDeleteMembers) ? <button className="saas-ghost-btn" onClick={() => setSelectedMember(member)}>Gérer</button> : null}
               </div>
             </div>
@@ -310,9 +256,6 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
           member={selectedMember}
           roles={sortedRoles}
           canDelete={canDeleteMembers}
-          canViewPassword={canViewMemberPassword}
-          canCopyPassword={canCopyMemberPassword}
-          canCopyCredentials={canCopyCredentials}
           canEditPassword={canEditMemberPassword}
           isCreateMode={!selectedMember.id}
           onClose={() => setSelectedMember(null)}
@@ -344,34 +287,15 @@ export function MembersPageClient({ initialMembers, initialRoles, initialPermiss
   );
 }
 
-function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyPassword, canCopyCredentials, canEditPassword, isCreateMode, onClose, onSaved, onError }: { member: Member; roles: Role[]; canDelete: boolean; canViewPassword: boolean; canCopyPassword: boolean; canCopyCredentials: boolean; canEditPassword: boolean; isCreateMode: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
+function MemberManageModal({ member, roles, canDelete, canEditPassword, isCreateMode, onClose, onSaved, onError }: { member: Member; roles: Role[]; canDelete: boolean; canEditPassword: boolean; isCreateMode: boolean; onClose: () => void; onSaved: () => Promise<void>; onError: (message: string) => void; }) {
   const [draft, setDraft] = useState(member);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState('');
   const [copyFallbackText, setCopyFallbackText] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-
-  useEffect(() => {
-    async function loadCurrentPassword() {
-      if (isCreateMode || !member.id || (!canViewPassword && !canCopyPassword && !canCopyCredentials)) {
-        setCurrentPassword('');
-        return;
-      }
-
-      const response = await fetch(`/api/members/${member.id}/password`, { cache: 'no-store' });
-      if (!response.ok) return;
-      const data = (await response.json()) as { password?: string };
-      setCurrentPassword(data.password ?? '');
-    }
-
-    void loadCurrentPassword();
-  }, [isCreateMode, member.id, canViewPassword, canCopyPassword, canCopyCredentials]);
-
   function generatePassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-    const value = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const value = Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     setNewPassword(value);
   }
 
@@ -390,13 +314,8 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
     return false;
   }
 
-  async function copyCurrentPassword() {
-    if (!currentPassword) return;
-    await copyTextRobust(currentPassword, 'Mot de passe copié');
-  }
-
   async function copyTabletAccessMessage() {
-    const passwordValue = newPassword || currentPassword;
+    const passwordValue = newPassword;
     if (!draft.username || !passwordValue) {
       setCopyFeedback('User/MDP manquant');
       setTimeout(() => setCopyFeedback(''), 1200);
@@ -456,23 +375,9 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
           </select>
           <label className="flex items-center gap-2 text-sm text-[#ffe3c1]"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Actif</label>
 
-          {(canViewPassword || canCopyPassword) ? (
-            <div>
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <p className="text-xs text-[#ffe3c1]/80">Mot de passe actuel</p>
-                <div className="flex items-center gap-1">
-                  {canViewPassword ? <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => setShowCurrentPassword((v) => !v)}>{showCurrentPassword ? 'Masquer' : 'Afficher'}</button> : null}
-                  {canCopyPassword ? <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={() => void copyCurrentPassword()}>Copier</button> : null}
-                </div>
-              </div>
-              <input className="saas-input w-full" type={showCurrentPassword ? 'text' : 'password'} value={currentPassword || ''} readOnly />
-              {copyFeedback ? <p className="mt-1 text-xs text-[#efcdab]">{copyFeedback}</p> : null}
-            </div>
-          ) : null}
-
           {canEditPassword ? (
             <div className="relative">
-              <input className="saas-input w-full pr-20" type={showPassword ? 'text' : 'password'} placeholder="Nouveau mot de passe" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <input className="saas-input w-full pr-20" type={showPassword ? 'text' : 'password'} placeholder="Nouveau mot de passe (12 caractères minimum)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={isCreateMode ? 12 : undefined} required={isCreateMode} />
               <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
                 <button type="button" className="saas-ghost-btn !px-2 !py-1" onClick={() => setShowPassword((v) => !v)}>{showPassword ? '🙈' : '👁️'}</button>
                 <button type="button" className="saas-ghost-btn !px-2 !py-1 text-xs" onClick={generatePassword}>Gen</button>
@@ -480,8 +385,10 @@ function MemberManageModal({ member, roles, canDelete, canViewPassword, canCopyP
             </div>
           ) : null}
 
+          {copyFeedback ? <p className="text-xs text-[#efcdab]">{copyFeedback}</p> : null}
+
           <div className="flex flex-wrap justify-end gap-2 pt-2">
-            {!isCreateMode && canCopyCredentials ? <button className="saas-ghost-btn" onClick={() => void copyTabletAccessMessage()}>Copier</button> : null}
+            {newPassword ? <button className="saas-ghost-btn" onClick={() => void copyTabletAccessMessage()}>Copier le nouvel accès</button> : null}
             {!isCreateMode && canDelete ? <div className="flex items-center"><RemoveLineButton onClick={() => void remove()} title="Supprimer le membre" /></div> : null}
             <button className="saas-primary-btn" onClick={() => void save()}>Enregistrer</button>
           </div>

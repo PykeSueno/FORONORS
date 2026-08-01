@@ -6,9 +6,9 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function PATCH(request: Request) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ message: 'Non autorisé.' }, { status: 401 });
+  if (!session) return NextResponse.json({ message: 'Non autorise.' }, { status: 401 });
   const canUpdate = await hasUserPermission(session.userId, 'account.password.update');
-  if (!canUpdate) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
+  if (!canUpdate) return NextResponse.json({ message: 'Acces refuse.' }, { status: 403 });
 
   const body = (await request.json()) as {
     current_password?: string;
@@ -24,20 +24,20 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: 'La confirmation ne correspond pas.' }, { status: 400 });
   }
 
-  if (body.new_password.length < 4) {
-    return NextResponse.json({ message: 'Le nouveau mot de passe doit contenir au moins 4 caractères.' }, { status: 400 });
+  if (body.new_password.length < 12) {
+    return NextResponse.json({ message: 'Le nouveau mot de passe doit contenir au moins 12 caracteres.' }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
   const { data: user } = await supabase.from('users').select('id, password_hash').eq('id', session.userId).maybeSingle();
-
   if (!user) return NextResponse.json({ message: 'Utilisateur introuvable.' }, { status: 404 });
 
   const valid = await comparePassword(body.current_password, user.password_hash);
   if (!valid) return NextResponse.json({ message: 'Ancien mot de passe invalide.' }, { status: 401 });
 
   const nextHash = await hashPassword(body.new_password);
-  await supabase.from('users').update({ password_hash: nextHash, password_plain: body.new_password }).eq('id', session.userId);
+  const { error } = await supabase.from('users').update({ password_hash: nextHash }).eq('id', session.userId);
+  if (error) return NextResponse.json({ message: 'Mise a jour impossible.' }, { status: 500 });
 
   await createAuditLog({
     actorUserId: session.userId,

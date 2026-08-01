@@ -284,8 +284,8 @@ export const SIMPLE_PERMISSION_MODULES: PermissionModule[] = [
     description: 'Membres, grades et identifiants.',
     permissions: [
       { key: 'members.view', label: 'Voir', permissions: ['members.access', 'members.view', 'members.preview', 'members.activities.view'] },
-      { key: 'members.create', label: 'Creer', permissions: ['members.create'] },
-      { key: 'members.edit', label: 'Modifier', permissions: ['members.edit', 'members.password.view', 'members.password.copy', 'members.password.edit', 'members.credentials.copy', 'account.password.update'] },
+      { key: 'members.create', label: 'Creer', permissions: ['members.create', 'members.password.edit'] },
+      { key: 'members.edit', label: 'Modifier', permissions: ['members.edit', 'members.password.edit', 'account.password.update'] },
       { key: 'members.delete', label: 'Supprimer', permissions: ['members.delete'] },
       { key: 'members.grades', label: 'Grades', permissions: ['roles.rename'] }
     ]

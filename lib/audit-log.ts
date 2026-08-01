@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from './supabase';
+import { normalizeDiscordWebhookUrl } from './discord-webhook';
 
 type CreateAuditLogInput = {
   actorUserId: string;
@@ -13,11 +14,11 @@ type CreateAuditLogInput = {
 
 async function getDiscordWebhookUrl() {
   const envWebhook = process.env.DISCORD_LOG_WEBHOOK_URL;
-  if (envWebhook) return envWebhook;
+  if (envWebhook) return normalizeDiscordWebhookUrl(envWebhook);
 
   const supabase = getSupabaseAdmin();
   const { data } = await supabase.from('app_settings').select('value').eq('key', 'discord.log_webhook_url').maybeSingle();
-  return data?.value as string | undefined;
+  return normalizeDiscordWebhookUrl((data?.value as string | undefined) ?? '');
 }
 
 async function sendDiscordWebhook(payload: {

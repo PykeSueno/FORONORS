@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import type { AppUser } from './supabase';
 import { getEnv } from './env';
 
@@ -32,20 +32,6 @@ export async function comparePassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export async function createSessionToken(user: Pick<AppUser, 'id' | 'username' | 'role'>, remember = false) {
-  const payload: SessionPayload = {
-    sub: user.id,
-    username: user.username,
-    role: user.role ?? ''
-  };
-
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime(remember ? '30d' : '7d')
-    .sign(getSecret());
-}
-
 export async function createSessionCookie(user: Pick<AppUser, 'id' | 'username' | 'role'>, remember = false) {
   const token = await new SignJWT({
     sub: user.id,
@@ -67,7 +53,6 @@ export async function createSessionCookie(user: Pick<AppUser, 'id' | 'username' 
     maxAge
   });
 
-  return token;
 }
 
 export async function clearSessionCookie() {
@@ -75,33 +60,14 @@ export async function clearSessionCookie() {
   cookieStore.delete(COOKIE_NAME);
 }
 
-export async function restoreSessionFromToken(token: string, remember = true) {
-  const { payload } = await jwtVerify(token, getSecret());
-  const session = payload as SessionPayload;
-  return createSessionCookie({ id: session.sub, username: session.username, role: session.role }, remember);
-}
-
 export async function getSession() {
-  const headerStore = await headers();
-  const authorization = headerStore.get('authorization');
-  const fivemToken = headerStore.get('x-fivem-session');
-
-  let token = '';
-  if (authorization?.startsWith('Bearer ')) {
-    token = authorization.slice('Bearer '.length).trim();
-  } else if (fivemToken) {
-    token = fivemToken.trim();
-  }
-
-  if (!token) {
-    const cookieStore = await cookies();
-    token = cookieStore.get(COOKIE_NAME)?.value ?? '';
-    if (token) {
-      try {
-        token = decodeURIComponent(token);
-      } catch {
-        // keep raw token if it is not URI-encoded
-      }
+  const cookieStore = await cookies();
+  let token = cookieStore.get(COOKIE_NAME)?.value ?? '';
+  if (token) {
+    try {
+      token = decodeURIComponent(token);
+    } catch {
+      // Keep the raw token if it is not URI-encoded.
     }
   }
 

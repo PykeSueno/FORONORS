@@ -44,8 +44,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (body.password) {
     if (!canEditPassword) return NextResponse.json({ message: 'Permission mot de passe manquante.' }, { status: 403 });
+    if (body.password.length < 12) return NextResponse.json({ message: 'Le mot de passe doit contenir au moins 12 caracteres.' }, { status: 400 });
     payload.password_hash = await hashPassword(body.password);
-    payload.password_plain = body.password;
   }
 
   const { error } = await supabase.from('users').update(payload).eq('id', id);

@@ -2,13 +2,11 @@ import { NextResponse } from 'next/server';
 import { getCronActorUserId, sendTabletDailyReport } from '@/lib/tablet-discord-webhook';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getTabletBusinessDate, getTabletParisHour } from '@/lib/tablet';
+import { getCronAuthError } from '@/lib/cron-auth';
 
 async function handler(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const authorization = request.headers.get('authorization') ?? '';
-    if (authorization !== `Bearer ${secret}`) return NextResponse.json({ message: 'Accès refusé.' }, { status: 403 });
-  }
+  const authError = getCronAuthError(request);
+  if (authError) return authError;
 
   const parisHour = getTabletParisHour(new Date());
   if (parisHour !== 0) return NextResponse.json({ ok: true, skipped: true, reason: 'not_midnight_paris', parisHour });

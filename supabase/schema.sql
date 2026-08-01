@@ -48,7 +48,6 @@ create table if not exists public.users (
   name text not null default '',
   iban_rib text,
   password_hash text not null,
-  password_plain text,
   role text,
   role_id bigint references public.roles(id) on delete set null,
   is_active boolean not null default true,
@@ -59,7 +58,7 @@ alter table public.roles add column if not exists display_order integer not null
 alter table public.users add column if not exists role_id bigint references public.roles(id) on delete set null;
 alter table public.users add column if not exists name text not null default '';
 alter table public.users add column if not exists iban_rib text;
-alter table public.users add column if not exists password_plain text;
+alter table public.users drop column if exists password_plain;
 alter table public.users add column if not exists dashboard_layout jsonb;
 
 create index if not exists idx_users_is_active_role on public.users(is_active, role_id);
@@ -108,9 +107,6 @@ values
   ('members.activities.view'),
   ('members.preview'),
   ('members.view'),
-  ('members.password.view'),
-  ('members.password.copy'),
-  ('members.credentials.copy'),
   ('members.password.edit'),
   ('account.password.update'),
   ('roles.manage'),
@@ -155,6 +151,9 @@ values
   ('sale_objects.routing.view'),
   ('sale_objects.routing.edit')
 on conflict (name) do nothing;
+
+delete from public.permissions
+where name in ('members.password.view', 'members.password.copy', 'members.credentials.copy');
 
 
 insert into public.role_permissions (role_id, permission_id)
